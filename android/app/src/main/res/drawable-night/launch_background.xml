@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The launch window while the process starts, when the phone is in dark mode.
+
+     values-night/styles.xml already selects a dark Android theme, but it points
+     windowBackground at @drawable/launch_background, which is hardcoded white.
+     Without this file that reference resolves to the light drawable and the
+     splash flashes white before the first Flutter frame — which on a dark phone
+     reads as the app being broken for the half-second it lasts. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/launch_background" />
+</layer-list>

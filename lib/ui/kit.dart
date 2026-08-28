@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
 
 /// The pieces the mockup is made of.
@@ -71,28 +72,7 @@ class RoleHeader extends StatelessWidget {
               GestureDetector(
                 onTap: onAvatar,
                 behavior: HitTestBehavior.opaque,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    CircleInitials(label: avatarLabel ?? name, tint: role.tint),
-                    if (onAvatar != null)
-                      // A small chevron, so the circle reads as a control and
-                      // not as decoration.
-                      PositionedDirectional(
-                        bottom: -1,
-                        end: -1,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppTheme.border),
-                          ),
-                          child: Icon(Icons.expand_more_rounded, size: 11, color: role.tint),
-                        ),
-                      ),
-                  ],
-                ),
+                child: CircleInitials(label: avatarLabel ?? name, tint: role.tint),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -118,7 +98,15 @@ class RoleHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              if (trailing != null) trailing! else BellButton(count: notificationCount, onTap: onBell),
+              if (trailing != null)
+                trailing!
+              else ...[
+                BellButton(count: notificationCount, onTap: onBell),
+                if (onAvatar != null) ...[
+                  const SizedBox(width: 6),
+                  _MenuButton(onTap: onAvatar!),
+                ],
+              ],
             ],
           ),
           if (bottom != null) ...[const SizedBox(height: 14), bottom!],
@@ -756,6 +744,42 @@ class Banner2 extends StatelessWidget {
             child: Icon(icon, size: 20, color: Colors.white),
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+/// Opens the account drawer.
+///
+/// Sits beside the bell rather than replacing the avatar, and looks exactly
+/// like the bell, because the two do the same kind of thing: open something
+/// from the header. The account used to be a labelled tab in the bottom bar;
+/// moving it behind an icon means the icon has to be one people already read
+/// as "menu", not a chevron tucked onto a circle of initials.
+class _MenuButton extends StatelessWidget {
+  const _MenuButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: t('nav.account'),
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: const Icon(Icons.menu_rounded, size: 19, color: AppTheme.textMuted),
+        ),
       ),
     );
   }

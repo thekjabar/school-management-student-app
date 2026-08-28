@@ -35,6 +35,10 @@ class Push {
 
   static bool _started = false;
 
+  /// The person this handset is signed in as, kept so the OneSignal login can
+  /// be re-issued once a subscription actually exists.
+  static String? _personId;
+
   /// Bring the SDK up. Safe to call more than once.
   ///
   /// Deliberately does NOT ask for permission. The Android 13 dialog gets one
@@ -63,6 +67,7 @@ class Push {
   /// every parent quietly falls through to the paid channel.
   static Future<void> identify(String personId) async {
     if (!_started || personId.isEmpty) return;
+    _personId = personId;
     try {
       await OneSignal.login(personId);
     } catch (e) {
@@ -82,6 +87,25 @@ class Push {
       final id = subscriptionId;
       if (id != null) {
         if (id == _registered) return;
+
+        // Re-issue the login now that a subscription exists.
+        //
+        // login() at sign-in runs BEFORE notification permission is granted, so
+        // there is no push subscription yet to attach to the user. The one
+        // created a moment later when permission is granted lands on the
+        // anonymous user instead, and the server — which addresses everyone by
+        // external id — gets "All included players are not subscribed" and the
+        // parent is never told anything. Calling login() again once the
+        // subscription is real is what binds the two.
+        final person = _personId;
+        if (person != null) {
+          try {
+            await OneSignal.login(person);
+          } catch (e) {
+            debugPrint('push: re-login failed: $e');
+          }
+        }
+
         try {
           await ApiClient.instance.post('/push/devices', {
             'subscriptionId': id,
@@ -116,6 +140,7 @@ class Push {
       }
       _registered = null;
     }
+    _personId = null;
     try {
       await OneSignal.logout();
     } catch (e) {

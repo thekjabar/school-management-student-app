@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches AppTheme.canvas, so the launch window and the first Flutter
+         frame are the same colour and there is no flash between them. -->
+    <color name="launch_background">#F6F5FB</color>
+</resources>

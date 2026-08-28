@@ -115,8 +115,11 @@ void main() {
     }
   });
 
-  tearDownAll(() async {
+  tearDownAll(() {
+    // Deliberately NOT signing out.  runs files concurrently and
+    // the live tests share one demo account, so ending the session here ends
+    // it for whichever file is still using it — which fails as a mysterious
+    // 401 in an unrelated test.
     AppLocale.current.value = Lang.en;
-    await Session.instance.signOut();
   });
 }

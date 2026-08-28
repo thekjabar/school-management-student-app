@@ -128,6 +128,7 @@ const Map<String, String> _en = {
   'nav.children': 'Children',
   'nav.messages': 'Messages',
   'nav.more': 'More',
+  'nav.account': 'Account',
 
   // Greetings
   'greet.morning': 'Good morning,',
@@ -409,6 +410,7 @@ const Map<String, String> _ckb = {
   'nav.children': 'منداڵەکان',
   'nav.messages': 'نامەکان',
   'nav.more': 'زیاتر',
+  'nav.account': 'هەژمار',
 
   'greet.morning': 'بەیانیت باش،',
   'greet.afternoon': 'ئێوارەت باش،',
@@ -674,6 +676,7 @@ const Map<String, String> _ar = {
   'nav.children': 'الأبناء',
   'nav.messages': 'الرسائل',
   'nav.more': 'المزيد',
+  'nav.account': 'الحساب',
 
   'greet.morning': 'صباح الخير،',
   'greet.afternoon': 'مساء الخير،',
