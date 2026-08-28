@@ -6,6 +6,7 @@ import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/kit.dart';
+import '../../ui/settings_widgets.dart';
 import '../login_screen.dart' show LanguagePicker;
 import 'fees_screen.dart';
 import 'leave_screen.dart';
@@ -89,15 +90,15 @@ class ProfileDrawer extends StatelessWidget {
                   ),
 
                   _Section(t('more.notifications')),
-                  const Card16(
-                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                    child: _PushRow(),
+                  Card16(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                    child: PushRow(tint: Role.parent.tint),
                   ),
 
                   _Section(t('more.appearance')),
                   Card16(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                    child: const _ThemePicker(),
+                    child: ThemePicker(tint: Role.parent.tint),
                   ),
 
                   _Section(t('more.language')),
@@ -179,7 +180,7 @@ class ProfileDrawer extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const _ChangePasswordSheet(),
+      builder: (_) => ChangePasswordSheet(tint: Role.parent.tint),
     );
   }
 }
@@ -298,278 +299,9 @@ class _Note extends StatelessWidget {
   }
 }
 
-/// Whether this phone will actually be told anything.
-///
-/// Worth a row of its own: when a parent says "the school never told me", the
-/// first question is whether this was ever on, and neither they nor the office
-/// can answer that from inside Android's settings.
-class _PushRow extends StatefulWidget {
-  const _PushRow();
-
-  @override
-  State<_PushRow> createState() => _PushRowState();
-}
-
-class _PushRowState extends State<_PushRow> with WidgetsBindingObserver {
-  bool _granted = Push.granted;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Permission can be revoked in Android settings while the app is in the
-    // background, so this re-reads on the way back rather than trusting what
-    // it learned on build.
-    if (state == AppLifecycleState.resumed && mounted) {
-      setState(() => _granted = Push.granted);
-    }
-  }
-
-  Future<void> _ask() async {
-    final ok = await Push.askPermission();
-    if (!mounted) return;
-    setState(() => _granted = ok);
-    if (!ok) {
-      // Android shows its dialog once. After that the only way back is the
-      // system settings screen, and saying so is more use than a toast that
-      // reads "permission denied".
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(t('more.pushBlocked'))),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return TileRow(
-      icon: _granted ? Icons.notifications_active_rounded : Icons.notifications_off_rounded,
-      color: _granted ? AppTheme.green : AppTheme.amber,
-      title: t('more.push'),
-      subtitle: _granted ? t('more.pushOn') : t('more.pushOff'),
-      trailing: _granted ? null : t('more.turnOn'),
-      last: true,
-      onTap: _granted ? null : _ask,
-    );
-  }
-}
-
-/// Changing a password ends every other session, which is the point: somebody
-/// who thinks a relative has their phone needs this two taps away, not five.
-class _ChangePasswordSheet extends StatefulWidget {
-  const _ChangePasswordSheet();
-
-  @override
-  State<_ChangePasswordSheet> createState() => _ChangePasswordSheetState();
-}
-
-class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
-  final _current = TextEditingController();
-  final _next = TextEditingController();
-  final _confirm = TextEditingController();
-  bool _busy = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _current.dispose();
-    _next.dispose();
-    _confirm.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (_next.text.length < 8) {
-      setState(() => _error = t('login.tooShort'));
-      return;
-    }
-    if (_next.text != _confirm.text) {
-      setState(() => _error = t('login.mismatch'));
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await Session.instance.changePassword(_current.text, _next.text);
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(t('more.passwordChanged'))),
-      );
-    } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('ApiException: ', ''));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 38,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppTheme.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              t('more.changePassword'),
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              t('more.changePasswordSub'),
-              style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted, height: 1.4),
-            ),
-            const SizedBox(height: 16),
-            _Field(controller: _current, label: t('more.currentPassword')),
-            const SizedBox(height: 10),
-            _Field(controller: _next, label: t('login.newPassword')),
-            const SizedBox(height: 10),
-            _Field(controller: _confirm, label: t('login.confirmPassword')),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(_error!, style: TextStyle(color: AppTheme.rose, fontSize: 12.5)),
-            ],
-            const SizedBox(height: 18),
-            BigButton(
-              label: _busy ? t('common.saving') : t('common.save'),
-              color: Role.parent.tint,
-              height: 50,
-              onPressed: _busy ? null : _submit,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Field extends StatelessWidget {
-  const _Field({required this.controller, required this.label});
-
-  final TextEditingController controller;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      obscureText: true,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: AppTheme.canvas,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(13),
-          borderSide: BorderSide(color: AppTheme.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(13),
-          borderSide: BorderSide(color: AppTheme.border),
-        ),
-      ),
-    );
-  }
-}
 
 
-/// Light, dark, or follow the phone.
-///
-/// "System" first and selected by default: somebody who has set their handset
-/// to dark has already answered this question, and asking it again in every
-/// app is how a settings screen fills up with questions nobody wanted.
-class _ThemePicker extends StatelessWidget {
-  const _ThemePicker();
 
-  IconData _icon(AppThemeMode m) => switch (m) {
-        AppThemeMode.system => Icons.brightness_auto_rounded,
-        AppThemeMode.light => Icons.light_mode_rounded,
-        AppThemeMode.dark => Icons.dark_mode_rounded,
-      };
 
-  String _label(AppThemeMode m) => switch (m) {
-        AppThemeMode.system => t('theme.system'),
-        AppThemeMode.light => t('theme.light'),
-        AppThemeMode.dark => t('theme.dark'),
-      };
 
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<AppThemeMode>(
-      valueListenable: AppThemeSetting.current,
-      builder: (context, current, _) => Row(
-        children: [
-          for (final mode in AppThemeMode.values)
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: current == mode ? null : () => AppThemeSetting.set(mode),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 140),
-                  curve: Curves.easeOut,
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  padding: const EdgeInsets.symmetric(vertical: 11),
-                  decoration: BoxDecoration(
-                    color: current == mode ? Role.parent.wash : AppTheme.canvas,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: current == mode ? Role.parent.tint : AppTheme.border,
-                      width: current == mode ? 1.4 : 1,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        _icon(mode),
-                        size: 19,
-                        color: current == mode ? Role.parent.tint : AppTheme.textMuted,
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        _label(mode),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: current == mode ? FontWeight.w700 : FontWeight.w600,
-                          color: current == mode ? AppTheme.text : AppTheme.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
+

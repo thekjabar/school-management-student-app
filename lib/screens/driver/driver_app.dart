@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../api/crew_api.dart';
 import '../../api/session.dart';
+import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
-import 'crew_account.dart';
+import '../../ui/kit.dart';
+import 'driver_drawer.dart';
 import 'trip_screen.dart';
 
 /// The driver and attendant app.
@@ -25,61 +27,60 @@ class DriverApp extends StatefulWidget {
 }
 
 class _DriverAppState extends State<DriverApp> {
+  // Held so the header's menu button can open the drawer: the Scaffold that
+  // owns it is built by this method, so there is no context above it to ask.
+  final _scaffold = GlobalKey<ScaffoldState>();
   int _tab = 0;
+
+  List<NavItem> get _nav => [
+        NavItem(Icons.today_rounded, Icons.today_outlined, t('driver.today')),
+        NavItem(Icons.history_rounded, Icons.history_outlined, t('driver.past')),
+      ];
 
   @override
   Widget build(BuildContext context) {
     const role = Role.driver;
     final me = Session.instance.me;
 
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? t('greet.morning')
+        : hour < 17
+            ? t('greet.afternoon')
+            : t('greet.evening');
+
     return Scaffold(
+      key: _scaffold,
       backgroundColor: AppTheme.canvas,
+      // The account moved out of the bottom bar. A driver opens it once a term;
+      // the two runs are what they open every morning.
+      drawer: const DriverDrawer(),
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            Container(
-              width: double.infinity,
-              color: role.wash,
-              padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          me?.firstName ?? 'Driver',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.4,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          longDate(DateTime.now()),
-                          style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
-                        ),
-                      ],
-                    ),
+            RoleHeader(
+              role: role,
+              greeting: greeting,
+              name: me?.name ?? '',
+              onAvatar: () => _scaffold.currentState?.openDrawer(),
+              // The date, not a notification count: a driver's day is defined
+              // by which day it is, and there is no inbox in this app.
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Text(
+                  shortDate(DateTime.now()),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: role.tint,
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      humanise(me?.role),
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: role.tint,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
             Expanded(
@@ -88,14 +89,18 @@ class _DriverAppState extends State<DriverApp> {
                 children: const [
                   _TodayTab(),
                   _HistoryTab(),
-                  CrewAccountTab(),
                 ],
               ),
             ),
           ],
         ),
       ),
-      bottomNavigationBar: _Nav(index: _tab, onChanged: (i) => setState(() => _tab = i)),
+      bottomNavigationBar: BottomNav(
+        items: _nav,
+        index: _tab,
+        tint: role.tint,
+        onChanged: (i) => setState(() => _tab = i),
+      ),
     );
   }
 }
@@ -117,7 +122,7 @@ class _TodayTabState extends State<_TodayTab> {
       tint: Role.driver.tint,
       load: () => CrewApi.instance.today(),
       isEmpty: (rows) => rows.isEmpty,
-      empty: 'No runs assigned to you today.',
+      empty: t('driver.noRunsToday'),
       builder: (context, trips) {
         // Anything still owing a sweep goes to the top regardless of time. A
         // completed run with an unconfirmed cabin sweep is the one state in
@@ -152,7 +157,7 @@ class _HistoryTab extends StatelessWidget {
       tint: Role.driver.tint,
       load: () => CrewApi.instance.trips(),
       isEmpty: (rows) => rows.isEmpty,
-      empty: 'No runs recorded yet.',
+      empty: t('driver.noRunsYet'),
       builder: (context, trips) {
         final sorted = [...trips]..sort((a, b) => b.serviceDate.compareTo(a.serviceDate));
         return Column(
@@ -207,7 +212,7 @@ class _TripCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${trip.leg == 'OUT' ? 'Morning — to school' : 'Afternoon — home'}'
+                        '${trip.leg == 'OUT' ? t('driver.morningRun') : t('driver.afternoonRun')}'
                         ' · ${hhmm(trip.scheduledDepartureAt)}',
                         style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                       ),
@@ -232,10 +237,10 @@ class _TripCard extends StatelessWidget {
             const SizedBox(height: 14),
             Row(
               children: [
-                _Fig(label: 'To carry', value: '${trip.expected}'),
-                _Fig(label: 'On board', value: '${trip.boarded - trip.alighted}'),
-                _Fig(label: 'Dropped', value: '${trip.alighted}'),
-                _Fig(label: 'Bus', value: trip.vehicleLabel ?? '—'),
+                _Fig(label: t('driver.toCarry'), value: '${trip.expected}'),
+                _Fig(label: t('driver.onBoard'), value: '${trip.boarded - trip.alighted}'),
+                _Fig(label: t('driver.dropped'), value: '${trip.alighted}'),
+                _Fig(label: t('driver.bus'), value: trip.vehicleLabel ?? '—'),
               ],
             ),
             if (urgent) ...[
@@ -252,8 +257,8 @@ class _TripCard extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'This run has ended and the cabin sweep is not confirmed.'
-                        '${trip.sweepDeadlineAt != null ? ' Due by ${hhmm(trip.sweepDeadlineAt)}.' : ''}',
+                        '${t('driver.sweepOutstanding')}'
+                        '${trip.sweepDeadlineAt != null ? ' ${tn('driver.sweepDueBy', hhmm(trip.sweepDeadlineAt))}.' : ''}',
                         style: TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.rose),
                       ),
                     ),
@@ -273,7 +278,7 @@ class _TripCard extends StatelessWidget {
                   // The gate refuses the run rather than warning about it, so
                   // the reasons have to be readable here or the driver is stuck
                   // at the depot with no idea why.
-                  'Blocked: ${trip.complianceFailReasons.map(humanise).join(', ')}',
+                  tn('driver.blocked', trip.complianceFailReasons.map(humanise).join(', ')),
                   style: TextStyle(fontSize: 12.5, color: AppTheme.rose, height: 1.45),
                 ),
               ),
@@ -295,12 +300,12 @@ class _TripCard extends StatelessWidget {
                 ),
                 child: Text(
                   urgent
-                      ? 'Confirm the sweep'
+                      ? t('driver.confirmSweep')
                       : trip.running
-                          ? 'Continue the run'
+                          ? t('driver.continueRun')
                           : trip.finished
-                              ? 'See what happened'
-                              : 'Open the run',
+                              ? t('driver.seeWhatHappened')
+                              : t('driver.openRun'),
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
               ),
@@ -391,57 +396,3 @@ class _Fig extends StatelessWidget {
   }
 }
 
-class _Nav extends StatelessWidget {
-  const _Nav({required this.index, required this.onChanged});
-
-  final int index;
-  final ValueChanged<int> onChanged;
-
-  static const _items = [
-    (Icons.today_rounded, Icons.today_outlined, 'Today'),
-    (Icons.history_rounded, Icons.history_outlined, 'Past runs'),
-    (Icons.person_rounded, Icons.person_outline_rounded, 'Me'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        border: Border(top: BorderSide(color: AppTheme.border)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 62,
-          child: Row(
-            children: List.generate(_items.length, (i) {
-              final on = i == index;
-              final item = _items[i];
-              return Expanded(
-                child: InkWell(
-                  onTap: () => onChanged(i),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(on ? item.$1 : item.$2, size: 23, color: on ? Role.driver.tint : AppTheme.textFaint),
-                      const SizedBox(height: 3),
-                      Text(
-                        item.$3,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: on ? FontWeight.w700 : FontWeight.w500,
-                          color: on ? Role.driver.tint : AppTheme.textFaint,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
-      ),
-    );
-  }
-}

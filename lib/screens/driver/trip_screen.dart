@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/client.dart';
 import '../../api/crew_api.dart';
+import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
@@ -59,7 +60,7 @@ class _TripScreenState extends State<TripScreen> {
     return Scaffold(
       backgroundColor: AppTheme.canvas,
       appBar: AppBar(
-        title: const Text('The run'),
+        title: Text(t('driver.theRun')),
         backgroundColor: Role.driver.wash,
         surfaceTintColor: Colors.transparent,
       ),
@@ -81,12 +82,12 @@ class _TripScreenState extends State<TripScreen> {
                 _RunControls(
                   trip: trip,
                   busy: _busy,
-                  onStart: () => _act('Shift started', () => CrewApi.instance.startShift(trip.id)),
-                  onDepart: () => _act('Departed', () => CrewApi.instance.depart(trip.id)),
-                  onEnd: () => _act('Run ended', () => CrewApi.instance.endTrip(trip.id)),
+                  onStart: () => _act(t('driver.shiftStarted'), () => CrewApi.instance.startShift(trip.id)),
+                  onDepart: () => _act(t('driver.departed'), () => CrewApi.instance.depart(trip.id)),
+                  onEnd: () => _act(t('driver.runEnded'), () => CrewApi.instance.endTrip(trip.id)),
                 ),
               ],
-              const SectionHead('Stops'),
+              SectionHead(t('driver.stops')),
               _OrderToggle(
                 nearestFirst: _nearestFirst,
                 note: data.plan.orderingNote,
@@ -104,12 +105,12 @@ class _TripScreenState extends State<TripScreen> {
                   onChanged: () => _loaderKey.currentState?.reload(),
                 ),
               ),
-              const SectionHead('Before you leave the bus'),
+              SectionHead(t('driver.beforeYouLeave')),
               _SweepCard(
                 sweep: data.sweep,
                 busy: _busy != null,
                 onConfirm: () => _act(
-                  'Sweep confirmed',
+                  t('driver.sweepConfirmed'),
                   () => CrewApi.instance.confirmSweep(widget.tripId),
                 ),
               ),
@@ -160,14 +161,14 @@ class _HeadcountCard extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              _Fig(label: 'On board', value: '${counts.stillOnBoard}', colour: AppTheme.blue),
-              _Fig(label: 'Dropped', value: '${counts.alighted}', colour: AppTheme.green),
+              _Fig(label: t('driver.onBoard'), value: '${counts.stillOnBoard}', colour: AppTheme.blue),
+              _Fig(label: t('driver.dropped'), value: '${counts.alighted}', colour: AppTheme.green),
               _Fig(
-                label: 'Still to drop',
+                label: t('driver.stillToDrop'),
                 value: '$outstanding',
                 colour: outstanding > 0 ? AppTheme.amber : AppTheme.textMuted,
               ),
-              _Fig(label: 'Stops', value: '${counts.stopsDone}/${counts.stopsTotal}', colour: AppTheme.text),
+              _Fig(label: t('driver.stops'), value: '${counts.stopsDone}/${counts.stopsTotal}', colour: AppTheme.text),
             ],
           ),
           if (counts.excluded.isNotEmpty) ...[
@@ -175,7 +176,7 @@ class _HeadcountCard extends StatelessWidget {
             Divider(height: 1, color: AppTheme.border),
             const SizedBox(height: 10),
             Text(
-              'Not riding today',
+              t('driver.notRiding'),
               style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppTheme.textMuted),
             ),
             const SizedBox(height: 5),
@@ -211,10 +212,10 @@ class _RunControls extends StatelessWidget {
     // start, depart and end together invites the wrong one to be pressed on a
     // moving bus.
     final (String label, VoidCallback? action) = switch (trip.status) {
-      'PLANNED' || 'ROSTERED' => ('Start my shift', onStart),
-      'BOARDING' => ('Set off', onDepart),
-      'IN_PROGRESS' => ('End the run', onEnd),
-      _ => ('This run has finished', null),
+      'PLANNED' || 'ROSTERED' => (t('driver.startShift'), onStart),
+      'BOARDING' => (t('driver.setOff'), onDepart),
+      'IN_PROGRESS' => (t('driver.endRun'), onEnd),
+      _ => (t('driver.runFinished'), null),
     };
 
     return Panel(
@@ -234,12 +235,12 @@ class _RunControls extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${trip.vehicleLabel ?? 'Bus'}${trip.plate != null ? ' · ${trip.plate}' : ''}',
+                      '${trip.vehicleLabel ?? t('driver.bus')}${trip.plate != null ? ' · ${trip.plate}' : ''}',
                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
                     ),
                     Text(
-                      'Due out ${hhmm(trip.scheduledDepartureAt)}'
-                      '${trip.startedAt != null ? ' · left ${hhmm(trip.startedAt)}' : ''}',
+                      '${tn('driver.dueOut', hhmm(trip.scheduledDepartureAt))}'
+                      '${trip.startedAt != null ? ' · ${tn('driver.departedAt', hhmm(trip.startedAt))}' : ''}',
                       style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
                   ],
@@ -283,9 +284,9 @@ class _OrderToggle extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Nearest stop first',
+                  t('driver.nearestFirst'),
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
                 ),
               ),
@@ -455,7 +456,7 @@ class _StopCardState extends State<_StopCard> {
                             if (context.mounted) showNote(context, e.message, bad: true);
                           }
                         },
-                        child: const Text('Arrived'),
+                        child: Text(t('driver.arrived')),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -470,7 +471,7 @@ class _StopCardState extends State<_StopCard> {
                             if (context.mounted) showNote(context, e.message, bad: true);
                           }
                         },
-                        child: const Text('Moving on'),
+                        child: Text(t('driver.movingOn')),
                       ),
                     ),
                   ],
@@ -558,12 +559,12 @@ class _RiderRow extends StatelessWidget {
                 ),
                 if (off)
                   Text(
-                    '${leg == 'OUT' ? 'At school' : 'Handed over'} ${hhmm(rider.alightedAt)}',
+                    '${leg == 'OUT' ? t('driver.atSchool') : t('driver.handedOver')} ${hhmm(rider.alightedAt)}',
                     style: TextStyle(fontSize: 11, color: AppTheme.green),
                   )
                 else if (onBus)
                   Text(
-                    'On board since ${hhmm(rider.boardedAt)}',
+                    tn('driver.onBoardSince', hhmm(rider.boardedAt)),
                     style: TextStyle(fontSize: 11, color: AppTheme.blue),
                   ),
               ],
@@ -627,7 +628,7 @@ class _SweepCard extends StatelessWidget {
     if (!sweep.required_) {
       return Panel(
         child: Text(
-          'No cabin sweep is required for this run.',
+          t('driver.sweepNotRequired'),
           style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
         ),
       );
@@ -648,9 +649,9 @@ class _SweepCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Cabin swept', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                  Text(t('driver.cabinSwept'), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
                   Text(
-                    'Confirmed at ${hhmm(sweep.confirmedAt)}',
+                    tn('driver.confirmedAt', hhmm(sweep.confirmedAt)),
                     style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                   ),
                 ],
@@ -681,15 +682,15 @@ class _SweepCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Walk to the back seat',
+                    Text(
+                      t('driver.walkToBack'),
                       style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       late
-                          ? 'The deadline has passed. The office has been told.'
-                          : 'Due by ${hhmm(sweep.deadlineAt)} — about ${(seconds / 60).ceil()} min.',
+                          ? t('driver.sweepDeadlinePassed')
+                          : '${tn('driver.sweepDueBy', hhmm(sweep.deadlineAt))} — ${tn('driver.aboutMinutes', (seconds / 60).ceil())}',
                       style: TextStyle(
                         fontSize: 12.5,
                         color: late ? AppTheme.rose : AppTheme.textMuted,
@@ -705,8 +706,7 @@ class _SweepCard extends StatelessWidget {
             // Said every time. In an Iraqi June a sealed cabin becomes lethal in
             // minutes, not hours, and this sentence is the reason the deadline
             // is short rather than convenient.
-            'Check every row, under every seat, and the back row last. '
-            'A closed bus gets dangerously hot within minutes in summer.',
+            '${t('driver.sweepHow')}${t('driver.sweepWhy')}',
             style: TextStyle(fontSize: 12.5, height: 1.5, color: AppTheme.textMuted),
           ),
           const SizedBox(height: 14),
@@ -719,8 +719,8 @@ class _SweepCard extends StatelessWidget {
                 backgroundColor: late ? AppTheme.rose : AppTheme.amber,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusSm)),
               ),
-              child: const Text(
-                'I have walked the bus — it is empty',
+              child: Text(
+                t('driver.walkedTheBus'),
                 style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
               ),
             ),
