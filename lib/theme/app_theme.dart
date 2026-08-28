@@ -14,11 +14,25 @@ enum Role {
   driver('Driver', Color(0xFFF97316), Color(0xFFFEEEE2)),
   admin('Admin', Color(0xFF6D4AFF), Color(0xFFECE8FE));
 
-  const Role(this.label, this.tint, this.wash);
+  const Role(this.label, this.tint, this._lightWash);
 
   final String label;
   final Color tint;
-  final Color wash;
+
+  /// The pale tint used behind headers in the light theme.
+  final Color _lightWash;
+
+  /// The wash behind a header, in whichever theme is drawing.
+  ///
+  /// The light value is a pale tint that reads as "almost white, with a hint of
+  /// who you are". Reused unchanged on a dark canvas it becomes a bright band
+  /// across the top of every screen — the app's darkest surface directly under
+  /// its lightest. So in the dark it is the same hue mixed INTO the canvas
+  /// instead: dark enough to belong, tinted enough to still say parent or
+  /// driver at a glance.
+  Color get wash => AppTheme.dark
+      ? Color.lerp(AppTheme.canvas, tint, 0.14)!
+      : _lightWash;
 }
 
 /// EduPulse — the visual language, shared by all five roles.
@@ -126,6 +140,59 @@ class AppTheme {
       /// to look like a different product from the one behind it. A form is
       /// the most-touched surface in these apps and the easiest to leave
       /// looking unfinished.
+      /// The date picker, once, for the whole app.
+      ///
+      /// Left alone it arrives as stock Material: square-ish corners, its own
+      /// blue, its own type — which is why the leave form looked like it had
+      /// been lifted out of a different product the moment a parent tapped a
+      /// date. It is also the one surface in these apps that Flutter builds
+      /// rather than us, so it is the easiest to forget.
+      datePickerTheme: DatePickerThemeData(
+        backgroundColor: surface,
+        surfaceTintColor: Colors.transparent,
+        headerBackgroundColor: accent,
+        headerForegroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+        dayStyle: const TextStyle(fontWeight: FontWeight.w600),
+        // The selected day is the accent; today is outlined in it. Two
+        // different jobs, so they must not look the same.
+        todayBorder: BorderSide(color: accent, width: 1.4),
+        todayForegroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected) ? Colors.white : accent,
+        ),
+        todayBackgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected) ? accent : Colors.transparent,
+        ),
+        dayForegroundColor: WidgetStateProperty.resolveWith(
+          (states) {
+            if (states.contains(WidgetState.disabled)) return textFaint;
+            return states.contains(WidgetState.selected) ? Colors.white : text;
+          },
+        ),
+        dayBackgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected) ? accent : Colors.transparent,
+        ),
+        yearForegroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected) ? Colors.white : text,
+        ),
+        yearBackgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected) ? accent : Colors.transparent,
+        ),
+        weekdayStyle: TextStyle(color: textMuted, fontWeight: FontWeight.w600, fontSize: 12),
+        dividerColor: border,
+        cancelButtonStyle: TextButton.styleFrom(foregroundColor: textMuted),
+        confirmButtonStyle: TextButton.styleFrom(foregroundColor: accent),
+      ),
+
+      /// The same for time, so the two never disagree.
+      timePickerTheme: TimePickerThemeData(
+        backgroundColor: surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+        dialHandColor: accent,
+        hourMinuteTextColor: text,
+        dayPeriodTextColor: text,
+      ),
+
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surface,

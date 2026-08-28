@@ -616,29 +616,77 @@ class BottomNav extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: 60,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
           child: Row(
             children: List.generate(items.length, (i) {
               final on = i == index;
               final item = items[i];
               return Expanded(
-                child: InkWell(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () => onChanged(i),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(on ? item.filled : item.outline, size: 22, color: on ? tint : AppTheme.textFaint),
-                      const SizedBox(height: 3),
-                      Text(
-                        item.label,
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: on ? FontWeight.w700 : FontWeight.w500,
-                          color: on ? tint : AppTheme.textFaint,
+                  child: AnimatedContainer(
+                    // Short enough to feel like a response to the tap rather
+                    // than an animation being played at you.
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    height: 46,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: BoxDecoration(
+                      // The selected tab is a soft pill in the role's colour
+                      // rather than a bare tinted icon over a hairline rule.
+                      // It reads as a control, and it is the same shape as
+                      // every other selected thing in the app.
+                      color: on ? tint.withValues(alpha: AppTheme.dark ? 0.22 : 0.12) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AnimatedScale(
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOutBack,
+                          scale: on ? 1.0 : 0.92,
+                          child: Icon(
+                            on ? item.filled : item.outline,
+                            size: 21,
+                            color: on ? tint : AppTheme.textFaint,
+                          ),
                         ),
-                      ),
-                    ],
+                        // The label appears only on the selected tab. Four
+                        // permanent 10px captions is what made this bar look
+                        // like a toolbar from another decade; the icons carry
+                        // the rest, and the one that matters says its name.
+                        ClipRect(
+                          child: AnimatedAlign(
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeOutCubic,
+                            alignment: AlignmentDirectional.centerStart,
+                            widthFactor: on ? 1.0 : 0.0,
+                            child: AnimatedOpacity(
+                              duration: const Duration(milliseconds: 140),
+                              opacity: on ? 1 : 0,
+                              child: Padding(
+                                padding: const EdgeInsetsDirectional.only(start: 7),
+                                child: Text(
+                                  item.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.clip,
+                                  softWrap: false,
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.1,
+                                    color: tint,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -650,7 +698,6 @@ class BottomNav extends StatelessWidget {
   }
 }
 
-/// A wide filled button — "View Route", "Get Started".
 class BigButton extends StatelessWidget {
   const BigButton({
     super.key,

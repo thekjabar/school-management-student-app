@@ -82,9 +82,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       // cannot read the sign-in form cannot find the setting
                       // that would let them read it — so the choice comes
                       // before anything that needs reading.
-                      const Align(
+                      Align(
                         alignment: AlignmentDirectional.centerEnd,
-                        child: LanguagePicker(),
+                        child: LanguagePicker(tint: role.tint),
                       ),
                       const Spacer(flex: 2),
                       _Brand(role: role),
@@ -500,7 +500,10 @@ class _ErrorLine extends StatelessWidget {
 /// in it to find their own. Every label is written in its own script, so it is
 /// legible whatever the app is currently set to.
 class LanguagePicker extends StatelessWidget {
-  const LanguagePicker({super.key});
+  const LanguagePicker({super.key, this.tint});
+
+  /// The role's colour, so the selected chip belongs to whichever app this is.
+  final Color? tint;
 
   @override
   Widget build(BuildContext context) {
@@ -509,7 +512,7 @@ class LanguagePicker extends StatelessWidget {
       builder: (context, current, _) => Container(
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: AppTheme.surface.withValues(alpha: 0.7),
+          color: AppTheme.surface.withValues(alpha: AppTheme.dark ? 0.9 : 0.7),
           borderRadius: BorderRadius.circular(11),
           border: Border.all(color: AppTheme.border),
         ),
@@ -525,7 +528,10 @@ class LanguagePicker extends StatelessWidget {
                   curve: Curves.easeOut,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                   decoration: BoxDecoration(
-                    color: current == lang ? AppTheme.text : Colors.transparent,
+                    // The role's colour, not AppTheme.text. Text is near-black
+                    // in the light theme and near-WHITE in the dark one, so a
+                    // selected chip using it disappeared behind its own label.
+                    color: current == lang ? (tint ?? AppTheme.violet) : Colors.transparent,
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Text(

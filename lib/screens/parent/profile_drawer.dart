@@ -101,11 +101,11 @@ class ProfileDrawer extends StatelessWidget {
                   ),
 
                   _Section(t('more.language')),
-                  const Card16(
-                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  Card16(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                     child: Align(
                       alignment: AlignmentDirectional.centerStart,
-                      child: LanguagePicker(),
+                      child: LanguagePicker(tint: Role.parent.tint),
                     ),
                   ),
 

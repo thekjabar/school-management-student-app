@@ -191,6 +191,36 @@ void main() {
         reason: 'the card painted light while the app was in dark mode');
   });
 
+
+  test('the header wash follows the theme', () {
+    // The wash is a pale tint in the light theme. Reused unchanged on a dark
+    // canvas it became a bright band across the top of every screen — the
+    // app's lightest surface sitting directly above its darkest.
+    for (final role in Role.values) {
+      AppTheme.dark = false;
+      final light = role.wash;
+      AppTheme.dark = true;
+      final night = role.wash;
+
+      expect(night, isNot(light), reason: '${role.name}: the wash did not change');
+      expect(night.computeLuminance(), lessThan(0.25),
+          reason: '${role.name}: the dark wash is still bright');
+      // Still tinted rather than plain canvas — the wash is how somebody
+      // glancing at a phone knows whose app is open.
+      expect(night, isNot(AppTheme.canvas),
+          reason: '${role.name}: the dark wash lost its tint entirely');
+    }
+  });
+
+  test('text stays readable on the header wash', () {
+    for (final dark in [false, true]) {
+      AppTheme.dark = dark;
+      final where = dark ? 'dark' : 'light';
+      expect(contrast(AppTheme.text, Role.parent.wash), greaterThan(4.5),
+          reason: '$where: header text is below AA on the wash');
+    }
+  });
+
   test('the stored setting round-trips', () async {
     SharedPreferences.setMockInitialValues({});
     await AppThemeSetting.set(AppThemeMode.dark);
