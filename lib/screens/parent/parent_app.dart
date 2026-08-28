@@ -8,7 +8,7 @@ import '../../ui/kit.dart';
 import 'children_tab.dart';
 import 'home_tab.dart';
 import 'messages_tab.dart';
-import 'more_tab.dart';
+import 'profile_drawer.dart';
 
 /// The parent app.
 ///
@@ -25,6 +25,9 @@ class ParentApp extends StatefulWidget {
 }
 
 class _ParentAppState extends State<ParentApp> {
+  // Held so the avatar can open the drawer: the Scaffold that owns it is
+  // built by this very method, so there is no context above it to ask.
+  final _scaffold = GlobalKey<ScaffoldState>();
   int _tab = 0;
   List<Child>? _children;
   String? _selectedId;
@@ -35,7 +38,6 @@ class _ParentAppState extends State<ParentApp> {
     NavItem(Icons.home_rounded, Icons.home_outlined, t('nav.home')),
     NavItem(Icons.child_care_rounded, Icons.child_care_outlined, t('nav.children')),
     NavItem(Icons.forum_rounded, Icons.forum_outlined, t('nav.messages')),
-    NavItem(Icons.more_horiz_rounded, Icons.more_horiz_outlined, t('nav.more')),
   ];
 
   @override
@@ -120,7 +122,12 @@ class _ParentAppState extends State<ParentApp> {
             : t('greet.evening');
 
     return Scaffold(
+      key: _scaffold,
       backgroundColor: AppTheme.canvas,
+      // The account lives behind the avatar rather than in a fourth tab. A
+      // "⋯ More" tab spends a quarter of the bottom bar on a drawer's worth of
+      // settings, and hides the three things a parent opens the app for.
+      drawer: children == null ? null : ProfileDrawer(children: children),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -131,6 +138,7 @@ class _ParentAppState extends State<ParentApp> {
               name: me?.name ?? '',
               notificationCount: _unread,
               onBell: () => setState(() => _tab = 2),
+              onAvatar: () => _scaffold.currentState?.openDrawer(),
               // The picker only appears for a family with more than one child.
               // A single chip that never changes anything is furniture.
               bottom: (children != null && children.length > 1)
@@ -153,7 +161,6 @@ class _ParentAppState extends State<ParentApp> {
                             HomeTab(child: child, onOpenTab: (i) => setState(() => _tab = i)),
                             ChildrenTab(children: children, selected: child),
                             MessagesTab(onRead: () => setState(() => _unread = 0)),
-                            MoreTab(children: children),
                           ],
                         ),
             ),

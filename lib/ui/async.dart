@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../api/client.dart';
+import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
+
+/// Lets a [Loader] know when the screen it sits on is uncovered again.
+///
+/// One observer for the whole app, handed to MaterialApp.navigatorObservers.
+final RouteObserver<PageRoute<dynamic>> routeObserver = RouteObserver<PageRoute<dynamic>>();
 
 /// Loads something, and shows the four states it can be in.
 ///
@@ -38,19 +44,61 @@ class Loader<T> extends StatefulWidget {
   State<Loader<T>> createState() => LoaderState<T>();
 }
 
-class LoaderState<T> extends State<Loader<T>> {
+class LoaderState<T> extends State<Loader<T>> with RouteAware {
   late Future<T> _future;
+  Lang _loadedIn = AppLocale.current.value;
 
   @override
   void initState() {
     super.initState();
     _future = widget.load();
+    // The server answers in whatever language the app is showing, so the data
+    // on screen belongs to the language it was fetched in. Changing language
+    // has to refetch — otherwise the labels flip and the content stays in the
+    // old language until the parent thinks to pull down, which reads as the
+    // setting not having worked.
+    AppLocale.current.addListener(_languageChanged);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.current.removeListener(_languageChanged);
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) routeObserver.subscribe(this, route);
+  }
+
+  /// Coming back to a screen that was covered by another one. A parent who
+  /// submits a leave request and presses back expects to see it listed.
+  @override
+  void didPopNext() => reload();
+
+  void _languageChanged() {
+    if (!mounted) return;
+    if (AppLocale.current.value == _loadedIn) return;
+    _loadedIn = AppLocale.current.value;
+    reload();
   }
 
   /// Re-runs the load. Called by pull-to-refresh, and by screens that have just
   /// changed something on the server and need the list to catch up.
   Future<void> reload() async {
-    setState(() => _future = widget.load());
+    if (!mounted) return;
+    _loadedIn = AppLocale.current.value;
+    // A BLOCK body, not an arrow. `() => _future = widget.load()` returns the
+    // assignment's value — a Future — and Flutter rejects a setState callback
+    // that returns one, as a guard against async work inside setState. It threw
+    // silently every time, so the refetch happened and the rebuild never did:
+    // pull-to-refresh fetched new data and then showed the old.
+    setState(() {
+      _future = widget.load();
+    });
     await _future.catchError((_) => null as T);
   }
 
@@ -74,7 +122,7 @@ class LoaderState<T> extends State<Loader<T>> {
               _Failed(
                 message: error is ApiException
                     ? error.message
-                    : 'Something went wrong. Pull down to try again.',
+                    : t('common.loadFailed'),
                 onRetry: reload,
                 tint: tint,
               ),
@@ -150,10 +198,10 @@ class _Failed extends StatelessWidget {
                 background: AppTheme.roseSoft,
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'That did not load',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  t('common.didNotLoad'),
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                 ),
               ),
             ],
@@ -166,7 +214,7 @@ class _Failed extends StatelessWidget {
             child: FilledButton(
               onPressed: onRetry,
               style: FilledButton.styleFrom(backgroundColor: tint),
-              child: const Text('Try again'),
+              child: Text(t('common.tryAgain')),
             ),
           ),
         ],

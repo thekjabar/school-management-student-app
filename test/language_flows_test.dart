@@ -12,7 +12,6 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:student_app/api/client.dart';
 import 'package:student_app/api/parent_api.dart';
 import 'package:student_app/api/session.dart';
 import 'package:student_app/i18n/strings.dart';

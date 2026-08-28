@@ -78,6 +78,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding: const EdgeInsets.fromLTRB(24, 12, 24, 26),
                   child: Column(
                     children: [
+                      // First thing on the screen, deliberately. A parent who
+                      // cannot read the sign-in form cannot find the setting
+                      // that would let them read it — so the choice comes
+                      // before anything that needs reading.
+                      const Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: LanguagePicker(),
+                      ),
                       const Spacer(flex: 2),
                       _Brand(role: role),
                       const Spacer(flex: 1),
@@ -477,6 +485,59 @@ class _ErrorLine extends StatelessWidget {
                 style: const TextStyle(color: AppTheme.rose, fontSize: 12.5, height: 1.45),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+/// The three languages, as a segmented row.
+///
+/// A row rather than a dropdown: there are three, they are short, and a parent
+/// who cannot read the current language should not have to open a menu written
+/// in it to find their own. Every label is written in its own script, so it is
+/// legible whatever the app is currently set to.
+class LanguagePicker extends StatelessWidget {
+  const LanguagePicker({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Lang>(
+      valueListenable: AppLocale.current,
+      builder: (context, current, _) => Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: AppTheme.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final lang in Lang.values)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: current == lang ? null : () => AppLocale.set(lang),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 140),
+                  curve: Curves.easeOut,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: current == lang ? AppTheme.text : Colors.transparent,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Text(
+                    lang.label,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: current == lang ? FontWeight.w700 : FontWeight.w600,
+                      color: current == lang ? Colors.white : AppTheme.textMuted,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

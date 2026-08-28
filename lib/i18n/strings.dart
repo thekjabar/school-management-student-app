@@ -19,7 +19,7 @@ enum Lang {
   final TextDirection direction;
 
   static Lang fromCode(String? code) =>
-      Lang.values.firstWhere((l) => l.code == code, orElse: () => Lang.ckb);
+      Lang.values.firstWhere((l) => l.code == code, orElse: () => Lang.en);
 }
 
 /// The chosen language, and the thing that rebuilds the app when it changes.
@@ -30,7 +30,7 @@ enum Lang {
 class AppLocale {
   AppLocale._();
 
-  static final ValueNotifier<Lang> current = ValueNotifier<Lang>(Lang.ckb);
+  static final ValueNotifier<Lang> current = ValueNotifier<Lang>(Lang.en);
 
   static const _key = 'sm_lang';
 
@@ -42,13 +42,14 @@ class AppLocale {
       current.value = Lang.fromCode(saved);
       return;
     }
-    // No choice made yet. A phone set to Arabic should not open in Kurdish
-    // just because Kurdish is our default.
+    // No choice made yet. A phone already set to Kurdish or Arabic opens in
+    // it; anything else opens in English, which is the default and the one the
+    // sign-in screen offers first.
     final device = WidgetsBinding.instance.platformDispatcher.locale.languageCode;
     current.value = switch (device) {
       'ar' => Lang.ar,
-      'en' => Lang.en,
-      _ => Lang.ckb,
+      'ku' || 'ckb' => Lang.ckb,
+      _ => Lang.en,
     };
   }
 
@@ -115,6 +116,7 @@ const Map<String, String> _en = {
   'login.chooseWhy':
       'The one you were given is known to whoever typed it. Pick something only you know.',
   'login.newPassword': 'New password',
+  'login.confirmPassword': 'Confirm new password',
   'login.typeAgain': 'Type it again',
   'login.rule': 'At least eight characters, with a letter and a number.',
   'login.tooShort': 'Use at least eight characters.',
@@ -363,8 +365,10 @@ const Map<String, String> _en = {
   // Common
   'common.cancel': 'Cancel',
   'common.save': 'Save',
+  'common.saving': 'Saving…',
   'common.tryAgain': 'Try again',
   'common.didNotLoad': 'That did not load',
+  'common.loadFailed': 'Something went wrong. Pull down to try again.',
   'common.offline': 'No connection. Check the phone is on the network and try again.',
   'common.noChildren': 'No children are linked to this number yet.',
   'common.noChildrenBody':
@@ -394,6 +398,7 @@ const Map<String, String> _ckb = {
   'login.chooseWhy':
       'ئەوەی پێیان داویت، ئەو کەسەی نووسیویەتی دەیزانێت. شتێک هەڵبژێرە کە تەنها خۆت بزانیت.',
   'login.newPassword': 'وشەی نهێنی نوێ',
+  'login.confirmPassword': 'دووبارەکردنەوەی وشەی نهێنی نوێ',
   'login.typeAgain': 'دووبارە بینووسەوە',
   'login.rule': 'لانیکەم هەشت پیت، بە پیتێک و ژمارەیەکەوە.',
   'login.tooShort': 'لانیکەم هەشت پیت بەکاربهێنە.',
@@ -626,8 +631,10 @@ const Map<String, String> _ckb = {
 
   'common.cancel': 'هەڵوەشاندنەوە',
   'common.save': 'پاشەکەوتکردن',
+  'common.saving': 'پاشەکەوت دەکرێت…',
   'common.tryAgain': 'دووبارە هەوڵبدە',
   'common.didNotLoad': 'ئەمە بار نەبوو',
+  'common.loadFailed': 'هەڵەیەک ڕوویدا. بۆ هەوڵدانەوە ڕایبکێشە خوارەوە.',
   'common.offline': 'پەیوەندی نییە. دڵنیابە مۆبایلەکە لەسەر ئینتەرنێتە و دووبارە هەوڵبدە.',
   'common.noChildren': 'هێشتا هیچ منداڵێک بەم ژمارەیەوە نەبەستراوە.',
   'common.noChildrenBody':
@@ -656,6 +663,7 @@ const Map<String, String> _ar = {
   'login.choose': 'اختر كلمة مرور خاصة بك',
   'login.chooseWhy': 'التي أُعطيت لك يعرفها من كتبها. اختر شيئاً تعرفه أنت وحدك.',
   'login.newPassword': 'كلمة مرور جديدة',
+  'login.confirmPassword': 'تأكيد كلمة المرور الجديدة',
   'login.typeAgain': 'اكتبها مرة أخرى',
   'login.rule': 'ثمانية أحرف على الأقل، مع حرف ورقم.',
   'login.tooShort': 'استخدم ثمانية أحرف على الأقل.',
@@ -885,8 +893,10 @@ const Map<String, String> _ar = {
 
   'common.cancel': 'إلغاء',
   'common.save': 'حفظ',
+  'common.saving': 'جارٍ الحفظ…',
   'common.tryAgain': 'حاول مرة أخرى',
   'common.didNotLoad': 'تعذّر التحميل',
+  'common.loadFailed': 'حدث خطأ ما. اسحب للأسفل للمحاولة مرة أخرى.',
   'common.offline': 'لا يوجد اتصال. تأكد من اتصال الهاتف بالشبكة وحاول مرة أخرى.',
   'common.noChildren': 'لا يوجد أبناء مرتبطون بهذا الرقم بعد.',
   'common.noChildrenBody':

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'api/client.dart';
 import 'api/push.dart';
 import 'i18n/delegates.dart';
+import 'ui/async.dart';
 import 'i18n/strings.dart';
 import 'api/session.dart';
 import 'screens/driver/driver_app.dart';
@@ -75,6 +76,9 @@ class EduPulseApp extends StatelessWidget {
       // Without them a date picker or a text field throws on build. See
       // i18n/delegates.dart — the widget tests mount this same list.
       localizationsDelegates: appLocalizationsDelegates,
+      // Lets every Loader refetch when the screen it sits on is uncovered —
+      // press back from a leave request and the list already includes it.
+      navigatorObservers: [routeObserver],
       theme: AppTheme.build(tint: _role.tint),
       builder: (context, child) {
         // The phone's font scale is honoured but capped. A driver's manifest at

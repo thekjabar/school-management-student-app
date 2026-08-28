@@ -24,6 +24,7 @@ class RoleHeader extends StatelessWidget {
     this.avatarLabel,
     this.notificationCount = 0,
     this.onBell,
+    this.onAvatar,
     this.trailing,
     this.bottom,
   });
@@ -39,6 +40,11 @@ class RoleHeader extends StatelessWidget {
 
   final int notificationCount;
   final VoidCallback? onBell;
+
+  /// Tapping the avatar opens the account drawer. The face is where people
+  /// already press to find "my account" — a separate menu button beside it
+  /// would be a second thing to learn for the same destination.
+  final VoidCallback? onAvatar;
   final Widget? trailing;
 
   /// Anything that sits under the greeting inside the wash — the child picker,
@@ -62,7 +68,32 @@ class RoleHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              CircleInitials(label: avatarLabel ?? name, tint: role.tint),
+              GestureDetector(
+                onTap: onAvatar,
+                behavior: HitTestBehavior.opaque,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleInitials(label: avatarLabel ?? name, tint: role.tint),
+                    if (onAvatar != null)
+                      // A small chevron, so the circle reads as a control and
+                      // not as decoration.
+                      PositionedDirectional(
+                        bottom: -1,
+                        end: -1,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppTheme.border),
+                          ),
+                          child: Icon(Icons.expand_more_rounded, size: 11, color: role.tint),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
