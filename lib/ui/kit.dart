@@ -81,7 +81,7 @@ class RoleHeader extends StatelessWidget {
                   children: [
                     Text(
                       greeting,
-                      style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                      style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                     ),
                     const SizedBox(height: 1),
                     Text(
@@ -179,8 +179,8 @@ class BellButton extends StatelessWidget {
             width: 40,
             height: 40,
             alignment: Alignment.center,
-            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-            child: const Icon(Icons.notifications_none_rounded, size: 21, color: AppTheme.text),
+            decoration: BoxDecoration(color: AppTheme.surface, shape: BoxShape.circle),
+            child: Icon(Icons.notifications_none_rounded, size: 21, color: AppTheme.text),
           ),
           if (count > 0)
             Positioned(
@@ -193,14 +193,14 @@ class BellButton extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppTheme.rose,
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: Colors.white, width: 1.6),
+                  border: Border.all(color: AppTheme.surface, width: 1.6),
                 ),
                 child: Text(
                   count > 9 ? '9+' : '$count',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                    color: AppTheme.surface,
                     height: 1.25,
                   ),
                 ),
@@ -251,7 +251,7 @@ class FigureStrip extends StatelessWidget {
                   f.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
                 ),
                 const SizedBox(height: 3),
                 Text(
@@ -411,7 +411,7 @@ class TileRow extends StatelessWidget {
                     subtitle!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                    style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                   ),
                 ],
               ],
@@ -433,7 +433,7 @@ class TileRow extends StatelessWidget {
                 if (trailingSub != null)
                   Text(
                     trailingSub!,
-                    style: const TextStyle(fontSize: 10.5, color: AppTheme.textFaint),
+                    style: TextStyle(fontSize: 10.5, color: AppTheme.textFaint),
                   ),
               ],
             ),
@@ -448,7 +448,7 @@ class TileRow extends StatelessWidget {
           content
         else
           InkWell(onTap: onTap, child: content),
-        if (!last) const Divider(height: 1, color: AppTheme.border),
+        if (!last) Divider(height: 1, color: AppTheme.border),
       ],
     );
   }
@@ -610,8 +610,8 @@ class BottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
         border: Border(top: BorderSide(color: AppTheme.border)),
       ),
       child: SafeArea(
@@ -731,7 +731,7 @@ class Banner2 extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                 ),
               ],
             ),
@@ -774,11 +774,11 @@ class _MenuButton extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppTheme.surface,
             shape: BoxShape.circle,
             border: Border.all(color: AppTheme.border),
           ),
-          child: const Icon(Icons.menu_rounded, size: 19, color: AppTheme.textMuted),
+          child: Icon(Icons.menu_rounded, size: 19, color: AppTheme.textMuted),
         ),
       ),
     );

@@ -119,13 +119,13 @@ class _RequestCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               humanise(item.kind),
-              style: const TextStyle(fontSize: 12, color: AppTheme.textMuted, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 12, color: AppTheme.textMuted, fontWeight: FontWeight.w600),
             ),
             if (item.reason != null && item.reason!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
                 item.reason!,
-                style: const TextStyle(fontSize: 13, height: 1.45, color: AppTheme.text),
+                style: TextStyle(fontSize: 13, height: 1.45, color: AppTheme.text),
               ),
             ],
             if (item.decisionNote != null && item.decisionNote!.isNotEmpty) ...[
@@ -259,7 +259,7 @@ class _AskSheetState extends State<_AskSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: inset),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppTheme.canvas,
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         ),
@@ -285,7 +285,7 @@ class _AskSheetState extends State<_AskSheet> {
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.4),
               ),
               const SizedBox(height: 16),
-              Text(t('leave.why'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textMuted)),
+              Text(t('leave.why'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textMuted)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -297,7 +297,7 @@ class _AskSheetState extends State<_AskSheet> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                       decoration: BoxDecoration(
-                        color: on ? Role.parent.tint : Colors.white,
+                        color: on ? Role.parent.tint : AppTheme.surface,
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(color: on ? Role.parent.tint : AppTheme.border),
                       ),
@@ -329,7 +329,7 @@ class _AskSheetState extends State<_AskSheet> {
                 ],
               ),
               const SizedBox(height: 18),
-              Text(t('leave.reason'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textMuted)),
+              Text(t('leave.reason'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textMuted)),
               const SizedBox(height: 8),
               TextField(
                 controller: _reason,
@@ -351,7 +351,7 @@ class _AskSheetState extends State<_AskSheet> {
                     Expanded(
                       child: Text(
                         t('leave.busNote'),
-                        style: const TextStyle(fontSize: 12, height: 1.45, color: AppTheme.textMuted),
+                        style: TextStyle(fontSize: 12, height: 1.45, color: AppTheme.textMuted),
                       ),
                     ),
                   ],
@@ -359,7 +359,7 @@ class _AskSheetState extends State<_AskSheet> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                Text(_error!, style: const TextStyle(color: AppTheme.rose, fontSize: 12.5)),
+                Text(_error!, style: TextStyle(color: AppTheme.rose, fontSize: 12.5)),
               ],
               const SizedBox(height: 16),
               SizedBox(
@@ -400,7 +400,7 @@ class _DateField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textMuted)),
+        Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textMuted)),
         const SizedBox(height: 8),
         GestureDetector(
           onTap: onTap,
@@ -408,13 +408,13 @@ class _DateField extends StatelessWidget {
             height: 48,
             padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppTheme.surface,
               borderRadius: BorderRadius.circular(AppTheme.radiusSm),
               border: Border.all(color: AppTheme.border),
             ),
             child: Row(
               children: [
-                const Icon(Icons.calendar_today_rounded, size: 15, color: AppTheme.textFaint),
+                Icon(Icons.calendar_today_rounded, size: 15, color: AppTheme.textFaint),
                 const SizedBox(width: 9),
                 Text(shortDate(value), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
               ],

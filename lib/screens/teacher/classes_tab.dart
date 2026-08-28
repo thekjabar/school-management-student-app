@@ -55,7 +55,7 @@ class ClassesTab extends StatelessWidget {
                               Text(
                                 '${c.subjectName} · ${c.studentCount} children'
                                 '${c.room != null ? ' · ${c.room}' : ''}',
-                                style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                                style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                               ),
                             ],
                           ),
@@ -231,7 +231,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   color: AppTheme.greenSoft,
                   borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(Icons.check_circle_rounded, size: 17, color: AppTheme.green),
                     SizedBox(width: 9),
@@ -252,7 +252,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   color: AppTheme.amberSoft,
                   borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(Icons.info_rounded, size: 17, color: AppTheme.amber),
                     SizedBox(width: 9),
@@ -291,7 +291,7 @@ class _MarkRow extends StatelessWidget {
   final RegisterMark mark;
   final ValueChanged<String> onChanged;
 
-  static const _options = [
+  static List<(String, String, Color, Color)> get _options => [
     ('PRESENT', 'P', AppTheme.green, AppTheme.greenSoft),
     ('ABSENT', 'A', AppTheme.rose, AppTheme.roseSoft),
     ('LATE', 'L', AppTheme.amber, AppTheme.amberSoft),
@@ -310,7 +310,7 @@ class _MarkRow extends StatelessWidget {
               width: 26,
               child: Text(
                 mark.rollNumber ?? '',
-                style: const TextStyle(fontSize: 12, color: AppTheme.textFaint, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 12, color: AppTheme.textFaint, fontWeight: FontWeight.w600),
               ),
             ),
             Expanded(
@@ -323,7 +323,7 @@ class _MarkRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
                   ),
-                  Text(mark.code, style: const TextStyle(fontSize: 10.5, color: AppTheme.textFaint)),
+                  Text(mark.code, style: TextStyle(fontSize: 10.5, color: AppTheme.textFaint)),
                 ],
               ),
             ),
@@ -422,7 +422,7 @@ class _StudentsScreen extends StatelessWidget {
                             ),
                             Text(
                               s.code,
-                              style: const TextStyle(fontSize: 11, color: AppTheme.textFaint),
+                              style: TextStyle(fontSize: 11, color: AppTheme.textFaint),
                             ),
                           ],
                         ),

@@ -172,16 +172,16 @@ class _HeadcountCard extends StatelessWidget {
           ),
           if (counts.excluded.isNotEmpty) ...[
             const SizedBox(height: 12),
-            const Divider(height: 1, color: AppTheme.border),
+            Divider(height: 1, color: AppTheme.border),
             const SizedBox(height: 10),
-            const Text(
+            Text(
               'Not riding today',
               style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppTheme.textMuted),
             ),
             const SizedBox(height: 5),
             Text(
               counts.excluded.join(', '),
-              style: const TextStyle(fontSize: 12.5, height: 1.5, color: AppTheme.textMuted),
+              style: TextStyle(fontSize: 12.5, height: 1.5, color: AppTheme.textMuted),
             ),
           ],
         ],
@@ -223,7 +223,7 @@ class _RunControls extends StatelessWidget {
         children: [
           Row(
             children: [
-              const IconChip(
+              IconChip(
                 icon: Icons.directions_bus_filled_rounded,
                 color: AppTheme.textMuted,
                 background: Color(0xFFF1F3F6),
@@ -240,7 +240,7 @@ class _RunControls extends StatelessWidget {
                     Text(
                       'Due out ${hhmm(trip.scheduledDepartureAt)}'
                       '${trip.startedAt != null ? ' · left ${hhmm(trip.startedAt)}' : ''}',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                      style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
                   ],
                 ),
@@ -255,7 +255,7 @@ class _RunControls extends StatelessWidget {
               onPressed: busy != null ? null : action,
               style: FilledButton.styleFrom(
                 backgroundColor: action == null ? AppTheme.border : Role.driver.tint,
-                foregroundColor: action == null ? AppTheme.textMuted : Colors.white,
+                foregroundColor: action == null ? AppTheme.textMuted : AppTheme.surface,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusSm)),
               ),
               child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
@@ -299,7 +299,7 @@ class _OrderToggle extends StatelessWidget {
           if (note.isNotEmpty)
             Text(
               note,
-              style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted, height: 1.45),
+              style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted, height: 1.45),
             ),
         ],
       ),
@@ -379,7 +379,7 @@ class _StopCardState extends State<_StopCard> {
                         borderRadius: BorderRadius.circular(11),
                       ),
                       child: s.done || remaining == 0
-                          ? const Icon(Icons.check_rounded, size: 18, color: AppTheme.green)
+                          ? Icon(Icons.check_rounded, size: 18, color: AppTheme.green)
                           : Text(
                               '${s.plannedSequence}',
                               style: TextStyle(
@@ -411,7 +411,7 @@ class _StopCardState extends State<_StopCard> {
                             ].join(' · '),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                            style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                           ),
                         ],
                       ),
@@ -431,7 +431,7 @@ class _StopCardState extends State<_StopCard> {
               ),
             ),
             if (_open) ...[
-              const Divider(height: 1, color: AppTheme.border),
+              Divider(height: 1, color: AppTheme.border),
               ...s.students.map((r) => _RiderRow(
                     rider: r,
                     leg: widget.leg,
@@ -552,19 +552,19 @@ class _RiderRow extends StatelessWidget {
                     ),
                     if (rider.requiresAssistance) ...[
                       const SizedBox(width: 6),
-                      const Icon(Icons.accessible_rounded, size: 14, color: AppTheme.amber),
+                      Icon(Icons.accessible_rounded, size: 14, color: AppTheme.amber),
                     ],
                   ],
                 ),
                 if (off)
                   Text(
                     '${leg == 'OUT' ? 'At school' : 'Handed over'} ${hhmm(rider.alightedAt)}',
-                    style: const TextStyle(fontSize: 11, color: AppTheme.green),
+                    style: TextStyle(fontSize: 11, color: AppTheme.green),
                   )
                 else if (onBus)
                   Text(
                     'On board since ${hhmm(rider.boardedAt)}',
-                    style: const TextStyle(fontSize: 11, color: AppTheme.blue),
+                    style: TextStyle(fontSize: 11, color: AppTheme.blue),
                   ),
               ],
             ),
@@ -625,7 +625,7 @@ class _SweepCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!sweep.required_) {
-      return const Panel(
+      return Panel(
         child: Text(
           'No cabin sweep is required for this run.',
           style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
@@ -638,10 +638,10 @@ class _SweepCard extends StatelessWidget {
         color: AppTheme.greenSoft,
         child: Row(
           children: [
-            const IconChip(
+            IconChip(
               icon: Icons.verified_rounded,
               color: AppTheme.green,
-              background: Colors.white,
+              background: AppTheme.surface,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -651,7 +651,7 @@ class _SweepCard extends StatelessWidget {
                   const Text('Cabin swept', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
                   Text(
                     'Confirmed at ${hhmm(sweep.confirmedAt)}',
-                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                    style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                   ),
                 ],
               ),
@@ -674,7 +674,7 @@ class _SweepCard extends StatelessWidget {
               IconChip(
                 icon: Icons.event_seat_rounded,
                 color: late ? AppTheme.rose : AppTheme.amber,
-                background: Colors.white,
+                background: AppTheme.surface,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -701,7 +701,7 @@ class _SweepCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             // Said every time. In an Iraqi June a sealed cabin becomes lethal in
             // minutes, not hours, and this sentence is the reason the deadline
             // is short rather than convenient.
@@ -748,7 +748,7 @@ class _Fig extends StatelessWidget {
             value,
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.6, color: colour),
           ),
-          Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+          Text(label, style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
         ],
       ),
     );

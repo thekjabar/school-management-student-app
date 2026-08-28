@@ -123,7 +123,7 @@ class _NoticeCardState extends State<_NoticeCard> {
                         if (n.sentAt != null) _ago(n.sentAt!),
                         if (n.authorName.isNotEmpty) n.authorName,
                       ].join(' · '),
-                      style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                      style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                     ),
                   ],
                 ),
@@ -139,7 +139,7 @@ class _NoticeCardState extends State<_NoticeCard> {
             n.body,
             maxLines: _open ? null : 2,
             overflow: _open ? null : TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12.5, height: 1.55, color: AppTheme.textMuted),
+            style: TextStyle(fontSize: 12.5, height: 1.55, color: AppTheme.textMuted),
           ),
           if (!_open && n.body.length > 110) ...[
             const SizedBox(height: 6),
@@ -158,7 +158,7 @@ class _NoticeCardState extends State<_NoticeCard> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.assignment_turned_in_rounded, size: 16, color: AppTheme.amber),
+                  Icon(Icons.assignment_turned_in_rounded, size: 16, color: AppTheme.amber),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(

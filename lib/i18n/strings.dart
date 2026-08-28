@@ -22,6 +22,45 @@ enum Lang {
       Lang.values.firstWhere((l) => l.code == code, orElse: () => Lang.en);
 }
 
+/// Light, dark, or whatever the phone is set to.
+enum AppThemeMode {
+  system('system'),
+  light('light'),
+  dark('dark');
+
+  const AppThemeMode(this.code);
+
+  final String code;
+
+  static AppThemeMode fromCode(String? code) =>
+      AppThemeMode.values.firstWhere((m) => m.code == code, orElse: () => AppThemeMode.system);
+}
+
+/// The chosen appearance.
+///
+/// Defaults to following the phone. Somebody who has set their handset to dark
+/// has already said what they want, and asking again in every app is how a
+/// setting screen fills up with questions nobody wanted to answer.
+class AppThemeSetting {
+  AppThemeSetting._();
+
+  static final ValueNotifier<AppThemeMode> current =
+      ValueNotifier<AppThemeMode>(AppThemeMode.system);
+
+  static const _key = 'sm_theme';
+
+  static Future<void> restore() async {
+    final prefs = await SharedPreferences.getInstance();
+    current.value = AppThemeMode.fromCode(prefs.getString(_key));
+  }
+
+  static Future<void> set(AppThemeMode mode) async {
+    current.value = mode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, mode.code);
+  }
+}
+
 /// The chosen language, and the thing that rebuilds the app when it changes.
 ///
 /// A ValueNotifier rather than a package: one setting, read everywhere, written
@@ -342,6 +381,10 @@ const Map<String, String> _en = {
   'more.pushBlocked': 'Turn notifications on for EduPulse in your phone settings.',
   'more.account': 'Account',
   'more.language': 'Language',
+  'more.appearance': 'Appearance',
+  'theme.system': 'System',
+  'theme.light': 'Light',
+  'theme.dark': 'Dark',
   'more.feesSub': 'What you owe and how to pay it',
   'more.leaveSub': 'Ask the school to excuse a day',
   'more.changePassword': 'Change password',
@@ -611,6 +654,10 @@ const Map<String, String> _ckb = {
   'more.pushBlocked': 'لە ڕێکخستنەکانی مۆبایلەکەت ئاگادارکردنەوە بۆ EduPulse کاری پێبکە.',
   'more.account': 'هەژمار',
   'more.language': 'زمان',
+  'more.appearance': 'ڕووکار',
+  'theme.system': 'سیستەم',
+  'theme.light': 'ڕووناک',
+  'theme.dark': 'تاریک',
   'more.feesSub': 'چەندت لەسەرە و چۆن بیدەیت',
   'more.leaveSub': 'داوا لە قوتابخانە بکە ڕۆژێک مۆڵەت بدات',
   'more.changePassword': 'گۆڕینی وشەی نهێنی',
@@ -875,6 +922,10 @@ const Map<String, String> _ar = {
   'more.pushBlocked': 'فعّل الإشعارات لتطبيق EduPulse من إعدادات هاتفك.',
   'more.account': 'الحساب',
   'more.language': 'اللغة',
+  'more.appearance': 'المظهر',
+  'theme.system': 'النظام',
+  'theme.light': 'فاتح',
+  'theme.dark': 'داكن',
   'more.feesSub': 'ما عليك وكيف تدفعه',
   'more.leaveSub': 'اطلب من المدرسة إعفاء يوم',
   'more.changePassword': 'تغيير كلمة المرور',

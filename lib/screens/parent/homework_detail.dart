@@ -126,7 +126,7 @@ class HomeworkDetail extends StatelessWidget {
                               const SizedBox(height: 1),
                               Text(
                                 tn('hw.due', longDate(item.dueDate)),
-                                style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                                style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                               ),
                             ],
                           ),
@@ -234,7 +234,7 @@ class HomeworkDetail extends StatelessWidget {
                               if (item.submittedAt != null)
                                 Text(
                                   '${t('hw.handedIn')} · ${longDate(item.submittedAt)}',
-                                  style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                                  style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                                 ),
                             ],
                           ),
@@ -243,11 +243,11 @@ class HomeworkDetail extends StatelessWidget {
                     ),
                     if (item.feedback?.isNotEmpty ?? false) ...[
                       const SizedBox(height: 14),
-                      const Divider(height: 1, color: AppTheme.border),
+                      Divider(height: 1, color: AppTheme.border),
                       const SizedBox(height: 12),
                       Text(
                         t('hw.feedback'),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,
                           color: AppTheme.textMuted,

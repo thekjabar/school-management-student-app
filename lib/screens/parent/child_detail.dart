@@ -62,7 +62,7 @@ class _ChildDetailState extends State<ChildDetail> {
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: on ? Role.parent.tint : Colors.white,
+                        color: on ? Role.parent.tint : AppTheme.surface,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
@@ -152,7 +152,7 @@ class _BusSectionState extends State<_BusSection> {
             padding: const EdgeInsets.only(top: 40),
             child: Column(
               children: [
-                const Icon(Icons.directions_walk_rounded, size: 38, color: AppTheme.textFaint),
+                Icon(Icons.directions_walk_rounded, size: 38, color: AppTheme.textFaint),
                 const SizedBox(height: 14),
                 Text(
                   tn('bus.notOnBus', widget.child.name.split(' ').first),
@@ -238,7 +238,7 @@ class _LiveCard extends StatelessWidget {
       return Card16(
         child: Row(
           children: [
-            const Chip36(
+            Chip36(
               icon: Icons.location_off_rounded,
               color: AppTheme.textMuted,
               size: 40,
@@ -252,7 +252,7 @@ class _LiveCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     l?.reasonText ?? t('bus.checking'),
-                    style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted, height: 1.45),
+                    style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted, height: 1.45),
                   ),
                 ],
               ),
@@ -273,7 +273,7 @@ class _LiveCard extends StatelessWidget {
               Chip36(
                 icon: Icons.directions_bus_filled_rounded,
                 color: fresh ? AppTheme.green : AppTheme.amber,
-                background: Colors.white,
+                background: AppTheme.surface,
                 size: 40,
               ),
               const SizedBox(width: 12),
@@ -290,7 +290,7 @@ class _LiveCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       l.stopName != null ? tn('bus.headingFor', l.stopName!) : t('bus.onRoute'),
-                      style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                      style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                     ),
                   ],
                 ),
@@ -367,7 +367,7 @@ class _RunCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 13),
-          const Divider(height: 1, color: AppTheme.border),
+          Divider(height: 1, color: AppTheme.border),
           const SizedBox(height: 12),
           _Detail(label: t('bus.stop'), value: trip.stopName ?? '—'),
           _Detail(label: t('bus.vehicle'), value: [trip.vehicleLabel, trip.plate].where((e) => e != null).join(' · ')),
@@ -469,7 +469,7 @@ class _DropoffCardState extends State<_DropoffCard> {
           if (_options.isEmpty)
             Text(
               _note.isEmpty ? 'No other address has been approved for this child yet.' : _note,
-              style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted, height: 1.5),
+              style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted, height: 1.5),
             )
           else ...[
             ..._options.map(
@@ -490,7 +490,7 @@ class _DropoffCardState extends State<_DropoffCard> {
                           const SizedBox(height: 2),
                           Text(
                             o.landmark ?? o.stopName,
-                            style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                            style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                           ),
                         ],
                       ),
@@ -509,7 +509,7 @@ class _DropoffCardState extends State<_DropoffCard> {
               // 14:05. Once the bus has left, its manifest is on a phone that
               // may have no signal, so this stops being data and becomes a call.
               t('bus.cutOff'),
-              style: const TextStyle(fontSize: 11.5, color: AppTheme.textFaint, height: 1.45),
+              style: TextStyle(fontSize: 11.5, color: AppTheme.textFaint, height: 1.45),
             ),
           ],
         ],
@@ -558,11 +558,11 @@ class _TimetableSection extends StatelessWidget {
                             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
                           ),
                           const SizedBox(width: 8),
-                          if (isToday) Pill(t('bus.today'), color: Role.parent.tint, background: Colors.white),
+                          if (isToday) Pill(t('bus.today'), color: Role.parent.tint, background: AppTheme.surface),
                           const Spacer(),
                           Text(
                             '${lessons.length} lessons',
-                            style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                            style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                           ),
                         ],
                       ),
@@ -645,7 +645,7 @@ class _HomeworkSection extends StatelessWidget {
                                 const SizedBox(height: 2),
                                 Text(
                                   '${h.subject}${h.teacher != null ? ' · ${h.teacher}' : ''}',
-                                  style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                                  style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                                 ),
                               ],
                             ),
@@ -655,7 +655,7 @@ class _HomeworkSection extends StatelessWidget {
                             color: h.daysLeft < 0 ? AppTheme.rose : AppTheme.textMuted,
                           ),
                           const SizedBox(width: 4),
-                          const Icon(Icons.chevron_right_rounded, size: 18, color: AppTheme.textFaint),
+                          Icon(Icons.chevron_right_rounded, size: 18, color: AppTheme.textFaint),
                         ],
                       ),
                       if (h.description != null && h.description!.isNotEmpty) ...[
@@ -664,25 +664,25 @@ class _HomeworkSection extends StatelessWidget {
                           h.description!,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12.5, height: 1.5, color: AppTheme.textMuted),
+                          style: TextStyle(fontSize: 12.5, height: 1.5, color: AppTheme.textMuted),
                         ),
                       ],
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          const Icon(Icons.event_rounded, size: 13, color: AppTheme.textFaint),
+                          Icon(Icons.event_rounded, size: 13, color: AppTheme.textFaint),
                           const SizedBox(width: 5),
                           Text(
                             tn('hw.due', longDate(h.dueDate)),
-                            style: const TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
+                            style: TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
                           ),
                           if (h.estimatedMinutes != null) ...[
                             const SizedBox(width: 12),
-                            const Icon(Icons.schedule_rounded, size: 13, color: AppTheme.textFaint),
+                            Icon(Icons.schedule_rounded, size: 13, color: AppTheme.textFaint),
                             const SizedBox(width: 5),
                             Text(
                               'about ${h.estimatedMinutes} min',
-                              style: const TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
+                              style: TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
                             ),
                           ],
                         ],
@@ -826,7 +826,7 @@ class _ResultCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '${item.subject} · ${shortDate(item.date)}',
-                  style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                  style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                 ),
               ],
             ),
@@ -891,7 +891,7 @@ class _AttendanceSection extends StatelessWidget {
                         padding: const EdgeInsets.only(bottom: 6),
                         child: Text(
                           tn('att.ofDays', a.total),
-                          style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                          style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                         ),
                       ),
                     ],
@@ -957,7 +957,7 @@ class _Detail extends StatelessWidget {
         children: [
           SizedBox(
             width: 96,
-            child: Text(label, style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted)),
+            child: Text(label, style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted)),
           ),
           Expanded(
             child: Text(

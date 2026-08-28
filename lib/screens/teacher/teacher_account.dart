@@ -58,14 +58,14 @@ class TeacherAccountTab extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           me?.phone ?? '',
-                          style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                          style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           me?.schoolName ?? '',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
+                          style: TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
                         ),
                       ],
                     ),
@@ -75,7 +75,7 @@ class TeacherAccountTab extends StatelessWidget {
             ),
             const SectionHead('Your week'),
             if (days.isEmpty)
-              const Panel(
+              Panel(
                 child: Text(
                   'No lessons are timetabled for you.',
                   style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
@@ -99,11 +99,11 @@ class TeacherAccountTab extends StatelessWidget {
                               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
                             ),
                             const SizedBox(width: 8),
-                            if (isToday) Tag('Today', color: Role.teacher.tint, background: Colors.white),
+                            if (isToday) Tag('Today', color: Role.teacher.tint, background: AppTheme.surface),
                             const Spacer(),
                             Text(
                               '${lessons.length} lesson${lessons.length == 1 ? '' : 's'}',
-                              style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                              style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                             ),
                           ],
                         ),
@@ -117,7 +117,7 @@ class TeacherAccountTab extends StatelessWidget {
                                   width: 44,
                                   child: Text(
                                     clock(l.startMinute),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                       color: AppTheme.textMuted,
@@ -144,7 +144,7 @@ class TeacherAccountTab extends StatelessWidget {
                                 if (l.room != null)
                                   Text(
                                     l.room!,
-                                    style: const TextStyle(fontSize: 11, color: AppTheme.textFaint),
+                                    style: TextStyle(fontSize: 11, color: AppTheme.textFaint),
                                   ),
                               ],
                             ),
@@ -243,7 +243,7 @@ class TeacherAccountTab extends StatelessWidget {
                 ),
                 if (error != null) ...[
                   const SizedBox(height: 12),
-                  Text(error!, style: const TextStyle(color: AppTheme.rose, fontSize: 12.5)),
+                  Text(error!, style: TextStyle(color: AppTheme.rose, fontSize: 12.5)),
                 ],
               ],
             ),
@@ -291,7 +291,7 @@ class _Row extends StatelessWidget {
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, size: 19, color: AppTheme.textFaint),
+            Icon(Icons.chevron_right_rounded, size: 19, color: AppTheme.textFaint),
           ],
         ),
       ),

@@ -45,27 +45,74 @@ Future<void> main() async {
   // app opens in English and redraws itself in Kurdish a moment later, which
   // looks like a fault.
   await AppLocale.restore();
+  await AppThemeSetting.restore();
   // Started here, but deliberately not asked for permission here — see Push.
   // Failing to start push must not stop the app, so this never throws.
   await Push.start();
   runApp(const EduPulseApp());
 }
 
-class EduPulseApp extends StatelessWidget {
+class EduPulseApp extends StatefulWidget {
   const EduPulseApp({super.key});
+
+  @override
+  State<EduPulseApp> createState() => _EduPulseAppState();
+}
+
+/// Stateful only so it can hear the phone change brightness.
+///
+/// On "follow the system" the app has to repaint when the handset flips, which
+/// on most phones happens on a schedule nobody thinks about — an app that only
+/// read the setting at launch stays light all evening.
+class _EduPulseAppState extends State<EduPulseApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    if (mounted && AppThemeSetting.current.value == AppThemeMode.system) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
     // Listening here rather than at each screen: changing language rebuilds the
     // whole app, which is what has to happen — the text direction flips and
     // every row in every list is laid out the other way round.
+    // Both listened to here rather than at each screen: either one rebuilds
+    // the whole app, which is what has to happen. A language change flips the
+    // text direction and re-lays every row; a theme change repaints every
+    // surface.
     return ValueListenableBuilder<Lang>(
       valueListenable: AppLocale.current,
-      builder: (context, lang, _) => _app(lang),
+      builder: (context, lang, _) => ValueListenableBuilder<AppThemeMode>(
+        valueListenable: AppThemeSetting.current,
+        builder: (context, mode, _) => _app(lang, mode),
+      ),
     );
   }
 
-  Widget _app(Lang lang) {
+  Widget _app(Lang lang, AppThemeMode mode) {
+    // The palette reads one global flag, so it has to be set BEFORE the
+    // ThemeData and the widgets below are built — not from inside a builder
+    // that runs after them.
+    final platformDark =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
+    AppTheme.dark = switch (mode) {
+      AppThemeMode.dark => true,
+      AppThemeMode.light => false,
+      AppThemeMode.system => platformDark,
+    };
+    SystemChrome.setSystemUIOverlayStyle(AppTheme.systemOverlay);
+
     return MaterialApp(
       title: _title,
       debugShowCheckedModeBanner: false,
@@ -79,7 +126,11 @@ class EduPulseApp extends StatelessWidget {
       // Lets every Loader refetch when the screen it sits on is uncovered —
       // press back from a leave request and the list already includes it.
       navigatorObservers: [routeObserver],
+      // One ThemeData, built from the flag above. Handing MaterialApp separate
+      // light/dark themes would let IT choose, and the palette getters would
+      // then disagree with whatever it picked.
       theme: AppTheme.build(tint: _role.tint),
+      themeMode: ThemeMode.light,
       builder: (context, child) {
         // The phone's font scale is honoured but capped. A driver's manifest at
         // 200% text becomes one name per screen, which is worse for them than
@@ -189,7 +240,7 @@ class _GateState extends State<_Gate> {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.school_rounded, color: Colors.white, size: 32),
+                  child: Icon(Icons.school_rounded, color: AppTheme.surface, size: 32),
                 ),
                 const SizedBox(height: 18),
                 const Text(
@@ -250,7 +301,7 @@ class _WrongApp extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.desktop_windows_rounded, size: 40, color: AppTheme.textFaint),
+                Icon(Icons.desktop_windows_rounded, size: 40, color: AppTheme.textFaint),
                 const SizedBox(height: 16),
                 Text(
                   'This account is for the web console',
@@ -262,7 +313,7 @@ class _WrongApp extends StatelessWidget {
                   'Your role — ${role.replaceAll('_', ' ').toLowerCase()} — works at '
                   'school.mrwari.com/portal rather than in this app.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppTheme.textMuted, fontSize: 13, height: 1.55),
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 13, height: 1.55),
                 ),
                 const SizedBox(height: 24),
                 OutlinedButton(onPressed: onSignOut, child: const Text('Sign out')),

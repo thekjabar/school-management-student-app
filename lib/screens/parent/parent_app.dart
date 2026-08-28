@@ -94,12 +94,12 @@ class _ParentAppState extends State<ParentApp> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.wifi_off_rounded, size: 36, color: AppTheme.textFaint),
+                  Icon(Icons.wifi_off_rounded, size: 36, color: AppTheme.textFaint),
                   const SizedBox(height: 14),
                   Text(
                     _error!,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppTheme.textMuted, height: 1.5, fontSize: 13),
+                    style: TextStyle(color: AppTheme.textMuted, height: 1.5, fontSize: 13),
                   ),
                   const SizedBox(height: 20),
                   SizedBox(
@@ -209,7 +209,7 @@ class _ChildPicker extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 13),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: on ? tint : Colors.white,
+                color: on ? tint : AppTheme.surface,
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
@@ -240,7 +240,7 @@ class _NoChildren extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.family_restroom_rounded, size: 38, color: AppTheme.textFaint),
+          Icon(Icons.family_restroom_rounded, size: 38, color: AppTheme.textFaint),
           const SizedBox(height: 14),
           Text(
             t('common.noChildren'),
@@ -251,7 +251,7 @@ class _NoChildren extends StatelessWidget {
           Text(
             t('common.noChildrenBody'),
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppTheme.textMuted, fontSize: 13, height: 1.5),
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 13, height: 1.5),
           ),
         ],
       ),

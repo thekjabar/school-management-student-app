@@ -347,16 +347,16 @@ class _ChildCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       '${child.className} · ${child.code}',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                      style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: AppTheme.textFaint),
+              Icon(Icons.chevron_right_rounded, color: AppTheme.textFaint),
             ],
           ),
           const SizedBox(height: 14),
-          const Divider(height: 1, color: AppTheme.border),
+          Divider(height: 1, color: AppTheme.border),
           const SizedBox(height: 14),
           FigureStrip(
             figures: [
@@ -414,7 +414,7 @@ class _Nothing extends StatelessWidget {
       child: Center(
         child: Text(
           text,
-          style: const TextStyle(fontSize: 12.5, color: AppTheme.textFaint),
+          style: TextStyle(fontSize: 12.5, color: AppTheme.textFaint),
         ),
       ),
     );

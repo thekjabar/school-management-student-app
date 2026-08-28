@@ -125,7 +125,7 @@ class _ChildCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       '${child.className} · ${child.code}',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                      style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
                   ],
                 ),
@@ -134,7 +134,7 @@ class _ChildCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          const Divider(height: 1, color: AppTheme.border),
+          Divider(height: 1, color: AppTheme.border),
           const SizedBox(height: 14),
           FigureStrip(
             figures: [
@@ -166,7 +166,7 @@ class _ChildCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.directions_bus_rounded, size: 16, color: AppTheme.textMuted),
+                Icon(Icons.directions_bus_rounded, size: 16, color: AppTheme.textMuted),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -205,7 +205,7 @@ class _ChildCard extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, 42),
                     foregroundColor: AppTheme.textMuted,
-                    side: const BorderSide(color: AppTheme.border),
+                    side: BorderSide(color: AppTheme.border),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: Text(t('children.askLeave')),

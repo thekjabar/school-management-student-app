@@ -207,7 +207,7 @@ class _Failed extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Text(message, style: const TextStyle(color: AppTheme.textMuted, height: 1.45, fontSize: 13)),
+          Text(message, style: TextStyle(color: AppTheme.textMuted, height: 1.45, fontSize: 13)),
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
@@ -234,12 +234,12 @@ class _Empty extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 44),
       child: Column(
         children: [
-          const Icon(Icons.inbox_rounded, size: 34, color: AppTheme.textFaint),
+          Icon(Icons.inbox_rounded, size: 34, color: AppTheme.textFaint),
           const SizedBox(height: 12),
           Text(
             text,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppTheme.textMuted, fontSize: 13.5, height: 1.5),
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 13.5, height: 1.5),
           ),
         ],
       ),

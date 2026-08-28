@@ -114,7 +114,7 @@ class _ExamCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         '${exam.className} · ${exam.subjectName} · ${shortDate(exam.date)}',
-                        style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                        style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                       ),
                     ],
                   ),
@@ -129,14 +129,14 @@ class _ExamCard extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                const Icon(Icons.edit_note_rounded, size: 15, color: AppTheme.textFaint),
+                Icon(Icons.edit_note_rounded, size: 15, color: AppTheme.textFaint),
                 const SizedBox(width: 6),
                 Text(
                   '${exam.resultCount} marked · out of ${exam.maxScore}',
-                  style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                 ),
                 const Spacer(),
-                const Icon(Icons.chevron_right_rounded, color: AppTheme.textFaint),
+                Icon(Icons.chevron_right_rounded, color: AppTheme.textFaint),
               ],
             ),
           ],
@@ -263,7 +263,7 @@ class _MarksScreenState extends State<MarksScreen> {
                       onPressed: _published || _dirty ? null : _publish,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppTheme.green,
-                        side: const BorderSide(color: AppTheme.green),
+                        side: BorderSide(color: AppTheme.green),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                         ),
@@ -372,7 +372,7 @@ class _MarkEntryState extends State<_MarkEntry> {
               width: 26,
               child: Text(
                 widget.row.rollNumber ?? '',
-                style: const TextStyle(fontSize: 12, color: AppTheme.textFaint, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 12, color: AppTheme.textFaint, fontWeight: FontWeight.w600),
               ),
             ),
             Expanded(
@@ -385,7 +385,7 @@ class _MarkEntryState extends State<_MarkEntry> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
                   ),
-                  Text(widget.row.code, style: const TextStyle(fontSize: 10.5, color: AppTheme.textFaint)),
+                  Text(widget.row.code, style: TextStyle(fontSize: 10.5, color: AppTheme.textFaint)),
                 ],
               ),
             ),
@@ -546,7 +546,7 @@ class _NewExamSheetState extends State<_NewExamSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppTheme.canvas,
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         ),
@@ -608,7 +608,7 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
                         decoration: BoxDecoration(
-                          color: on ? Role.teacher.tint : Colors.white,
+                          color: on ? Role.teacher.tint : AppTheme.surface,
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(color: on ? Role.teacher.tint : AppTheme.border),
                         ),
@@ -646,13 +646,13 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                               height: 48,
                               padding: const EdgeInsets.symmetric(horizontal: 14),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: AppTheme.surface,
                                 borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                                 border: Border.all(color: AppTheme.border),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.calendar_today_rounded, size: 15, color: AppTheme.textFaint),
+                                  Icon(Icons.calendar_today_rounded, size: 15, color: AppTheme.textFaint),
                                   const SizedBox(width: 9),
                                   Text(
                                     shortDate(_date),
@@ -685,7 +685,7 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
-                  Text(_error!, style: const TextStyle(color: AppTheme.rose, fontSize: 12.5)),
+                  Text(_error!, style: TextStyle(color: AppTheme.rose, fontSize: 12.5)),
                 ],
                 const SizedBox(height: 16),
                 SizedBox(
@@ -728,7 +728,7 @@ class _Label extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 7, left: 2),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textMuted),
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textMuted),
       ),
     );
   }

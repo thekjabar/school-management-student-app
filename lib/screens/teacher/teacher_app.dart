@@ -59,7 +59,7 @@ class _TeacherAppState extends State<TeacherApp> {
                     '${me?.schoolName ?? ''} · ${longDate(DateTime.now())}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                    style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                   ),
                 ],
               ),
@@ -125,7 +125,7 @@ class _TodayTab extends StatelessWidget {
             ),
             const SectionHead("Today's lessons"),
             if (todaysLessons.isEmpty)
-              const Panel(
+              Panel(
                 child: Text(
                   'Nothing timetabled today.',
                   style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
@@ -178,7 +178,7 @@ class _LessonRow extends StatelessWidget {
                       color: live ? Role.teacher.tint : AppTheme.text,
                     ),
                   ),
-                  Text('P${slot.period}', style: const TextStyle(fontSize: 11, color: AppTheme.textFaint)),
+                  Text('P${slot.period}', style: TextStyle(fontSize: 11, color: AppTheme.textFaint)),
                 ],
               ),
             ),
@@ -198,12 +198,12 @@ class _LessonRow extends StatelessWidget {
                   Text(slot.subjectName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                   Text(
                     '${slot.className}${slot.room != null ? ' · ${slot.room}' : ''}',
-                    style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                    style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                   ),
                 ],
               ),
             ),
-            if (live) Tag('Now', color: Colors.white, background: Role.teacher.tint),
+            if (live) Tag('Now', color: AppTheme.surface, background: Role.teacher.tint),
           ],
         ),
       ),
@@ -253,7 +253,7 @@ class _ClassRow extends StatelessWidget {
                   ),
                   Text(
                     '${slot.studentCount} children${slot.room != null ? ' · ${slot.room}' : ''}',
-                    style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                    style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                   ),
                 ],
               ),
@@ -278,7 +278,7 @@ class _Fig extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
-          Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+          Text(label, style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
         ],
       ),
     );
@@ -302,8 +302,8 @@ class _Nav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
         border: Border(top: BorderSide(color: AppTheme.border)),
       ),
       child: SafeArea(

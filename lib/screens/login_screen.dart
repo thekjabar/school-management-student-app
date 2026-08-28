@@ -110,8 +110,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed: _openSheet,
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppTheme.text,
-                            backgroundColor: Colors.white,
-                            side: const BorderSide(color: AppTheme.border),
+                            backgroundColor: AppTheme.surface,
+                            side: BorderSide(color: AppTheme.border),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
                             textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
                           ),
@@ -122,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(
                         t('welcome.usePhone'),
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 12, color: AppTheme.textFaint, height: 1.5),
+                        style: TextStyle(fontSize: 12, color: AppTheme.textFaint, height: 1.5),
                       ),
                     ],
                   ),
@@ -159,7 +159,7 @@ class _Brand extends StatelessWidget {
               ),
             ],
           ),
-          child: const Icon(Icons.school_rounded, color: Colors.white, size: 33),
+          child: Icon(Icons.school_rounded, color: AppTheme.surface, size: 33),
         ),
         const SizedBox(height: 16),
         Text(
@@ -170,7 +170,7 @@ class _Brand extends StatelessWidget {
         Text(
           t('app.tagline'),
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 13.5, color: AppTheme.textMuted, height: 1.5),
+          style: TextStyle(fontSize: 13.5, color: AppTheme.textMuted, height: 1.5),
         ),
       ],
     );
@@ -277,7 +277,7 @@ class _SignInSheetState extends State<_SignInSheet> {
       // The sheet rides above the keyboard rather than hiding behind it.
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppTheme.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
         ),
@@ -317,7 +317,7 @@ class _SignInSheetState extends State<_SignInSheet> {
         const SizedBox(height: 5),
         Text(
           t('login.subtitle'),
-          style: const TextStyle(fontSize: 13, color: AppTheme.textMuted, height: 1.45),
+          style: TextStyle(fontSize: 13, color: AppTheme.textMuted, height: 1.45),
         ),
         const SizedBox(height: 24),
         _Label(t('login.phone')),
@@ -332,7 +332,7 @@ class _SignInSheetState extends State<_SignInSheet> {
           onSubmitted: (_) => _passwordFocus.requestFocus(),
           decoration: InputDecoration(
             hintText: t('login.phoneHint'),
-            prefixIcon: const Icon(Icons.phone_rounded, size: 18, color: AppTheme.textFaint),
+            prefixIcon: Icon(Icons.phone_rounded, size: 18, color: AppTheme.textFaint),
             prefixIconConstraints: const BoxConstraints(minWidth: 44),
           ),
         ),
@@ -345,7 +345,7 @@ class _SignInSheetState extends State<_SignInSheet> {
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => _busy ? null : _signIn(),
           decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.lock_outline_rounded, size: 18, color: AppTheme.textFaint),
+            prefixIcon: Icon(Icons.lock_outline_rounded, size: 18, color: AppTheme.textFaint),
             prefixIconConstraints: const BoxConstraints(minWidth: 44),
             suffixIcon: IconButton(
               icon: Icon(
@@ -370,7 +370,7 @@ class _SignInSheetState extends State<_SignInSheet> {
         Text(
           t('login.forgot'),
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 12, color: AppTheme.textFaint, height: 1.5),
+          style: TextStyle(fontSize: 12, color: AppTheme.textFaint, height: 1.5),
         ),
       ],
     );
@@ -395,7 +395,7 @@ class _SignInSheetState extends State<_SignInSheet> {
         const SizedBox(height: 11),
         Text(
           t('login.chooseWhy'),
-          style: const TextStyle(color: AppTheme.textMuted, fontSize: 12.5, height: 1.5),
+          style: TextStyle(color: AppTheme.textMuted, fontSize: 12.5, height: 1.5),
         ),
         const SizedBox(height: 22),
         _Label(t('login.newPassword')),
@@ -404,7 +404,7 @@ class _SignInSheetState extends State<_SignInSheet> {
           obscureText: true,
           autofocus: true,
           textInputAction: TextInputAction.next,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             prefixIcon: Icon(Icons.lock_outline_rounded, size: 18, color: AppTheme.textFaint),
             prefixIconConstraints: BoxConstraints(minWidth: 44),
           ),
@@ -412,7 +412,7 @@ class _SignInSheetState extends State<_SignInSheet> {
         const SizedBox(height: 6),
         Text(
           t('login.rule'),
-          style: const TextStyle(color: AppTheme.textFaint, fontSize: 11.5),
+          style: TextStyle(color: AppTheme.textFaint, fontSize: 11.5),
         ),
         const SizedBox(height: 16),
         _Label(t('login.typeAgain')),
@@ -421,7 +421,7 @@ class _SignInSheetState extends State<_SignInSheet> {
           obscureText: true,
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => _busy ? null : _choose(),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             prefixIcon: Icon(Icons.lock_outline_rounded, size: 18, color: AppTheme.textFaint),
             prefixIconConstraints: BoxConstraints(minWidth: 44),
           ),
@@ -451,7 +451,7 @@ class _Label extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 7, left: 2),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.textMuted),
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.textMuted),
       ),
     );
   }
@@ -477,12 +477,12 @@ class _ErrorLine extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 16, color: AppTheme.rose),
+            Icon(Icons.error_outline_rounded, size: 16, color: AppTheme.rose),
             const SizedBox(width: 9),
             Expanded(
               child: Text(
                 text,
-                style: const TextStyle(color: AppTheme.rose, fontSize: 12.5, height: 1.45),
+                style: TextStyle(color: AppTheme.rose, fontSize: 12.5, height: 1.45),
               ),
             ),
           ],
@@ -509,7 +509,7 @@ class LanguagePicker extends StatelessWidget {
       builder: (context, current, _) => Container(
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.7),
+          color: AppTheme.surface.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(11),
           border: Border.all(color: AppTheme.border),
         ),

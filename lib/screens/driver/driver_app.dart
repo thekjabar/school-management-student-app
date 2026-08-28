@@ -59,7 +59,7 @@ class _DriverAppState extends State<DriverApp> {
                         const SizedBox(height: 2),
                         Text(
                           longDate(DateTime.now()),
-                          style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                          style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                         ),
                       ],
                     ),
@@ -67,7 +67,7 @@ class _DriverAppState extends State<DriverApp> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppTheme.surface,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
@@ -209,7 +209,7 @@ class _TripCard extends StatelessWidget {
                       Text(
                         '${trip.leg == 'OUT' ? 'Morning — to school' : 'Afternoon — home'}'
                         ' · ${hhmm(trip.scheduledDepartureAt)}',
-                        style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                        style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                       ),
                     ],
                   ),
@@ -243,18 +243,18 @@ class _TripCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppTheme.surface,
                   borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.warning_rounded, color: AppTheme.rose, size: 19),
+                    Icon(Icons.warning_rounded, color: AppTheme.rose, size: 19),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'This run has ended and the cabin sweep is not confirmed.'
                         '${trip.sweepDeadlineAt != null ? ' Due by ${hhmm(trip.sweepDeadlineAt)}.' : ''}',
-                        style: const TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.rose),
+                        style: TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.rose),
                       ),
                     ),
                   ],
@@ -274,7 +274,7 @@ class _TripCard extends StatelessWidget {
                   // the reasons have to be readable here or the driver is stuck
                   // at the depot with no idea why.
                   'Blocked: ${trip.complianceFailReasons.map(humanise).join(', ')}',
-                  style: const TextStyle(fontSize: 12.5, color: AppTheme.rose, height: 1.45),
+                  style: TextStyle(fontSize: 12.5, color: AppTheme.rose, height: 1.45),
                 ),
               ),
             ],
@@ -349,7 +349,7 @@ class _HistoryRow extends StatelessWidget {
                   ),
                   Text(
                     '${shortDate(trip.serviceDate)} · ${trip.leg == 'OUT' ? 'to school' : 'home'}',
-                    style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                    style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                   ),
                 ],
               ),
@@ -384,7 +384,7 @@ class _Fig extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(value, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
-          Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+          Text(label, style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
         ],
       ),
     );
@@ -406,8 +406,8 @@ class _Nav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
         border: Border(top: BorderSide(color: AppTheme.border)),
       ),
       child: SafeArea(

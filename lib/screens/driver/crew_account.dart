@@ -61,7 +61,7 @@ class CrewAccountTab extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           (person['phoneE164'] ?? me?.phone ?? '') as String,
-                          style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                          style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                         ),
                         const SizedBox(height: 6),
                         Wrap(
@@ -88,7 +88,7 @@ class CrewAccountTab extends StatelessWidget {
                   color: AppTheme.roseSoft,
                   borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                 ),
-                child: const Text(
+                child: Text(
                   'Your leaving process has started. The office will tell you when your access ends.',
                   style: TextStyle(fontSize: 12.5, height: 1.5, color: AppTheme.rose),
                 ),
@@ -96,7 +96,7 @@ class CrewAccountTab extends StatelessWidget {
             ],
             const SectionHead('Your papers'),
             if (credentials.isEmpty)
-              const Panel(
+              Panel(
                 child: Text(
                   'Nothing is on file. The office holds licences, medicals and vetting checks — '
                   'ask them to add yours, or the gate will stop you at check-in.',
@@ -194,7 +194,7 @@ class CrewAccountTab extends StatelessWidget {
                 ),
                 if (error != null) ...[
                   const SizedBox(height: 12),
-                  Text(error!, style: const TextStyle(color: AppTheme.rose, fontSize: 12.5)),
+                  Text(error!, style: TextStyle(color: AppTheme.rose, fontSize: 12.5)),
                 ],
               ],
             ),
@@ -255,7 +255,7 @@ class _CredentialRow extends StatelessWidget {
                   ),
                   Text(
                     expires == null ? 'No expiry recorded' : 'Expires ${longDate(expires)}',
-                    style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                    style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                   ),
                 ],
               ),
@@ -302,7 +302,7 @@ class _Row extends StatelessWidget {
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, size: 19, color: AppTheme.textFaint),
+            Icon(Icons.chevron_right_rounded, size: 19, color: AppTheme.textFaint),
           ],
         ),
       ),

@@ -51,7 +51,7 @@ class FeesScreen extends StatelessWidget {
                           : late
                               ? AppTheme.rose
                               : AppTheme.amber,
-                      background: Colors.white,
+                      background: AppTheme.surface,
                       size: 44,
                     ),
                     const SizedBox(width: 13),
@@ -77,7 +77,7 @@ class FeesScreen extends StatelessWidget {
                                         ? t('fees.dueNow')
                                         : tn('fees.dueOn', longDate(f.dueAt)) +
                                             (f.daysUntilDue != null ? tn('fees.inDays', f.daysUntilDue!) : ''),
-                            style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted, height: 1.4),
+                            style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted, height: 1.4),
                           ),
                         ],
                       ),
@@ -100,13 +100,13 @@ class FeesScreen extends StatelessWidget {
                         title: t('fees.cash'),
                         body: t('fees.cashBody'),
                       ),
-                      const Divider(height: 22, color: AppTheme.border),
+                      Divider(height: 22, color: AppTheme.border),
                       _Way(
                         icon: Icons.account_balance_rounded,
                         title: t('fees.transfer'),
                         body: t('fees.transferBody'),
                       ),
-                      const Divider(height: 22, color: AppTheme.border),
+                      Divider(height: 22, color: AppTheme.border),
                       _Way(
                         icon: Icons.directions_bus_rounded,
                         title: t('fees.driver'),
@@ -160,7 +160,7 @@ class _Way extends StatelessWidget {
               const SizedBox(height: 3),
               Text(
                 body,
-                style: const TextStyle(fontSize: 12, height: 1.5, color: AppTheme.textMuted),
+                style: TextStyle(fontSize: 12, height: 1.5, color: AppTheme.textMuted),
               ),
             ],
           ),
@@ -201,7 +201,7 @@ class _InvoiceCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       invoice.serial,
-                      style: const TextStyle(fontSize: 11, color: AppTheme.textFaint),
+                      style: TextStyle(fontSize: 11, color: AppTheme.textFaint),
                     ),
                   ],
                 ),
@@ -213,7 +213,7 @@ class _InvoiceCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          const Divider(height: 1, color: AppTheme.border),
+          Divider(height: 1, color: AppTheme.border),
           const SizedBox(height: 12),
           for (final line in invoice.lines)
             Padding(
@@ -225,7 +225,7 @@ class _InvoiceCard extends StatelessWidget {
                       line.studentName != null
                           ? '${line.description} — ${line.studentName}'
                           : line.description,
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                      style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
                   ),
                   Text(
@@ -236,7 +236,7 @@ class _InvoiceCard extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 6),
-          const Divider(height: 1, color: AppTheme.border),
+          Divider(height: 1, color: AppTheme.border),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -254,7 +254,7 @@ class _InvoiceCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(t('fees.stillOwed'), style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted)),
+                  child: Text(t('fees.stillOwed'), style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted)),
                 ),
                 Text(
                   iqd(invoice.balanceIqd),
@@ -265,7 +265,7 @@ class _InvoiceCard extends StatelessWidget {
             const SizedBox(height: 3),
             Text(
               tn('fees.dueOn', longDate(invoice.dueAt)),
-              style: const TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
+              style: TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
             ),
           ],
         ],

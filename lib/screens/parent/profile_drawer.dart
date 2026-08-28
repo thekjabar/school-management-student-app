@@ -94,6 +94,12 @@ class ProfileDrawer extends StatelessWidget {
                     child: _PushRow(),
                   ),
 
+                  _Section(t('more.appearance')),
+                  Card16(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    child: const _ThemePicker(),
+                  ),
+
                   _Section(t('more.language')),
                   const Card16(
                     padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -222,7 +228,7 @@ class _Head extends StatelessWidget {
                   // A phone number is read left-to-right even on a Kurdish
                   // screen; letting it mirror makes it unreadable.
                   textDirection: TextDirection.ltr,
-                  style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                  style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                 ),
                 if ((me?.schoolName ?? '').isNotEmpty) ...[
                   const SizedBox(height: 2),
@@ -230,7 +236,7 @@ class _Head extends StatelessWidget {
                     me!.schoolName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
+                    style: TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
                   ),
                 ],
               ],
@@ -255,7 +261,7 @@ class _Section extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(4, 18, 4, 8),
       child: Text(
         text.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.6,
@@ -281,7 +287,7 @@ class _Note extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_rounded, size: 17, color: AppTheme.amber),
+          Icon(Icons.info_rounded, size: 17, color: AppTheme.amber),
           const SizedBox(width: 9),
           Expanded(
             child: Text(text, style: const TextStyle(fontSize: 12, height: 1.5)),
@@ -413,8 +419,8 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -440,7 +446,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
             const SizedBox(height: 4),
             Text(
               t('more.changePasswordSub'),
-              style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted, height: 1.4),
+              style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted, height: 1.4),
             ),
             const SizedBox(height: 16),
             _Field(controller: _current, label: t('more.currentPassword')),
@@ -450,7 +456,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
             _Field(controller: _confirm, label: t('login.confirmPassword')),
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(color: AppTheme.rose, fontSize: 12.5)),
+              Text(_error!, style: TextStyle(color: AppTheme.rose, fontSize: 12.5)),
             ],
             const SizedBox(height: 18),
             BigButton(
@@ -483,12 +489,86 @@ class _Field extends StatelessWidget {
         fillColor: AppTheme.canvas,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: AppTheme.border),
+          borderSide: BorderSide(color: AppTheme.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: AppTheme.border),
+          borderSide: BorderSide(color: AppTheme.border),
         ),
+      ),
+    );
+  }
+}
+
+
+/// Light, dark, or follow the phone.
+///
+/// "System" first and selected by default: somebody who has set their handset
+/// to dark has already answered this question, and asking it again in every
+/// app is how a settings screen fills up with questions nobody wanted.
+class _ThemePicker extends StatelessWidget {
+  const _ThemePicker();
+
+  IconData _icon(AppThemeMode m) => switch (m) {
+        AppThemeMode.system => Icons.brightness_auto_rounded,
+        AppThemeMode.light => Icons.light_mode_rounded,
+        AppThemeMode.dark => Icons.dark_mode_rounded,
+      };
+
+  String _label(AppThemeMode m) => switch (m) {
+        AppThemeMode.system => t('theme.system'),
+        AppThemeMode.light => t('theme.light'),
+        AppThemeMode.dark => t('theme.dark'),
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<AppThemeMode>(
+      valueListenable: AppThemeSetting.current,
+      builder: (context, current, _) => Row(
+        children: [
+          for (final mode in AppThemeMode.values)
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: current == mode ? null : () => AppThemeSetting.set(mode),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 140),
+                  curve: Curves.easeOut,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  decoration: BoxDecoration(
+                    color: current == mode ? Role.parent.wash : AppTheme.canvas,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: current == mode ? Role.parent.tint : AppTheme.border,
+                      width: current == mode ? 1.4 : 1,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        _icon(mode),
+                        size: 19,
+                        color: current == mode ? Role.parent.tint : AppTheme.textMuted,
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        _label(mode),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: current == mode ? FontWeight.w700 : FontWeight.w600,
+                          color: current == mode ? AppTheme.text : AppTheme.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

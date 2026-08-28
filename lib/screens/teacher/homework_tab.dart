@@ -130,7 +130,7 @@ class _Card extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         '${item.className} · ${item.subjectName}',
-                        style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                        style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                       ),
                     ],
                   ),
@@ -145,11 +145,11 @@ class _Card extends StatelessWidget {
             const SizedBox(height: 10),
             Row(
               children: [
-                const Icon(Icons.event_rounded, size: 13, color: AppTheme.textFaint),
+                Icon(Icons.event_rounded, size: 13, color: AppTheme.textFaint),
                 const SizedBox(width: 5),
                 Text(
                   'Set ${shortDate(item.assignedOn)} · due ${longDate(item.dueDate)}',
-                  style: const TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
+                  style: TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
                 ),
               ],
             ),
@@ -259,7 +259,7 @@ class _SetSheetState extends State<_SetSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppTheme.canvas,
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         ),
@@ -344,13 +344,13 @@ class _SetSheetState extends State<_SetSheet> {
                               height: 48,
                               padding: const EdgeInsets.symmetric(horizontal: 14),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: AppTheme.surface,
                                 borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                                 border: Border.all(color: AppTheme.border),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.calendar_today_rounded, size: 15, color: AppTheme.textFaint),
+                                  Icon(Icons.calendar_today_rounded, size: 15, color: AppTheme.textFaint),
                                   const SizedBox(width: 9),
                                   Text(
                                     shortDate(_due),
@@ -383,7 +383,7 @@ class _SetSheetState extends State<_SetSheet> {
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
-                  Text(_error!, style: const TextStyle(color: AppTheme.rose, fontSize: 12.5)),
+                  Text(_error!, style: TextStyle(color: AppTheme.rose, fontSize: 12.5)),
                 ],
                 const SizedBox(height: 16),
                 SizedBox(
@@ -429,7 +429,7 @@ class _Label extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 7, left: 2),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textMuted),
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textMuted),
       ),
     );
   }
