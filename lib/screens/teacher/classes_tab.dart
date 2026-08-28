@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/client.dart';
 import '../../api/teacher_api.dart';
+import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
@@ -21,7 +22,7 @@ class ClassesTab extends StatelessWidget {
       tint: Role.teacher.tint,
       load: () => TeacherApi.instance.classes(),
       isEmpty: (rows) => rows.isEmpty,
-      empty: 'No classes are assigned to you yet.',
+      empty: t('teacher.noClasses'),
       builder: (context, classes) => Column(
         children: [
           const SizedBox(height: 12),
@@ -61,7 +62,7 @@ class ClassesTab extends StatelessWidget {
                           ),
                         ),
                         if (c.isHomeroom)
-                          Tag('Homeroom', color: Role.teacher.tint, background: Role.teacher.wash),
+                          Tag(t('teacher.homeroom'), color: Role.teacher.tint, background: Role.teacher.wash),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -79,7 +80,7 @@ class ClassesTab extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                               ),
                             ),
-                            child: const Text('Take the register'),
+                            child: Text(t('teacher.takeRegister')),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -89,7 +90,7 @@ class ClassesTab extends StatelessWidget {
                               MaterialPageRoute(builder: (_) => _StudentsScreen(slot: c)),
                             ),
                             style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
-                            child: const Text('The children'),
+                            child: Text(t('teacher.theChildren')),
                           ),
                         ),
                       ],
@@ -135,7 +136,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
       if (!mounted) return;
       setState(() => _dirty = false);
-      showNote(context, 'Register saved');
+      showNote(context, t('teacher.registerSaved'));
       _loaderKey.currentState?.reload();
     } on ApiException catch (e) {
       if (mounted) showNote(context, e.message, bad: true);
@@ -201,7 +202,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
                           )
                         : Text(
-                            'Save — $present present, $absent absent, $late late',
+                            tn('teacher.saveTally', t('teacher.tally').replaceAll('{n}', '$present').replaceAll('{a}', '$absent').replaceAll('{l}', '$late')),
                             style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
                           ),
                   ),
@@ -218,7 +219,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           return data;
         },
         isEmpty: (d) => d.marks.isEmpty,
-        empty: 'Nobody is on this class roster.',
+        empty: t('teacher.noRoster'),
         builder: (context, data) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -237,7 +238,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     SizedBox(width: 9),
                     Expanded(
                       child: Text(
-                        'This register has already been taken. Changing it will amend the record.',
+                        t('teacher.registerTaken'),
                         style: TextStyle(fontSize: 12, height: 1.45, color: AppTheme.green),
                       ),
                     ),
@@ -260,7 +261,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       child: Text(
                         // Said plainly, because the screen opens with everyone
                         // showing Present and that is a default, not a record.
-                        'Nothing is marked yet. Everyone shows as present until you save.',
+                        t('teacher.nothingMarked'),
                         style: TextStyle(fontSize: 12, height: 1.45, color: AppTheme.text),
                       ),
                     ),
@@ -381,7 +382,7 @@ class _StudentsScreen extends StatelessWidget {
         tint: Role.teacher.tint,
         load: () => TeacherApi.instance.students(slot.classId),
         isEmpty: (rows) => rows.isEmpty,
-        empty: 'Nobody is on this class roster.',
+        empty: t('teacher.noRoster'),
         builder: (context, students) => Column(
           children: [
             const SizedBox(height: 10),

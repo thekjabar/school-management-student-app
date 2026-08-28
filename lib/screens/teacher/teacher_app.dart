@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../api/session.dart';
 import '../../api/teacher_api.dart';
+import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
+import '../../ui/kit.dart';
 import 'classes_tab.dart';
 import 'exams_tab.dart';
+import 'teacher_drawer.dart';
 import 'homework_tab.dart';
-import 'teacher_account.dart';
 
 /// The teacher app.
 ///
@@ -24,44 +26,61 @@ class TeacherApp extends StatefulWidget {
 }
 
 class _TeacherAppState extends State<TeacherApp> {
+  // Held so the header's menu button can open the drawer: the Scaffold that
+  // owns it is built by this method, so there is no context above it to ask.
+  final _scaffold = GlobalKey<ScaffoldState>();
   int _tab = 0;
+
+  List<NavItem> get _nav => [
+        NavItem(Icons.today_rounded, Icons.today_outlined, t('teacher.today')),
+        NavItem(Icons.groups_rounded, Icons.groups_outlined, t('teacher.classes')),
+        NavItem(Icons.assignment_rounded, Icons.assignment_outlined, t('teacher.homework')),
+        NavItem(Icons.school_rounded, Icons.school_outlined, t('teacher.exams')),
+      ];
 
   @override
   Widget build(BuildContext context) {
     const role = Role.teacher;
     final me = Session.instance.me;
+
     final hour = DateTime.now().hour;
-    final greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    final greeting = hour < 12
+        ? t('greet.morning')
+        : hour < 17
+            ? t('greet.afternoon')
+            : t('greet.evening');
 
     return Scaffold(
+      key: _scaffold,
       backgroundColor: AppTheme.canvas,
+      // The account left the bottom bar. Five items is past the point where a
+      // bar is scanned rather than read, and the fifth was the one nobody
+      // needed during a lesson.
+      drawer: const TeacherDrawer(),
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            Container(
-              width: double.infinity,
-              color: role.wash,
-              padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    me == null ? greeting : '$greeting, ${me.firstName}',
-                    style: const TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.4,
-                    ),
+            RoleHeader(
+              role: role,
+              greeting: greeting,
+              name: me?.name ?? '',
+              onAvatar: () => _scaffold.currentState?.openDrawer(),
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Text(
+                  shortDate(DateTime.now()),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: role.tint,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${me?.schoolName ?? ''} · ${longDate(DateTime.now())}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
-                  ),
-                ],
+                ),
               ),
             ),
             Expanded(
@@ -72,19 +91,22 @@ class _TeacherAppState extends State<TeacherApp> {
                   ClassesTab(),
                   HomeworkTab(),
                   ExamsTab(),
-                  TeacherAccountTab(),
                 ],
               ),
             ),
           ],
         ),
       ),
-      bottomNavigationBar: _Nav(index: _tab, onChanged: (i) => setState(() => _tab = i)),
+      bottomNavigationBar: BottomNav(
+        items: _nav,
+        index: _tab,
+        tint: role.tint,
+        onChanged: (i) => setState(() => _tab = i),
+      ),
     );
   }
 }
 
-/// Today: the lessons, in order, with the class each belongs to.
 class _TodayTab extends StatelessWidget {
   const _TodayTab();
 
@@ -116,10 +138,10 @@ class _TodayTab extends StatelessWidget {
             Panel(
               child: Row(
                 children: [
-                  _Fig(label: 'Classes', value: '${data.profile.classCount}'),
-                  _Fig(label: 'Subjects', value: '${data.profile.subjectCount}'),
-                  _Fig(label: 'Children', value: '${data.profile.studentCount}'),
-                  _Fig(label: 'Today', value: '${todaysLessons.length}'),
+                  _Fig(label: t('teacher.classes'), value: '${data.profile.classCount}'),
+                  _Fig(label: t('teacher.subjects'), value: '${data.profile.subjectCount}'),
+                  _Fig(label: t('teacher.children'), value: '${data.profile.studentCount}'),
+                  _Fig(label: t('teacher.today'), value: '${todaysLessons.length}'),
                 ],
               ),
             ),
@@ -127,13 +149,13 @@ class _TodayTab extends StatelessWidget {
             if (todaysLessons.isEmpty)
               Panel(
                 child: Text(
-                  'Nothing timetabled today.',
+                  t('teacher.nothingToday'),
                   style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
                 ),
               )
             else
               ...todaysLessons.map((s) => _LessonRow(slot: s)),
-            const SectionHead('Your classes'),
+            SectionHead(t('teacher.yourClasses')),
             ...data.classes.map((c) => _ClassRow(slot: c)),
             const SizedBox(height: 10),
           ],
@@ -247,7 +269,7 @@ class _ClassRow extends StatelessWidget {
                       ),
                       if (slot.isHomeroom) ...[
                         const SizedBox(width: 7),
-                        Tag('Homeroom', color: Role.teacher.tint, background: Role.teacher.wash),
+                        Tag(t('teacher.homeroom'), color: Role.teacher.tint, background: Role.teacher.wash),
                       ],
                     ],
                   ),
@@ -285,59 +307,3 @@ class _Fig extends StatelessWidget {
   }
 }
 
-class _Nav extends StatelessWidget {
-  const _Nav({required this.index, required this.onChanged});
-
-  final int index;
-  final ValueChanged<int> onChanged;
-
-  static const _items = [
-    (Icons.today_rounded, Icons.today_outlined, 'Today'),
-    (Icons.groups_rounded, Icons.groups_outlined, 'Classes'),
-    (Icons.assignment_rounded, Icons.assignment_outlined, 'Homework'),
-    (Icons.school_rounded, Icons.school_outlined, 'Exams'),
-    (Icons.person_rounded, Icons.person_outline_rounded, 'Me'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        border: Border(top: BorderSide(color: AppTheme.border)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 60,
-          child: Row(
-            children: List.generate(_items.length, (i) {
-              final on = i == index;
-              final item = _items[i];
-              return Expanded(
-                child: InkWell(
-                  onTap: () => onChanged(i),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(on ? item.$1 : item.$2, size: 21, color: on ? Role.teacher.tint : AppTheme.textFaint),
-                      const SizedBox(height: 3),
-                      Text(
-                        item.$3,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: on ? FontWeight.w700 : FontWeight.w500,
-                          color: on ? Role.teacher.tint : AppTheme.textFaint,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
-      ),
-    );
-  }
-}

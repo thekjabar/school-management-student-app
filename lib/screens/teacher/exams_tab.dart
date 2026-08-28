@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../api/client.dart';
 import '../../api/session.dart';
 import '../../api/teacher_api.dart';
+import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
@@ -32,14 +33,14 @@ class _ExamsTabState extends State<ExamsTab> {
         backgroundColor: Role.teacher.tint,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
-        label: const Text('New test'),
+        label: Text(t('teacher.newTest')),
       ),
       body: Loader<List<TeacherExam>>(
         key: _loaderKey,
         tint: Role.teacher.tint,
         load: () => TeacherApi.instance.exams(),
         isEmpty: (rows) => rows.isEmpty,
-        empty: 'You have not set any tests yet.',
+        empty: t('teacher.noTestsYet'),
         builder: (context, rows) {
           final sorted = [...rows]..sort((a, b) => b.date.compareTo(a.date));
           return Column(
@@ -73,7 +74,7 @@ class _ExamsTabState extends State<ExamsTab> {
     );
     if (saved == true) {
       _loaderKey.currentState?.reload();
-      if (mounted) showNote(context, 'Test created');
+      if (mounted) showNote(context, t('teacher.testCreated'));
     }
   }
 }
@@ -120,7 +121,7 @@ class _ExamCard extends StatelessWidget {
                   ),
                 ),
                 Tag(
-                  published ? 'Released' : humanise(exam.state),
+                  published ? t('teacher.released') : humanise(exam.state),
                   color: published ? AppTheme.green : AppTheme.amber,
                   background: published ? AppTheme.greenSoft : AppTheme.amberSoft,
                 ),
@@ -177,7 +178,7 @@ class _MarksScreenState extends State<MarksScreen> {
       await TeacherApi.instance.saveMarks(widget.exam.id, _rows);
       if (!mounted) return;
       setState(() => _dirty = false);
-      showNote(context, 'Marks saved — families cannot see them yet');
+      showNote(context, t('teacher.marksSaved'));
       _loaderKey.currentState?.reload();
     } on ApiException catch (e) {
       if (mounted) showNote(context, e.message, bad: true);
@@ -190,17 +191,14 @@ class _MarksScreenState extends State<MarksScreen> {
     final yes = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Release these marks?'),
-        content: const Text(
-          'Every family in this class will be able to see their own child\'s mark, '
-          'and will be notified. This cannot be quietly undone.',
-        ),
+        title: Text(t('teacher.releaseAsk')),
+        content: Text(t('teacher.releaseWarning')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Not yet')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t('teacher.notYet'))),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: Role.teacher.tint),
-            child: const Text('Release'),
+            child: Text(t('teacher.release')),
           ),
         ],
       ),
@@ -210,7 +208,7 @@ class _MarksScreenState extends State<MarksScreen> {
     try {
       await TeacherApi.instance.publishMarks(widget.exam.id);
       if (!mounted) return;
-      showNote(context, 'Marks released to families');
+      showNote(context, t('teacher.marksReleased'));
       _loaderKey.currentState?.reload();
     } on ApiException catch (e) {
       if (mounted) showNote(context, e.message, bad: true);
@@ -250,7 +248,7 @@ class _MarksScreenState extends State<MarksScreen> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
                           )
-                        : Text('Save $marked/${_rows.length}'),
+                        : Text(tn('teacher.saveCount', '$marked/${_rows.length}')),
                   ),
                 ),
               ),
@@ -268,7 +266,7 @@ class _MarksScreenState extends State<MarksScreen> {
                           borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                         ),
                       ),
-                      child: Text(_published ? 'Released' : 'Release'),
+                      child: Text(_published ? t('teacher.released') : t('teacher.release')),
                     ),
                   ),
                 ),
@@ -287,7 +285,7 @@ class _MarksScreenState extends State<MarksScreen> {
           return data;
         },
         isEmpty: (d) => d.rows.isEmpty,
-        empty: 'Nobody is on this class roster.',
+        empty: t('teacher.noRoster'),
         builder: (context, data) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -310,10 +308,10 @@ class _MarksScreenState extends State<MarksScreen> {
                   Expanded(
                     child: Text(
                       data.published
-                          ? 'Families can see these marks.'
+                          ? t('teacher.familiesSeeMarks')
                           : _mayRelease
-                              ? 'Only you can see these. Release them when the whole class is marked.'
-                              : 'Only you can see these. The school office releases marks to families.',
+                              ? t('teacher.onlyYouSee')
+                              : t('teacher.officeReleases'),
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.45,
@@ -512,11 +510,11 @@ class _NewExamSheetState extends State<_NewExamSheet> {
     final termId = _termId;
     if (slot == null) return;
     if (termId == null) {
-      setState(() => _error = 'No term is open. The school office sets these.');
+      setState(() => _error = t('teacher.noTerm'));
       return;
     }
     if (_title.text.trim().length < 2) {
-      setState(() => _error = 'Give the test a name.');
+      setState(() => _error = t('teacher.testNameHint'));
       return;
     }
     setState(() {
@@ -567,17 +565,17 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'New test',
+              Text(
+                t('teacher.newTest'),
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.4),
               ),
               const SizedBox(height: 16),
               if (_loading)
                 const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()))
               else if (_classes.isEmpty)
-                const Text('You have no classes to set a test for.')
+                Text(t('teacher.noClassForTest'))
               else ...[
-                const _Label('Class and subject'),
+                _Label(t('teacher.classAndSubject')),
                 DropdownButtonFormField<TeachingSlot>(
                   initialValue: _slot,
                   isExpanded: true,
@@ -590,14 +588,14 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                   onChanged: (v) => setState(() => _slot = v),
                 ),
                 const SizedBox(height: 16),
-                const _Label('Name'),
+                _Label(t('teacher.testName')),
                 TextField(
                   controller: _title,
                   textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(hintText: 'Unit 3 quiz'),
+                  decoration: InputDecoration(hintText: t('teacher.testNameExample')),
                 ),
                 const SizedBox(height: 16),
-                const _Label('Kind'),
+                _Label(t('teacher.kind')),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -631,7 +629,7 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const _Label('Date'),
+                          _Label(t('teacher.dueDate')),
                           GestureDetector(
                             onTap: () async {
                               final picked = await showDatePicker(
@@ -670,7 +668,7 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const _Label('Out of'),
+                          _Label(t('teacher.outOf')),
                           DropdownButtonFormField<int>(
                             initialValue: _maxScore,
                             items: const [10, 20, 25, 50, 100]
@@ -705,7 +703,7 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
                           )
-                        : const Text('Create', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                        : Text(t('teacher.create'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                   ),
                 ),
               ],

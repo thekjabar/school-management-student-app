@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/client.dart';
 import '../../api/teacher_api.dart';
+import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
@@ -31,14 +32,14 @@ class _HomeworkTabState extends State<HomeworkTab> {
         backgroundColor: Role.teacher.tint,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Set homework'),
+        label: Text(t('teacher.setHomework')),
       ),
       body: Loader<List<TeacherHomework>>(
         key: _loaderKey,
         tint: Role.teacher.tint,
         load: () => TeacherApi.instance.homework(),
         isEmpty: (rows) => rows.isEmpty,
-        empty: 'You have not set any homework yet.',
+        empty: t('teacher.noHomeworkYet'),
         builder: (context, rows) {
           final drafts = rows.where((h) => h.publishedAt == null).toList();
           final live = rows.where((h) => h.publishedAt != null).toList()
@@ -48,7 +49,7 @@ class _HomeworkTabState extends State<HomeworkTab> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (drafts.isNotEmpty) ...[
-                const SectionHead('Not yet published'),
+                SectionHead(t('teacher.notPublished')),
                 ...drafts.map((h) => _Card(
                       item: h,
                       onPublish: () => _publish(h),
@@ -68,7 +69,7 @@ class _HomeworkTabState extends State<HomeworkTab> {
     try {
       await TeacherApi.instance.publishHomework(h.id);
       _loaderKey.currentState?.reload();
-      if (mounted) showNote(context, 'Published — families can see it now');
+      if (mounted) showNote(context, t('teacher.published'));
     } on ApiException catch (e) {
       if (mounted) showNote(context, e.message, bad: true);
     }
@@ -83,7 +84,7 @@ class _HomeworkTabState extends State<HomeworkTab> {
     );
     if (saved == true) {
       _loaderKey.currentState?.reload();
-      if (mounted) showNote(context, 'Homework set');
+      if (mounted) showNote(context, t('teacher.homeworkSet'));
     }
   }
 }
@@ -148,7 +149,7 @@ class _Card extends StatelessWidget {
                 Icon(Icons.event_rounded, size: 13, color: AppTheme.textFaint),
                 const SizedBox(width: 5),
                 Text(
-                  'Set ${shortDate(item.assignedOn)} · due ${longDate(item.dueDate)}',
+                  '${tn('teacher.setOn', shortDate(item.assignedOn))} · ${tn('teacher.dueOn', longDate(item.dueDate))}',
                   style: TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
                 ),
               ],
@@ -166,7 +167,7 @@ class _Card extends StatelessWidget {
                       borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                     ),
                   ),
-                  child: const Text('Publish to families'),
+                  child: Text(t('teacher.publishToFamilies')),
                 ),
               ),
             ],
@@ -230,7 +231,7 @@ class _SetSheetState extends State<_SetSheet> {
     final slot = _slot;
     if (slot == null) return;
     if (_title.text.trim().length < 2) {
-      setState(() => _error = 'Give it a title the children will recognise.');
+      setState(() => _error = t('teacher.titleHint'));
       return;
     }
     setState(() {
@@ -280,17 +281,17 @@ class _SetSheetState extends State<_SetSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Set homework',
+              Text(
+                t('teacher.setHomework'),
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.4),
               ),
               const SizedBox(height: 16),
               if (_loading)
                 const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()))
               else if (_classes.isEmpty)
-                const Text('You have no classes to set work for.')
+                Text(t('teacher.noClassForWork'))
               else ...[
-                const _Label('Class and subject'),
+                _Label(t('teacher.classAndSubject')),
                 DropdownButtonFormField<TeachingSlot>(
                   initialValue: _slot,
                   isExpanded: true,
@@ -306,21 +307,21 @@ class _SetSheetState extends State<_SetSheet> {
                   onChanged: (v) => setState(() => _slot = v),
                 ),
                 const SizedBox(height: 16),
-                const _Label('Title'),
+                _Label(t('teacher.title')),
                 TextField(
                   controller: _title,
                   textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(hintText: 'Exercises 1–12'),
+                  decoration: InputDecoration(hintText: t('teacher.titleExample')),
                 ),
                 const SizedBox(height: 16),
-                const _Label('What to do'),
+                _Label(t('teacher.whatToDo')),
                 TextField(
                   controller: _description,
                   maxLines: 3,
                   maxLength: 1000,
                   textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    hintText: 'Complete the exercises in your workbook and bring it to the next lesson.',
+                  decoration: InputDecoration(
+                    hintText: t('teacher.whatToDoExample'),
                   ),
                 ),
                 Row(
@@ -368,7 +369,7 @@ class _SetSheetState extends State<_SetSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const _Label('About how long'),
+                          _Label(t('teacher.howLong')),
                           DropdownButtonFormField<int>(
                             initialValue: _minutes,
                             items: const [15, 20, 30, 45, 60, 90]
@@ -403,8 +404,8 @@ class _SetSheetState extends State<_SetSheet> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
                           )
-                        : const Text(
-                            'Set it',
+                        : Text(
+                            t('teacher.setIt'),
                             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                           ),
                   ),

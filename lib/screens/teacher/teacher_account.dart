@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../../api/client.dart';
 import '../../api/session.dart';
 import '../../api/teacher_api.dart';
+import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
 
 /// The teacher's own record, their week, and the way out.
-class TeacherAccountTab extends StatelessWidget {
-  const TeacherAccountTab({super.key});
+class TeacherWeekScreen extends StatelessWidget {
+  const TeacherWeekScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -73,11 +73,11 @@ class TeacherAccountTab extends StatelessWidget {
                 ],
               ),
             ),
-            const SectionHead('Your week'),
+            SectionHead(t('teacher.yourWeek')),
             if (days.isEmpty)
               Panel(
                 child: Text(
-                  'No lessons are timetabled for you.',
+                  t('teacher.noLessons'),
                   style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
                 ),
               )
@@ -99,7 +99,7 @@ class TeacherAccountTab extends StatelessWidget {
                               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
                             ),
                             const SizedBox(width: 8),
-                            if (isToday) Tag('Today', color: Role.teacher.tint, background: AppTheme.surface),
+                            if (isToday) Tag(t('teacher.today'), color: Role.teacher.tint, background: AppTheme.surface),
                             const Spacer(),
                             Text(
                               '${lessons.length} lesson${lessons.length == 1 ? '' : 's'}',
@@ -155,146 +155,10 @@ class TeacherAccountTab extends StatelessWidget {
                   ),
                 );
               }),
-            const SectionHead('Account'),
-            _Row(
-              icon: Icons.lock_outline_rounded,
-              label: 'Change password',
-              onTap: () => _changePassword(context),
-            ),
-            _Row(
-              icon: Icons.logout_rounded,
-              label: 'Sign out',
-              danger: true,
-              onTap: () async {
-                final yes = await showDialog<bool>(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    title: const Text('Sign out?'),
-                    content: const Text('You will need your password to get back in.'),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Stay')),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        style: TextButton.styleFrom(foregroundColor: AppTheme.rose),
-                        child: const Text('Sign out'),
-                      ),
-                    ],
-                  ),
-                );
-                if (yes == true) await Session.instance.signOut();
-              },
-            ),
-            const SizedBox(height: 20),
           ],
         );
       },
     );
   }
 
-  Future<void> _changePassword(BuildContext context) async {
-    final current = TextEditingController();
-    final next = TextEditingController();
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setState) {
-          String? error;
-          bool busy = false;
-
-          Future<void> save() async {
-            if (next.text.length < 8) {
-              setState(() => error = 'Use at least eight characters.');
-              return;
-            }
-            setState(() {
-              busy = true;
-              error = null;
-            });
-            try {
-              await Session.instance.changePassword(current.text, next.text);
-              if (dialogContext.mounted) Navigator.pop(dialogContext);
-              if (context.mounted) {
-                showNote(context, 'Password changed. Every other device has been signed out.');
-              }
-            } on ApiException catch (e) {
-              setState(() {
-                error = e.message;
-                busy = false;
-              });
-            }
-          }
-
-          return AlertDialog(
-            title: const Text('Change password'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: current,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Current password'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: next,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'New password'),
-                ),
-                if (error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(error!, style: TextStyle(color: AppTheme.rose, fontSize: 12.5)),
-                ],
-              ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-              FilledButton(
-                onPressed: busy ? null : save,
-                style: FilledButton.styleFrom(backgroundColor: Role.teacher.tint),
-                child: const Text('Save'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _Row extends StatelessWidget {
-  const _Row({required this.icon, required this.label, required this.onTap, this.danger = false});
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool danger;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Panel(
-        onTap: onTap,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-        child: Row(
-          children: [
-            Icon(icon, size: 19, color: danger ? AppTheme.rose : AppTheme.textMuted),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                  color: danger ? AppTheme.rose : AppTheme.text,
-                ),
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded, size: 19, color: AppTheme.textFaint),
-          ],
-        ),
-      ),
-    );
-  }
 }
