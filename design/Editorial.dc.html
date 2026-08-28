@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,300&family=Source+Sans+3:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #7B2D26; text-decoration: none; }
+    a:hover { color: #5C201B; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #FAF8F3; font-family: 'Source Sans 3', 'Helvetica Neue', sans-serif; color: #17150F; display: flex; flex-direction: column; overflow: hidden;">
+
+  <!-- Masthead: a rule and a wordmark, like a journal cover -->
+  <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 26px 24px 14px 24px; border-bottom: 1px solid #17150F;">
+    <div style="font-family: Newsreader, Georgia, serif; font-size: 19px; font-weight: 500; letter-spacing: -0.2px;">Rêbaz</div>
+    <div style="font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: #8A8175;">Sunday · 28 Sept</div>
+  </div>
+
+  <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 0 24px;">
+
+    <!-- The student, set as a byline -->
+    <div style="display: flex; align-items: baseline; gap: 8px; padding: 18px 0 20px 0;">
+      <div style="font-family: Newsreader, Georgia, serif; font-size: 26px; font-weight: 400; letter-spacing: -0.4px; line-height: 1;">Rawand Karwan</div>
+      <div style="font-size: 11px; color: #8A8175; letter-spacing: 0.4px;">№ 8821</div>
+    </div>
+
+    <!-- Now — the one thing that matters, given a full measure -->
+    <div style="border-top: 2px solid #17150F; border-bottom: 1px solid #DDD8CC; padding: 16px 0 18px 0;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 9px;">
+        <div style="font-size: 10px; letter-spacing: 1.6px; text-transform: uppercase; color: #7B2D26; font-weight: 600;">Now</div>
+        <div style="font-size: 11px; color: #8A8175; font-variant-numeric: tabular-nums;">08:00 — 09:30</div>
+      </div>
+      <div style="font-family: Newsreader, Georgia, serif; font-size: 29px; font-weight: 400; line-height: 1.12; letter-spacing: -0.5px; margin-bottom: 7px;">Advanced<br>Mathematics</div>
+      <div style="font-size: 13px; color: #5C564B;">Room 402 · Prof. Richard Feynman</div>
+    </div>
+
+    <!-- Figures, set as a table rather than as cards -->
+    <div style="display: flex; border-bottom: 1px solid #DDD8CC;">
+      <div style="flex: 1; padding: 16px 0 15px 0; border-right: 1px solid #DDD8CC;">
+        <div style="font-size: 9.5px; letter-spacing: 1.4px; text-transform: uppercase; color: #8A8175; margin-bottom: 7px;">Attendance</div>
+        <div style="display: flex; align-items: baseline; gap: 4px;">
+          <span style="font-family: Newsreader, Georgia, serif; font-size: 33px; font-weight: 400; line-height: 1; font-variant-numeric: tabular-nums;">92</span>
+          <span style="font-size: 14px; color: #8A8175;">%</span>
+        </div>
+      </div>
+      <div style="flex: 1; padding: 16px 0 15px 18px;">
+        <div style="font-size: 9.5px; letter-spacing: 1.4px; text-transform: uppercase; color: #8A8175; margin-bottom: 7px;">Grade point</div>
+        <div style="font-family: Newsreader, Georgia, serif; font-size: 33px; font-weight: 400; line-height: 1; font-variant-numeric: tabular-nums;">3.85</div>
+      </div>
+    </div>
+
+    <!-- Due — a reading list, not a card stack -->
+    <div style="padding: 20px 0 4px 0;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
+        <div style="font-size: 10px; letter-spacing: 1.6px; text-transform: uppercase; color: #8A8175;">Due</div>
+        <div style="font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: #7B2D26;">Two items</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; gap: 12px; align-items: baseline; min-height: 44px;">
+          <div style="font-family: Newsreader, Georgia, serif; font-size: 13px; font-style: italic; color: #7B2D26; width: 16px; flex-shrink: 0;">i</div>
+          <div style="flex: 1;">
+            <div style="font-family: Newsreader, Georgia, serif; font-size: 17px; font-weight: 400; line-height: 1.25; margin-bottom: 3px;">Chemistry Lab Report</div>
+            <div style="font-size: 12px; color: #7B2D26;">Due today, 23:59</div>
+          </div>
+        </div>
+        <div style="height: 1px; background: #E8E3D8;"></div>
+        <div style="display: flex; gap: 12px; align-items: baseline; min-height: 44px;">
+          <div style="font-family: Newsreader, Georgia, serif; font-size: 13px; font-style: italic; color: #8A8175; width: 16px; flex-shrink: 0;">ii</div>
+          <div style="flex: 1;">
+            <div style="font-family: Newsreader, Georgia, serif; font-size: 17px; font-weight: 400; line-height: 1.25; margin-bottom: 3px;">Digital Art Portfolio</div>
+            <div style="font-size: 12px; color: #6E675B;">Wednesday, 10:00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex: 1;"></div>
+
+    <!-- Quick links as an index, set in two columns -->
+    <div style="border-top: 1px solid #17150F; padding: 14px 0 18px 0;">
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 18px;">
+        <a href="#" style="display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13.5px; color: #17150F;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7B2D26" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A2.5 2.5 0 016.5 2H20v20H6.5A2.5 2.5 0 014 19.5z"/><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/></svg>
+          Library
+        </a>
+        <a href="#" style="display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13.5px; color: #17150F;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7B2D26" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="1.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+          Examinations
+        </a>
+        <a href="#" style="display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13.5px; color: #17150F;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7B2D26" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 01-9 8.4L3 21l1.1-9A8.4 8.4 0 1121 11.5z"/></svg>
+          Student Hub
+        </a>
+        <a href="#" style="display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13.5px; color: #17150F;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7B2D26" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="14" rx="2"/><path d="M4 10h16M7 21v-2M17 21v-2"/><circle cx="8" cy="14" r="0.6" fill="#7B2D26"/><circle cx="16" cy="14" r="0.6" fill="#7B2D26"/></svg>
+          Bus
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs: lettered, underlined, no icons -->
+  <div style="display: flex; border-top: 1px solid #17150F; background: #FAF8F3;">
+    <div style="flex: 1; min-height: 56px; display: flex; align-items: center; justify-content: center; border-bottom: 3px solid #7B2D26; font-family: Newsreader, Georgia, serif; font-size: 14px; color: #17150F;">Learn</div>
+    <div style="flex: 1; min-height: 56px; display: flex; align-items: center; justify-content: center; border-bottom: 3px solid transparent; font-family: Newsreader, Georgia, serif; font-size: 14px; color: #A39A8B;">Schedule</div>
+    <div style="flex: 1; min-height: 56px; display: flex; align-items: center; justify-content: center; border-bottom: 3px solid transparent; font-family: Newsreader, Georgia, serif; font-size: 14px; color: #A39A8B;">Grades</div>
+    <div style="flex: 1; min-height: 56px; display: flex; align-items: center; justify-content: center; border-bottom: 3px solid transparent; font-family: Newsreader, Georgia, serif; font-size: 14px; color: #A39A8B;">Account</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

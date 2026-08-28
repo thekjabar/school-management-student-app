@@ -1,6 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      Flutter puts INTERNET in the debug and profile manifests only, because
+      the tool needs it for hot reload. It is NOT in a release build unless it
+      is declared here — so an app that works perfectly under `flutter run`
+      cannot open a single socket once it is installed from an APK, and every
+      screen reports "no connection".
+
+      ACCESS_NETWORK_STATE is what lets the platform tell "the phone is off the
+      network" apart from "the server did not answer", which are two different
+      sentences to show a driver at seven in the morning.
+    -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
     <application
-        android:label="student_app"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

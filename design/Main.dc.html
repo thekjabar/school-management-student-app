@@ -1,0 +1,164 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #F97316; text-decoration: none; }
+    a:hover { color: #EA580C; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #EAF6FF; font-family: Fredoka, 'Trebuchet MS', sans-serif; color: #1B3A4B; display: flex; flex-direction: column; overflow: hidden; position: relative;">
+
+  <!-- Sky: clouds drift behind everything -->
+  <div style="position: absolute; top: 34px; left: -14px; width: 90px; height: 34px; background: #FFFFFF; border-radius: 999px; opacity: 0.75;"></div>
+  <div style="position: absolute; top: 96px; right: -18px; width: 76px; height: 30px; background: #FFFFFF; border-radius: 999px; opacity: 0.6;"></div>
+
+  <!-- Mascot greeting with a speech bubble -->
+  <div style="position: relative; padding: 24px 18px 0 18px; display: flex; align-items: flex-start; gap: 12px;">
+
+    <!-- Pelo the owl, drawn from simple shapes -->
+    <svg width="74" height="82" viewBox="0 0 74 82" fill="none" style="flex-shrink: 0; margin-top: 2px;">
+      <ellipse cx="37" cy="76" rx="20" ry="4" fill="#1B3A4B" opacity="0.10"/>
+      <path d="M14 26c0-4 2-12 6-14 3-1.5 7 2 8 5" fill="#8B5CF6"/>
+      <path d="M60 26c0-4-2-12-6-14-3-1.5-7 2-8 5" fill="#8B5CF6"/>
+      <ellipse cx="37" cy="44" rx="25" ry="28" fill="#A78BFA"/>
+      <ellipse cx="37" cy="52" rx="17" ry="19" fill="#EDE9FE"/>
+      <circle cx="28" cy="38" r="10" fill="#FFFFFF"/>
+      <circle cx="46" cy="38" r="10" fill="#FFFFFF"/>
+      <circle cx="29.5" cy="39" r="5" fill="#1B3A4B"/>
+      <circle cx="44.5" cy="39" r="5" fill="#1B3A4B"/>
+      <circle cx="31.5" cy="37" r="1.8" fill="#FFFFFF"/>
+      <circle cx="46.5" cy="37" r="1.8" fill="#FFFFFF"/>
+      <path d="M37 45l-4.5 5h9z" fill="#FBBF24"/>
+      <path d="M17 46c-3 6-2 13 1 16" stroke="#8B5CF6" stroke-width="7" stroke-linecap="round"/>
+      <path d="M57 46c3 6 2 13-1 16" stroke="#8B5CF6" stroke-width="7" stroke-linecap="round"/>
+      <path d="M30 70l-3 6M44 70l3 6" stroke="#FBBF24" stroke-width="4" stroke-linecap="round"/>
+    </svg>
+
+    <div style="flex: 1; padding-top: 6px;">
+      <!-- Speech bubble with a tail pointing back at the owl -->
+      <div style="position: relative; background: #FFFFFF; border: 3px solid #1B3A4B; border-radius: 20px; padding: 13px 15px; box-shadow: 0 4px 0 #1B3A4B;">
+        <div style="position: absolute; left: -9px; top: 22px; width: 14px; height: 14px; background: #FFFFFF; border-left: 3px solid #1B3A4B; border-bottom: 3px solid #1B3A4B; transform: rotate(45deg);"></div>
+        <div style="font-size: 15.5px; font-weight: 600; line-height: 1.3; position: relative;">Beyanî baş, Rawand!</div>
+        <div style="font-size: 13px; font-weight: 400; color: #5B7C8D; margin-top: 3px; position: relative;">You're on a 12 day streak</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex: 1; overflow: hidden; padding: 16px 18px 0 18px; display: flex; flex-direction: column; gap: 13px; position: relative;">
+
+    <!-- Now: a bright card with a thick outline and a hard drop shadow -->
+    <div style="background: #FFD84D; border: 3px solid #1B3A4B; border-radius: 22px; padding: 15px 16px 17px 16px; box-shadow: 0 5px 0 #1B3A4B;">
+      <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 10px;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="#1B3A4B"/><path d="M12 7v5l3.5 2" stroke="#FFD84D" stroke-width="2.2" stroke-linecap="round"/></svg>
+        <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.2px;">RIGHT NOW · until 09:30</div>
+      </div>
+      <div style="font-size: 24px; font-weight: 700; line-height: 1.1; letter-spacing: -0.3px; margin-bottom: 5px;">Advanced Maths</div>
+      <div style="font-size: 13.5px; font-weight: 400; color: #4A5A2E;">Room 402 · Prof. Feynman</div>
+    </div>
+
+    <!-- Two chunky score cards -->
+    <div style="display: flex; gap: 11px;">
+      <div style="flex: 1; background: #4ADE80; border: 3px solid #1B3A4B; border-radius: 20px; padding: 13px 14px 15px 14px; box-shadow: 0 4px 0 #1B3A4B;">
+        <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 6px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 13l5 5 11-12" stroke="#1B3A4B" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div style="font-size: 11px; font-weight: 600;">Here</div>
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 1px;">
+          <span style="font-size: 30px; font-weight: 700; line-height: 1;">92</span>
+          <span style="font-size: 15px; font-weight: 600;">%</span>
+        </div>
+      </div>
+      <div style="flex: 1; background: #FB923C; border: 3px solid #1B3A4B; border-radius: 20px; padding: 13px 14px 15px 14px; box-shadow: 0 4px 0 #1B3A4B;">
+        <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 6px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.6 5.9 6.4.6-4.8 4.3 1.4 6.3L12 16.9 6.4 20.1l1.4-6.3L3 9.5l6.4-.6z" fill="#1B3A4B"/></svg>
+          <div style="font-size: 11px; font-weight: 600;">Score</div>
+        </div>
+        <div style="font-size: 30px; font-weight: 700; line-height: 1;">3.85</div>
+      </div>
+    </div>
+
+    <!-- Quests, not "assignments" -->
+    <div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; padding: 0 2px;">
+        <div style="font-size: 16px; font-weight: 600; letter-spacing: -0.2px;">Your quests</div>
+        <div style="background: #F87171; border: 2.5px solid #1B3A4B; border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 600; color: #FFFFFF;">2 to go</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 9px;">
+        <div style="background: #FFFFFF; border: 3px solid #1B3A4B; border-radius: 18px; padding: 11px 13px; display: flex; align-items: center; gap: 12px; min-height: 44px; box-shadow: 0 4px 0 #1B3A4B;">
+          <div style="width: 40px; height: 40px; border-radius: 13px; background: #A5D8FF; border: 2.5px solid #1B3A4B; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M9.5 3v6L5 18.5A2 2 0 006.8 21.5h10.4A2 2 0 0019 18.5L14.5 9V3" stroke="#1B3A4B" stroke-width="2.2" stroke-linejoin="round"/><path d="M8 3h8" stroke="#1B3A4B" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="16" r="1.6" fill="#F97316"/><circle cx="9.6" cy="18.6" r="1.1" fill="#F97316"/></svg>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-size: 14.5px; font-weight: 600; letter-spacing: -0.1px;">Chemistry Lab Report</div>
+            <div style="font-size: 12px; font-weight: 500; color: #EF4444;">Today at 23:59</div>
+          </div>
+        </div>
+
+        <div style="background: #FFFFFF; border: 3px solid #1B3A4B; border-radius: 18px; padding: 11px 13px; display: flex; align-items: center; gap: 12px; min-height: 44px; box-shadow: 0 4px 0 #1B3A4B;">
+          <div style="width: 40px; height: 40px; border-radius: 13px; background: #FBCFE8; border: 2.5px solid #1B3A4B; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#1B3A4B" stroke-width="2.2"/><circle cx="9" cy="10" r="1.5" fill="#1B3A4B"/><circle cx="15" cy="10" r="1.5" fill="#1B3A4B"/><path d="M12 21a3 3 0 003-3 2 2 0 00-2-2h-1" stroke="#1B3A4B" stroke-width="2.2" stroke-linejoin="round"/></svg>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-size: 14.5px; font-weight: 600; letter-spacing: -0.1px;">Digital Art Portfolio</div>
+            <div style="font-size: 12px; font-weight: 500; color: #6B8797;">Wednesday, 10:00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex: 1;"></div>
+
+    <!-- Four bright shortcut tiles -->
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding-bottom: 12px;">
+      <div style="background: #C4B5FD; border: 3px solid #1B3A4B; border-radius: 16px; padding: 9px 4px 8px 4px; display: flex; flex-direction: column; align-items: center; gap: 5px; min-height: 44px; box-shadow: 0 3px 0 #1B3A4B;">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M4 5a2 2 0 012-2h13v18H6a2 2 0 01-2-2z" stroke="#1B3A4B" stroke-width="2.2" stroke-linejoin="round"/><path d="M4 19a2 2 0 012-2h13" stroke="#1B3A4B" stroke-width="2.2"/></svg>
+        <div style="font-size: 9.5px; font-weight: 500;">Books</div>
+      </div>
+      <div style="background: #FDE68A; border: 3px solid #1B3A4B; border-radius: 16px; padding: 9px 4px 8px 4px; display: flex; flex-direction: column; align-items: center; gap: 5px; min-height: 44px; box-shadow: 0 3px 0 #1B3A4B;">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="5.5" width="17" height="15" rx="3" stroke="#1B3A4B" stroke-width="2.2"/><path d="M3.5 10.5h17M8 3v4M16 3v4" stroke="#1B3A4B" stroke-width="2.2" stroke-linecap="round"/></svg>
+        <div style="font-size: 9.5px; font-weight: 500;">Exams</div>
+      </div>
+      <div style="background: #99F6E4; border: 3px solid #1B3A4B; border-radius: 16px; padding: 9px 4px 8px 4px; display: flex; flex-direction: column; align-items: center; gap: 5px; min-height: 44px; box-shadow: 0 3px 0 #1B3A4B;">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M20.5 11.5a8 8 0 01-8.5 8L4 21l1-8a8 8 0 1115.5-1.5z" stroke="#1B3A4B" stroke-width="2.2" stroke-linejoin="round"/></svg>
+        <div style="font-size: 9.5px; font-weight: 500;">Hub</div>
+      </div>
+      <div style="background: #FCA5A5; border: 3px solid #1B3A4B; border-radius: 16px; padding: 9px 4px 8px 4px; display: flex; flex-direction: column; align-items: center; gap: 5px; min-height: 44px; box-shadow: 0 3px 0 #1B3A4B;">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><rect x="4" y="3.5" width="16" height="13.5" rx="3" stroke="#1B3A4B" stroke-width="2.2"/><path d="M4 10.5h16M7.5 21v-2.5M16.5 21v-2.5" stroke="#1B3A4B" stroke-width="2.2" stroke-linecap="round"/><circle cx="8.5" cy="14" r="1.1" fill="#1B3A4B"/><circle cx="15.5" cy="14" r="1.1" fill="#1B3A4B"/></svg>
+        <div style="font-size: 9.5px; font-weight: 500;">Bus</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab bar as a solid outlined strip -->
+  <div style="background: #FFFFFF; border-top: 3px solid #1B3A4B; display: flex; padding: 6px 8px 12px 8px; gap: 4px;">
+    <div style="flex: 1; min-height: 48px; border-radius: 15px; background: #FFD84D; border: 2.5px solid #1B3A4B; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M3 8l9-4.5L21 8l-9 4.5z" fill="#1B3A4B"/><path d="M6.5 11v4.5c0 1.6 2.5 2.8 5.5 2.8s5.5-1.2 5.5-2.8V11" stroke="#1B3A4B" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <div style="font-size: 9.5px; font-weight: 600;">Learn</div>
+    </div>
+    <div style="flex: 1; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="5.5" width="17" height="15" rx="3" stroke="#94AEBC" stroke-width="2.2"/><path d="M3.5 10.5h17M8 3v4M16 3v4" stroke="#94AEBC" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <div style="font-size: 9.5px; font-weight: 500; color: #94AEBC;">Days</div>
+    </div>
+    <div style="flex: 1; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.6 5.9 6.4.6-4.8 4.3 1.4 6.3L12 16.9 6.4 20.1l1.4-6.3L3 9.5l6.4-.6z" stroke="#94AEBC" stroke-width="2.2" stroke-linejoin="round"/></svg>
+      <div style="font-size: 9.5px; font-weight: 500; color: #94AEBC;">Score</div>
+    </div>
+    <div style="flex: 1; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.5" r="3.6" stroke="#94AEBC" stroke-width="2.2"/><path d="M5 20a7 7 0 0114 0" stroke="#94AEBC" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <div style="font-size: 9.5px; font-weight: 500; color: #94AEBC;">Me</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,894 @@
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// The three languages a Kurdistan school actually needs.
+///
+/// Kurdish first, because it is the language of instruction in most of these
+/// schools and the one a guardian is most likely to read comfortably. Arabic
+/// second — the Region is bilingual and many families use it daily. English
+/// last, for staff and for anyone whose phone is set to it.
+enum Lang {
+  ckb('کوردی', 'ku', TextDirection.rtl),
+  ar('العربية', 'ar', TextDirection.rtl),
+  en('English', 'en', TextDirection.ltr);
+
+  const Lang(this.label, this.code, this.direction);
+
+  final String label;
+  final String code;
+  final TextDirection direction;
+
+  static Lang fromCode(String? code) =>
+      Lang.values.firstWhere((l) => l.code == code, orElse: () => Lang.ckb);
+}
+
+/// The chosen language, and the thing that rebuilds the app when it changes.
+///
+/// A ValueNotifier rather than a package: one setting, read everywhere, written
+/// from one screen. Anything heavier would be scaffolding around a single
+/// string.
+class AppLocale {
+  AppLocale._();
+
+  static final ValueNotifier<Lang> current = ValueNotifier<Lang>(Lang.ckb);
+
+  static const _key = 'sm_lang';
+
+  /// Read the saved choice, falling back to the phone's own language.
+  static Future<void> restore() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_key);
+    if (saved != null) {
+      current.value = Lang.fromCode(saved);
+      return;
+    }
+    // No choice made yet. A phone set to Arabic should not open in Kurdish
+    // just because Kurdish is our default.
+    final device = WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+    current.value = switch (device) {
+      'ar' => Lang.ar,
+      'en' => Lang.en,
+      _ => Lang.ckb,
+    };
+  }
+
+  static Future<void> set(Lang lang) async {
+    current.value = lang;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, lang.code);
+  }
+}
+
+/// Look a phrase up in the current language.
+///
+/// Falls back to English rather than to the key. A screen that has outrun the
+/// translators should read awkwardly, not show `home.todaysSchedule` to a
+/// parent.
+String t(String key) {
+  final table = switch (AppLocale.current.value) {
+    Lang.ckb => _ckb,
+    Lang.ar => _ar,
+    Lang.en => _en,
+  };
+  return table[key] ?? _en[key] ?? key;
+}
+
+/// The same, with one value substituted for `{n}`.
+String tn(String key, Object value) => t(key).replaceAll('{n}', '$value');
+
+/// The tables, exposed so a test can compare them.
+///
+/// A missing key falls back to English, which is right on a phone and wrong for
+/// anybody hunting the gap — the screen looks fine and one line is quietly in
+/// the wrong language. test/strings_test.dart uses these to find them.
+Map<String, String> tableFor(Lang lang) => switch (lang) {
+      Lang.ckb => _ckb,
+      Lang.ar => _ar,
+      Lang.en => _en,
+    };
+
+/// Every phrase the app knows how to say, by key.
+Iterable<String> get englishKeys => _en.keys;
+
+/* ---------------------------------------------------------------------------
+ * English — the reference. Every other table is checked against these keys.
+ * ------------------------------------------------------------------------- */
+
+const Map<String, String> _en = {
+  // Brand and welcome
+  'app.name': 'EduPulse',
+  'app.tagline': 'Connecting students, parents,\nteachers and schools',
+  'welcome.getStarted': 'Get started',
+  'welcome.logIn': 'Log in',
+  'welcome.usePhone': 'Use the phone number your school has for you.',
+
+  // Sign in
+  'login.welcomeBack': 'Welcome back',
+  'login.subtitle': 'Sign in to follow your child’s day.',
+  'login.phone': 'Phone number',
+  'login.phoneHint': '0750 123 4567',
+  'login.password': 'Password',
+  'login.signIn': 'Sign in',
+  'login.forgot': 'Forgotten it? The school office can issue a new one.',
+  'login.phoneNeeded': 'Enter the phone number the school has for you.',
+  'login.choose': 'Choose your own password',
+  'login.chooseWhy':
+      'The one you were given is known to whoever typed it. Pick something only you know.',
+  'login.newPassword': 'New password',
+  'login.typeAgain': 'Type it again',
+  'login.rule': 'At least eight characters, with a letter and a number.',
+  'login.tooShort': 'Use at least eight characters.',
+  'login.mismatch': 'Those two do not match.',
+  'login.saveContinue': 'Save and continue',
+
+  // Navigation
+  'nav.home': 'Home',
+  'nav.children': 'Children',
+  'nav.messages': 'Messages',
+  'nav.more': 'More',
+
+  // Greetings
+  'greet.morning': 'Good morning,',
+  'greet.afternoon': 'Good afternoon,',
+  'greet.evening': 'Good evening,',
+
+  // Home
+  'home.todaysSchedule': 'Today’s schedule',
+  'home.recentUpdates': 'Recent updates',
+  'home.quickActions': 'Quick actions',
+  'home.viewAll': 'View all',
+  'home.noLessons': 'No lessons timetabled today.',
+  'home.nothingNew': 'Nothing new from the school.',
+  'home.attendance': 'Attendance',
+  'home.average': 'Average',
+  'home.feesDue': 'Fees due',
+  'home.excellent': 'Excellent',
+  'home.watchIt': 'Watch it',
+  'home.concerning': 'Concerning',
+  'home.notMarked': 'not marked yet',
+  'home.noMarks': 'no marks yet',
+  'home.paid': 'Paid',
+  'home.nothingOwed': 'nothing owed',
+  'home.dueNow': 'due now',
+  'home.daysLate': '{n} days late',
+  'home.dueInDays': 'due in {n} days',
+  'action.fees': 'Fees &\nbilling',
+  'action.leave': 'Ask for\nleave',
+  'action.calendar': 'School\ncalendar',
+  'action.report': 'Report\ncard',
+
+  // Children
+  'children.open': 'Open',
+  'children.askLeave': 'Ask for leave',
+  'children.homework': 'Homework',
+  'children.bus': 'Bus',
+  'children.yes': 'Yes',
+  'children.no': 'No',
+  'children.dueSoon': '{n} due soon',
+  'children.nothingUrgent': 'nothing urgent',
+  'children.absent': '{n} absent',
+  'children.noBusToday': 'No bus today',
+  'children.notOnBus': 'Not on a school bus',
+  'children.waitingForBus': 'Waiting for the bus',
+  'children.morning': 'Morning',
+  'children.homeRun': 'Home run',
+
+  // Child detail tabs
+  'tab.bus': 'Bus',
+  'tab.timetable': 'Timetable',
+  'tab.homework': 'Homework',
+  'tab.marks': 'Marks',
+  'tab.attendance': 'Attendance',
+
+  // Bus
+  'bus.mapClosed': 'Map closed',
+  'bus.checking': 'Checking…',
+  'bus.minutesAway': 'About {n} minutes away',
+  'bus.moving': 'The bus is moving',
+  'bus.headingFor': 'Heading for {n}',
+  'bus.onRoute': 'On the route',
+  'bus.ageUnknown': 'Position age unknown',
+  'bus.reportedAgo': 'Reported {n} ago',
+  'bus.notRecent': ' — the bus has not reported recently',
+  'bus.today': 'Today',
+  'bus.noBusToday': 'No bus is scheduled for today.',
+  'bus.arrangement': 'The arrangement',
+  'bus.morningStop': 'Morning stop',
+  'bus.afternoonStop': 'Afternoon stop',
+  'bus.seat': 'Seat {n}',
+  'bus.morningToSchool': 'Morning — to school',
+  'bus.afternoonHome': 'Afternoon — home',
+  'bus.stop': 'Stop',
+  'bus.vehicle': 'Bus',
+  'bus.driver': 'Driver',
+  'bus.notAssigned': 'Not assigned',
+  'bus.gotOn': 'Got on',
+  'bus.atSchool': 'At school',
+  'bus.handedOver': 'Handed over',
+  'bus.notOnBus': '{n} is not on a school bus.',
+  'bus.askOffice': 'If that is wrong, the school office can add them to a route.',
+  'bus.dropElsewhere': 'Drop off somewhere else',
+  'bus.usuallyAt': 'Usually dropped at {n}',
+  'bus.noOtherAddress': 'No other address has been approved for this child yet.',
+  'bus.useToday': 'Use today',
+  'bus.sending': 'Sending…',
+  'bus.sentToOffice': 'Sent to the office. They will confirm before the bus leaves.',
+  'bus.cutOff': 'Ask before the bus sets off. Once it has left, telephone the office instead.',
+  'bus.onBus': 'On the bus',
+  'bus.arrived': 'Arrived at school',
+  'bus.droppedOff': 'Dropped off',
+  'bus.didNotBoard': 'Did not board',
+  'bus.excused': 'Excused — not riding',
+  'bus.notStarted': 'Not started yet',
+  'bus.waitingAtStop': 'Waiting at the stop',
+
+  // Homework
+  'hw.none': 'No homework has been set.',
+  'hw.due': 'Due {n}',
+  'hw.setOn': 'Set {n}',
+  'hw.about': 'about {n} min',
+  'hw.whatToDo': 'What to do',
+  'hw.details': 'Homework',
+  'hw.subject': 'Subject',
+  'hw.teacher': 'Set by',
+  'hw.effort': 'Should take',
+  'hw.outOf': 'Marked out of',
+  'hw.handedIn': 'Handed in',
+  'hw.notHandedIn': 'Not handed in yet',
+  'hw.mark': 'Mark',
+  'hw.feedback': 'What the teacher said',
+  'hw.noDescription': 'The teacher did not add any detail.',
+  'due.overdue': '{n} days overdue',
+  'due.yesterday': 'yesterday',
+  'due.today': 'due today',
+  'due.tomorrow': 'due tomorrow',
+  'due.inDays': 'in {n} days',
+
+  // Marks
+  'marks.none': 'No marks have been published yet.',
+  'marks.comingUp': 'Coming up',
+  'marks.published': 'Published marks',
+  'marks.average': 'Average',
+  'marks.passed': 'Passed',
+  'marks.best': 'Best',
+  'marks.across': 'across {n}',
+  'marks.of': 'of {n}',
+  'marks.topMark': 'top mark',
+  'marks.absent': 'Absent',
+
+  // Attendance
+  'att.none': 'The register has not been marked yet.',
+  'att.ofDays': 'of {n} days marked',
+  'att.present': 'Present',
+  'att.absent': 'Absent',
+  'att.late': 'Late',
+  'att.excused': 'Excused',
+  'att.notPresent': 'Days not present',
+  'att.minutesLate': '{n} min late',
+
+  // Messages
+  'msg.none': 'Nothing from the school yet.',
+  'msg.pinned': 'Pinned by the school',
+  'msg.fromSchool': 'From the school',
+  'msg.earlier': 'Earlier',
+  'msg.readMore': 'Read more',
+  'msg.important': 'Important',
+  'msg.needsReply': 'The school needs a reply to this one.',
+  'msg.minutesAgo': '{n} minutes ago',
+  'msg.hoursAgo': '{n} hours ago',
+  'msg.yesterday': 'yesterday',
+  'msg.daysAgo': '{n} days ago',
+
+  // Fees
+  'fees.title': 'Fees & billing',
+  'fees.nothingOwed': 'Nothing owed',
+  'fees.upToDate': 'Your account is up to date. Thank you.',
+  'fees.overdueAmount': '{n} of this is overdue',
+  'fees.dueNow': 'Due now',
+  'fees.dueOn': 'Due {n}',
+  'fees.inDays': ' — in {n} days',
+  'fees.howToPay': 'How to pay',
+  'fees.cash': 'Cash at the school office',
+  'fees.cashBody': 'Bring the amount to the office and ask for a receipt. It is recorded the same day.',
+  'fees.transfer': 'Bank transfer or FIB',
+  'fees.transferBody':
+      'Transfer to the school account, then send or bring the receipt so it can be matched to your name.',
+  'fees.driver': 'To the driver',
+  'fees.driverBody':
+      'Where your school allows it, the driver can collect and gives you a receipt from the app.',
+  'fees.yourBills': 'Your bills',
+  'fees.nothingBilled': 'Nothing has been billed to your household yet.',
+  'fees.paid': 'Paid',
+  'fees.overdue': 'Overdue',
+  'fees.total': 'Total',
+  'fees.stillOwed': 'Still owed',
+
+  // Leave
+  'leave.title': 'Leave requests',
+  'leave.ask': 'Ask for leave',
+  'leave.none': 'No leave has been asked for. Tap “Ask for leave” when you need a day.',
+  'leave.withdraw': 'Withdraw this request',
+  'leave.withdrawn': 'Request withdrawn',
+  'leave.sent': 'Sent to the school office',
+  'leave.for': 'Leave for {n}',
+  'leave.why': 'Why',
+  'leave.sick': 'Unwell',
+  'leave.medical': 'Doctor or dentist',
+  'leave.family': 'Family reason',
+  'leave.travel': 'Travelling',
+  'leave.bereavement': 'Bereavement',
+  'leave.religious': 'Religious',
+  'leave.other': 'Something else',
+  'leave.from': 'From',
+  'leave.to': 'To',
+  'leave.reason': 'Reason',
+  'leave.reasonHint': 'High temperature since last night, seeing the doctor this morning.',
+  'leave.reasonNeeded': 'Say briefly why — the office decides on this.',
+  'leave.busNote':
+      'If the office approves this, the bus will not wait for your child on those days.',
+  'leave.send': 'Send to the office',
+
+  // More
+  'more.yourChildren': 'Your children',
+  'more.moneyRequests': 'Money and requests',
+  'more.notifications': 'Notifications',
+  'more.push': 'Notifications on this phone',
+  'more.pushOn': 'You will be told about attendance, the bus and homework.',
+  'more.pushOff': 'This phone will not be told anything.',
+  'more.turnOn': 'Turn on',
+  'more.pushBlocked': 'Turn notifications on for EduPulse in your phone settings.',
+  'more.account': 'Account',
+  'more.language': 'Language',
+  'more.feesSub': 'What you owe and how to pay it',
+  'more.leaveSub': 'Ask the school to excuse a day',
+  'more.changePassword': 'Change password',
+  'more.changePasswordSub': 'Signs out every other device',
+  'more.signOut': 'Sign out',
+  'more.signOutSub': 'You will need your password to return',
+  'more.signOutAsk': 'Sign out?',
+  'more.signOutBody': 'You will need your password to get back in.',
+  'more.stay': 'Stay',
+  'more.unverified': 'Unverified',
+  'more.unverifiedNote':
+      'Until the office verifies this number you will not see the bus on the map.',
+  'more.currentPassword': 'Current password',
+  'more.passwordChanged': 'Password changed. Every other device has been signed out.',
+
+  // Status words
+  'status.pending': 'Pending',
+  'status.approved': 'Approved',
+  'status.rejected': 'Rejected',
+  'status.cancelled': 'Cancelled',
+
+  // Common
+  'common.cancel': 'Cancel',
+  'common.save': 'Save',
+  'common.tryAgain': 'Try again',
+  'common.didNotLoad': 'That did not load',
+  'common.offline': 'No connection. Check the phone is on the network and try again.',
+  'common.noChildren': 'No children are linked to this number yet.',
+  'common.noChildrenBody':
+      'The school office links a child to a guardian. Ask them to check the number they hold for you.',
+};
+
+/* ---------------------------------------------------------------------------
+ * Kurdish (Sorani)
+ * ------------------------------------------------------------------------- */
+
+const Map<String, String> _ckb = {
+  'app.name': 'EduPulse',
+  'app.tagline': 'پەیوەندی نێوان قوتابی، دایک و باوک،\nمامۆستا و قوتابخانە',
+  'welcome.getStarted': 'دەستپێبکە',
+  'welcome.logIn': 'چوونەژوورەوە',
+  'welcome.usePhone': 'ئەو ژمارە مۆبایلە بەکاربهێنە کە قوتابخانە هەیەتی.',
+
+  'login.welcomeBack': 'بەخێربێیتەوە',
+  'login.subtitle': 'بچۆ ژوورەوە بۆ بەدواداچوونی ڕۆژی منداڵەکەت.',
+  'login.phone': 'ژمارەی مۆبایل',
+  'login.phoneHint': '٠٧٥٠ ١٢٣ ٤٥٦٧',
+  'login.password': 'وشەی نهێنی',
+  'login.signIn': 'چوونەژوورەوە',
+  'login.forgot': 'لەبیرت چووە؟ نووسینگەی قوتابخانە دەتوانێت یەکی نوێت بداتێ.',
+  'login.phoneNeeded': 'ئەو ژمارە مۆبایلە بنووسە کە قوتابخانە هەیەتی.',
+  'login.choose': 'وشەیەکی نهێنی تایبەت بە خۆت هەڵبژێرە',
+  'login.chooseWhy':
+      'ئەوەی پێیان داویت، ئەو کەسەی نووسیویەتی دەیزانێت. شتێک هەڵبژێرە کە تەنها خۆت بزانیت.',
+  'login.newPassword': 'وشەی نهێنی نوێ',
+  'login.typeAgain': 'دووبارە بینووسەوە',
+  'login.rule': 'لانیکەم هەشت پیت، بە پیتێک و ژمارەیەکەوە.',
+  'login.tooShort': 'لانیکەم هەشت پیت بەکاربهێنە.',
+  'login.mismatch': 'ئەو دووانە وەک یەک نین.',
+  'login.saveContinue': 'پاشەکەوتکردن و بەردەوامبوون',
+
+  'nav.home': 'سەرەکی',
+  'nav.children': 'منداڵەکان',
+  'nav.messages': 'نامەکان',
+  'nav.more': 'زیاتر',
+
+  'greet.morning': 'بەیانیت باش،',
+  'greet.afternoon': 'ئێوارەت باش،',
+  'greet.evening': 'شەوت باش،',
+
+  'home.todaysSchedule': 'خشتەی ئەمڕۆ',
+  'home.recentUpdates': 'نوێترین هەواڵەکان',
+  'home.quickActions': 'کارە خێراکان',
+  'home.viewAll': 'هەمووی',
+  'home.noLessons': 'هیچ وانەیەک بۆ ئەمڕۆ دانەنراوە.',
+  'home.nothingNew': 'هیچ شتێکی نوێ لە قوتابخانەوە نییە.',
+  'home.attendance': 'ئامادەبوون',
+  'home.average': 'ناوەند',
+  'home.feesDue': 'پارەی ماوە',
+  'home.excellent': 'نایاب',
+  'home.watchIt': 'ئاگاداربە',
+  'home.concerning': 'نیگەرانکەر',
+  'home.notMarked': 'هێشتا تۆمار نەکراوە',
+  'home.noMarks': 'هێشتا نمرە نییە',
+  'home.paid': 'دراوە',
+  'home.nothingOwed': 'هیچ نەماوە',
+  'home.dueNow': 'ئێستا',
+  'home.daysLate': '{n} ڕۆژ دواکەوتووە',
+  'home.dueInDays': 'لە {n} ڕۆژدا',
+  'action.fees': 'پارە و\nپسوڵە',
+  'action.leave': 'داواى\nمۆڵەت',
+  'action.calendar': 'ڕۆژژمێری\nقوتابخانە',
+  'action.report': 'کارتی\nنمرە',
+
+  'children.open': 'کردنەوە',
+  'children.askLeave': 'داوای مۆڵەت',
+  'children.homework': 'ئەرکی ماڵەوە',
+  'children.bus': 'پاس',
+  'children.yes': 'بەڵێ',
+  'children.no': 'نەخێر',
+  'children.dueSoon': '{n} بەم زووانە',
+  'children.nothingUrgent': 'هیچ پەلەیەک نییە',
+  'children.absent': '{n} ئامادە نەبووە',
+  'children.noBusToday': 'ئەمڕۆ پاس نییە',
+  'children.notOnBus': 'لەسەر پاسی قوتابخانە نییە',
+  'children.waitingForBus': 'چاوەڕێی پاسە',
+  'children.morning': 'بەیانی',
+  'children.homeRun': 'گەڕانەوە',
+
+  'tab.bus': 'پاس',
+  'tab.timetable': 'خشتە',
+  'tab.homework': 'ئەرک',
+  'tab.marks': 'نمرەکان',
+  'tab.attendance': 'ئامادەبوون',
+
+  'bus.mapClosed': 'نەخشە داخراوە',
+  'bus.checking': 'پشکنین…',
+  'bus.minutesAway': 'نزیکەی {n} خولەک ماوە',
+  'bus.moving': 'پاس لە ڕێگادایە',
+  'bus.headingFor': 'بەرەو {n}',
+  'bus.onRoute': 'لەسەر ڕێڕەو',
+  'bus.ageUnknown': 'کاتی شوێن نەزانراوە',
+  'bus.reportedAgo': '{n} لەمەوبەر تۆمارکراوە',
+  'bus.notRecent': ' — پاس بەم دواییانە هیچی نەناردووە',
+  'bus.today': 'ئەمڕۆ',
+  'bus.noBusToday': 'هیچ پاسێک بۆ ئەمڕۆ دانەنراوە.',
+  'bus.arrangement': 'ڕێکخستنەکە',
+  'bus.morningStop': 'وێستگەی بەیانی',
+  'bus.afternoonStop': 'وێستگەی ئێوارە',
+  'bus.seat': 'کورسی {n}',
+  'bus.morningToSchool': 'بەیانی — بۆ قوتابخانە',
+  'bus.afternoonHome': 'ئێوارە — بۆ ماڵەوە',
+  'bus.stop': 'وێستگە',
+  'bus.vehicle': 'پاس',
+  'bus.driver': 'شۆفێر',
+  'bus.notAssigned': 'دیارینەکراوە',
+  'bus.gotOn': 'سواربوو',
+  'bus.atSchool': 'لە قوتابخانە',
+  'bus.handedOver': 'تەسلیمکرا',
+  'bus.notOnBus': '{n} لەسەر پاسی قوتابخانە نییە.',
+  'bus.askOffice': 'ئەگەر ئەمە هەڵەیە، نووسینگەی قوتابخانە دەتوانێت زیادی بکات بۆ ڕێڕەوێک.',
+  'bus.dropElsewhere': 'دابەزاندن لە شوێنێکی تر',
+  'bus.usuallyAt': 'بەزۆری لە {n} دادەبەزێت',
+  'bus.noOtherAddress': 'هێشتا هیچ ناونیشانێکی تر بۆ ئەم منداڵە پەسەند نەکراوە.',
+  'bus.useToday': 'بۆ ئەمڕۆ',
+  'bus.sending': 'ناردن…',
+  'bus.sentToOffice': 'نێردرا بۆ نووسینگە. پێش ڕۆیشتنی پاس پەسەندی دەکەن.',
+  'bus.cutOff': 'پێش ڕۆیشتنی پاس داوا بکە. دوای ڕۆیشتنی، پەیوەندی بە نووسینگەوە بکە.',
+  'bus.onBus': 'لەسەر پاسە',
+  'bus.arrived': 'گەیشتە قوتابخانە',
+  'bus.droppedOff': 'دابەزێنرا',
+  'bus.didNotBoard': 'سوارنەبوو',
+  'bus.excused': 'مۆڵەتدراوە — سوار نابێت',
+  'bus.notStarted': 'هێشتا دەستی پێنەکردووە',
+  'bus.waitingAtStop': 'لە وێستگە چاوەڕێیە',
+
+  'hw.none': 'هیچ ئەرکێک دانەنراوە.',
+  'hw.due': 'کاتی {n}',
+  'hw.setOn': 'دانراوە {n}',
+  'hw.about': 'نزیکەی {n} خولەک',
+  'hw.whatToDo': 'چی بکرێت',
+  'hw.details': 'ئەرکی ماڵەوە',
+  'hw.subject': 'بابەت',
+  'hw.teacher': 'دانەری',
+  'hw.effort': 'کاتی پێویست',
+  'hw.outOf': 'نمرە لە',
+  'hw.handedIn': 'پێشکەشکراوە',
+  'hw.notHandedIn': 'هێشتا پێشکەش نەکراوە',
+  'hw.mark': 'نمرە',
+  'hw.feedback': 'قسەی مامۆستا',
+  'hw.noDescription': 'مامۆستا وردەکاری زیادی نەکردووە.',
+  'due.overdue': '{n} ڕۆژ دواکەوتووە',
+  'due.yesterday': 'دوێنێ',
+  'due.today': 'ئەمڕۆ',
+  'due.tomorrow': 'سبەینێ',
+  'due.inDays': 'لە {n} ڕۆژدا',
+
+  'marks.none': 'هێشتا هیچ نمرەیەک بڵاو نەکراوەتەوە.',
+  'marks.comingUp': 'بەم زووانە',
+  'marks.published': 'نمرە بڵاوکراوەکان',
+  'marks.average': 'ناوەند',
+  'marks.passed': 'دەرچوو',
+  'marks.best': 'باشترین',
+  'marks.across': 'لە {n} تاقیکردنەوە',
+  'marks.of': 'لە {n}',
+  'marks.topMark': 'بەرزترین نمرە',
+  'marks.absent': 'ئامادە نەبوو',
+
+  'att.none': 'هێشتا ئامادەبوون تۆمار نەکراوە.',
+  'att.ofDays': 'لە {n} ڕۆژی تۆمارکراو',
+  'att.present': 'ئامادە',
+  'att.absent': 'ئامادەنەبوو',
+  'att.late': 'دواکەوتوو',
+  'att.excused': 'مۆڵەتدراو',
+  'att.notPresent': 'ڕۆژانی ئامادەنەبوون',
+  'att.minutesLate': '{n} خولەک دواکەوتوو',
+
+  'msg.none': 'هێشتا هیچ شتێک لە قوتابخانەوە نییە.',
+  'msg.pinned': 'گرنگ — لەلایەن قوتابخانەوە',
+  'msg.fromSchool': 'لە قوتابخانەوە',
+  'msg.earlier': 'پێشتر',
+  'msg.readMore': 'زیاتر بخوێنەوە',
+  'msg.important': 'گرنگ',
+  'msg.needsReply': 'قوتابخانە پێویستی بە وەڵامی ئەمە هەیە.',
+  'msg.minutesAgo': '{n} خولەک لەمەوبەر',
+  'msg.hoursAgo': '{n} کاتژمێر لەمەوبەر',
+  'msg.yesterday': 'دوێنێ',
+  'msg.daysAgo': '{n} ڕۆژ لەمەوبەر',
+
+  'fees.title': 'پارە و پسوڵە',
+  'fees.nothingOwed': 'هیچ نەماوە',
+  'fees.upToDate': 'حسابەکەت ڕێکە. سوپاس.',
+  'fees.overdueAmount': '{n} لەمە دواکەوتووە',
+  'fees.dueNow': 'ئێستا',
+  'fees.dueOn': 'کاتی {n}',
+  'fees.inDays': ' — لە {n} ڕۆژدا',
+  'fees.howToPay': 'چۆن بدرێت',
+  'fees.cash': 'کاش لە نووسینگەی قوتابخانە',
+  'fees.cashBody': 'بڕەکە بۆ نووسینگە ببە و داوای پسوڵە بکە. هەر ئەو ڕۆژە تۆمار دەکرێت.',
+  'fees.transfer': 'گواستنەوەی بانکی یان FIB',
+  'fees.transferBody':
+      'بۆ حسابی قوتابخانە بگوازەوە، پاشان پسوڵەکە بنێرە یان بیبە تا بە ناوی تۆوە ببەسترێت.',
+  'fees.driver': 'بە شۆفێر',
+  'fees.driverBody':
+      'لەو قوتابخانانەی ڕێگە دەدەن، شۆفێر دەتوانێت وەریبگرێت و پسوڵەت لە ئەپەکەوە بداتێ.',
+  'fees.yourBills': 'پسوڵەکانت',
+  'fees.nothingBilled': 'هێشتا هیچ پارەیەک لەسەر ماڵەکەت نەنووسراوە.',
+  'fees.paid': 'دراوە',
+  'fees.overdue': 'دواکەوتوو',
+  'fees.total': 'کۆی گشتی',
+  'fees.stillOwed': 'ماوە',
+
+  'leave.title': 'داواکاری مۆڵەت',
+  'leave.ask': 'داوای مۆڵەت',
+  'leave.none': 'هیچ مۆڵەتێک داوا نەکراوە. کاتێک پێویستت بە ڕۆژێک بوو دەست بنێ.',
+  'leave.withdraw': 'ئەم داواکارییە بگەڕێنەوە',
+  'leave.withdrawn': 'داواکارییەکە گەڕێندرایەوە',
+  'leave.sent': 'نێردرا بۆ نووسینگەی قوتابخانە',
+  'leave.for': 'مۆڵەت بۆ {n}',
+  'leave.why': 'هۆکار',
+  'leave.sick': 'نەخۆشە',
+  'leave.medical': 'پزیشک یان ددانساز',
+  'leave.family': 'هۆکاری خێزانی',
+  'leave.travel': 'گەشت',
+  'leave.bereavement': 'پرسە',
+  'leave.religious': 'ئایینی',
+  'leave.other': 'شتێکی تر',
+  'leave.from': 'لە',
+  'leave.to': 'بۆ',
+  'leave.reason': 'هۆکار',
+  'leave.reasonHint': 'لە دوێنێ شەوەوە تایەکی بەرزی هەیە، ئەمڕۆ بەیانی دەچینە لای پزیشک.',
+  'leave.reasonNeeded': 'بە کورتی بڵێ بۆچی — نووسینگە لەسەر ئەمە بڕیار دەدات.',
+  'leave.busNote': 'ئەگەر نووسینگە پەسەندی بکات، پاس لەو ڕۆژانەدا چاوەڕێی منداڵەکەت ناکات.',
+  'leave.send': 'بنێرە بۆ نووسینگە',
+
+  'more.yourChildren': 'منداڵەکانت',
+  'more.moneyRequests': 'پارە و داواکاری',
+  'more.notifications': 'ئاگادارکردنەوەکان',
+  'more.push': 'ئاگادارکردنەوە لەم مۆبایلە',
+  'more.pushOn': 'ئاگادار دەکرێیتەوە لە ئامادەبوون، پاس و ئەرکی ماڵەوە.',
+  'more.pushOff': 'ئەم مۆبایلە هیچ ئاگادارکردنەوەیەکی پێ ناگات.',
+  'more.turnOn': 'کاری پێبکە',
+  'more.pushBlocked': 'لە ڕێکخستنەکانی مۆبایلەکەت ئاگادارکردنەوە بۆ EduPulse کاری پێبکە.',
+  'more.account': 'هەژمار',
+  'more.language': 'زمان',
+  'more.feesSub': 'چەندت لەسەرە و چۆن بیدەیت',
+  'more.leaveSub': 'داوا لە قوتابخانە بکە ڕۆژێک مۆڵەت بدات',
+  'more.changePassword': 'گۆڕینی وشەی نهێنی',
+  'more.changePasswordSub': 'هەموو ئامێرەکانی تر دەردەچن',
+  'more.signOut': 'دەرچوون',
+  'more.signOutSub': 'بۆ گەڕانەوە پێویستت بە وشەی نهێنی دەبێت',
+  'more.signOutAsk': 'دەرچیت؟',
+  'more.signOutBody': 'بۆ گەڕانەوە پێویستت بە وشەی نهێنییەکەت دەبێت.',
+  'more.stay': 'مانەوە',
+  'more.unverified': 'پشتڕاست نەکراوە',
+  'more.unverifiedNote':
+      'تا نووسینگە ئەم ژمارەیە پشتڕاست نەکاتەوە، پاس لەسەر نەخشە نابینیت.',
+  'more.currentPassword': 'وشەی نهێنی ئێستا',
+  'more.passwordChanged': 'وشەی نهێنی گۆڕا. هەموو ئامێرەکانی تر دەرچوون.',
+
+  'status.pending': 'چاوەڕوان',
+  'status.approved': 'پەسەندکراو',
+  'status.rejected': 'ڕەتکراوە',
+  'status.cancelled': 'هەڵوەشێنراوە',
+
+  'common.cancel': 'هەڵوەشاندنەوە',
+  'common.save': 'پاشەکەوتکردن',
+  'common.tryAgain': 'دووبارە هەوڵبدە',
+  'common.didNotLoad': 'ئەمە بار نەبوو',
+  'common.offline': 'پەیوەندی نییە. دڵنیابە مۆبایلەکە لەسەر ئینتەرنێتە و دووبارە هەوڵبدە.',
+  'common.noChildren': 'هێشتا هیچ منداڵێک بەم ژمارەیەوە نەبەستراوە.',
+  'common.noChildrenBody':
+      'نووسینگەی قوتابخانە منداڵ بە دایک و باوکەوە دەبەستێت. داوایان لێبکە ژمارەکەت بپشکنن.',
+};
+
+/* ---------------------------------------------------------------------------
+ * Arabic
+ * ------------------------------------------------------------------------- */
+
+const Map<String, String> _ar = {
+  'app.name': 'EduPulse',
+  'app.tagline': 'يربط الطلاب وأولياء الأمور\nوالمعلمين والمدارس',
+  'welcome.getStarted': 'ابدأ',
+  'welcome.logIn': 'تسجيل الدخول',
+  'welcome.usePhone': 'استخدم رقم الهاتف المسجّل لدى المدرسة.',
+
+  'login.welcomeBack': 'أهلاً بعودتك',
+  'login.subtitle': 'سجّل الدخول لمتابعة يوم طفلك.',
+  'login.phone': 'رقم الهاتف',
+  'login.phoneHint': '٠٧٥٠ ١٢٣ ٤٥٦٧',
+  'login.password': 'كلمة المرور',
+  'login.signIn': 'تسجيل الدخول',
+  'login.forgot': 'نسيتها؟ يمكن لمكتب المدرسة إصدار واحدة جديدة.',
+  'login.phoneNeeded': 'أدخل رقم الهاتف المسجّل لدى المدرسة.',
+  'login.choose': 'اختر كلمة مرور خاصة بك',
+  'login.chooseWhy': 'التي أُعطيت لك يعرفها من كتبها. اختر شيئاً تعرفه أنت وحدك.',
+  'login.newPassword': 'كلمة مرور جديدة',
+  'login.typeAgain': 'اكتبها مرة أخرى',
+  'login.rule': 'ثمانية أحرف على الأقل، مع حرف ورقم.',
+  'login.tooShort': 'استخدم ثمانية أحرف على الأقل.',
+  'login.mismatch': 'الكلمتان غير متطابقتين.',
+  'login.saveContinue': 'حفظ ومتابعة',
+
+  'nav.home': 'الرئيسية',
+  'nav.children': 'الأبناء',
+  'nav.messages': 'الرسائل',
+  'nav.more': 'المزيد',
+
+  'greet.morning': 'صباح الخير،',
+  'greet.afternoon': 'مساء الخير،',
+  'greet.evening': 'مساء الخير،',
+
+  'home.todaysSchedule': 'جدول اليوم',
+  'home.recentUpdates': 'آخر المستجدات',
+  'home.quickActions': 'إجراءات سريعة',
+  'home.viewAll': 'الكل',
+  'home.noLessons': 'لا توجد حصص مجدولة اليوم.',
+  'home.nothingNew': 'لا جديد من المدرسة.',
+  'home.attendance': 'الحضور',
+  'home.average': 'المعدل',
+  'home.feesDue': 'الرسوم المستحقة',
+  'home.excellent': 'ممتاز',
+  'home.watchIt': 'انتبه',
+  'home.concerning': 'مقلق',
+  'home.notMarked': 'لم يُسجَّل بعد',
+  'home.noMarks': 'لا درجات بعد',
+  'home.paid': 'مدفوع',
+  'home.nothingOwed': 'لا شيء مستحق',
+  'home.dueNow': 'مستحق الآن',
+  'home.daysLate': 'متأخر {n} يوماً',
+  'home.dueInDays': 'خلال {n} أيام',
+  'action.fees': 'الرسوم\nوالفواتير',
+  'action.leave': 'طلب\nإجازة',
+  'action.calendar': 'تقويم\nالمدرسة',
+  'action.report': 'كشف\nالدرجات',
+
+  'children.open': 'فتح',
+  'children.askLeave': 'طلب إجازة',
+  'children.homework': 'الواجبات',
+  'children.bus': 'الحافلة',
+  'children.yes': 'نعم',
+  'children.no': 'لا',
+  'children.dueSoon': '{n} قريباً',
+  'children.nothingUrgent': 'لا شيء عاجل',
+  'children.absent': '{n} غياب',
+  'children.noBusToday': 'لا حافلة اليوم',
+  'children.notOnBus': 'ليس على حافلة المدرسة',
+  'children.waitingForBus': 'بانتظار الحافلة',
+  'children.morning': 'الصباح',
+  'children.homeRun': 'العودة',
+
+  'tab.bus': 'الحافلة',
+  'tab.timetable': 'الجدول',
+  'tab.homework': 'الواجبات',
+  'tab.marks': 'الدرجات',
+  'tab.attendance': 'الحضور',
+
+  'bus.mapClosed': 'الخريطة مغلقة',
+  'bus.checking': 'جارٍ التحقق…',
+  'bus.minutesAway': 'على بُعد {n} دقيقة تقريباً',
+  'bus.moving': 'الحافلة في الطريق',
+  'bus.headingFor': 'متجهة إلى {n}',
+  'bus.onRoute': 'على المسار',
+  'bus.ageUnknown': 'وقت الموقع غير معروف',
+  'bus.reportedAgo': 'سُجّل قبل {n}',
+  'bus.notRecent': ' — لم ترسل الحافلة موقعها مؤخراً',
+  'bus.today': 'اليوم',
+  'bus.noBusToday': 'لا توجد حافلة مجدولة اليوم.',
+  'bus.arrangement': 'الترتيب',
+  'bus.morningStop': 'موقف الصباح',
+  'bus.afternoonStop': 'موقف بعد الظهر',
+  'bus.seat': 'مقعد {n}',
+  'bus.morningToSchool': 'الصباح — إلى المدرسة',
+  'bus.afternoonHome': 'بعد الظهر — إلى المنزل',
+  'bus.stop': 'الموقف',
+  'bus.vehicle': 'الحافلة',
+  'bus.driver': 'السائق',
+  'bus.notAssigned': 'غير محدد',
+  'bus.gotOn': 'صعد',
+  'bus.atSchool': 'في المدرسة',
+  'bus.handedOver': 'تم التسليم',
+  'bus.notOnBus': '{n} ليس على حافلة المدرسة.',
+  'bus.askOffice': 'إذا كان هذا خطأ، يمكن لمكتب المدرسة إضافته إلى مسار.',
+  'bus.dropElsewhere': 'التنزيل في مكان آخر',
+  'bus.usuallyAt': 'يُنزَّل عادة في {n}',
+  'bus.noOtherAddress': 'لم يُعتمد أي عنوان آخر لهذا الطفل بعد.',
+  'bus.useToday': 'اليوم فقط',
+  'bus.sending': 'جارٍ الإرسال…',
+  'bus.sentToOffice': 'أُرسل إلى المكتب. سيؤكدون قبل مغادرة الحافلة.',
+  'bus.cutOff': 'اطلب قبل انطلاق الحافلة. بعد مغادرتها، اتصل بالمكتب.',
+  'bus.onBus': 'على الحافلة',
+  'bus.arrived': 'وصل إلى المدرسة',
+  'bus.droppedOff': 'تم إنزاله',
+  'bus.didNotBoard': 'لم يصعد',
+  'bus.excused': 'معذور — لن يركب',
+  'bus.notStarted': 'لم تبدأ بعد',
+  'bus.waitingAtStop': 'ينتظر في الموقف',
+
+  'hw.none': 'لم تُسند أي واجبات.',
+  'hw.due': 'موعده {n}',
+  'hw.setOn': 'أُسند {n}',
+  'hw.about': 'نحو {n} دقيقة',
+  'hw.whatToDo': 'المطلوب',
+  'hw.details': 'الواجب',
+  'hw.subject': 'المادة',
+  'hw.teacher': 'أسنده',
+  'hw.effort': 'الوقت المتوقع',
+  'hw.outOf': 'الدرجة من',
+  'hw.handedIn': 'سُلّم',
+  'hw.notHandedIn': 'لم يُسلَّم بعد',
+  'hw.mark': 'الدرجة',
+  'hw.feedback': 'ملاحظة المعلم',
+  'hw.noDescription': 'لم يضف المعلم تفاصيل.',
+  'due.overdue': 'متأخر {n} يوماً',
+  'due.yesterday': 'أمس',
+  'due.today': 'اليوم',
+  'due.tomorrow': 'غداً',
+  'due.inDays': 'خلال {n} أيام',
+
+  'marks.none': 'لم تُنشر أي درجات بعد.',
+  'marks.comingUp': 'قادم',
+  'marks.published': 'الدرجات المنشورة',
+  'marks.average': 'المعدل',
+  'marks.passed': 'ناجح',
+  'marks.best': 'الأفضل',
+  'marks.across': 'من {n} اختبارات',
+  'marks.of': 'من {n}',
+  'marks.topMark': 'أعلى درجة',
+  'marks.absent': 'غائب',
+
+  'att.none': 'لم يُسجَّل الحضور بعد.',
+  'att.ofDays': 'من {n} يوماً مسجلاً',
+  'att.present': 'حاضر',
+  'att.absent': 'غائب',
+  'att.late': 'متأخر',
+  'att.excused': 'معذور',
+  'att.notPresent': 'أيام الغياب',
+  'att.minutesLate': 'متأخر {n} دقيقة',
+
+  'msg.none': 'لا شيء من المدرسة بعد.',
+  'msg.pinned': 'مثبّت من المدرسة',
+  'msg.fromSchool': 'من المدرسة',
+  'msg.earlier': 'سابقاً',
+  'msg.readMore': 'اقرأ المزيد',
+  'msg.important': 'مهم',
+  'msg.needsReply': 'تحتاج المدرسة رداً على هذه.',
+  'msg.minutesAgo': 'قبل {n} دقيقة',
+  'msg.hoursAgo': 'قبل {n} ساعة',
+  'msg.yesterday': 'أمس',
+  'msg.daysAgo': 'قبل {n} يوماً',
+
+  'fees.title': 'الرسوم والفواتير',
+  'fees.nothingOwed': 'لا شيء مستحق',
+  'fees.upToDate': 'حسابك محدّث. شكراً لك.',
+  'fees.overdueAmount': '{n} منها متأخرة',
+  'fees.dueNow': 'مستحق الآن',
+  'fees.dueOn': 'مستحق {n}',
+  'fees.inDays': ' — خلال {n} أيام',
+  'fees.howToPay': 'طرق الدفع',
+  'fees.cash': 'نقداً في مكتب المدرسة',
+  'fees.cashBody': 'أحضر المبلغ إلى المكتب واطلب إيصالاً. يُسجَّل في اليوم نفسه.',
+  'fees.transfer': 'حوالة بنكية أو FIB',
+  'fees.transferBody': 'حوّل إلى حساب المدرسة، ثم أرسل الإيصال أو أحضره ليُطابق باسمك.',
+  'fees.driver': 'إلى السائق',
+  'fees.driverBody': 'حيث تسمح مدرستك، يمكن للسائق الاستلام ويعطيك إيصالاً من التطبيق.',
+  'fees.yourBills': 'فواتيرك',
+  'fees.nothingBilled': 'لم تُصدر أي فاتورة لأسرتك بعد.',
+  'fees.paid': 'مدفوعة',
+  'fees.overdue': 'متأخرة',
+  'fees.total': 'الإجمالي',
+  'fees.stillOwed': 'المتبقي',
+
+  'leave.title': 'طلبات الإجازة',
+  'leave.ask': 'طلب إجازة',
+  'leave.none': 'لم تُطلب أي إجازة. اضغط "طلب إجازة" عندما تحتاج يوماً.',
+  'leave.withdraw': 'سحب هذا الطلب',
+  'leave.withdrawn': 'سُحب الطلب',
+  'leave.sent': 'أُرسل إلى مكتب المدرسة',
+  'leave.for': 'إجازة لـ {n}',
+  'leave.why': 'السبب',
+  'leave.sick': 'مريض',
+  'leave.medical': 'طبيب أو أسنان',
+  'leave.family': 'سبب عائلي',
+  'leave.travel': 'سفر',
+  'leave.bereavement': 'عزاء',
+  'leave.religious': 'ديني',
+  'leave.other': 'شيء آخر',
+  'leave.from': 'من',
+  'leave.to': 'إلى',
+  'leave.reason': 'السبب',
+  'leave.reasonHint': 'حرارة مرتفعة منذ الليلة الماضية، سنراجع الطبيب هذا الصباح.',
+  'leave.reasonNeeded': 'اذكر السبب باختصار — المكتب يقرر بناءً عليه.',
+  'leave.busNote': 'إذا وافق المكتب، لن تنتظر الحافلة طفلك في تلك الأيام.',
+  'leave.send': 'إرسال إلى المكتب',
+
+  'more.yourChildren': 'أبناؤك',
+  'more.moneyRequests': 'المال والطلبات',
+  'more.notifications': 'الإشعارات',
+  'more.push': 'الإشعارات على هذا الهاتف',
+  'more.pushOn': 'سيتم إبلاغك عن الحضور والحافلة والواجبات.',
+  'more.pushOff': 'لن يصل أي إشعار إلى هذا الهاتف.',
+  'more.turnOn': 'تفعيل',
+  'more.pushBlocked': 'فعّل الإشعارات لتطبيق EduPulse من إعدادات هاتفك.',
+  'more.account': 'الحساب',
+  'more.language': 'اللغة',
+  'more.feesSub': 'ما عليك وكيف تدفعه',
+  'more.leaveSub': 'اطلب من المدرسة إعفاء يوم',
+  'more.changePassword': 'تغيير كلمة المرور',
+  'more.changePasswordSub': 'يسجّل الخروج من كل الأجهزة الأخرى',
+  'more.signOut': 'تسجيل الخروج',
+  'more.signOutSub': 'ستحتاج كلمة المرور للعودة',
+  'more.signOutAsk': 'تسجيل الخروج؟',
+  'more.signOutBody': 'ستحتاج كلمة المرور للدخول مرة أخرى.',
+  'more.stay': 'البقاء',
+  'more.unverified': 'غير موثّق',
+  'more.unverifiedNote': 'حتى يوثّق المكتب هذا الرقم لن ترى الحافلة على الخريطة.',
+  'more.currentPassword': 'كلمة المرور الحالية',
+  'more.passwordChanged': 'تم تغيير كلمة المرور. سُجّل الخروج من كل الأجهزة الأخرى.',
+
+  'status.pending': 'قيد الانتظار',
+  'status.approved': 'موافق عليه',
+  'status.rejected': 'مرفوض',
+  'status.cancelled': 'ملغى',
+
+  'common.cancel': 'إلغاء',
+  'common.save': 'حفظ',
+  'common.tryAgain': 'حاول مرة أخرى',
+  'common.didNotLoad': 'تعذّر التحميل',
+  'common.offline': 'لا يوجد اتصال. تأكد من اتصال الهاتف بالشبكة وحاول مرة أخرى.',
+  'common.noChildren': 'لا يوجد أبناء مرتبطون بهذا الرقم بعد.',
+  'common.noChildrenBody':
+      'مكتب المدرسة يربط الطفل بولي الأمر. اطلب منهم التحقق من الرقم المسجّل لك.',
+};

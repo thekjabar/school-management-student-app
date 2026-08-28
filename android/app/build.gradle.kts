@@ -30,6 +30,39 @@ android {
         versionName = flutter.versionName
     }
 
+    // One codebase, five apps. Each audience gets its own applicationId so all
+    // of them can sit on one phone at once — which is what a school actually
+    // needs when it is testing, and what a family needs when a parent is also
+    // a teacher at the same school.
+    flavorDimensions += "role"
+    productFlavors {
+        create("parent") {
+            dimension = "role"
+            applicationIdSuffix = ".parent"
+            resValue("string", "app_name", "EduPulse Parent")
+        }
+        create("student") {
+            dimension = "role"
+            applicationIdSuffix = ".student"
+            resValue("string", "app_name", "EduPulse Student")
+        }
+        create("teacher") {
+            dimension = "role"
+            applicationIdSuffix = ".teacher"
+            resValue("string", "app_name", "EduPulse Teacher")
+        }
+        create("driver") {
+            dimension = "role"
+            applicationIdSuffix = ".driver"
+            resValue("string", "app_name", "EduPulse Driver")
+        }
+        create("admin") {
+            dimension = "role"
+            applicationIdSuffix = ".admin"
+            resValue("string", "app_name", "EduPulse Admin")
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.

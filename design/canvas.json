@@ -1,0 +1,76 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "Cartoon directions" },
+    { "id": "page-2", "name": "Earlier — not chosen" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "title": "E · Mascot", "page": "page-1", "x": 0, "y": 0, "w": 390, "h": 844 },
+    { "file": "Sticker.dc.html", "title": "F · Sticker book", "page": "page-1", "x": 490, "y": 0, "w": 390, "h": 844 },
+    { "file": "Puffy.dc.html", "title": "G · Puffy", "page": "page-1", "x": 980, "y": 0, "w": 390, "h": 844 },
+    { "file": "Doodle.dc.html", "title": "H · Doodle", "page": "page-1", "x": 1470, "y": 0, "w": 390, "h": 844 },
+
+    { "file": "Editorial.dc.html", "title": "A · Editorial", "page": "page-2", "x": 0, "y": 0, "w": 390, "h": 844 },
+    { "file": "SoftModern.dc.html", "title": "B · Soft modern", "page": "page-2", "x": 490, "y": 0, "w": 390, "h": 844 },
+    { "file": "SwissMinimal.dc.html", "title": "C · Swiss minimal", "page": "page-2", "x": 980, "y": 0, "w": 390, "h": 844 },
+    { "file": "VibrantAcademic.dc.html", "title": "D · Vibrant academic", "page": "page-2", "x": 1470, "y": 0, "w": 390, "h": 844 }
+  ],
+  "annotations": [
+    {
+      "id": "brief",
+      "page": "page-1",
+      "x": 0,
+      "y": -200,
+      "w": 660,
+      "text": "Round 2 — cartoon.\n\nThe first four were academic and professional, which is the opposite of what the owner wants. These four are all playful and illustrated; what differs is HOW.\n\nSame content in each. Ask the owner for a letter — and it's fine to mix, e.g. \"E's character with F's colours\"."
+    },
+    {
+      "id": "note-e",
+      "page": "page-1",
+      "x": 0,
+      "y": 900,
+      "w": 390,
+      "text": "E · MASCOT\nAn owl greets the student by name and speaks to them. Thick outlines, hard drop shadows, chunky buttons. Homework becomes \"quests\".\n\nStrongest on: warmth, daily habit, a character the school can own and put on posters.\nTrade-off: a mascot is a commitment — it needs drawing for every state, and a 17-year-old may find it babyish."
+    },
+    {
+      "id": "note-f",
+      "page": "page-1",
+      "x": 490,
+      "y": 900,
+      "w": 390,
+      "text": "F · STICKER BOOK\nEverything is a sticker: white keylines, hard shadows, slight tilts, confetti. Bold and loud, no character to maintain.\n\nStrongest on: energy, cheap to extend — any new card is just another sticker.\nTrade-off: the tilts can read as messy on a small screen, and lots of saturated colour at once tires the eye."
+    },
+    {
+      "id": "note-g",
+      "page": "page-1",
+      "x": 980,
+      "y": 900,
+      "w": 390,
+      "text": "G · PUFFY\nSoft 3D. Rounded, inflated shapes with gentle gradients and glow — toy-like rather than cartoon-drawn. No outlines anywhere.\n\nStrongest on: modern and premium while still playful; the one direction that suits 8-year-olds AND 17-year-olds.\nTrade-off: gradients and blur are the easiest thing to get wrong in Flutter and the most expensive to render on a cheap Android."
+    },
+    {
+      "id": "note-h",
+      "page": "page-1",
+      "x": 1470,
+      "y": 900,
+      "w": 390,
+      "text": "H · DOODLE\nNotebook paper with the red margin line. Hand-drawn boxes, wobbly underlines, a to-do list with drawn checkboxes.\n\nStrongest on: charming and genuinely different — nothing else in this market looks like it. Feels like a school.\nTrade-off: the handwritten font has no Kurdish letterforms, so Sorani text would fall back to a plain font and break the effect. Fixable, but it is real work."
+    },
+    {
+      "id": "note-rtl",
+      "page": "page-1",
+      "x": 1960,
+      "y": 0,
+      "w": 340,
+      "text": "STILL WORTH DECIDING\n\nThese are drawn in English, left-to-right. The real app is Sorani Kurdish and reads RIGHT-TO-LEFT.\n\nThis matters most for H: handwriting fonts almost never cover Kurdish, so that one needs a font decision before it can be built.\n\nTell me the letter and I'll show it in Kurdish RTL before writing any Flutter."
+    },
+    {
+      "id": "note-old",
+      "page": "page-2",
+      "x": 0,
+      "y": -160,
+      "w": 620,
+      "text": "Round 1, kept only for reference — the owner said these are too academic and professional.\n\nNothing here is being built. Flip back to \"Cartoon directions\" for the live set."
+    }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}

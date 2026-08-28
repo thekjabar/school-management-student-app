@@ -1,0 +1,142 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Nunito:wght@400;600;700&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #2563EB; text-decoration: none; }
+    a:hover { color: #1D4ED8; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #FFFDF5; font-family: Nunito, 'Trebuchet MS', sans-serif; color: #24303D; display: flex; flex-direction: column; overflow: hidden; position: relative;">
+
+  <!-- Ruled notebook paper, with the red margin line down the left -->
+  <div style="position: absolute; inset: 0; background-image: repeating-linear-gradient(180deg, transparent 0px, transparent 27px, #DCE8F2 27px, #DCE8F2 28px); opacity: 0.85;"></div>
+  <div style="position: absolute; top: 0; bottom: 0; left: 34px; width: 1.5px; background: #F4B8B8;"></div>
+
+  <!-- Header: written by hand across the top of the page -->
+  <div style="position: relative; padding: 22px 18px 0 44px;">
+    <div style="display: flex; align-items: flex-end; justify-content: space-between;">
+      <div>
+        <div style="font-family: 'Patrick Hand', 'Comic Sans MS', cursive; font-size: 25px; line-height: 1.1; color: #24303D;">Rawand Karwan</div>
+        <div style="font-family: 'Patrick Hand', 'Comic Sans MS', cursive; font-size: 14px; color: #7E8B99;">grade 11-B &nbsp;·&nbsp; no. 8821</div>
+      </div>
+      <!-- A hand-drawn star badge -->
+      <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+        <path d="M26 6.5c1.5 4.5 3 8 5.5 11.5 4 1 8 1.5 12 2.5-3 3-6.5 6-9 9.5.8 4.2 1.6 8.2 2.8 12.4-4-2-7.6-4.2-11.3-6-3.8 1.8-7.4 4-11.4 6 1.2-4.2 2-8.2 2.8-12.4-2.5-3.5-6-6.5-9-9.5 4-1 8-1.5 12-2.5C23 14.5 24.5 11 26 6.5z" fill="#FDE68A" stroke="#24303D" stroke-width="2.2" stroke-linejoin="round"/>
+        <text x="26" y="31" text-anchor="middle" font-family="Patrick Hand, cursive" font-size="14" fill="#24303D">12</text>
+      </svg>
+    </div>
+    <!-- A wobbly underline, drawn not ruled -->
+    <svg width="240" height="9" viewBox="0 0 240 9" fill="none" style="margin-top: 3px;">
+      <path d="M2 5.5c40-3 78 2 118-0.5s76-3.5 118 1" stroke="#2563EB" stroke-width="2.4" stroke-linecap="round"/>
+    </svg>
+  </div>
+
+  <div style="flex: 1; overflow: hidden; padding: 14px 18px 0 44px; display: flex; flex-direction: column; gap: 12px; position: relative;">
+
+    <!-- Now: circled in marker, the way you'd ring a lesson in a diary -->
+    <div style="position: relative; padding: 15px 16px 17px 16px;">
+      <svg viewBox="0 0 320 132" preserveAspectRatio="none" style="position: absolute; inset: 0; width: 100%; height: 100%;" fill="none">
+        <path d="M12 22c60-13 200-15 292-4 12 1.5 14 78 4 92-70 12-210 14-288 5-13-1.5-16-82-8-93z" fill="#FFFFFF" stroke="#2563EB" stroke-width="2.6" stroke-linejoin="round"/>
+      </svg>
+      <div style="position: relative;">
+        <div style="font-family: 'Patrick Hand', cursive; font-size: 15px; color: #2563EB; margin-bottom: 4px;">right now — until 9:30</div>
+        <div style="font-size: 22px; font-weight: 700; letter-spacing: -0.4px; line-height: 1.15; margin-bottom: 4px;">Advanced Maths</div>
+        <div style="font-family: 'Patrick Hand', cursive; font-size: 15px; color: #6B7A88;">room 402, Prof. Feynman</div>
+      </div>
+    </div>
+
+    <!-- Scores written as marks in a margin -->
+    <div style="display: flex; gap: 12px;">
+      <div style="flex: 1; background: #FFFFFF; border: 2.4px solid #24303D; border-radius: 14px 20px 15px 22px; padding: 13px 15px 15px 15px; transform: rotate(-0.8deg);">
+        <div style="font-family: 'Patrick Hand', cursive; font-size: 14.5px; color: #6B7A88; margin-bottom: 4px;">turned up</div>
+        <div style="display: flex; align-items: baseline; gap: 2px;">
+          <span style="font-family: 'Patrick Hand', cursive; font-size: 34px; color: #16A34A; line-height: 1;">92</span>
+          <span style="font-family: 'Patrick Hand', cursive; font-size: 17px; color: #16A34A;">%</span>
+        </div>
+      </div>
+      <div style="flex: 1; background: #FFFFFF; border: 2.4px solid #24303D; border-radius: 20px 14px 22px 15px; padding: 13px 15px 15px 15px; transform: rotate(0.9deg);">
+        <div style="font-family: 'Patrick Hand', cursive; font-size: 14.5px; color: #6B7A88; margin-bottom: 4px;">average</div>
+        <div style="font-family: 'Patrick Hand', cursive; font-size: 34px; color: #DB2777; line-height: 1;">3.85</div>
+      </div>
+    </div>
+
+    <!-- A to-do list with hand-drawn checkboxes -->
+    <div style="position: relative;">
+      <div style="font-family: 'Patrick Hand', cursive; font-size: 19px; margin-bottom: 8px;">to do —</div>
+
+      <div style="display: flex; align-items: flex-start; gap: 11px; min-height: 44px; margin-bottom: 10px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 1px;">
+          <path d="M3.5 4.5c5-1 12-1.5 17 0 1 5 1 11 0 15.5-5 1.2-12 1-17 0-1-4.5-1-10.5 0-15.5z" fill="#FFFFFF" stroke="#24303D" stroke-width="2"/>
+        </svg>
+        <div style="flex: 1;">
+          <div style="font-size: 15px; font-weight: 700; letter-spacing: -0.2px; line-height: 1.3;">Chemistry lab report</div>
+          <div style="font-family: 'Patrick Hand', cursive; font-size: 14.5px; color: #DC2626;">due TODAY, 11:59pm!</div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 11px; min-height: 44px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 1px;">
+          <path d="M3.5 4.5c5-1 12-1.5 17 0 1 5 1 11 0 15.5-5 1.2-12 1-17 0-1-4.5-1-10.5 0-15.5z" fill="#FFFFFF" stroke="#24303D" stroke-width="2"/>
+        </svg>
+        <div style="flex: 1;">
+          <div style="font-size: 15px; font-weight: 700; letter-spacing: -0.2px; line-height: 1.3;">Digital art portfolio</div>
+          <div style="font-family: 'Patrick Hand', cursive; font-size: 14.5px; color: #6B7A88;">wednesday, 10am</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex: 1;"></div>
+
+    <!-- Shortcuts as little taped-on notes -->
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding-bottom: 14px;">
+      <div style="background: #DBEAFE; border: 2.2px solid #24303D; border-radius: 12px 16px 13px 15px; padding: 11px 13px; display: flex; align-items: center; gap: 9px; min-height: 44px; transform: rotate(-0.7deg);">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M4.5 4.5c4-1 9-1 14.5-0.5v16C13.5 19.5 8.5 19.5 4.5 20.5z" stroke="#24303D" stroke-width="2" stroke-linejoin="round"/><path d="M12 4v16" stroke="#24303D" stroke-width="2"/></svg>
+        <div style="font-family: 'Patrick Hand', cursive; font-size: 15.5px;">Library</div>
+      </div>
+      <div style="background: #FEF3C7; border: 2.2px solid #24303D; border-radius: 16px 12px 15px 13px; padding: 11px 13px; display: flex; align-items: center; gap: 9px; min-height: 44px; transform: rotate(0.8deg);">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M3.5 6c5.5-1 11.5-1 17 0 1 4.5 1 10 0 14.5-5.5 1-11.5 1-17 0-1-4.5-1-10 0-14.5z" stroke="#24303D" stroke-width="2" stroke-linejoin="round"/><path d="M3.5 11h17M8 3.5v4M16 3.5v4" stroke="#24303D" stroke-width="2" stroke-linecap="round"/></svg>
+        <div style="font-family: 'Patrick Hand', cursive; font-size: 15.5px;">Exams</div>
+      </div>
+      <div style="background: #D1FAE5; border: 2.2px solid #24303D; border-radius: 15px 13px 12px 16px; padding: 11px 13px; display: flex; align-items: center; gap: 9px; min-height: 44px; transform: rotate(0.6deg);">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M20.5 11.5c0 4.5-4 8-8.5 8L4 21l1-8c0-4.5 3.5-8 8-8s7.5 3 7.5 6.5z" stroke="#24303D" stroke-width="2" stroke-linejoin="round"/></svg>
+        <div style="font-family: 'Patrick Hand', cursive; font-size: 15.5px;">Student hub</div>
+      </div>
+      <div style="background: #FCE7F3; border: 2.2px solid #24303D; border-radius: 13px 15px 16px 12px; padding: 11px 13px; display: flex; align-items: center; gap: 9px; min-height: 44px; transform: rotate(-1deg);">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M4.5 4.5c5-1 10-1 15 0 .8 4 .8 8.5 0 12.5-5 1-10 1-15 0-.8-4-.8-8.5 0-12.5z" stroke="#24303D" stroke-width="2" stroke-linejoin="round"/><path d="M4.5 11h15M7.5 21v-3M16.5 21v-3" stroke="#24303D" stroke-width="2" stroke-linecap="round"/></svg>
+        <div style="font-family: 'Patrick Hand', cursive; font-size: 15.5px;">Bus</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab bar drawn as tabs torn from the page -->
+  <div style="position: relative; background: #FFFDF5; border-top: 2.4px solid #24303D; display: flex; padding: 8px 10px 14px 10px; gap: 5px;">
+    <div style="flex: 1; min-height: 46px; border-radius: 12px 15px 12px 15px; background: #FDE68A; border: 2.2px solid #24303D; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 8l9-4.5L21 8l-9 4.5z" fill="#24303D"/><path d="M6.5 11v4.5c0 1.6 2.5 2.8 5.5 2.8s5.5-1.2 5.5-2.8V11" stroke="#24303D" stroke-width="2.1" stroke-linecap="round"/></svg>
+      <div style="font-family: 'Patrick Hand', cursive; font-size: 12px;">Learn</div>
+    </div>
+    <div style="flex: 1; min-height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3.5 6c5.5-1 11.5-1 17 0 1 4.5 1 10 0 14.5-5.5 1-11.5 1-17 0-1-4.5-1-10 0-14.5z" stroke="#9AA7B4" stroke-width="2.1" stroke-linejoin="round"/><path d="M3.5 11h17" stroke="#9AA7B4" stroke-width="2.1"/></svg>
+      <div style="font-family: 'Patrick Hand', cursive; font-size: 12px; color: #9AA7B4;">Days</div>
+    </div>
+    <div style="flex: 1; min-height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3.5l2.6 5.7 6.2.7-4.6 4.2 1.3 6.1L12 17.2l-5.5 3-1.3-6.1L.6 9.9l6.2-.7z" transform="translate(1.5,0)" stroke="#9AA7B4" stroke-width="2.1" stroke-linejoin="round"/></svg>
+      <div style="font-family: 'Patrick Hand', cursive; font-size: 12px; color: #9AA7B4;">Marks</div>
+    </div>
+    <div style="flex: 1; min-height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.5" r="3.6" stroke="#9AA7B4" stroke-width="2.1"/><path d="M5 20c1.5-4 4-6 7-6s5.5 2 7 6" stroke="#9AA7B4" stroke-width="2.1" stroke-linecap="round"/></svg>
+      <div style="font-family: 'Patrick Hand', cursive; font-size: 12px; color: #9AA7B4;">Me</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
