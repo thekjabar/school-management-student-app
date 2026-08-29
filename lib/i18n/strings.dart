@@ -880,6 +880,7 @@ const Map<String, String> _en = {
   'cal.nothingAhead': 'Nothing in the next fortnight.',
   'cal.upcomingHoliday': 'Upcoming holiday',
   'cal.daysLeft': '{n} days left',
+  'drawer.logout': 'Logout',
 };
 
 /* ---------------------------------------------------------------------------
@@ -1613,6 +1614,7 @@ const Map<String, String> _ckb = {
   'cal.nothingAhead': 'لە دوو هەفتەی داهاتوودا هیچ نییە.',
   'cal.upcomingHoliday': 'پشووی داهاتوو',
   'cal.daysLeft': '{n} ڕۆژ ماوە',
+  'drawer.logout': 'دەرچوون',
 };
 
 /* ---------------------------------------------------------------------------
@@ -2342,4 +2344,5 @@ const Map<String, String> _ar = {
   'cal.nothingAhead': 'لا شيء خلال الأسبوعين القادمين.',
   'cal.upcomingHoliday': 'عطلة قادمة',
   'cal.daysLeft': 'باقي {n} يوماً',
+  'drawer.logout': 'تسجيل الخروج',
 };

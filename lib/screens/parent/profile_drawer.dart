@@ -6,6 +6,7 @@ import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/kit.dart';
+import '../../ui/nav_glyphs.dart';
 import '../../ui/pickers.dart';
 import 'assignments_screen.dart';
 import 'bus_screen.dart';
@@ -81,14 +82,14 @@ class ProfileDrawer extends StatelessWidget {
                     onTap: () => _go(context, () => onGoTab(0)),
                   ),
                   _Row(
-                    icon: Icons.directions_bus_rounded,
+                    icon: Icons.directions_bus_outlined,
                     label: t('quick.bus'),
                     tint: tint,
                     enabled: child != null,
                     onTap: () => _push(context, BusScreen(child: child!)),
                   ),
                   _Row(
-                    icon: Icons.calendar_month_rounded,
+                    icon: Icons.calendar_today_outlined,
                     label: t('quick.timetable'),
                     tint: tint,
                     enabled: child != null,
@@ -98,14 +99,14 @@ class ProfileDrawer extends StatelessWidget {
                   const _Rule(),
                   _GroupLabel(t('drawer.academic')),
                   _Row(
-                    icon: Icons.description_rounded,
+                    icon: Icons.description_outlined,
                     label: t('quick.assignments'),
                     tint: AppTheme.violet,
                     enabled: child != null,
                     onTap: () => _push(context, AssignmentsScreen(child: child!)),
                   ),
                   _Row(
-                    icon: Icons.verified_user_rounded,
+                    icon: Icons.verified_user_outlined,
                     label: t('quick.attendance'),
                     tint: AppTheme.green,
                     enabled: child != null,
@@ -119,7 +120,8 @@ class ProfileDrawer extends StatelessWidget {
                     onTap: () => _push(context, MarksScreen(child: child!)),
                   ),
                   _Row(
-                    icon: Icons.favorite_rounded,
+                    icon: Icons.favorite_border_rounded,
+                    glyph: (colour, size) => HeartPersonIcon(color: colour, size: size),
                     label: t('quick.attitude'),
                     tint: AppTheme.rose,
                     enabled: child != null,
@@ -129,27 +131,27 @@ class ProfileDrawer extends StatelessWidget {
                   const _Rule(),
                   _GroupLabel(t('drawer.more')),
                   _Row(
-                    icon: Icons.forum_rounded,
+                    icon: Icons.chat_bubble_outline_rounded,
                     label: t('nav.messages'),
                     tint: tint,
                     badge: unread,
                     onTap: () => _go(context, () => onGoTab(1)),
                   ),
                   _Row(
-                    icon: Icons.credit_card_rounded,
+                    icon: Icons.credit_card_outlined,
                     label: t('drawer.fees'),
                     tint: AppTheme.amber,
                     onTap: () => _push(context, const FeesScreen()),
                   ),
                   _Row(
-                    icon: Icons.pie_chart_rounded,
+                    icon: Icons.pie_chart_outline_rounded,
                     label: t('quick.reports'),
                     tint: AppTheme.violet,
                     enabled: child != null,
                     onTap: () => _push(context, ReportsScreen(child: child!)),
                   ),
                   _Row(
-                    icon: Icons.settings_rounded,
+                    icon: Icons.settings_outlined,
                     label: t('drawer.settings'),
                     tint: AppTheme.textMuted,
                     onTap: () => _push(context, const SettingsScreen()),
@@ -244,7 +246,7 @@ class _Head extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
           // The ring is the one thing in the app that says "everything behind
@@ -255,7 +257,7 @@ class _Head extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(color: tint.withValues(alpha: 0.45), width: 2),
             ),
-            child: CircleInitials(label: child?.name ?? '?', tint: tint, size: 54),
+            child: CircleInitials(label: child?.name ?? '?', tint: tint, size: 50),
           ),
           const SizedBox(width: 13),
           Expanded(
@@ -385,7 +387,7 @@ class _GroupLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 9, 10, 5),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
       child: Text(
         text.toUpperCase(),
         style: TextStyle(
@@ -406,7 +408,7 @@ class _Rule extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Divider(height: 14, color: AppTheme.border),
+      child: Divider(height: 12, color: AppTheme.border),
     );
   }
 }
@@ -420,9 +422,13 @@ class _Row extends StatelessWidget {
     this.active = false,
     this.badge = 0,
     this.enabled = true,
+    this.glyph,
   });
 
   final IconData icon;
+
+  /// For the one mark that is not in the Material set.
+  final Widget Function(Color colour, double size)? glyph;
   final String label;
   final Color tint;
   final VoidCallback onTap;
@@ -437,7 +443,7 @@ class _Row extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Container(
         margin: const EdgeInsets.only(bottom: 2),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           // The current destination is a filled pill, not merely a coloured
           // label — a list where "you are here" is only a text colour is one
@@ -450,12 +456,23 @@ class _Row extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 19,
-              color: enabled ? tint : AppTheme.textFaint.withValues(alpha: 0.5),
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: glyph == null
+                  ? Icon(
+                      icon,
+                      size: 20,
+                      color: enabled ? tint : AppTheme.textFaint.withValues(alpha: 0.5),
+                    )
+                  : Center(
+                      child: glyph!(
+                        enabled ? tint : AppTheme.textFaint.withValues(alpha: 0.5),
+                        20,
+                      ),
+                    ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Text(
                 label,
@@ -642,7 +659,7 @@ class _LogoutButton extends StatelessWidget {
             Icon(Icons.logout_rounded, size: 19, color: AppTheme.rose),
             const SizedBox(width: 9),
             Text(
-              t('more.signOut'),
+              t('drawer.logout'),
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,

@@ -102,9 +102,9 @@ class _Overview extends StatelessWidget {
         child: Stack(
           children: [
             PositionedDirectional(
-              end: 0,
-              bottom: 0,
-              child: Image.asset('assets/art/school_shield.png', width: 210),
+              end: -6,
+              bottom: -6,
+              child: Image.asset('assets/art/school_shield.png', width: 236),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),

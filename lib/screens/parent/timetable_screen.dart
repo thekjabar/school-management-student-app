@@ -110,17 +110,20 @@ class _TimetableTabState extends State<TimetableTab> {
               // tall enough to hold the whole illustration — no negative
               // offsets, so nothing is clipped and both scroll together.
               SizedBox(
-                height: 118,
+                height: 124,
                 child: Stack(
+                  clipBehavior: Clip.none,
                   children: [
                     PositionedDirectional(
-                      end: -8,
-                      top: -18,
-                      child: Image.asset('assets/art/calendar_scene.png', width: 176),
+                      end: -6,
+                      top: -4,
+                      // A transparent cut-out, so there is no crop rectangle to
+                      // hide and it can sit as large as the design has it.
+                      child: Image.asset('assets/art/calendar_scene.png', width: 162),
                     ),
                     PositionedDirectional(
                       start: 0,
-                      end: 128,
+                      end: 140,
                       top: 8,
                       child: ChildCard(
                         name: widget.child.name,
