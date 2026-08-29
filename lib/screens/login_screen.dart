@@ -123,6 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final role = widget.role;
+    final keyboard = MediaQuery.of(context).viewInsets.bottom > 0;
 
     return Scaffold(
       backgroundColor: AppTheme.canvas,
@@ -141,24 +142,58 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(18, 10, 18, 56),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Align(
-                      alignment: AlignmentDirectional.centerEnd,
-                      child: LanguagePicker(tint: role.tint),
+              // One screen, no scrolling: the illustration takes whatever room
+              // the form leaves rather than a fixed height that pushed the
+              // page past the bottom and hid the hills behind the card.
+              // The keyboard is the one exception — then it scrolls, because a
+              // password field under a keyboard is worse than a short picture.
+              child: keyboard
+                  ? SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(18, 10, 18, 20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: LanguagePicker(tint: role.tint),
+                          ),
+                          const SizedBox(height: 12),
+                          Image.asset('assets/art/login_family.png', height: 110),
+                          const SizedBox(height: 8),
+                          _Card(
+                            child: _choosing ? _chooseForm(role) : _signInForm(role),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: LanguagePicker(tint: role.tint),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Image.asset(
+                                'assets/art/login_family.png',
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                          _Card(
+                            child: _choosing ? _chooseForm(role) : _signInForm(role),
+                          ),
+                          // The hills show under the card, as they do in the
+                          // design, rather than being covered by it.
+                          const SizedBox(height: 56),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 30),
-                    Image.asset('assets/art/login_family.png', height: 252),
-                    const SizedBox(height: 6),
-                    _Card(
-                      child: _choosing ? _chooseForm(role) : _signInForm(role),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ],
         ),
@@ -182,13 +217,13 @@ class _LoginScreenState extends State<LoginScreen> {
             color: AppTheme.text,
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 4),
         Text(
           t('login.signInToContinue'),
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 14, color: AppTheme.textMuted),
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 18),
 
         _Field(
           icon: Icons.smartphone_rounded,
@@ -289,7 +324,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (_error != null) _ErrorLine(_error!),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Align(
           alignment: AlignmentDirectional.centerEnd,
           child: GestureDetector(
@@ -305,7 +340,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
         BigButton(
           label: t('welcome.logIn'),
@@ -314,7 +349,7 @@ class _LoginScreenState extends State<LoginScreen> {
           height: 56,
           onPressed: _signIn,
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
 
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -457,7 +492,7 @@ class _Card extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 24, 18, 24),
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(24),
