@@ -1135,3 +1135,27 @@ class _MenuButton extends StatelessWidget {
     );
   }
 }
+
+
+/// A tab that can be navigated INSIDE.
+///
+/// Wraps one bottom-bar destination in its own Navigator so pushes from that
+/// tab sit under the bar instead of over it. [key] must be stable per tab —
+/// it is what lets the shell ask "can this tab go back?" before the app does.
+class TabHost extends StatelessWidget {
+  const TabHost({super.key, required this.navigatorKey, required this.child});
+
+  final GlobalKey<NavigatorState> navigatorKey;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Navigator(
+      key: navigatorKey,
+      onGenerateRoute: (settings) => MaterialPageRoute(
+        settings: settings,
+        builder: (_) => child,
+      ),
+    );
+  }
+}

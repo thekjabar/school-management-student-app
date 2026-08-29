@@ -33,6 +33,11 @@ class _ParentAppState extends State<ParentApp> {
   // Held so the avatar can open the drawer: the Scaffold that owns it is
   // built by this very method, so there is no context above it to ask.
   final _scaffold = GlobalKey<ScaffoldState>();
+
+  /// One per destination, so each tab remembers where it was and the back
+  /// gesture unwinds the tab rather than the app.
+  final _navKeys = List.generate(4, (_) => GlobalKey<NavigatorState>());
+
   int _tab = 0;
   List<Child>? _children;
   String? _selectedId;
@@ -153,7 +158,20 @@ class _ParentAppState extends State<ParentApp> {
             ? t('greet.afternoon')
             : t('greet.evening');
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        final nav = _navKeys[_tab].currentState;
+        if (nav != null && nav.canPop()) {
+          nav.pop();
+        } else if (_tab != 0) {
+          setState(() => _tab = 0);
+        } else {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
       key: _scaffold,
       backgroundColor: AppTheme.canvas,
       // The account lives behind the avatar rather than in a fourth tab. A
@@ -195,12 +213,27 @@ class _ParentAppState extends State<ParentApp> {
                       : IndexedStack(
                           index: _tab,
                           children: [
-                            HomeTab(child: child, onOpenTab: (i) => setState(() => _tab = i)),
-                            MessagesTab(onRead: () => setState(() => _unread = 0)),
-                            CalendarTab(child: child),
-                            ParentProfileTab(
-                              children: children,
-                              onOpenChild: (c) => setState(() => _selectedId = c.studentId),
+                            TabHost(
+                              navigatorKey: _navKeys[0],
+                              child: HomeTab(
+                                child: child,
+                                onOpenTab: (i) => setState(() => _tab = i),
+                              ),
+                            ),
+                            TabHost(
+                              navigatorKey: _navKeys[1],
+                              child: MessagesTab(onRead: () => setState(() => _unread = 0)),
+                            ),
+                            TabHost(
+                              navigatorKey: _navKeys[2],
+                              child: CalendarTab(child: child),
+                            ),
+                            TabHost(
+                              navigatorKey: _navKeys[3],
+                              child: ParentProfileTab(
+                                children: children,
+                                onOpenChild: (c) => setState(() => _selectedId = c.studentId),
+                              ),
                             ),
                           ],
                         ),
@@ -212,7 +245,13 @@ class _ParentAppState extends State<ParentApp> {
         items: _nav,
         index: _tab,
         tint: role.tint,
-        onChanged: (i) => setState(() => _tab = i),
+        onChanged: (i) {
+          if (i == _tab) {
+            _navKeys[i].currentState?.popUntil((r) => r.isFirst);
+          } else {
+            setState(() => _tab = i);
+          }
+        },
         // The one thing a parent DOES on this app rather than reads. Asking for
         // leave is the only action they initiate, so it is the only thing that
         // earns the raised button.
@@ -224,6 +263,7 @@ class _ParentAppState extends State<ParentApp> {
           );
         },
         badges: {1: _unread > 0},
+      ),
       ),
     );
   }

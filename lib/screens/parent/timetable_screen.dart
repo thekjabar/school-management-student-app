@@ -26,22 +26,10 @@ class TimetableScreen extends StatelessWidget {
       backgroundColor: AppTheme.canvas,
       body: SafeArea(
         bottom: false,
-        // The calendar is behind the whole top of the page — the header AND the
-        // child card — which is why it cannot live inside the scroll view: a
-        // viewport clips, and half the illustration was being cut off.
-        child: Stack(
+        child: Column(
           children: [
-            PositionedDirectional(
-              end: -10,
-              top: -8,
-              child: Image.asset('assets/art/calendar_scene.png', width: 196),
-            ),
-            Column(
-              children: [
-                ScreenHeader(title: t('quick.timetable'), onBell: () {}),
-                Expanded(child: TimetableTab(child: child, showChildCard: true)),
-              ],
-            ),
+            ScreenHeader(title: t('quick.timetable'), onBell: () {}),
+            Expanded(child: TimetableTab(child: child, showChildCard: true)),
           ],
         ),
       ),
@@ -118,20 +106,34 @@ class _TimetableTabState extends State<TimetableTab> {
             // as the design has them: the child card sits ON the tint, not on
             // a white band above it.
             if (widget.showChildCard)
-              // Held to the left of the page: the calendar behind it occupies
-              // the right, and a full-width card would sit on top of it.
-              Padding(
-                padding: const EdgeInsetsDirectional.only(end: 132),
-                child: ChildCard(
-                  name: widget.child.name,
-                  // Just the code. The card is half the page here, and
-                  // "Student ID:" is four syllables of label on a line with
-                  // room for the label or the value, not both.
-                  line: '${widget.child.className}  •  ${widget.child.code}',
-                  tint: tint,
+              // The card on the left, the calendar on the right, in a block
+              // tall enough to hold the whole illustration — no negative
+              // offsets, so nothing is clipped and both scroll together.
+              SizedBox(
+                height: 118,
+                child: Stack(
+                  children: [
+                    PositionedDirectional(
+                      end: -8,
+                      top: -18,
+                      child: Image.asset('assets/art/calendar_scene.png', width: 176),
+                    ),
+                    PositionedDirectional(
+                      start: 0,
+                      end: 128,
+                      top: 8,
+                      child: ChildCard(
+                        name: widget.child.name,
+                        // Just the code. The card is half the page here, and
+                        // "Student ID:" is four syllables of label on a line
+                        // with room for the label or the value, not both.
+                        line: '${widget.child.className}  •  ${widget.child.code}',
+                        tint: tint,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            const SizedBox(height: 30),
 
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: kGutter),
@@ -346,7 +348,7 @@ class _Table extends StatelessWidget {
         if (nextStart - ends >= 10) {
           rows.add(_BreakRow(from: ends, to: nextStart));
         } else {
-          rows.add(Divider(height: 1, color: AppTheme.border, indent: 62));
+          rows.add(Divider(height: 1, color: AppTheme.border, indent: 86, endIndent: 14));
         }
       }
     }
@@ -492,16 +494,25 @@ class _LessonRow extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            lesson.subject,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.3,
-                              height: 1.2,
-                              color: AppTheme.text,
+                          // Shrunk to fit rather than wrapped: "Mathematics"
+                          // broken across two lines as "Mathematic / s" is
+                          // worse than the same word one point smaller.
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: AlignmentDirectional.centerStart,
+                              child: Text(
+                                lesson.subject,
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.3,
+                                  height: 1.2,
+                                  color: AppTheme.text,
+                                ),
+                              ),
                             ),
                           ),
                           // The teacher's full name, as the design has it. The
