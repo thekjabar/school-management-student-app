@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The app's own pale violet, so the plate behind the shield belongs to
+         the product rather than being the launcher's default white. -->
+    <color name="ic_launcher_background">#F2EEFD</color>
+</resources>
