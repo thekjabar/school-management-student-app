@@ -150,7 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   final art = (box.maxHeight * 0.26).clamp(120.0, 208.0);
 
                   return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(18, 10, 18, 56),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 56),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -510,7 +510,7 @@ class _Field extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(15),
@@ -519,15 +519,15 @@ class _Field extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 30,
+            height: 30,
             decoration: BoxDecoration(
               color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.10),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(icon, size: 20, color: tint),
+            child: Icon(icon, size: 16, color: tint),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 13),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
