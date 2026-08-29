@@ -86,6 +86,97 @@ class DayOfLessons {
       );
 }
 
+/// What the school has said about how a child conducts themselves.
+///
+/// Merits and concerns arrive together and are shown together. A family given
+/// only the concerns is handed a record of a difficult child; given only the
+/// merits, they are handed nothing they can act on.
+class AttitudeNote {
+  AttitudeNote({
+    required this.id,
+    required this.kind,
+    required this.category,
+    required this.points,
+    required this.note,
+    required this.occurredAt,
+    required this.acknowledgedAt,
+    required this.className,
+    required this.recordedByName,
+  });
+
+  final String id;
+
+  /// MERIT, CONCERN or INCIDENT.
+  final String kind;
+  final String category;
+  final int points;
+  final String? note;
+  final DateTime occurredAt;
+  final DateTime? acknowledgedAt;
+  final String? className;
+  final String? recordedByName;
+
+  bool get isMerit => kind == 'MERIT';
+  bool get isConcern => kind == 'CONCERN' || kind == 'INCIDENT';
+  bool get seen => acknowledgedAt != null;
+
+  factory AttitudeNote.fromJson(Map<String, dynamic> j) => AttitudeNote(
+        id: j['id'] as String,
+        kind: (j['kind'] ?? 'MERIT') as String,
+        category: (j['category'] ?? 'OTHER') as String,
+        points: (j['points'] as num?)?.toInt() ?? 0,
+        note: j['note'] as String?,
+        occurredAt: DateTime.parse(j['occurredAt'] as String).toLocal(),
+        acknowledgedAt: j['acknowledgedAt'] == null
+            ? null
+            : DateTime.parse(j['acknowledgedAt'] as String).toLocal(),
+        className: j['className'] as String?,
+        recordedByName: j['recordedByName'] as String?,
+      );
+}
+
+/// The standing tally, computed over every record rather than the page in hand
+/// — a parent scrolling to page two should not watch the totals change.
+class AttitudeSummary {
+  AttitudeSummary({
+    required this.merits,
+    required this.concerns,
+    required this.incidents,
+    required this.points,
+    required this.notes,
+  });
+
+  final int merits;
+  final int concerns;
+  final int incidents;
+  final int points;
+  final List<AttitudeNote> notes;
+
+  /// One word for the whole picture, for the figure strip on the home screen.
+  /// Deliberately generous at the top: a child with a handful of merits and no
+  /// concerns is doing well, and saying so is the point of showing it.
+  String get verdict {
+    if (concerns + incidents == 0 && merits > 0) return 'excellent';
+    if (concerns + incidents == 0) return 'settled';
+    if (merits >= (concerns + incidents) * 2) return 'good';
+    if (concerns + incidents > merits) return 'needsWork';
+    return 'mixed';
+  }
+
+  factory AttitudeSummary.fromJson(Map<String, dynamic> j) {
+    final s = (j['summary'] ?? const {}) as Map<String, dynamic>;
+    return AttitudeSummary(
+      merits: (s['merits'] as num?)?.toInt() ?? 0,
+      concerns: (s['concerns'] as num?)?.toInt() ?? 0,
+      incidents: (s['incidents'] as num?)?.toInt() ?? 0,
+      points: (s['points'] as num?)?.toInt() ?? 0,
+      notes: ((j['rows'] as List?) ?? const [])
+          .map((e) => AttitudeNote.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
 class HomeworkItem {
   HomeworkItem({
     required this.id,
@@ -559,6 +650,18 @@ class ParentApi {
       return json.map((e) => ExamResultItem.fromJson(e as Map<String, dynamic>)).toList();
     }
     return Paged.from<ExamResultItem>(json, ExamResultItem.fromJson).rows;
+  }
+
+/// What the school has published about this child's conduct.
+  Future<AttitudeSummary> attitude(String studentId) async {
+    final json = await _api.get('/parent/children/$studentId/attitude') as Map<String, dynamic>;
+    return AttitudeSummary.fromJson(json);
+  }
+
+  /// "I have seen this." Recorded so the office knows whether a concern
+  /// actually reached the family before they telephone about it.
+  Future<void> markAttitudeSeen(String id) async {
+    await _api.post('/parent/attitude/$id/seen');
   }
 
   Future<AttendanceSummary> attendance(String studentId) async {

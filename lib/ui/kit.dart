@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
+import 'nav_glyphs.dart';
 
 /// The pieces the mockup is made of.
 ///
@@ -98,14 +99,16 @@ class RoleHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              if (trailing != null)
-                trailing!
-              else ...[
+              // These three are independent. The menu used to live inside the
+              // `else`, so any screen passing a `trailing` widget — the driver
+              // and teacher apps both pass a date pill — silently lost the only
+              // way into the account drawer.
+              ?trailing,
+              if (trailing == null && onBell != null)
                 BellButton(count: notificationCount, onTap: onBell),
-                if (onAvatar != null) ...[
-                  const SizedBox(width: 6),
-                  _MenuButton(onTap: onAvatar!),
-                ],
+              if (onAvatar != null) ...[
+                const SizedBox(width: 6),
+                _MenuButton(onTap: onAvatar!),
               ],
             ],
           ),
@@ -461,17 +464,26 @@ class QuickAction {
     required this.label,
     required this.color,
     this.onTap,
+    this.glyph,
   });
 
   final IconData icon;
   final String label;
   final Color color;
   final VoidCallback? onTap;
+
+  /// Set when the design's mark is not in the Material set — see
+  /// nav_glyphs.dart. [icon] stays required as the fallback.
+  final Widget Function(Color color, double size)? glyph;
 }
 
-/// Four tinted squares across one card. The one place in these apps where an
-/// icon carries the meaning rather than decorating it, so the labels stay
-/// short enough to read at a glance.
+/// Six tinted squares across one card.
+///
+/// All six fit — they are not a scrolling strip. The design puts every route
+/// out of the home screen on one line, and a row that scrolls hides two of them
+/// behind a gesture nobody makes on a card. What gives instead is the label:
+/// it scales down to fit its column rather than truncating, so "Assignments"
+/// stays "Assignments" beside the shorter words.
 class QuickActions extends StatelessWidget {
   const QuickActions({super.key, required this.actions});
 
@@ -480,35 +492,70 @@ class QuickActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card16(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
-      child: Row(
-        children: actions
-            .map(
-              (a) => Expanded(
-                child: GestureDetector(
-                  onTap: a.onTap,
-                  behavior: HitTestBehavior.opaque,
-                  child: Column(
-                    children: [
-                      Chip36(icon: a.icon, color: a.color, size: 44),
-                      const SizedBox(height: 7),
-                      Text(
-                        a.label,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                          height: 1.25,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13),
+      child: Column(
+        children: [
+          Row(
+            children: [
+          for (final a in actions)
+            Expanded(
+              child: GestureDetector(
+                onTap: a.onTap,
+                behavior: HitTestBehavior.opaque,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: a.color.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: a.glyph == null
+                          ? Icon(a.icon, size: 22, color: a.color)
+                          : Center(child: a.glyph!(a.color, 22)),
+                    ),
+                    const SizedBox(height: 9),
+                    // The padding is what keeps "Bus tracking" off
+                    // "Assignments": a scale-down box shrinks to its
+                    // CONSTRAINT, and six equal columns with no inset put two
+                    // full-width words hard against each other.
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          a.label,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.2,
+                            color: AppTheme.text,
+                          ),
                         ),
                       ),
-                    ],
+                    ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            )
-            .toList(),
+            ],
+          ),
+          const SizedBox(height: 11),
+          // A short rule beneath the row. Not a page indicator — the six fit —
+          // but the design carries it, and it reads as "this is one set".
+          Container(
+            width: 34,
+            height: 3,
+            decoration: BoxDecoration(
+              color: AppTheme.violet.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -523,6 +570,7 @@ class Card16 extends StatelessWidget {
     this.onTap,
     this.color,
     this.border,
+    this.radius = 18,
   });
 
   final Widget child;
@@ -530,6 +578,7 @@ class Card16 extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? color;
   final Color? border;
+  final double radius;
 
   @override
   Widget build(BuildContext context) {
@@ -538,12 +587,21 @@ class Card16 extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         color: color ?? AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: border != null ? Border.all(color: border!) : null,
-        boxShadow: const [
-          BoxShadow(color: Color(0x0A101828), blurRadius: 14, offset: Offset(0, 4)),
-          BoxShadow(color: Color(0x08101828), blurRadius: 3, offset: Offset(0, 1)),
-        ],
+        borderRadius: BorderRadius.circular(radius),
+        // No outline on the light theme. A grey hairline round every card is
+        // what turned a white page into a grey one: eight cards on a screen is
+        // eight grey rectangles, and the design separates them with light.
+        // The dark theme is the opposite — nothing casts a shadow on navy, so
+        // there the border IS the edge.
+        border: AppTheme.dark
+            ? Border.all(color: border ?? AppTheme.border)
+            : (border == null ? null : Border.all(color: border!)),
+        boxShadow: AppTheme.dark
+            ? null
+            : const [
+                BoxShadow(color: Color(0x0A101828), blurRadius: 14, offset: Offset(0, 4)),
+                BoxShadow(color: Color(0x08101828), blurRadius: 3, offset: Offset(0, 1)),
+              ],
       ),
       child: child,
     );
@@ -552,7 +610,7 @@ class Card16 extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(radius),
         child: content,
       ),
     );
@@ -585,7 +643,12 @@ class Pill extends StatelessWidget {
 
 /// One destination in the bottom bar.
 class NavItem {
-  const NavItem(this.filled, this.outline, this.label);
+  const NavItem(this.filled, this.outline, this.label, {this.glyph});
+
+  /// Set on the parent bar, whose four marks are drawn rather than taken from
+  /// the Material set — see nav_glyphs.dart. The two IconData stay required so
+  /// the driver and teacher bars are unaffected.
+  final NavGlyph? glyph;
 
   final IconData filled;
   final IconData outline;
@@ -692,6 +755,247 @@ class BottomNav extends StatelessWidget {
               );
             }),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A bottom bar with a raised action in the middle.
+///
+/// The centre button is not a sixth destination — it is the one thing a parent
+/// DOES rather than reads, and it sits apart because mixing an action into a
+/// row of destinations is how people tap it expecting a page. Two slots either
+/// side, which is as many as a thumb can reach without the bar becoming a
+/// menu.
+class CenterActionNav extends StatelessWidget {
+  const CenterActionNav({
+    super.key,
+    required this.items,
+    required this.index,
+    required this.tint,
+    required this.onChanged,
+    required this.centerIcon,
+    required this.onCenter,
+    this.centerLabel,
+    this.badges = const {},
+  });
+
+  final List<NavItem> items;
+  final int index;
+  final Color tint;
+  final ValueChanged<int> onChanged;
+  final IconData centerIcon;
+  final VoidCallback onCenter;
+
+  /// A word inside the button. The driver's raised action is not "add
+  /// something" — it is the one thing the whole app exists to start, and a
+  /// naked icon does not say which.
+  final String? centerLabel;
+
+  /// Index -> a dot on that item. A count is not shown: "you have something"
+  /// is the whole message, and a number invites arithmetic nobody wanted.
+  final Map<int, bool> badges;
+
+  static const _bar = 64.0;
+
+  /// How far the raised button rises above the bar.
+  static const _lift = 10.0;
+  static const _fab = 54.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final half = (items.length / 2).ceil();
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+        child: SizedBox(
+          // Room above the bar for the part of the button that stands proud
+          // of it. Without it the raised action is clipped by the bar's box.
+          height: _bar + _lift,
+          child: Stack(
+            alignment: Alignment.bottomCenter,
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                height: _bar,
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  border: AppTheme.dark ? Border.all(color: AppTheme.border) : null,
+                  boxShadow: AppTheme.dark
+                      ? null
+                      : const [
+                          BoxShadow(
+                            color: Color(0x14101828),
+                            blurRadius: 18,
+                            offset: Offset(0, 6),
+                          ),
+                        ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < half; i++) Expanded(child: _slot(i)),
+                      // The gap the raised button sits in.
+                      SizedBox(width: _fab + 18),
+                      for (var i = half; i < items.length; i++) Expanded(child: _slot(i)),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                child: GestureDetector(
+                  onTap: onCenter,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: _fab,
+                    height: _fab,
+                    decoration: BoxDecoration(
+                      // The role hue, not one fixed brand colour: the teacher
+                      // bar is green in the design and a violet button in it
+                      // would be the only violet on the screen.
+                      color: tint,
+                      shape: BoxShape.circle,
+                      // The ring is the page showing through, which is what
+                      // gives the bar its notch without cutting a hole in it.
+                      border: Border.all(color: AppTheme.canvas, width: 3.5),
+                      // A neutral halo, as the design draws it. Tinting the
+                      // shadow with the button's own violet painted a coloured
+                      // crescent on the ring, which read as a second circle
+                      // rather than as depth.
+                      boxShadow: AppTheme.dark
+                          ? null
+                          : const [
+                              BoxShadow(
+                                color: Color(0x1A101828),
+                                blurRadius: 12,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                    ),
+                    child: centerLabel == null
+                        ? Icon(centerIcon, size: 25, color: Colors.white)
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(centerIcon, size: 22, color: Colors.white),
+                              Text(
+                                centerLabel!,
+                                maxLines: 1,
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.2,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The slate the design draws an unselected mark in.
+  static Color get _idle =>
+      AppTheme.dark ? const Color(0xFFA8B0C0) : const Color(0xFF5B6478);
+
+  Widget _slot(int i) {
+    final on = i == index;
+    final item = items[i];
+
+    // Where you are is a filled block on the dark canvas and a rule under the
+    // word on the light one — exactly as the design draws it. A tint that works
+    // on white is invisible on navy, and a rule on navy is invisible full stop.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onChanged(i),
+      child: Container(
+        height: _bar,
+        color: on && AppTheme.dark
+            ? tint.withValues(alpha: 0.18)
+            : Colors.transparent,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (on && !AppTheme.dark)
+              // Clear of the bar's edge, and rounded on all four corners. Sat
+              // flush against the bottom it was sliced in half by the bar's
+              // own clip and read as a rendering fault rather than as a rule.
+              PositionedDirectional(
+                bottom: 7,
+                child: Container(
+                  width: 26,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: tint,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      if (item.glyph != null)
+                        NavGlyphIcon(
+                          glyph: item.glyph!,
+                          filled: on,
+                          size: 21,
+                          color: on ? tint : _idle,
+                        )
+                      else
+                        Icon(
+                          on ? item.filled : item.outline,
+                          size: 21,
+                          color: on ? tint : _idle,
+                        ),
+                      if (badges[i] == true)
+                        PositionedDirectional(
+                          top: -2,
+                          end: -3,
+                          child: Container(
+                            width: 8.5,
+                            height: 8.5,
+                            decoration: BoxDecoration(
+                              color: tint,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppTheme.surface, width: 1.4),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      color: on ? tint : _idle,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

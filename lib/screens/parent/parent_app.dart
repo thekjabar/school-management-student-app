@@ -5,9 +5,14 @@ import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/kit.dart';
-import 'children_tab.dart';
+import '../../ui/nav_glyphs.dart';
+import '../../ui/pickers.dart';
+import '../../ui/home_kit.dart';
+import 'calendar_tab.dart';
 import 'home_tab.dart';
+import 'leave_screen.dart';
 import 'messages_tab.dart';
+import 'parent_profile_tab.dart';
 import 'profile_drawer.dart';
 
 /// The parent app.
@@ -35,9 +40,12 @@ class _ParentAppState extends State<ParentApp> {
   int _unread = 0;
 
   List<NavItem> get _nav => [
-    NavItem(Icons.home_rounded, Icons.home_outlined, t('nav.home')),
-    NavItem(Icons.child_care_rounded, Icons.child_care_outlined, t('nav.children')),
-    NavItem(Icons.forum_rounded, Icons.forum_outlined, t('nav.messages')),
+    NavItem(Icons.home_rounded, Icons.home_outlined, t('nav.home'), glyph: NavGlyph.home),
+    NavItem(Icons.sms_rounded, Icons.sms_outlined, t('nav.messages'), glyph: NavGlyph.messages),
+    NavItem(Icons.event_available_rounded, Icons.event_available_outlined, t('nav.calendar'),
+        glyph: NavGlyph.calendar),
+    NavItem(Icons.person_rounded, Icons.person_outline_rounded, t('nav.profile'),
+        glyph: NavGlyph.profile),
   ];
 
   @override
@@ -75,6 +83,30 @@ class _ParentAppState extends State<ParentApp> {
     final children = _children;
     if (children == null || children.isEmpty) return null;
     return children.firstWhere((c) => c.studentId == _selectedId, orElse: () => children.first);
+  }
+
+
+  /// Which child this screen is about.
+  ///
+  /// A sheet rather than a row of chips under the header: a family with four
+  /// children had four chips competing with the greeting for the top of the
+  /// screen, and the switch is something they do rarely and deliberately.
+  Future<void> _pickChild(List<Child> children) async {
+    final picked = await pickOne<String>(
+      context,
+      title: t('home.whichChild'),
+      tint: Role.parent.tint,
+      selected: _selectedId ?? children.first.studentId,
+      options: children
+          .map((c) => PickOption(
+                value: c.studentId,
+                label: c.name,
+                subtitle: '${c.className} · ${c.code}',
+                icon: Icons.child_care_rounded,
+              ))
+          .toList(),
+    );
+    if (picked != null && mounted) setState(() => _selectedId = picked);
   }
 
   @override
@@ -127,28 +159,33 @@ class _ParentAppState extends State<ParentApp> {
       // The account lives behind the avatar rather than in a fourth tab. A
       // "⋯ More" tab spends a quarter of the bottom bar on a drawer's worth of
       // settings, and hides the three things a parent opens the app for.
-      drawer: children == null ? null : ProfileDrawer(children: children),
+      drawer: children == null
+          ? null
+          : ProfileDrawer(
+              children: children,
+              selected: child,
+              onSelectChild: (id) => setState(() => _selectedId = id),
+              onGoTab: (i) => setState(() => _tab = i),
+              unread: _unread,
+            ),
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            RoleHeader(
-              role: role,
+            ParentHeader(
               greeting: greeting,
-              name: me?.name ?? '',
+              parentName: me?.name ?? '',
+              child: child == null
+                  ? null
+                  : ChildBrief(name: child.name, className: child.className),
+              schoolName: me?.schoolName ?? '',
+              tint: role.tint,
+              onMenu: () => _scaffold.currentState?.openDrawer(),
+              onBell: () => setState(() => _tab = 1),
               notificationCount: _unread,
-              onBell: () => setState(() => _tab = 2),
-              onAvatar: () => _scaffold.currentState?.openDrawer(),
-              // The picker only appears for a family with more than one child.
-              // A single chip that never changes anything is furniture.
-              bottom: (children != null && children.length > 1)
-                  ? _ChildPicker(
-                      children: children,
-                      selectedId: child?.studentId,
-                      tint: role.tint,
-                      onSelect: (id) => setState(() => _selectedId = id),
-                    )
-                  : null,
+              // Only a family with more than one child gets the switcher.
+              canSwitchChild: children != null && children.length > 1,
+              onSwitchChild: () => _pickChild(children ?? const []),
             ),
             Expanded(
               child: children == null
@@ -159,76 +196,39 @@ class _ParentAppState extends State<ParentApp> {
                           index: _tab,
                           children: [
                             HomeTab(child: child, onOpenTab: (i) => setState(() => _tab = i)),
-                            ChildrenTab(children: children, selected: child),
                             MessagesTab(onRead: () => setState(() => _unread = 0)),
+                            CalendarTab(child: child),
+                            ParentProfileTab(
+                              children: children,
+                              onOpenChild: (c) => setState(() => _selectedId = c.studentId),
+                            ),
                           ],
                         ),
             ),
           ],
         ),
       ),
-      bottomNavigationBar: BottomNav(
+      bottomNavigationBar: CenterActionNav(
         items: _nav,
         index: _tab,
         tint: role.tint,
         onChanged: (i) => setState(() => _tab = i),
-      ),
-    );
-  }
-}
-
-/// The row of children in the header.
-class _ChildPicker extends StatelessWidget {
-  const _ChildPicker({
-    required this.children,
-    required this.selectedId,
-    required this.tint,
-    required this.onSelect,
-  });
-
-  final List<Child> children;
-  final String? selectedId;
-  final Color tint;
-  final ValueChanged<String> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 34,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: children.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final c = children[i];
-          final on = c.studentId == selectedId;
-          return GestureDetector(
-            onTap: () => onSelect(c.studentId),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 140),
-              padding: const EdgeInsets.symmetric(horizontal: 13),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: on ? tint : AppTheme.surface,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                // First name plus class: two children in one family often share
-                // a given name in this region.
-                '${c.name.split(' ').first} · ${c.className}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: on ? Colors.white : AppTheme.textMuted,
-                ),
-              ),
-            ),
+        // The one thing a parent DOES on this app rather than reads. Asking for
+        // leave is the only action they initiate, so it is the only thing that
+        // earns the raised button.
+        centerIcon: Icons.add_rounded,
+        onCenter: () {
+          if (child == null) return;
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => LeaveScreen(child: child)),
           );
         },
+        badges: {1: _unread > 0},
       ),
     );
   }
 }
+
 
 class _NoChildren extends StatelessWidget {
   const _NoChildren();
@@ -258,3 +258,4 @@ class _NoChildren extends StatelessWidget {
     );
   }
 }
+

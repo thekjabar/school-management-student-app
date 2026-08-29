@@ -280,8 +280,19 @@ class CrewApi {
     return Paged.from<CrewTrip>(json, CrewTrip.fromJson).rows;
   }
 
-  Future<List<CrewTrip>> trips({String? date}) async {
-    final json = await _api.get('/crew/trips${date != null ? '?serviceDate=$date' : ''}');
+  /// The crew's runs.
+  ///
+  /// [date] asks for one day. [days] asks for that many days ending today,
+  /// newest first, which is what a history list wants — calling this with
+  /// neither returns TODAY, and that is what made "past runs" show the current
+  /// day and, on a day with no runs, nothing at all.
+  Future<List<CrewTrip>> trips({String? date, int? days}) async {
+    final query = date != null
+        ? '?date=$date'
+        : days != null
+            ? '?days=$days&pageSize=50'
+            : '';
+    final json = await _api.get('/crew/trips$query');
     return Paged.from<CrewTrip>(json, CrewTrip.fromJson).rows;
   }
 

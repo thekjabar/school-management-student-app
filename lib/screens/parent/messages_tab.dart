@@ -1,188 +1,350 @@
 import 'package:flutter/material.dart';
 
 import '../../api/parent_api.dart';
+import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
-import '../../i18n/strings.dart';
 import '../../ui/format.dart';
+import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
+import '../../ui/screen_kit.dart';
 
-/// What the school has told this family.
+/// Everything the school has sent this family.
 ///
-/// The office aims each notice at a scope — the whole school, a grade, a class,
-/// a bus route — and the server works out which of those apply to THIS family's
-/// children. So a grade 4 consent form does not appear for a family whose
-/// children are in grades 1 and 6, and nobody has to scroll past it.
+/// One list, filtered by what the message IS: a notice about the whole school,
+/// something for this class, or something urgent. The design draws a second
+/// list of teacher conversations beside it — see the note on _Compose for why
+/// that is not here.
 class MessagesTab extends StatefulWidget {
-  const MessagesTab({super.key, this.onRead});
+  const MessagesTab({super.key, required this.onRead});
 
-  final VoidCallback? onRead;
+  final VoidCallback onRead;
 
   @override
   State<MessagesTab> createState() => _MessagesTabState();
 }
 
 class _MessagesTabState extends State<MessagesTab> {
+  int _tab = 0;
+  String _query = '';
+  bool _searching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Opening the tab is reading it, as far as the bell is concerned.
+    WidgetsBinding.instance.addPostFrameCallback((_) => widget.onRead());
+  }
+
   @override
   Widget build(BuildContext context) {
+    final tint = Role.parent.tint;
+
     return Loader<List<Announcement>>(
-      tint: Role.parent.tint,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-      load: () async {
-        final rows = await ParentApi.instance.announcements();
-        // Opening the tab is reading them, as far as the bell is concerned.
-        WidgetsBinding.instance.addPostFrameCallback((_) => widget.onRead?.call());
-        return rows;
-      },
-      isEmpty: (rows) => rows.isEmpty,
-      empty: t('msg.none'),
-      builder: (context, rows) {
-        final pinned = rows.where((r) => r.pinned).toList();
-        final rest = rows.where((r) => !r.pinned).toList();
+      tint: tint,
+      padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
+      load: () => ParentApi.instance.announcements(),
+      builder: (context, all) {
+        final rows = all.where((a) {
+          if (_query.isNotEmpty &&
+              !a.title.toLowerCase().contains(_query) &&
+              !a.body.toLowerCase().contains(_query)) {
+            return false;
+          }
+          return switch (_tab) {
+            1 => a.category == 'ANNOUNCEMENT' || a.category == 'EVENT',
+            2 => a.category == 'POLICY' || a.category == 'NOTICE',
+            3 => a.priority == 'URGENT' || a.priority == 'HIGH',
+            _ => true,
+          };
+        }).toList()
+          ..sort((a, b) {
+            if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+            return (b.sentAt ?? DateTime(0)).compareTo(a.sentAt ?? DateTime(0));
+          });
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (pinned.isNotEmpty) ...[
-              Heading(t('msg.pinned')),
-              ...pinned.map((n) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _NoticeCard(notice: n),
-                  )),
-            ],
-            if (rest.isNotEmpty) Heading(pinned.isEmpty ? t('msg.fromSchool') : t('msg.earlier')),
-            ...rest.map((n) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _NoticeCard(notice: n),
-                )),
+            // Title, search and tabs on one card, as the design has them.
+            Card16(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _searching
+                            ? TextField(
+                                autofocus: true,
+                                onChanged: (v) =>
+                                    setState(() => _query = v.trim().toLowerCase()),
+                                decoration: InputDecoration(
+                                  hintText: t('common.search'),
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 11,
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                t('nav.messages'),
+                                style: TextStyle(
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.6,
+                                  color: AppTheme.text,
+                                ),
+                              ),
+                      ),
+                      const SizedBox(width: 10),
+                      _RoundButton(
+                        icon: _searching ? Icons.close_rounded : Icons.search_rounded,
+                        onTap: () => setState(() {
+                          _searching = !_searching;
+                          if (!_searching) _query = '';
+                        }),
+                      ),
+                      const SizedBox(width: 8),
+                      _RoundButton(
+                        icon: Icons.edit_outlined,
+                        filled: true,
+                        onTap: () => _compose(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  UnderlineTabs(
+                    tint: tint,
+                    index: _tab,
+                    onChanged: (i) => setState(() => _tab = i),
+                    tabs: [
+                      TabSpec(label: t('msg.all'), icon: Icons.forum_outlined),
+                      TabSpec(
+                        label: t('msg.announcements'),
+                        icon: Icons.campaign_outlined,
+                        color: AppTheme.violet,
+                      ),
+                      TabSpec(
+                        label: t('msg.notices'),
+                        icon: Icons.description_outlined,
+                        color: AppTheme.blue,
+                      ),
+                      TabSpec(
+                        label: t('msg.urgent'),
+                        icon: Icons.priority_high_rounded,
+                        color: AppTheme.rose,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: kCardGap),
+
+            if (rows.isEmpty)
+              Card16(
+                padding: const EdgeInsets.symmetric(vertical: 34),
+                child: Center(
+                  child: Text(
+                    t('msg.nothing'),
+                    style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                  ),
+                ),
+              )
+            else
+              Card16(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Column(
+                  children: [
+                    for (var i = 0; i < rows.length; i++) ...[
+                      if (i > 0) Divider(height: 1, color: AppTheme.border),
+                      _MessageRow(item: rows[i]),
+                    ],
+                  ],
+                ),
+              ),
           ],
         );
       },
     );
   }
+
+  /// Writing TO the school is not switched on.
+  ///
+  /// The design shows teacher conversations and a Quick Chat strip. There is no
+  /// messaging service behind this app — announcements travel one way, from the
+  /// office outward — so a compose box would open onto nothing and a chat list
+  /// would be furniture. Better to say so than to draw an inbox that never
+  /// delivers.
+  void _compose(BuildContext context) => showNote(context, t('msg.oneWay'));
 }
 
-class _NoticeCard extends StatefulWidget {
-  const _NoticeCard({required this.notice});
+class _RoundButton extends StatelessWidget {
+  const _RoundButton({required this.icon, required this.onTap, this.filled = false});
 
-  final Announcement notice;
-
-  @override
-  State<_NoticeCard> createState() => _NoticeCardState();
-}
-
-class _NoticeCardState extends State<_NoticeCard> {
-  bool _open = false;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool filled;
 
   @override
   Widget build(BuildContext context) {
-    final n = widget.notice;
-    final urgent = n.priority == 'HIGH' || n.priority == 'CRITICAL';
+    final tint = Role.parent.tint;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: filled ? tint : AppTheme.canvas,
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: filled ? tint : AppTheme.border),
+        ),
+        child: Icon(icon, size: 19, color: filled ? Colors.white : AppTheme.text),
+      ),
+    );
+  }
+}
 
-    final (Color colour, IconData icon) = switch (n.category) {
-      'BILLING' => (AppTheme.violet, Icons.receipt_long_rounded),
-      'TRIP_STATUS' || 'DELAY' => (AppTheme.amber, Icons.directions_bus_rounded),
-      'ACADEMIC' => (AppTheme.blue, Icons.school_rounded),
-      'SAFETY_CRITICAL' => (AppTheme.rose, Icons.warning_rounded),
-      _ => urgent ? (AppTheme.rose, Icons.priority_high_rounded) : (Role.parent.tint, Icons.campaign_rounded),
+/* ---------------------------------------------------------------------------
+ * One message
+ * ------------------------------------------------------------------------- */
+
+class _MessageRow extends StatelessWidget {
+  const _MessageRow({required this.item});
+
+  final Announcement item;
+
+  @override
+  Widget build(BuildContext context) {
+    final urgent = item.priority == 'URGENT' || item.priority == 'HIGH';
+    final (colour, icon) = switch (item.category) {
+      'EVENT' => (AppTheme.green, Icons.event_rounded),
+      'POLICY' || 'NOTICE' => (AppTheme.blue, Icons.description_rounded),
+      'TRANSPORT' => (AppTheme.amber, Icons.directions_bus_rounded),
+      'HEALTH' => (AppTheme.rose, Icons.favorite_rounded),
+      _ => (Role.parent.tint, Icons.account_balance_rounded),
     };
+    final tint = urgent ? AppTheme.rose : colour;
 
-    return Card16(
-      onTap: () => setState(() => _open = !_open),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Chip36(icon: icon, color: colour, size: 40),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        if (n.pinned) ...[
-                          Icon(Icons.push_pin_rounded, size: 13, color: colour),
-                          const SizedBox(width: 5),
-                        ],
-                        Expanded(
-                          child: Text(
-                            n.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, height: 1.3),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      [
-                        if (n.sentAt != null) _ago(n.sentAt!),
-                        if (n.authorName.isNotEmpty) n.authorName,
-                      ].join(' · '),
-                      style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
-                    ),
-                  ],
-                ),
-              ),
-              if (urgent) ...[
-                const SizedBox(width: 8),
-                Pill(t('msg.important'), color: AppTheme.rose),
-              ],
-            ],
-          ),
-          const SizedBox(height: 11),
-          Text(
-            n.body,
-            maxLines: _open ? null : 2,
-            overflow: _open ? null : TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12.5, height: 1.55, color: AppTheme.textMuted),
-          ),
-          if (!_open && n.body.length > 110) ...[
-            const SizedBox(height: 6),
-            Text(
-              t('msg.readMore'),
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Role.parent.tint),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(item.title),
+          content: SingleChildScrollView(child: Text(item.body)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(t('common.close')),
             ),
           ],
-          if (n.requiresAcknowledgement) ...[
-            const SizedBox(height: 12),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Container(
-              padding: const EdgeInsets.all(11),
+              width: 46,
+              height: 46,
               decoration: BoxDecoration(
-                color: AppTheme.amberSoft,
-                borderRadius: BorderRadius.circular(12),
+                color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Row(
+              child: Icon(urgent ? Icons.priority_high_rounded : icon, size: 22, color: tint),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.assignment_turned_in_rounded, size: 16, color: AppTheme.amber),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      // Said rather than shown as a button, because the paper
-                      // form is what the school actually needs back.
-                      t('msg.needsReply'),
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, height: 1.4),
+                  Text(
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                      color: AppTheme.text,
                     ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    item.authorName.isEmpty ? t('msg.school') : item.authorName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: tint,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    item.body,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.textMuted),
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  _when(item.sentAt),
+                  style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+                ),
+                const SizedBox(height: 6),
+                if (item.readAt == null)
+                  Container(
+                    width: 20,
+                    height: 20,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Role.parent.tint,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Text(
+                      '1',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                  )
+                else if (item.pinned)
+                  Icon(Icons.push_pin_rounded, size: 15, color: AppTheme.amber),
+              ],
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right_rounded, size: 19, color: AppTheme.textFaint),
           ],
-        ],
+        ),
       ),
     );
   }
 
-  String _ago(DateTime at) {
-    final diff = DateTime.now().difference(at);
-    if (diff.inMinutes < 60) return tn('msg.minutesAgo', diff.inMinutes.clamp(1, 59));
-    if (diff.inHours < 24) return tn('msg.hoursAgo', diff.inHours);
-    if (diff.inDays == 1) return t('msg.yesterday');
-    if (diff.inDays < 30) return tn('msg.daysAgo', diff.inDays);
-    return longDate(at);
+  /// "08:30", "Yesterday", "Mon", then the date — the way a message list reads
+  /// time, which is by how recently rather than by when.
+  String _when(DateTime? at) {
+    if (at == null) return '—';
+    final now = DateTime.now();
+    final midnight = DateTime(now.year, now.month, now.day);
+    final days = midnight.difference(DateTime(at.year, at.month, at.day)).inDays;
+    if (days <= 0) return hhmm(at);
+    if (days == 1) return t('due.yesterday');
+    if (days < 7) return t('day.${at.weekday}').characters.take(3).toString();
+    return shortDate(at);
   }
 }

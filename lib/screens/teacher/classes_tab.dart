@@ -6,6 +6,7 @@ import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
+import '../../ui/pickers.dart';
 
 /// A teacher's classes, and the register for one of them.
 ///
@@ -13,6 +14,29 @@ import '../../ui/format.dart';
 /// day, so it is one tap from the class list and saves in one call. Thirty
 /// separate requests over a school's connection is thirty chances for one to
 /// fail and leave a child unmarked with nobody the wiser.
+/// The class list as a screen of its own.
+///
+/// It used to be a bottom-bar tab. The bar now carries the five destinations
+/// the design asks for, so everything that was a tab and is still a place needs
+/// a Scaffold of its own to be pushed onto.
+class ClassesScreen extends StatelessWidget {
+  const ClassesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.canvas,
+      appBar: AppBar(
+        title: Text(t('teacher.myClasses')),
+        backgroundColor: Role.teacher.wash,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: const ClassesTab(),
+    );
+  }
+}
+
 class ClassesTab extends StatelessWidget {
   const ClassesTab({super.key});
 
@@ -87,7 +111,7 @@ class ClassesTab extends StatelessWidget {
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => _StudentsScreen(slot: c)),
+                              MaterialPageRoute(builder: (_) => ClassRosterScreen(slot: c)),
                             ),
                             style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
                             child: Text(t('teacher.theChildren')),
@@ -146,11 +170,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime.now().subtract(const Duration(days: 60)),
-      lastDate: DateTime.now(),
+    final picked = await pickDate(
+      context,
+      initial: _date,
+      first: DateTime.now().subtract(const Duration(days: 60)),
+      last: DateTime.now(),
+      tint: Role.teacher.tint,
     );
     if (picked == null) return;
     setState(() {
@@ -364,8 +389,8 @@ class _MarkRow extends StatelessWidget {
   }
 }
 
-class _StudentsScreen extends StatelessWidget {
-  const _StudentsScreen({required this.slot});
+class ClassRosterScreen extends StatelessWidget {
+  const ClassRosterScreen({super.key, required this.slot});
 
   final TeachingSlot slot;
 

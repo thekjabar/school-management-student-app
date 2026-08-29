@@ -11,6 +11,7 @@ import 'i18n/strings.dart';
 import 'api/session.dart';
 import 'screens/driver/driver_app.dart';
 import 'screens/login_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/parent/parent_app.dart';
 import 'screens/teacher/teacher_app.dart';
 import 'theme/app_theme.dart';
@@ -151,7 +152,9 @@ class _EduPulseAppState extends State<EduPulseApp> with WidgetsBindingObserver {
       // is identical to the one already mounted — so the language changed and
       // nothing below this line redrew until a new route was pushed. The same
       // applies to the three role apps below.
-      home: _Gate(),
+      // The clip plays OVER the app rather than before it, so the sign-in
+      // check happens underneath instead of after.
+      home: SplashGate(child: _Gate()),
     );
   }
 }
@@ -264,18 +267,51 @@ class _GateState extends State<_Gate> {
       return LoginScreen(role: _role, onSignedIn: (me) => setState(() => _me = me));
     }
 
-    // The signed-in person's real role decides the screens, not the build
-    // flavour. A guardian who somehow installed the driver build gets the
-    // parent app rather than an empty manifest and a confusing error.
-    return switch (_me!.role) {
-      'DRIVER' || 'ATTENDANT' => DriverApp(),
-      'TEACHER' => TeacherApp(),
-      'GUARDIAN' => ParentApp(),
-      _ => _WrongApp(role: _me!.role, onSignOut: () async {
+    // The BUILD decides which app this is, not the account.
+    //
+    // It used to be the other way round: whatever role the signed-in person
+    // held chose the screens. That reads sensibly until three separately named
+    // and separately installed apps exist — then signing into EduPulse Teacher
+    // with a parent account silently showed the parent app in teacher blue,
+    // and the three APKs became one app wearing three colours.
+    //
+    // A person can hold more than one role — a teacher whose own child attends
+    // the school is common — so the check is whether they hold the role THIS
+    // app serves, not whether their first membership happens to match.
+    final membership = _membershipForThisApp();
+    if (membership == null) {
+      return _WrongApp(
+        role: _me!.role,
+        onSignOut: () async {
           await Session.instance.signOut();
           if (mounted) setState(() => _me = null);
-        }),
+        },
+      );
+    }
+
+    return switch (kRole) {
+      'driver' => DriverApp(),
+      'teacher' => TeacherApp(),
+      _ => ParentApp(),
     };
+  }
+
+  /// The membership that entitles this person to use this build, or null.
+  ///
+  /// Returning the membership rather than a bool because a person with two
+  /// roles at two schools needs the right one made active before any screen
+  /// asks the server for anything.
+  Membership? _membershipForThisApp() {
+    final wanted = switch (kRole) {
+      'driver' => const ['DRIVER', 'ATTENDANT'],
+      'teacher' => const ['TEACHER'],
+      _ => const ['GUARDIAN'],
+    };
+    for (final m in _me!.memberships) {
+      if (wanted.contains(m.role)) return m;
+    }
+    // The active membership may not be listed separately on some accounts.
+    return wanted.contains(_me!.role) ? _me!.active : null;
   }
 }
 

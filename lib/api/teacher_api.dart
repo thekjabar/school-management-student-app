@@ -1,4 +1,5 @@
 import 'client.dart';
+import 'parent_api.dart' show Announcement;
 
 class TeacherProfile {
   TeacherProfile({
@@ -303,6 +304,15 @@ class TeacherApi {
 
   Future<TeacherProfile> me() async =>
       TeacherProfile.fromJson(await _api.get('/teacher/me') as Map<String, dynamic>);
+
+  /// What the office has sent that this teacher should see.
+  ///
+  /// Resolved server-side against their classes, their campus and anything
+  /// aimed at staff — the client cannot work that out and should not try.
+  Future<List<Announcement>> announcements() async {
+    final json = await _api.get('/teacher/announcements?pageSize=50');
+    return Paged.from<Announcement>(json, Announcement.fromJson).rows;
+  }
 
   Future<List<TeachingSlot>> classes() async {
     final json = await _api.get('/teacher/classes');

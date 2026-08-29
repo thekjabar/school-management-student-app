@@ -7,6 +7,7 @@ import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
+import '../../ui/pickers.dart';
 
 /// Exams, and the mark sheet behind each one.
 ///
@@ -576,16 +577,27 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                 Text(t('teacher.noClassForTest'))
               else ...[
                 _Label(t('teacher.classAndSubject')),
-                DropdownButtonFormField<TeachingSlot>(
-                  initialValue: _slot,
-                  isExpanded: true,
-                  items: _classes
-                      .map((c) => DropdownMenuItem(
-                            value: c,
-                            child: Text('${c.className} · ${c.subjectName}', overflow: TextOverflow.ellipsis),
-                          ))
-                      .toList(),
-                  onChanged: (v) => setState(() => _slot = v),
+                PickerField(
+                  label: '',
+                  value: _slot == null ? null : '${_slot!.className} · ${_slot!.subjectName}',
+                  placeholder: t('pick.choose'),
+                  onTap: () async {
+                    final picked = await pickOne<TeachingSlot>(
+                      context,
+                      title: t('teacher.classAndSubject'),
+                      tint: Role.teacher.tint,
+                      selected: _slot,
+                      options: _classes
+                          .map((c) => PickOption(
+                                value: c,
+                                label: c.className,
+                                subtitle: c.subjectName,
+                                icon: Icons.groups_rounded,
+                              ))
+                          .toList(),
+                    );
+                    if (picked != null) setState(() => _slot = picked);
+                  },
                 ),
                 const SizedBox(height: 16),
                 _Label(t('teacher.testName')),
@@ -632,11 +644,12 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                           _Label(t('teacher.dueDate')),
                           GestureDetector(
                             onTap: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: _date,
-                                firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                                lastDate: DateTime.now().add(const Duration(days: 180)),
+                              final picked = await pickDate(
+                                context,
+                                initial: _date,
+                                first: DateTime.now().subtract(const Duration(days: 30)),
+                                last: DateTime.now().add(const Duration(days: 180)),
+                                tint: Role.teacher.tint,
                               );
                               if (picked != null) setState(() => _date = picked);
                             },
@@ -669,12 +682,21 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _Label(t('teacher.outOf')),
-                          DropdownButtonFormField<int>(
-                            initialValue: _maxScore,
-                            items: const [10, 20, 25, 50, 100]
-                                .map((m) => DropdownMenuItem(value: m, child: Text('$m')))
-                                .toList(),
-                            onChanged: (v) => setState(() => _maxScore = v ?? 100),
+                          PickerField(
+                            label: '',
+                            value: '$_maxScore',
+                            onTap: () async {
+                              final picked = await pickOne<int>(
+                                context,
+                                title: t('teacher.outOf'),
+                                tint: Role.teacher.tint,
+                                selected: _maxScore,
+                                options: const [10, 20, 25, 50, 100]
+                                    .map((m) => PickOption(value: m, label: '$m'))
+                                    .toList(),
+                              );
+                              if (picked != null) setState(() => _maxScore = picked);
+                            },
                           ),
                         ],
                       ),

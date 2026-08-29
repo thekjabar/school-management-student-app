@@ -6,6 +6,7 @@ import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
+import '../../ui/pickers.dart';
 
 /// Work set, and the form for setting more.
 ///
@@ -292,19 +293,27 @@ class _SetSheetState extends State<_SetSheet> {
                 Text(t('teacher.noClassForWork'))
               else ...[
                 _Label(t('teacher.classAndSubject')),
-                DropdownButtonFormField<TeachingSlot>(
-                  initialValue: _slot,
-                  isExpanded: true,
-                  items: _classes
-                      .map((c) => DropdownMenuItem(
-                            value: c,
-                            child: Text(
-                              '${c.className} · ${c.subjectName}',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ))
-                      .toList(),
-                  onChanged: (v) => setState(() => _slot = v),
+                PickerField(
+                  label: '',
+                  value: _slot == null ? null : '${_slot!.className} · ${_slot!.subjectName}',
+                  placeholder: t('pick.choose'),
+                  onTap: () async {
+                    final picked = await pickOne<TeachingSlot>(
+                      context,
+                      title: t('teacher.classAndSubject'),
+                      tint: Role.teacher.tint,
+                      selected: _slot,
+                      options: _classes
+                          .map((c) => PickOption(
+                                value: c,
+                                label: c.className,
+                                subtitle: c.subjectName,
+                                icon: Icons.groups_rounded,
+                              ))
+                          .toList(),
+                    );
+                    if (picked != null) setState(() => _slot = picked);
+                  },
                 ),
                 const SizedBox(height: 16),
                 _Label(t('teacher.title')),
@@ -333,11 +342,12 @@ class _SetSheetState extends State<_SetSheet> {
                           const _Label('Due'),
                           GestureDetector(
                             onTap: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: _due,
-                                firstDate: DateTime.now(),
-                                lastDate: DateTime.now().add(const Duration(days: 180)),
+                              final picked = await pickDate(
+                                context,
+                                initial: _due,
+                                first: DateTime.now(),
+                                last: DateTime.now().add(const Duration(days: 180)),
+                                tint: Role.teacher.tint,
                               );
                               if (picked != null) setState(() => _due = picked);
                             },
@@ -370,12 +380,21 @@ class _SetSheetState extends State<_SetSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _Label(t('teacher.howLong')),
-                          DropdownButtonFormField<int>(
-                            initialValue: _minutes,
-                            items: const [15, 20, 30, 45, 60, 90]
-                                .map((m) => DropdownMenuItem(value: m, child: Text('$m minutes')))
-                                .toList(),
-                            onChanged: (v) => setState(() => _minutes = v ?? 30),
+                          PickerField(
+                            label: '',
+                            value: tn('teacher.minutes', _minutes),
+                            onTap: () async {
+                              final picked = await pickOne<int>(
+                                context,
+                                title: t('teacher.howLong'),
+                                tint: Role.teacher.tint,
+                                selected: _minutes,
+                                options: const [15, 20, 30, 45, 60, 90]
+                                    .map((m) => PickOption(value: m, label: tn('teacher.minutes', m)))
+                                    .toList(),
+                              );
+                              if (picked != null) setState(() => _minutes = picked);
+                            },
                           ),
                         ],
                       ),

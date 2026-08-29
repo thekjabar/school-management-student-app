@@ -49,6 +49,10 @@ dependencies:
   # which quarter is missing. The server side already addresses by external id.
   onesignal_flutter: ^5.3.0
 
+  # The opening animation is a rendered clip rather than a drawn logo, so it
+  # needs a real decoder; there is no image format that plays.
+  video_player: ^2.9.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -70,6 +74,12 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # The bus scene on the parent home screen, taken from the design itself —
+  # nothing assembled out of Material icons was going to be the same picture.
+  assets:
+    - assets/art/
+    - assets/video/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

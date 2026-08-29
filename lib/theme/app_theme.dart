@@ -8,10 +8,10 @@ import 'package:flutter/services.dart';
 /// across a staff room knows whose app is open, and it is the only thing that
 /// differs between the five home screens.
 enum Role {
-  parent('Parent', Color(0xFF7C5CFF), Color(0xFFEFEAFE)),
+  parent('Parent', Color(0xFF6D3FF7), Color(0xFFF2EEFD)),
   student('Student', Color(0xFF22C55E), Color(0xFFE7F8EE)),
-  teacher('Teacher', Color(0xFF3B82F6), Color(0xFFE6F0FE)),
-  driver('Driver', Color(0xFFF97316), Color(0xFFFEEEE2)),
+  teacher('Teacher', Color(0xFF4D994B), Color(0xFFE7F1E6)),
+  driver('Driver', Color(0xFFFB6A00), Color(0xFFFFEFE2)),
   admin('Admin', Color(0xFF6D4AFF), Color(0xFFECE8FE));
 
   const Role(this.label, this.tint, this._lightWash);
@@ -55,18 +55,24 @@ class AppTheme {
   // Dark is not the light palette inverted. Cards sit ABOVE the canvas in both
   // themes, so in the dark the canvas is the darkest surface and cards are
   // lifted off it — inverting would put the card behind its own page.
-  static Color get canvas => _pick(const Color(0xFFF7F8FA), const Color(0xFF12111A));
-  static Color get surface => _pick(const Color(0xFFFFFFFF), const Color(0xFF1C1B26));
-  static Color get border => _pick(const Color(0xFFEFF1F4), const Color(0xFF2C2A38));
+  //
+  // Both palettes are sampled from the design rather than chosen: the page, the
+  // card and the border are three values apart in the light theme and the
+  // separation comes from the shadow, and the dark theme is navy rather than
+  // the near-black the app used to draw — which is the single change that made
+  // the dark screens stop looking like a different product from the mockup.
+  static Color get canvas => _pick(const Color(0xFFFCFCFE), const Color(0xFF0A1324));
+  static Color get surface => _pick(const Color(0xFFFFFFFF), const Color(0xFF121A29));
+  static Color get border => _pick(const Color(0xFFEEEFF4), const Color(0xFF212A3D));
 
   // ---- Text ----------------------------------------------------------------
   //
   // Not pure white on dark: #F2F1F6 against #12111A is about 15:1, well past
   // AA, without the halo pure white produces on an OLED at night — which is
   // most of the phones this runs on.
-  static Color get text => _pick(const Color(0xFF15181D), const Color(0xFFF2F1F6));
-  static Color get textMuted => _pick(const Color(0xFF5F6B7A), const Color(0xFF9B96AD));
-  static Color get textFaint => _pick(const Color(0xFFA8B0BC), const Color(0xFF6E6980));
+  static Color get text => _pick(const Color(0xFF111827), const Color(0xFFF2F4F8));
+  static Color get textMuted => _pick(const Color(0xFF6B7280), const Color(0xFF97A1B4));
+  static Color get textFaint => _pick(const Color(0xFF9CA3AF), const Color(0xFF6B7688));
 
   // ---- Accents content uses ------------------------------------------------
   //
@@ -74,16 +80,35 @@ class AppTheme {
   // tint that works on white is nearly white itself, and on a dark canvas it
   // becomes a glowing block — so in the dark they are deep, desaturated
   // versions of the same hue instead.
-  static Color get violet => _pick(const Color(0xFF7C5CFF), const Color(0xFF9B85FF));
-  static Color get violetSoft => _pick(const Color(0xFFF0ECFF), const Color(0xFF2A2440));
-  static Color get green => _pick(const Color(0xFF15803D), const Color(0xFF3DD17A));
-  static Color get greenSoft => _pick(const Color(0xFFE3F7EB), const Color(0xFF16301F));
-  static Color get amber => _pick(const Color(0xFFB45309), const Color(0xFFF7B23B));
-  static Color get amberSoft => _pick(const Color(0xFFFEF3E2), const Color(0xFF33260F));
-  static Color get blue => _pick(const Color(0xFF2563EB), const Color(0xFF6BA3FF));
-  static Color get blueSoft => _pick(Color(0xFFE7F0FE), Color(0xFF16233A));
-  static Color get rose => _pick(Color(0xFFF43F5E), Color(0xFFFF6B84));
-  static Color get roseSoft => _pick(Color(0xFFFDE8EC), Color(0xFF3A1620));
+  static Color get violet => _pick(const Color(0xFF6D3FF7), const Color(0xFF8B6BFF));
+  static Color get violetSoft => _pick(const Color(0xFFF2EEFD), const Color(0xFF20213C));
+  // A shade under the design's #16A34A, which came out at 2.96:1 on its own
+  // soft backing — under the 3:1 floor the theme test enforces, and visibly so
+  // for the 8pt captions in the figure strip.
+  static Color get green => _pick(const Color(0xFF149447), const Color(0xFF22C55E));
+  static Color get greenSoft => _pick(const Color(0xFFEAF6EC), const Color(0xFF172629));
+  // Two shades under the design's #F97316, for the same reason as green: the
+  // bright orange is 2.5:1 on its own backing, and this colour carries text —
+  // an overdue date, a late tally — not just icons.
+  static Color get amber => _pick(const Color(0xFFDF5F09), const Color(0xFFFB8C3A));
+  static Color get amberSoft => _pick(const Color(0xFFFEF0E6), const Color(0xFF252225));
+  static Color get blue => _pick(const Color(0xFF2E7DF6), const Color(0xFF4D97FF));
+  static Color get blueSoft => _pick(const Color(0xFFE9F0FE), const Color(0xFF15233A));
+  static Color get rose => _pick(const Color(0xFFF43F5E), const Color(0xFFFF6B84));
+  static Color get roseSoft => _pick(const Color(0xFFFDECF0), const Color(0xFF251D2E));
+
+  /// The deep green the teacher design uses for the one thing it wants read
+  /// first — the lesson count and the button under it. Not [Role.teacher.tint]:
+  /// that is the hue of the app, and a headline in it disappears into the six
+  /// other green things on the screen.
+  static const teacherDeep = Color(0xFF0B503C);
+
+  /// The brand violet, at full strength in both themes.
+  ///
+  /// [violet] lightens in the dark so text drawn in it stays legible; the raised
+  /// action in the bottom bar is a FILLED shape, so it wants the one value the
+  /// design uses for it on both canvases.
+  static const brand = Color(0xFF6D3FF7);
 
   static const radius = 18.0;
   static const radiusSm = 14.0;

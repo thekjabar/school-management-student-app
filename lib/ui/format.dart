@@ -20,23 +20,57 @@ String clock(int? minuteOfDay) {
   return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
 }
 
+/// The same time with AM/PM.
+///
+/// The schools here run on a 24-hour clock and so does the rest of the app; the
+/// teacher home screen is drawn with AM/PM in the design, and that is the only
+/// reason this exists.
+String clock12(int? minuteOfDay) {
+  if (minuteOfDay == null) return '—';
+  final h24 = (minuteOfDay ~/ 60) % 24;
+  final m = minuteOfDay % 60;
+  final h = h24 % 12 == 0 ? 12 : h24 % 12;
+  final suffix = h24 < 12 ? 'AM' : 'PM';
+  return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $suffix';
+}
+
 /// The clock part of an instant, which is all a bus card needs.
 String hhmm(DateTime? at) {
   if (at == null) return '—';
   return '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
 }
 
-const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+/// Month and weekday names, in whatever language the app is showing.
+///
+/// These were const English arrays, so every date in all three apps read
+/// "Thu 3 Sep 2026" on an otherwise Kurdish screen — including the ones a
+/// parent reads most, like a homework due date.
+String _month(int m) => t('month.$m');
+String _day(int weekday) => t('day.$weekday');
+
+/// "September 2026", for a calendar header.
+String monthYear(DateTime d) => '${_month(d.month)} ${d.year}';
+
+/// The seven column headings of a month grid, starting on SATURDAY — the first
+/// day of the week in the Region, which is neither Monday nor Sunday.
+List<String> weekdayInitials() => [
+      t('dayInitial.1'),
+      t('dayInitial.2'),
+      t('dayInitial.3'),
+      t('dayInitial.4'),
+      t('dayInitial.5'),
+      t('dayInitial.6'),
+      t('dayInitial.7'),
+    ];
 
 String shortDate(DateTime? d) {
   if (d == null) return '—';
-  return '${d.day} ${_months[d.month - 1]}';
+  return '${d.day} ${_month(d.month)}';
 }
 
 String longDate(DateTime? d) {
   if (d == null) return '—';
-  return '${_days[d.weekday - 1]} ${d.day} ${_months[d.month - 1]} ${d.year}';
+  return '${_day(d.weekday)} ${d.day} ${_month(d.month)} ${d.year}';
 }
 
 /// "in 3 days", "today", "2 days late" — the thing the reader actually wanted
@@ -77,6 +111,16 @@ Color parseHex(String? hex, Color fallback) {
   final value = int.tryParse(hex.substring(1), radix: 16);
   if (value == null) return fallback;
   return Color(0xFF000000 | value);
+}
+
+/// An API weekday — MONDAY, TUESDAY — as a short name in the reader's language.
+///
+/// The API speaks in enum names because they are stable across releases; a
+/// screen has to speak in whatever the parent reads.
+String weekdayName(String apiWeekday) {
+  const order = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+  final i = order.indexOf(apiWeekday.toUpperCase());
+  return i == -1 ? apiWeekday : t('day.${i + 1}');
 }
 
 /// The weekday the school is on right now, in the API's own vocabulary.
