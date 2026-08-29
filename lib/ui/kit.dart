@@ -477,82 +477,194 @@ class QuickAction {
   final Widget Function(Color color, double size)? glyph;
 }
 
-/// Six tinted squares across one card.
+/// The tinted squares across one card.
 ///
-/// All six fit — they are not a scrolling strip. The design puts every route
-/// out of the home screen on one line, and a row that scrolls hides two of them
-/// behind a gesture nobody makes on a card. What gives instead is the label:
-/// it scales down to fit its column rather than truncating, so "Assignments"
-/// stays "Assignments" beside the shorter words.
+/// Seven of them: the six the design's close-up shows plus Bus tracking, which
+/// is first on the full home screen. Seven do not fit a phone, which is what
+/// the rule beneath is for — it is a scroll indicator, not decoration. Four or
+/// fewer still spread to fill the width, so nothing that fits looks cut off.
 class QuickActions extends StatelessWidget {
   const QuickActions({super.key, required this.actions});
 
   final List<QuickAction> actions;
 
+  /// Wide enough for "Assignments" at the label's size, which is the longest
+  /// word any of these carry in the three languages.
+  static const _tile = 62.0;
+
   @override
   Widget build(BuildContext context) {
     return Card16(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13),
-      child: Column(
-        children: [
-          Row(
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final fits = actions.length * _tile <= box.maxWidth;
+          final row = Row(
+            mainAxisSize: fits ? MainAxisSize.max : MainAxisSize.min,
             children: [
-          for (final a in actions)
-            Expanded(
-              child: GestureDetector(
-                onTap: a.onTap,
-                behavior: HitTestBehavior.opaque,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: a.color.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
-                        borderRadius: BorderRadius.circular(13),
-                      ),
-                      child: a.glyph == null
-                          ? Icon(a.icon, size: 22, color: a.color)
-                          : Center(child: a.glyph!(a.color, 22)),
-                    ),
-                    const SizedBox(height: 9),
-                    // The padding is what keeps "Bus tracking" off
-                    // "Assignments": a scale-down box shrinks to its
-                    // CONSTRAINT, and six equal columns with no inset put two
-                    // full-width words hard against each other.
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          a.label,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: -0.2,
-                            color: AppTheme.text,
-                          ),
-                        ),
-                      ),
-                    ),
-                      ],
-                    ),
-                  ),
+              for (final a in actions)
+                SizedBox(
+                  width: fits ? box.maxWidth / actions.length : _tile,
+                  child: _Tile(action: a),
                 ),
             ],
-          ),
-          const SizedBox(height: 11),
-          // A short rule beneath the row. Not a page indicator — the six fit —
-          // but the design carries it, and it reads as "this is one set".
+          );
+
+          if (fits) {
+            return Column(
+              children: [row, const SizedBox(height: 11), const _Rule(progress: 0, visible: 1)],
+            );
+          }
+          return _ScrollingActions(
+            row: row,
+            width: box.maxWidth,
+            span: actions.length * _tile,
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _Tile extends StatelessWidget {
+  const _Tile({required this.action});
+
+  final QuickAction action;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: action.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
           Container(
-            width: 34,
-            height: 3,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: AppTheme.violet.withValues(alpha: 0.55),
+              color: action.color.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: action.glyph == null
+                ? Icon(action.icon, size: 22, color: action.color)
+                : Center(child: action.glyph!(action.color, 22)),
+          ),
+          const SizedBox(height: 9),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                action.label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.2,
+                  color: AppTheme.text,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A horizontally scrolling row with a progress rule beneath it.
+///
+/// The rule is not a page indicator — the row scrolls continuously — it is a
+/// hint that there is more to the side, which a row of tiles cut off at the
+/// card's edge does not give on its own.
+class _ScrollingActions extends StatefulWidget {
+  const _ScrollingActions({required this.row, required this.width, required this.span});
+
+  final Widget row;
+  final double width;
+  final double span;
+
+  @override
+  State<_ScrollingActions> createState() => _ScrollingActionsState();
+}
+
+class _ScrollingActionsState extends State<_ScrollingActions> {
+  final _controller = ScrollController();
+  double _progress = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() {
+      final max = _controller.position.maxScrollExtent;
+      final next = max <= 0 ? 0.0 : (_controller.offset / max).clamp(0.0, 1.0);
+      if ((next - _progress).abs() > 0.01) setState(() => _progress = next);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SingleChildScrollView(
+          controller: _controller,
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: widget.row,
+        ),
+        const SizedBox(height: 11),
+        _Rule(
+          progress: _progress,
+          visible: (widget.width / widget.span).clamp(0.2, 1.0),
+        ),
+      ],
+    );
+  }
+}
+
+class _Rule extends StatelessWidget {
+  const _Rule({required this.progress, required this.visible});
+
+  /// 0 at the left of the row, 1 at the right.
+  final double progress;
+
+  /// How much of the row is on screen, as a fraction — the thumb's length.
+  final double visible;
+
+  @override
+  Widget build(BuildContext context) {
+    const rail = 40.0;
+    final thumb = rail * visible;
+
+    return SizedBox(
+      width: rail,
+      height: 3,
+      child: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: AppTheme.border,
               borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 90),
+            left: (rail - thumb) * progress,
+            child: Container(
+              width: thumb,
+              height: 3,
+              decoration: BoxDecoration(
+                color: AppTheme.violet,
+                borderRadius: BorderRadius.circular(999),
+              ),
             ),
           ),
         ],

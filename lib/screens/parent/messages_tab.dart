@@ -13,8 +13,9 @@ import '../../ui/screen_kit.dart';
 ///
 /// One list, filtered by what the message IS: a notice about the whole school,
 /// something for this class, or something urgent. The design draws a second
-/// list of teacher conversations beside it — see the note on _Compose for why
-/// that is not here.
+/// list of teacher conversations beside it; there is no messaging service
+/// behind this app — announcements travel one way, from the office outward —
+/// so that list would be furniture and a compose box would open onto nothing.
 class MessagesTab extends StatefulWidget {
   const MessagesTab({super.key, required this.onRead});
 
@@ -26,8 +27,6 @@ class MessagesTab extends StatefulWidget {
 
 class _MessagesTabState extends State<MessagesTab> {
   int _tab = 0;
-  String _query = '';
-  bool _searching = false;
 
   @override
   void initState() {
@@ -46,11 +45,6 @@ class _MessagesTabState extends State<MessagesTab> {
       load: () => ParentApi.instance.announcements(),
       builder: (context, all) {
         final rows = all.where((a) {
-          if (_query.isNotEmpty &&
-              !a.title.toLowerCase().contains(_query) &&
-              !a.body.toLowerCase().contains(_query)) {
-            return false;
-          }
           return switch (_tab) {
             1 => a.category == 'ANNOUNCEMENT' || a.category == 'EVENT',
             2 => a.category == 'POLICY' || a.category == 'NOTICE',
@@ -66,54 +60,20 @@ class _MessagesTabState extends State<MessagesTab> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title, search and tabs on one card, as the design has them.
+            // Title and tabs on one card, as the design has them.
             Card16(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _searching
-                            ? TextField(
-                                autofocus: true,
-                                onChanged: (v) =>
-                                    setState(() => _query = v.trim().toLowerCase()),
-                                decoration: InputDecoration(
-                                  hintText: t('common.search'),
-                                  isDense: true,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 11,
-                                  ),
-                                ),
-                              )
-                            : Text(
-                                t('nav.messages'),
-                                style: TextStyle(
-                                  fontSize: 21,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.6,
-                                  color: AppTheme.text,
-                                ),
-                              ),
-                      ),
-                      const SizedBox(width: 10),
-                      _RoundButton(
-                        icon: _searching ? Icons.close_rounded : Icons.search_rounded,
-                        onTap: () => setState(() {
-                          _searching = !_searching;
-                          if (!_searching) _query = '';
-                        }),
-                      ),
-                      const SizedBox(width: 8),
-                      _RoundButton(
-                        icon: Icons.edit_outlined,
-                        filled: true,
-                        onTap: () => _compose(context),
-                      ),
-                    ],
+                  Text(
+                    t('nav.messages'),
+                    style: TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.6,
+                      color: AppTheme.text,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   UnderlineTabs(
@@ -169,42 +129,6 @@ class _MessagesTabState extends State<MessagesTab> {
           ],
         );
       },
-    );
-  }
-
-  /// Writing TO the school is not switched on.
-  ///
-  /// The design shows teacher conversations and a Quick Chat strip. There is no
-  /// messaging service behind this app — announcements travel one way, from the
-  /// office outward — so a compose box would open onto nothing and a chat list
-  /// would be furniture. Better to say so than to draw an inbox that never
-  /// delivers.
-  void _compose(BuildContext context) => showNote(context, t('msg.oneWay'));
-}
-
-class _RoundButton extends StatelessWidget {
-  const _RoundButton({required this.icon, required this.onTap, this.filled = false});
-
-  final IconData icon;
-  final VoidCallback onTap;
-  final bool filled;
-
-  @override
-  Widget build(BuildContext context) {
-    final tint = Role.parent.tint;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: filled ? tint : AppTheme.canvas,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: filled ? tint : AppTheme.border),
-        ),
-        child: Icon(icon, size: 19, color: filled ? Colors.white : AppTheme.text),
-      ),
     );
   }
 }

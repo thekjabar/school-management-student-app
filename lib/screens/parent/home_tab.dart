@@ -72,6 +72,12 @@ class HomeTab extends StatelessWidget {
           QuickActions(
             actions: [
               QuickAction(
+                icon: Icons.directions_bus_outlined,
+                label: t('quick.bus'),
+                color: AppTheme.violet,
+                onTap: () => _push(context, BusScreen(child: child)),
+              ),
+              QuickAction(
                 icon: Icons.description_outlined,
                 label: t('quick.assignments'),
                 color: AppTheme.violet,

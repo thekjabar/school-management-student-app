@@ -46,7 +46,3 @@ app.*.map.json
 
 # Copied in per role by tool/build_apks.sh; the originals are in design/splash/.
 assets/video/splash.mp4
-
-# Rendered by test/*_golden_test.dart with --update-goldens. Regenerable from
-# the code and the live platform, and several megabytes of PNG per run.
-test/goldens/
