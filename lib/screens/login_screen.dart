@@ -1,26 +1,23 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api/client.dart';
 import '../api/push.dart';
 import '../api/session.dart';
-import '../theme/app_theme.dart';
 import '../i18n/strings.dart';
+import '../theme/app_theme.dart';
+import '../ui/async.dart';
 import '../ui/kit.dart';
-import '../ui/school_scene.dart';
 
-/// The way into the app.
+/// One screen: the language, the picture, and the form.
 ///
-/// A welcome, and then a sheet that rises over it. The form never gets a page
-/// of its own: a phone number and a password are two fields, and giving them a
-/// whole white screen with a logo stranded above is what makes a sign-in look
-/// like the first thing somebody ever built.
-///
-/// The number is the identity. There are no usernames anywhere in this product,
-/// because the school already holds a verified number for every guardian and
-/// every member of staff, and a second identifier would only be one more thing
-/// to lose.
+/// Not a welcome page with a sheet behind it. A parent opening this app has one
+/// thing to do, and putting a "Get started" button in front of it costs a tap
+/// and teaches nothing. The language pills come first, above everything that
+/// needs reading — somebody who cannot read the form cannot find the setting
+/// that would let them read it.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.role, required this.onSignedIn});
 
@@ -32,165 +29,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  bool _sheetOpen = false;
-
-  Future<void> _openSheet() async {
-    if (_sheetOpen) return;
-    setState(() => _sheetOpen = true);
-
-    final me = await showModalBottomSheet<Me>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      // The welcome stays visible and dims behind the sheet, so the app never
-      // blinks to a blank form.
-      barrierColor: Colors.black.withValues(alpha: 0.34),
-      builder: (_) => _SignInSheet(role: widget.role),
-    );
-
-    if (!mounted) return;
-    setState(() => _sheetOpen = false);
-    if (me != null) widget.onSignedIn(me);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final role = widget.role;
-
-    return Scaffold(
-      backgroundColor: AppTheme.canvas,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [role.wash, AppTheme.canvas],
-            stops: const [0, 0.62],
-          ),
-        ),
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) => SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 26),
-                  child: Column(
-                    children: [
-                      // First thing on the screen, deliberately. A parent who
-                      // cannot read the sign-in form cannot find the setting
-                      // that would let them read it — so the choice comes
-                      // before anything that needs reading.
-                      Align(
-                        alignment: AlignmentDirectional.centerEnd,
-                        child: LanguagePicker(tint: role.tint),
-                      ),
-                      const Spacer(flex: 2),
-                      _Brand(role: role),
-                      const Spacer(flex: 1),
-                      // Capped so the artwork never crowds the buttons on a
-                      // short phone — it is decoration, and decoration yields.
-                      SchoolScene(
-                        tint: role.tint,
-                        height: (constraints.maxHeight * 0.30).clamp(150.0, 230.0),
-                      ),
-                      const Spacer(flex: 2),
-                      BigButton(
-                        label: t('welcome.getStarted'),
-                        color: role.tint,
-                        height: 52,
-                        onPressed: _openSheet,
-                      ),
-                      const SizedBox(height: 11),
-                      SizedBox(
-                        height: 52,
-                        width: double.infinity,
-                        child: OutlinedButton(
-                          onPressed: _openSheet,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppTheme.text,
-                            backgroundColor: AppTheme.surface,
-                            side: BorderSide(color: AppTheme.border),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
-                            textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
-                          ),
-                          child: Text(t('welcome.logIn')),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        t('welcome.usePhone'),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: AppTheme.textFaint, height: 1.5),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Brand extends StatelessWidget {
-  const _Brand({required this.role});
-
-  final Role role;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 68,
-          height: 68,
-          decoration: BoxDecoration(
-            color: role.tint,
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: [
-              BoxShadow(
-                color: role.tint.withValues(alpha: 0.36),
-                blurRadius: 26,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Icon(Icons.school_rounded, color: AppTheme.surface, size: 33),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          t('app.name'),
-          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -0.9),
-        ),
-        const SizedBox(height: 7),
-        Text(
-          t('app.tagline'),
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13.5, color: AppTheme.textMuted, height: 1.5),
-        ),
-      ],
-    );
-  }
-}
-
-/* ---------------------------------------------------------------------------
- * The sheet
- * ------------------------------------------------------------------------- */
-
-class _SignInSheet extends StatefulWidget {
-  const _SignInSheet({required this.role});
-
-  final Role role;
-
-  @override
-  State<_SignInSheet> createState() => _SignInSheetState();
-}
-
-class _SignInSheetState extends State<_SignInSheet> {
   final _phone = TextEditingController();
   final _password = TextEditingController();
   final _next = TextEditingController();
@@ -203,6 +41,12 @@ class _SignInSheetState extends State<_SignInSheet> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    _phone.addListener(() => setState(() {}));
+  }
+
+  @override
   void dispose() {
     _phone.dispose();
     _password.dispose();
@@ -212,8 +56,15 @@ class _SignInSheetState extends State<_SignInSheet> {
     super.dispose();
   }
 
+  /// A local number, as the school holds it. Eleven digits starting 07 is what
+  /// every network here issues, and the tick appears the moment it is one.
+  bool get _phoneLooksRight {
+    final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
+    return digits.length >= 10 && digits.startsWith('0');
+  }
+
   Future<void> _signIn() async {
-    if (_phone.text.trim().length < 7) {
+    if (!_phoneLooksRight) {
       setState(() => _error = t('login.phoneNeeded'));
       return;
     }
@@ -229,7 +80,7 @@ class _SignInSheetState extends State<_SignInSheet> {
         return;
       }
       unawaited(Push.askPermission());
-      Navigator.of(context).pop(result.me);
+      widget.onSignedIn(result.me);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
       // Only wipe the field when the server actually rejected it. Clearing it
@@ -261,7 +112,7 @@ class _SignInSheetState extends State<_SignInSheet> {
       final again = await Session.instance.signIn(_phone.text, _next.text);
       if (!mounted) return;
       unawaited(Push.askPermission());
-      Navigator.of(context).pop(again.me);
+      widget.onSignedIn(again.me);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } finally {
@@ -273,38 +124,56 @@ class _SignInSheetState extends State<_SignInSheet> {
   Widget build(BuildContext context) {
     final role = widget.role;
 
-    return Padding(
-      // The sheet rides above the keyboard rather than hiding behind it.
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
+    return Scaffold(
+      backgroundColor: AppTheme.canvas,
+      body: Container(
         decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [role.wash, AppTheme.canvas],
+            stops: const [0, 0.55],
+          ),
         ),
-        padding: const EdgeInsets.fromLTRB(22, 10, 22, 24),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppTheme.border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+        child: Stack(
+          children: [
+            // The hills along the foot of the page, under everything.
+            PositionedDirectional(
+              start: 0,
+              end: 0,
+              bottom: 0,
+              child: Image.asset(
+                'assets/art/login_wave.png',
+                fit: BoxFit.fitWidth,
+              ),
+            ),
+            SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: LanguagePicker(tint: role.tint),
+                    ),
+                    const SizedBox(height: 18),
+                    Image.asset('assets/art/login_family.png', height: 210),
+                    const SizedBox(height: 8),
+                    _Card(
+                      child: _choosing ? _chooseForm(role) : _signInForm(role),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 22),
-              _choosing ? _chooseForm(role) : _signInForm(role),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
+
+  /* --- The form ---------------------------------------------------------- */
 
   Widget _signInForm(Role role) {
     return Column(
@@ -312,65 +181,172 @@ class _SignInSheetState extends State<_SignInSheet> {
       children: [
         Text(
           t('login.welcomeBack'),
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.6),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.7,
+            color: AppTheme.text,
+          ),
         ),
         const SizedBox(height: 5),
         Text(
-          t('login.subtitle'),
-          style: TextStyle(fontSize: 13, color: AppTheme.textMuted, height: 1.45),
+          t('login.signInToContinue'),
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, color: AppTheme.textMuted),
         ),
-        const SizedBox(height: 24),
-        _Label(t('login.phone')),
-        TextField(
-          controller: _phone,
-          keyboardType: TextInputType.phone,
-          textInputAction: TextInputAction.next,
-          autofocus: true,
-          // Digits only. Every other character a phone keypad offers is one the
-          // server will reject, and finding that out after typing is worse.
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          onSubmitted: (_) => _passwordFocus.requestFocus(),
-          decoration: InputDecoration(
-            hintText: t('login.phoneHint'),
-            prefixIcon: Icon(Icons.phone_rounded, size: 18, color: AppTheme.textFaint),
-            prefixIconConstraints: const BoxConstraints(minWidth: 44),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _Label(t('login.password')),
-        TextField(
-          controller: _password,
-          focusNode: _passwordFocus,
-          obscureText: _obscure,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _busy ? null : _signIn(),
-          decoration: InputDecoration(
-            prefixIcon: Icon(Icons.lock_outline_rounded, size: 18, color: AppTheme.textFaint),
-            prefixIconConstraints: const BoxConstraints(minWidth: 44),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                size: 19,
-                color: AppTheme.textFaint,
-              ),
-              onPressed: () => setState(() => _obscure = !_obscure),
+        const SizedBox(height: 22),
+
+        _Field(
+          icon: Icons.smartphone_rounded,
+          tint: role.tint,
+          label: t('login.phone'),
+          trailing: _phoneLooksRight
+              ? Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: AppTheme.green,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check_rounded, size: 16, color: Colors.white),
+                )
+              : null,
+          child: TextField(
+            controller: _phone,
+            keyboardType: TextInputType.phone,
+            textInputAction: TextInputAction.next,
+            // Digits only. Every other character a phone keypad offers is one
+            // the server will reject, and finding that out after typing is
+            // worse than not being able to type it.
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onSubmitted: (_) => _passwordFocus.requestFocus(),
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+              color: AppTheme.text,
+            ),
+            decoration: InputDecoration(
+              hintText: t('login.phoneHint'),
+              filled: false,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
             ),
           ),
         ),
+        const SizedBox(height: 7),
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 4),
+          child: Text(
+            t('login.phoneFormat'),
+            style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 4, bottom: 8),
+          child: Text(
+            t('login.password'),
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.text,
+            ),
+          ),
+        ),
+        _Field(
+          icon: Icons.lock_outline_rounded,
+          tint: role.tint,
+          trailing: GestureDetector(
+            onTap: () => setState(() => _obscure = !_obscure),
+            behavior: HitTestBehavior.opaque,
+            child: Icon(
+              _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+              size: 21,
+              color: AppTheme.textFaint,
+            ),
+          ),
+          child: TextField(
+            controller: _password,
+            focusNode: _passwordFocus,
+            obscureText: _obscure,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _busy ? null : _signIn(),
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              letterSpacing: _obscure ? 2 : -0.3,
+              color: AppTheme.text,
+            ),
+            decoration: const InputDecoration(
+              filled: false,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+            ),
+          ),
+        ),
+
         if (_error != null) _ErrorLine(_error!),
-        const SizedBox(height: 22),
+
+        const SizedBox(height: 12),
+        Align(
+          alignment: AlignmentDirectional.centerEnd,
+          child: GestureDetector(
+            onTap: () => showNote(context, t('login.forgot')),
+            behavior: HitTestBehavior.opaque,
+            child: Text(
+              t('login.forgotShort'),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: role.tint,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
         BigButton(
-          label: t('login.signIn'),
+          label: t('welcome.logIn'),
           color: role.tint,
           busy: _busy,
-          height: 52,
+          height: 56,
           onPressed: _signIn,
         ),
-        const SizedBox(height: 14),
-        Text(
-          t('login.forgot'),
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12, color: AppTheme.textFaint, height: 1.5),
+        const SizedBox(height: 18),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.verified_user_rounded, size: 22, color: role.tint),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  t('login.secure'),
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                    color: AppTheme.text,
+                  ),
+                ),
+                Text(
+                  t('login.secureBody'),
+                  style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                ),
+              ],
+            ),
+          ],
         ),
       ],
     );
@@ -387,7 +363,12 @@ class _SignInSheetState extends State<_SignInSheet> {
             Expanded(
               child: Text(
                 t('login.choose'),
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, letterSpacing: -0.3),
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 17,
+                  letterSpacing: -0.3,
+                  color: AppTheme.text,
+                ),
               ),
             ),
           ],
@@ -397,42 +378,72 @@ class _SignInSheetState extends State<_SignInSheet> {
           t('login.chooseWhy'),
           style: TextStyle(color: AppTheme.textMuted, fontSize: 12.5, height: 1.5),
         ),
-        const SizedBox(height: 22),
-        _Label(t('login.newPassword')),
-        TextField(
-          controller: _next,
-          obscureText: true,
-          autofocus: true,
-          textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            prefixIcon: Icon(Icons.lock_outline_rounded, size: 18, color: AppTheme.textFaint),
-            prefixIconConstraints: BoxConstraints(minWidth: 44),
+        const SizedBox(height: 20),
+        _Field(
+          icon: Icons.lock_outline_rounded,
+          tint: role.tint,
+          label: t('login.newPassword'),
+          child: TextField(
+            controller: _next,
+            obscureText: true,
+            textInputAction: TextInputAction.next,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 2,
+              color: AppTheme.text,
+            ),
+            decoration: const InputDecoration(
+              filled: false,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+            ),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          t('login.rule'),
-          style: TextStyle(color: AppTheme.textFaint, fontSize: 11.5),
+        const SizedBox(height: 7),
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 4),
+          child: Text(
+            t('login.rule'),
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 11.5),
+          ),
         ),
-        const SizedBox(height: 16),
-        _Label(t('login.typeAgain')),
-        TextField(
-          controller: _confirm,
-          obscureText: true,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _busy ? null : _choose(),
-          decoration: InputDecoration(
-            prefixIcon: Icon(Icons.lock_outline_rounded, size: 18, color: AppTheme.textFaint),
-            prefixIconConstraints: BoxConstraints(minWidth: 44),
+        const SizedBox(height: 14),
+        _Field(
+          icon: Icons.lock_outline_rounded,
+          tint: role.tint,
+          label: t('login.typeAgain'),
+          child: TextField(
+            controller: _confirm,
+            obscureText: true,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _busy ? null : _choose(),
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 2,
+              color: AppTheme.text,
+            ),
+            decoration: const InputDecoration(
+              filled: false,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+            ),
           ),
         ),
         if (_error != null) _ErrorLine(_error!),
-        const SizedBox(height: 22),
+        const SizedBox(height: 20),
         BigButton(
           label: t('login.saveContinue'),
           color: role.tint,
           busy: _busy,
-          height: 52,
+          height: 56,
           onPressed: _choose,
         ),
       ],
@@ -440,25 +451,99 @@ class _SignInSheetState extends State<_SignInSheet> {
   }
 }
 
-class _Label extends StatelessWidget {
-  const _Label(this.text);
+/* ---------------------------------------------------------------------------
+ * The pieces
+ * ------------------------------------------------------------------------- */
 
-  final String text;
+/// The white panel the form sits on.
+class _Card extends StatelessWidget {
+  const _Card({required this.child});
+
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 7, left: 2),
-      child: Text(
-        text,
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.textMuted),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 24, 18, 24),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: AppTheme.dark ? Border.all(color: AppTheme.border) : null,
+        boxShadow: AppTheme.dark
+            ? null
+            : const [
+                BoxShadow(color: Color(0x14101828), blurRadius: 24, offset: Offset(0, 8)),
+              ],
+      ),
+      child: child,
+    );
+  }
+}
+
+/// A field with its own icon chip, and the label INSIDE the box.
+///
+/// The design puts the label above the value inside the same bordered box
+/// rather than above the box, which is what lets the phone number be typed at
+/// the size it is read back at.
+class _Field extends StatelessWidget {
+  const _Field({
+    required this.icon,
+    required this.tint,
+    required this.child,
+    this.label,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final Color tint;
+  final Widget child;
+  final String? label;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.10),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(icon, size: 21, color: tint),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (label != null) ...[
+                  Text(
+                    label!,
+                    style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                  ),
+                  const SizedBox(height: 2),
+                ],
+                child,
+              ],
+            ),
+          ),
+          if (trailing != null) ...[const SizedBox(width: 10), trailing!],
+        ],
       ),
     );
   }
 }
 
-/// An error in the same shape as the app's other bad news: a tinted band, not
-/// bare red text floating between two fields.
 class _ErrorLine extends StatelessWidget {
   const _ErrorLine(this.text);
 
@@ -467,78 +552,65 @@ class _ErrorLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 14),
-      child: Container(
-        padding: const EdgeInsets.all(11),
-        decoration: BoxDecoration(
-          color: AppTheme.roseSoft,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.error_outline_rounded, size: 16, color: AppTheme.rose),
-            const SizedBox(width: 9),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(color: AppTheme.rose, fontSize: 12.5, height: 1.45),
-              ),
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline_rounded, size: 16, color: AppTheme.rose),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 12.5, height: 1.4, color: AppTheme.rose),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-
-/// The three languages, as a segmented row.
-///
-/// A row rather than a dropdown: there are three, they are short, and a parent
-/// who cannot read the current language should not have to open a menu written
-/// in it to find their own. Every label is written in its own script, so it is
-/// legible whatever the app is currently set to.
+/// Kurdish, Arabic, English — one pill each, the chosen one filled.
 class LanguagePicker extends StatelessWidget {
   const LanguagePicker({super.key, this.tint});
 
-  /// The role's colour, so the selected chip belongs to whichever app this is.
   final Color? tint;
 
   @override
   Widget build(BuildContext context) {
+    final accent = tint ?? AppTheme.violet;
+
     return ValueListenableBuilder<Lang>(
       valueListenable: AppLocale.current,
       builder: (context, current, _) => Container(
-        padding: const EdgeInsets.all(3),
+        padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: AppTheme.surface.withValues(alpha: AppTheme.dark ? 0.9 : 0.7),
-          borderRadius: BorderRadius.circular(11),
-          border: Border.all(color: AppTheme.border),
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: AppTheme.dark
+              ? null
+              : const [
+                  BoxShadow(color: Color(0x0F101828), blurRadius: 10, offset: Offset(0, 3)),
+                ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             for (final lang in Lang.values)
               GestureDetector(
-                behavior: HitTestBehavior.opaque,
                 onTap: current == lang ? null : () => AppLocale.set(lang),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 140),
-                  curve: Curves.easeOut,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
-                    // The role's colour, not AppTheme.text. Text is near-black
-                    // in the light theme and near-WHITE in the dark one, so a
-                    // selected chip using it disappeared behind its own label.
-                    color: current == lang ? (tint ?? AppTheme.violet) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(9),
+                    color: current == lang ? accent : Colors.transparent,
+                    borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     lang.label,
                     style: TextStyle(
                       fontSize: 12.5,
-                      fontWeight: current == lang ? FontWeight.w700 : FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: current == lang ? Colors.white : AppTheme.textMuted,
                     ),
                   ),

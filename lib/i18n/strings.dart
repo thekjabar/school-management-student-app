@@ -143,7 +143,7 @@ const Map<String, String> _en = {
   'welcome.usePhone': 'Use the phone number your school has for you.',
 
   // Sign in
-  'login.welcomeBack': 'Welcome back',
+  'login.welcomeBack': 'Welcome back!',
   'login.subtitle': 'Sign in to follow your child’s day.',
   'login.phone': 'Phone number',
   'login.phoneHint': '0750 123 4567',
@@ -902,6 +902,11 @@ const Map<String, String> _en = {
   'rep.updatedRegularly': 'Reports are updated regularly.',
   'rep.keepSupporting': 'Keep supporting {n}’s learning journey!',
   'rep.nothingYet': 'Nothing has been marked yet.',
+  'login.signInToContinue': 'Sign in to continue',
+  'login.phoneFormat': 'Enter your phone number like this: 0750 000 0000',
+  'login.forgotShort': 'Forgot password?',
+  'login.secure': 'Secure login',
+  'login.secureBody': 'Your data is safe with us',
 };
 
 /* ---------------------------------------------------------------------------
@@ -915,7 +920,7 @@ const Map<String, String> _ckb = {
   'welcome.logIn': 'چوونەژوورەوە',
   'welcome.usePhone': 'ئەو ژمارە مۆبایلە بەکاربهێنە کە قوتابخانە هەیەتی.',
 
-  'login.welcomeBack': 'بەخێربێیتەوە',
+  'login.welcomeBack': 'بەخێربێیتەوە!',
   'login.subtitle': 'بچۆ ژوورەوە بۆ بەدواداچوونی ڕۆژی منداڵەکەت.',
   'login.phone': 'ژمارەی مۆبایل',
   'login.phoneHint': '٠٧٥٠ ١٢٣ ٤٥٦٧',
@@ -1657,6 +1662,11 @@ const Map<String, String> _ckb = {
   'rep.updatedRegularly': 'ڕاپۆرتەکان بەردەوام نوێ دەکرێنەوە.',
   'rep.keepSupporting': 'بەردەوام بە لە پشتیوانی گەشتی فێربوونی {n}!',
   'rep.nothingYet': 'هێشتا هیچ نمرەیەک نەدراوە.',
+  'login.signInToContinue': 'بچۆ ژوورەوە بۆ بەردەوامبوون',
+  'login.phoneFormat': 'ژمارەکەت بەم شێوەیە بنووسە: 0750 000 0000',
+  'login.forgotShort': 'وشەی نهێنیت لەبیرچووە؟',
+  'login.secure': 'چوونەژوورەوەی پارێزراو',
+  'login.secureBody': 'زانیارییەکانت لەلای ئێمە پارێزراون',
 };
 
 /* ---------------------------------------------------------------------------
@@ -1670,7 +1680,7 @@ const Map<String, String> _ar = {
   'welcome.logIn': 'تسجيل الدخول',
   'welcome.usePhone': 'استخدم رقم الهاتف المسجّل لدى المدرسة.',
 
-  'login.welcomeBack': 'أهلاً بعودتك',
+  'login.welcomeBack': 'أهلاً بعودتك!',
   'login.subtitle': 'سجّل الدخول لمتابعة يوم طفلك.',
   'login.phone': 'رقم الهاتف',
   'login.phoneHint': '٠٧٥٠ ١٢٣ ٤٥٦٧',
@@ -2408,4 +2418,9 @@ const Map<String, String> _ar = {
   'rep.updatedRegularly': 'يتم تحديث التقارير بانتظام.',
   'rep.keepSupporting': 'واصل دعم رحلة تعلّم {n}!',
   'rep.nothingYet': 'لم تُصحَّح أي أعمال بعد.',
+  'login.signInToContinue': 'سجّل الدخول للمتابعة',
+  'login.phoneFormat': 'اكتب رقم هاتفك هكذا: 0750 000 0000',
+  'login.forgotShort': 'نسيت كلمة المرور؟',
+  'login.secure': 'دخول آمن',
+  'login.secureBody': 'بياناتك في أمان معنا',
 };
