@@ -278,9 +278,14 @@ class _Field extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Left to right in every language: a password is a sequence whose order IS
+    // the value, and mirroring it is how somebody ends up certain they typed it
+    // right and being told they did not.
     return TextField(
       controller: controller,
       obscureText: true,
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.left,
       decoration: InputDecoration(labelText: label),
     );
   }

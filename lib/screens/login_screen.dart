@@ -35,6 +35,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _confirm = TextEditingController();
   final _passwordFocus = FocusNode();
 
+  /// 0750 000 0000. Every network here issues eleven digits.
+  static const _phoneDigits = 11;
+
   bool _busy = false;
   bool _obscure = true;
   bool _choosing = false;
@@ -60,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
   /// every network here issues, and the tick appears the moment it is one.
   bool get _phoneLooksRight {
     final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
-    return digits.length >= 10 && digits.startsWith('0');
+    return digits.length == _phoneDigits && digits.startsWith('0');
   }
 
   Future<void> _signIn() async {
@@ -223,11 +226,18 @@ class _LoginScreenState extends State<LoginScreen> {
             controller: _phone,
             keyboardType: TextInputType.phone,
             textInputAction: TextInputAction.next,
-            // Digits only. Every other character a phone keypad offers is one
-            // the server will reject, and finding that out after typing is
-            // worse than not being able to type it.
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            // Digits only, and eleven of them. Every other character a phone
+            // keypad offers is one the server will reject, and finding that
+            // out after typing is worse than not being able to type it. The
+            // limit is the shape of a number here — 0750 000 0000 — so a
+            // twelfth keystroke is a mistake, not a longer number.
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(_phoneDigits),
+            ],
             onSubmitted: (_) => _passwordFocus.requestFocus(),
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.left,
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w800,
@@ -284,6 +294,8 @@ class _LoginScreenState extends State<LoginScreen> {
             obscureText: _obscure,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _busy ? null : _signIn(),
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.left,
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w800,
@@ -394,6 +406,8 @@ class _LoginScreenState extends State<LoginScreen> {
             controller: _next,
             obscureText: true,
             textInputAction: TextInputAction.next,
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.left,
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w800,
@@ -428,6 +442,8 @@ class _LoginScreenState extends State<LoginScreen> {
             obscureText: true,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _busy ? null : _choose(),
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.left,
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w800,
@@ -509,7 +525,14 @@ class _Field extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    // Left to right whatever the app is showing. A phone number and a password
+    // are sequences whose order IS the value; mirroring them is not a
+    // translation, it is a different string. This also keeps the icon on the
+    // left and the eye on the right in all three languages, which is where
+    // every keypad and every bank app puts them.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
       decoration: BoxDecoration(
         color: AppTheme.surface,
@@ -546,6 +569,7 @@ class _Field extends StatelessWidget {
           ),
           if (trailing != null) ...[const SizedBox(width: 10), trailing!],
         ],
+      ),
       ),
     );
   }
