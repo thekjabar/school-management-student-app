@@ -126,15 +126,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.canvas,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [role.wash, AppTheme.canvas],
-            stops: const [0, 0.55],
-          ),
-        ),
+      body: ColoredBox(
+        color: AppTheme.dark ? AppTheme.canvas : role.wash,
         child: Stack(
           children: [
             // The hills along the foot of the page, under everything.
@@ -149,7 +142,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             SafeArea(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
+                padding: const EdgeInsets.fromLTRB(18, 10, 18, 56),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -157,9 +150,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       alignment: AlignmentDirectional.centerEnd,
                       child: LanguagePicker(tint: role.tint),
                     ),
-                    const SizedBox(height: 18),
-                    Image.asset('assets/art/login_family.png', height: 210),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 30),
+                    Image.asset('assets/art/login_family.png', height: 252),
+                    const SizedBox(height: 6),
                     _Card(
                       child: _choosing ? _chooseForm(role) : _signInForm(role),
                     ),
