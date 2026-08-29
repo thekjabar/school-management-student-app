@@ -123,7 +123,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final role = widget.role;
-    final keyboard = MediaQuery.of(context).viewInsets.bottom > 0;
 
     return Scaffold(
       backgroundColor: AppTheme.canvas,
@@ -136,64 +135,44 @@ class _LoginScreenState extends State<LoginScreen> {
               start: 0,
               end: 0,
               bottom: 0,
-              child: Image.asset(
-                'assets/art/login_wave.png',
-                fit: BoxFit.fitWidth,
-              ),
+              child: Image.asset('assets/art/login_wave.png', fit: BoxFit.fitWidth),
             ),
             SafeArea(
-              // One screen, no scrolling: the illustration takes whatever room
-              // the form leaves rather than a fixed height that pushed the
-              // page past the bottom and hid the hills behind the card.
-              // The keyboard is the one exception — then it scrolls, because a
-              // password field under a keyboard is worse than a short picture.
-              child: keyboard
-                  ? SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(18, 10, 18, 20),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Align(
-                            alignment: AlignmentDirectional.centerEnd,
-                            child: LanguagePicker(tint: role.tint),
-                          ),
-                          const SizedBox(height: 12),
-                          Image.asset('assets/art/login_family.png', height: 110),
-                          const SizedBox(height: 8),
-                          _Card(
-                            child: _choosing ? _chooseForm(role) : _signInForm(role),
-                          ),
-                        ],
-                      ),
-                    )
-                  : Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Align(
-                            alignment: AlignmentDirectional.centerEnd,
-                            child: LanguagePicker(tint: role.tint),
-                          ),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Image.asset(
-                                'assets/art/login_family.png',
-                                fit: BoxFit.contain,
-                              ),
-                            ),
-                          ),
-                          _Card(
-                            child: _choosing ? _chooseForm(role) : _signInForm(role),
-                          ),
-                          // The hills show under the card, as they do in the
-                          // design, rather than being covered by it.
-                          const SizedBox(height: 56),
-                        ],
-                      ),
+              child: LayoutBuilder(
+                builder: (context, box) {
+                  // ONE tree, always. Swapping between a scrolling layout and a
+                  // fixed one when the keyboard opened rebuilt the text fields
+                  // as new elements mid-tap: the field lost focus the instant
+                  // it gained it, and the focus fell through to the next one.
+                  // So the layout never changes shape — only the picture's
+                  // height, which is derived from the viewport so the page
+                  // lands on one screen without scrolling.
+                  final art = (box.maxHeight * 0.26).clamp(120.0, 208.0);
+
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(18, 10, 18, 56),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: LanguagePicker(tint: role.tint),
+                        ),
+                        const SizedBox(height: 10),
+                        Image.asset(
+                          'assets/art/login_family.png',
+                          height: art,
+                          fit: BoxFit.contain,
+                        ),
+                        const SizedBox(height: 10),
+                        _Card(
+                          child: _choosing ? _chooseForm(role) : _signInForm(role),
+                        ),
+                      ],
                     ),
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -346,7 +325,7 @@ class _LoginScreenState extends State<LoginScreen> {
           label: t('welcome.logIn'),
           color: role.tint,
           busy: _busy,
-          height: 56,
+          height: 52,
           onPressed: _signIn,
         ),
         const SizedBox(height: 16),
@@ -492,7 +471,7 @@ class _Card extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(24),
@@ -531,7 +510,7 @@ class _Field extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(15),
@@ -540,13 +519,13 @@ class _Field extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.10),
-              borderRadius: BorderRadius.circular(13),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, size: 21, color: tint),
+            child: Icon(icon, size: 20, color: tint),
           ),
           const SizedBox(width: 12),
           Expanded(
