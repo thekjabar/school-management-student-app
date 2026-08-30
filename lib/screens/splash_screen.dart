@@ -11,9 +11,17 @@ import 'package:video_player/video_player.dart';
 /// going to spend anyway, rather than adding its length to how long the app
 /// takes to open.
 class SplashGate extends StatefulWidget {
-  const SplashGate({super.key, required this.child});
+  const SplashGate({super.key, required this.child, this.ready});
 
   final Widget child;
+
+  /// Completes when the app underneath has what it needs to draw a real
+  /// screen. The curtain waits for BOTH this and the end of the clip, so a
+  /// fast connection never sees a second loading screen and a slow one spends
+  /// the wait watching the clip rather than a spinner.
+  ///
+  /// Null means "do not wait" — the clip alone decides.
+  final Future<void>? ready;
 
   @override
   State<SplashGate> createState() => _SplashGateState();
@@ -33,13 +41,33 @@ class _SplashGateState extends State<SplashGate> {
 
   VideoPlayerController? _video;
   bool _done = false;
+  bool _clipOver = false;
+  bool _appReady = false;
   Timer? _deadline;
 
   @override
   void initState() {
     super.initState();
+    // The deadline is the backstop for both halves. A codec the handset cannot
+    // open used to be a permanently black screen; a server that never answers
+    // would now be the same thing, and one rule covers both.
     _deadline = Timer(_limit, _finish);
     _start(_asset);
+
+    if (widget.ready == null) {
+      _appReady = true;
+    } else {
+      widget.ready!
+          .then((_) => _mark(ready: true))
+          .catchError((_) => _mark(ready: true));
+    }
+  }
+
+  /// One half is done. Lift only when both are.
+  void _mark({bool clip = false, bool ready = false}) {
+    if (clip) _clipOver = true;
+    if (ready) _appReady = true;
+    if (_clipOver && _appReady) _finish();
   }
 
   Future<void> _start(String asset) async {
@@ -66,11 +94,12 @@ class _SplashGateState extends State<SplashGate> {
     if (video == null || _done) return;
     final value = video.value;
     if (value.hasError) {
+      // A broken clip must not hold the app hostage waiting for the other half.
       _finish();
       return;
     }
     if (value.duration > Duration.zero && value.position >= value.duration) {
-      _finish();
+      _mark(clip: true);
     }
   }
 

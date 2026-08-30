@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'api/boot.dart';
 import 'api/client.dart';
 import 'api/push.dart';
 import 'i18n/delegates.dart';
@@ -34,9 +35,9 @@ Role get _role => switch (kRole) {
     };
 
 String get _title => switch (kRole) {
-      'teacher' => 'EduPulse Teacher',
-      'driver' => 'EduPulse Driver',
-      _ => 'EduPulse Parent',
+      'teacher' => 'KSP Teacher',
+      'driver' => 'KSP Driver',
+      _ => 'KSP Parent',
     };
 
 Future<void> main() async {
@@ -50,14 +51,14 @@ Future<void> main() async {
   // Started here, but deliberately not asked for permission here — see Push.
   // Failing to start push must not stop the app, so this never throws.
   await Push.start();
-  runApp(const EduPulseApp());
+  runApp(const KspApp());
 }
 
-class EduPulseApp extends StatefulWidget {
-  const EduPulseApp({super.key});
+class KspApp extends StatefulWidget {
+  const KspApp({super.key});
 
   @override
-  State<EduPulseApp> createState() => _EduPulseAppState();
+  State<KspApp> createState() => _KspAppState();
 }
 
 /// Stateful only so it can hear the phone change brightness.
@@ -65,7 +66,7 @@ class EduPulseApp extends StatefulWidget {
 /// On "follow the system" the app has to repaint when the handset flips, which
 /// on most phones happens on a schedule nobody thinks about — an app that only
 /// read the setting at launch stays light all evening.
-class _EduPulseAppState extends State<EduPulseApp> with WidgetsBindingObserver {
+class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
@@ -153,8 +154,10 @@ class _EduPulseAppState extends State<EduPulseApp> with WidgetsBindingObserver {
       // nothing below this line redrew until a new route was pushed. The same
       // applies to the three role apps below.
       // The clip plays OVER the app rather than before it, so the sign-in
-      // check happens underneath instead of after.
-      home: SplashGate(child: _Gate()),
+      // check happens underneath instead of after — and `ready` holds the
+      // curtain until the work started at boot has finished, so the clip is
+      // never followed by a second loading screen.
+      home: SplashGate(ready: Boot.instance.start(), child: _Gate()),
     );
   }
 }
@@ -194,73 +197,28 @@ class _GateState extends State<_Gate> {
     super.dispose();
   }
 
+  /// Reads the work started when the app booted, rather than starting its own.
+  ///
+  /// Boot.start() is called from build(), the instant the splash is created, so
+  /// by the time this runs the request is usually already in flight. Awaiting
+  /// the same future joins it instead of firing a second one.
   Future<void> _restore() async {
-    await ApiClient.instance.restore();
-    if (ApiClient.instance.hasSession) {
-      final me = await Session.instance.refresh();
-      if (!mounted) return;
-      setState(() {
-        _me = me;
-        _ready = true;
-      });
-      return;
-    }
+    final boot = await Boot.instance.start();
     if (!mounted) return;
-    setState(() => _ready = true);
+    setState(() {
+      _me = boot.me;
+      _ready = true;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     if (!_ready) {
-      // The same wash and the same mark as the sign-in screen, so the first
-      // second of the app is not a different design from the second second.
-      return Scaffold(
-        backgroundColor: AppTheme.canvas,
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [_role.wash, AppTheme.canvas],
-              stops: const [0, 0.55],
-            ),
-          ),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 66,
-                  height: 66,
-                  decoration: BoxDecoration(
-                    color: _role.tint,
-                    borderRadius: BorderRadius.circular(21),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _role.tint.withValues(alpha: 0.34),
-                        blurRadius: 22,
-                        offset: const Offset(0, 9),
-                      ),
-                    ],
-                  ),
-                  child: Icon(Icons.school_rounded, color: AppTheme.surface, size: 32),
-                ),
-                const SizedBox(height: 18),
-                const Text(
-                  'EduPulse',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.6),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2.2, color: _role.tint),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
+      // Deliberately bare. The splash is drawn over this, and the wordmark and
+      // spinner that used to live here read as a SECOND splash screen the
+      // moment the clip lifted — which is the part that felt slow, because by
+      // then a person is waiting rather than watching.
+      return Scaffold(backgroundColor: AppTheme.canvas, body: const SizedBox.expand());
     }
 
     if (_me == null) {
@@ -271,7 +229,7 @@ class _GateState extends State<_Gate> {
     //
     // It used to be the other way round: whatever role the signed-in person
     // held chose the screens. That reads sensibly until three separately named
-    // and separately installed apps exist — then signing into EduPulse Teacher
+    // and separately installed apps exist — then signing into KSP Teacher
     // with a parent account silently showed the parent app in teacher blue,
     // and the three APKs became one app wearing three colours.
     //

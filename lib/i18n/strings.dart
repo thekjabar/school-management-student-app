@@ -147,7 +147,7 @@ Iterable<String> get englishKeys => _en.keys;
 
 const Map<String, String> _en = {
   // Brand and welcome
-  'app.name': 'EduPulse',
+  'app.name': 'KSP',
   'app.tagline': 'Connecting students, parents,\nteachers and schools',
   'welcome.getStarted': 'Get started',
   'welcome.logIn': 'Log in',
@@ -740,7 +740,7 @@ const Map<String, String> _en = {
   'more.pushOn': 'You will be told about attendance, the bus and homework.',
   'more.pushOff': 'This phone will not be told anything.',
   'more.turnOn': 'Turn on',
-  'more.pushBlocked': 'Turn notifications on for EduPulse in your phone settings.',
+  'more.pushBlocked': 'Turn notifications on for KSP in your phone settings.',
   'more.account': 'Account',
   'more.language': 'Language',
   'more.appearance': 'Appearance',
@@ -1038,7 +1038,7 @@ const Map<String, String> _en = {
  * ------------------------------------------------------------------------- */
 
 const Map<String, String> _ckb = {
-  'app.name': 'EduPulse',
+  'app.name': 'KSP',
   'app.tagline': 'پەیوەندی نێوان قوتابی، دایک و باوک،\nمامۆستا و قوتابخانە',
   'welcome.getStarted': 'دەستپێبکە',
   'welcome.logIn': 'چوونەژوورەوە',
@@ -1614,7 +1614,7 @@ const Map<String, String> _ckb = {
   'more.pushOn': 'ئاگادار دەکرێیتەوە لە ئامادەبوون، پاس و ئەرکی ماڵەوە.',
   'more.pushOff': 'ئەم مۆبایلە هیچ ئاگادارکردنەوەیەکی پێ ناگات.',
   'more.turnOn': 'کاری پێبکە',
-  'more.pushBlocked': 'لە ڕێکخستنەکانی مۆبایلەکەت ئاگادارکردنەوە بۆ EduPulse کاری پێبکە.',
+  'more.pushBlocked': 'لە ڕێکخستنەکانی مۆبایلەکەت ئاگادارکردنەوە بۆ KSP کاری پێبکە.',
   'more.account': 'هەژمار',
   'more.language': 'زمان',
   'more.appearance': 'ڕووکار',
@@ -1911,7 +1911,7 @@ const Map<String, String> _ckb = {
  * ------------------------------------------------------------------------- */
 
 const Map<String, String> _ar = {
-  'app.name': 'EduPulse',
+  'app.name': 'KSP',
   'app.tagline': 'يربط الطلاب وأولياء الأمور\nوالمعلمين والمدارس',
   'welcome.getStarted': 'ابدأ',
   'welcome.logIn': 'تسجيل الدخول',
@@ -2484,7 +2484,7 @@ const Map<String, String> _ar = {
   'more.pushOn': 'سيتم إبلاغك عن الحضور والحافلة والواجبات.',
   'more.pushOff': 'لن يصل أي إشعار إلى هذا الهاتف.',
   'more.turnOn': 'تفعيل',
-  'more.pushBlocked': 'فعّل الإشعارات لتطبيق EduPulse من إعدادات هاتفك.',
+  'more.pushBlocked': 'فعّل الإشعارات لتطبيق KSP من إعدادات هاتفك.',
   'more.account': 'الحساب',
   'more.language': 'اللغة',
   'more.appearance': 'المظهر',

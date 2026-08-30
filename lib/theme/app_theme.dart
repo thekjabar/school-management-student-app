@@ -35,7 +35,7 @@ enum Role {
       : _lightWash;
 }
 
-/// EduPulse — the visual language, shared by all five roles.
+/// KSP — the visual language, shared by all five roles.
 ///
 /// One idea holds every screen together: a soft tinted wash behind the header,
 /// and everything below it a white card floating on near-white. Nothing shouts.

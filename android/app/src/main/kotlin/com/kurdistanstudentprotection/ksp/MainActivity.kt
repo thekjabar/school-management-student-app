@@ -1,4 +1,4 @@
-package com.edupulse.student_app
+package com.kurdistanstudentprotection.ksp
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

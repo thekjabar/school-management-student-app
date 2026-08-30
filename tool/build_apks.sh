@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the role APKs.
+# Build the KSP role APKs.
 #
 # The splash clip is the reason this is a script rather than three commands.
 # Flutter's asset bundle is not flavour-aware: every file under an `assets:`
@@ -38,8 +38,17 @@ for role in "${ROLES[@]}"; do
     --dart-define="APP_ROLE=$role" \
     --split-per-abi
 
-  cp "build/app/outputs/flutter-apk/app-arm64-v8a-$role-release.apk" "$OUT/$role.apk"
-  echo "→ $OUT/$role.apk  ($(du -h "$OUT/$role.apk" | cut -f1))"
+  # Named as the app is named, so the file somebody is handed over Telegram
+  # says what it installs.
+  case "$role" in
+    parent)  name="KSP-Parent"  ;;
+    teacher) name="KSP-Teacher" ;;
+    driver)  name="KSP-Driver"  ;;
+    *)       name="KSP-${role}" ;;
+  esac
+
+  cp "build/app/outputs/flutter-apk/app-arm64-v8a-$role-release.apk" "$OUT/$name.apk"
+  echo "→ $OUT/$name.apk  ($(du -h "$OUT/$name.apk" | cut -f1))"
 done
 
 rm -f assets/video/splash.mp4

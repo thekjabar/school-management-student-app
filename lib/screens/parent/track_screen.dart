@@ -353,7 +353,7 @@ class _MapCard extends StatelessWidget {
                     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     // OSM's tile policy asks for an identifying agent. Sending
                     // one is the condition of using the tiles at all.
-                    userAgentPackageName: 'com.edupulse.student_app',
+                    userAgentPackageName: 'com.kurdistanstudentprotection.ksp',
                     maxNativeZoom: 19,
                   ),
 

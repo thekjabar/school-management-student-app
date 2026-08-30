@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.edupulse.student_app"
+    namespace = "com.kurdistanstudentprotection.ksp"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,10 +20,15 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.edupulse.student_app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        // Kurdistan Student Protection. Each flavour suffixes this, so the five
+        // audiences can sit on one phone at once.
+        //
+        // Changed from com.edupulse.student_app during the rebrand. Android
+        // treats a new id as a different app, so an existing install has to be
+        // removed rather than upgraded — done now, while that costs one
+        // uninstall, because an id that reaches Play is fixed for the life of
+        // the listing.
+        applicationId = "com.kurdistanstudentprotection.ksp"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -39,27 +44,27 @@ android {
         create("parent") {
             dimension = "role"
             applicationIdSuffix = ".parent"
-            resValue("string", "app_name", "EduPulse Parent")
+            resValue("string", "app_name", "KSP Parent")
         }
         create("student") {
             dimension = "role"
             applicationIdSuffix = ".student"
-            resValue("string", "app_name", "EduPulse Student")
+            resValue("string", "app_name", "KSP Student")
         }
         create("teacher") {
             dimension = "role"
             applicationIdSuffix = ".teacher"
-            resValue("string", "app_name", "EduPulse Teacher")
+            resValue("string", "app_name", "KSP Teacher")
         }
         create("driver") {
             dimension = "role"
             applicationIdSuffix = ".driver"
-            resValue("string", "app_name", "EduPulse Driver")
+            resValue("string", "app_name", "KSP Driver")
         }
         create("admin") {
             dimension = "role"
             applicationIdSuffix = ".admin"
-            resValue("string", "app_name", "EduPulse Admin")
+            resValue("string", "app_name", "KSP Admin")
         }
     }
 

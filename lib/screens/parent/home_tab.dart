@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/boot.dart';
 import '../../api/parent_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
@@ -44,24 +45,18 @@ class HomeTab extends StatelessWidget {
       tint: Role.parent.tint,
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
       load: () async {
+        // Already fetched, while the splash clip was playing. Taken once: a
+        // pull-to-refresh after this gets live data rather than the snapshot
+        // the app opened with.
+        final early = Boot.instance.takeHome();
+        if (early != null && early.studentId == child.studentId) {
+          return _Home.from(early);
+        }
+
         // One pass, all at once. Six sequential round trips on a school
         // connection is the difference between a screen and a wait.
-        final r = await Future.wait([
-          ParentApi.instance.transport(child.studentId),
-          ParentApi.instance.timetable(child.studentId),
-          ParentApi.instance.attendance(child.studentId),
-          ParentApi.instance.homework(child.studentId),
-          ParentApi.instance.attitude(child.studentId),
-          ParentApi.instance.announcements(),
-        ]);
-        return _Home(
-          transport: r[0] as TransportInfo,
-          week: r[1] as List<DayOfLessons>,
-          attendance: r[2] as AttendanceSummary,
-          homework: r[3] as List<HomeworkItem>,
-          attitude: r[4] as AttitudeSummary,
-          announcements: r[5] as List<Announcement>,
-        );
+        final payload = await HomePayload.fetch(child.studentId);
+        return _Home.from(payload);
       },
       builder: (context, home) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,6 +218,17 @@ class _Home {
     required this.attitude,
     required this.announcements,
   });
+
+  /// The same six answers, however they arrived — fetched here, or prefetched
+  /// during the splash. The screen must not be able to tell the difference.
+  factory _Home.from(HomePayload p) => _Home(
+        transport: p.transport,
+        week: p.week,
+        attendance: p.attendance,
+        homework: p.homework,
+        attitude: p.attitude,
+        announcements: p.announcements,
+      );
 
   final TransportInfo transport;
   final List<DayOfLessons> week;
