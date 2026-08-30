@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The driver app's launcher icon on Android 8 and later.
+
+  A plain PNG here gets a white plate drawn behind it by most launchers, which
+  puts the logo's own orange on a hard white square. An adaptive icon lets the
+  launcher mask BOTH layers together, so the artwork sits on the app's own pale
+  orange whatever shape the phone cuts it into.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The driver app's own pale orange, so the plate behind the logo belongs
+         to the product rather than being the launcher's default white. -->
+    <color name="ic_launcher_background">#FFEFE2</color>
+</resources>
