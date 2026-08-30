@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'home_address_screen.dart';
 
 import '../../api/parent_api.dart';
 import '../../api/push.dart';
@@ -406,6 +407,15 @@ class _Settings extends StatelessWidget {
             title: t('profile.personal'),
             sub: t('profile.personalSub'),
             onTap: () => showNote(context, t('profile.editAtOffice')),
+          ),
+          Divider(height: 1, color: AppTheme.border),
+          _Row(
+            icon: Icons.home_outlined,
+            title: t('more.homeAddress'),
+            sub: t('more.homeAddressSub'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const HomeAddressScreen()),
+            ),
           ),
           Divider(height: 1, color: AppTheme.border),
           _Row(

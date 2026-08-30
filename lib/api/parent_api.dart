@@ -383,6 +383,85 @@ class MemoryItem {
       );
 }
 
+/// Where the family lives, as the school holds it.
+///
+/// The note matters more than the pin. Addressing here is landmark-based
+/// rather than street-based — "the blue gate opposite the bakery" is how
+/// somebody is actually found, and it is what a driver reads. The coordinates
+/// are for the planner choosing which stop the child uses.
+class HomeLocation {
+  HomeLocation({
+    required this.address,
+    required this.note,
+    required this.lat,
+    required this.lon,
+    required this.children,
+  });
+
+  final String? address;
+  final String? note;
+  final double? lat;
+  final double? lon;
+
+  /// What the address led to: the stop each child is actually assigned.
+  final List<AssignedStops> children;
+
+  bool get hasPin => lat != null && lon != null;
+
+  factory HomeLocation.fromJson(Map<String, dynamic> j) => HomeLocation(
+        address: j['address'] as String?,
+        note: j['note'] as String?,
+        lat: (j['lat'] as num?)?.toDouble(),
+        lon: (j['lon'] as num?)?.toDouble(),
+        children: ((j['children'] as List?) ?? const [])
+            .map((e) => AssignedStops.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+/// The stops one child rides between.
+class AssignedStops {
+  AssignedStops({
+    required this.studentId,
+    required this.name,
+    required this.pickup,
+    required this.dropoff,
+  });
+
+  final String studentId;
+  final String name;
+  final StopPoint? pickup;
+  final StopPoint? dropoff;
+
+  factory AssignedStops.fromJson(Map<String, dynamic> j) => AssignedStops(
+        studentId: (j['studentId'] ?? '') as String,
+        name: (j['name'] ?? '') as String,
+        pickup: j['pickup'] == null
+            ? null
+            : StopPoint.fromJson(j['pickup'] as Map<String, dynamic>),
+        dropoff: j['dropoff'] == null
+            ? null
+            : StopPoint.fromJson(j['dropoff'] as Map<String, dynamic>),
+      );
+}
+
+/// A planned stop, with the description the crew actually navigates by.
+class StopPoint {
+  StopPoint({required this.name, required this.lat, required this.lon, required this.landmark});
+
+  final String name;
+  final double? lat;
+  final double? lon;
+  final String? landmark;
+
+  factory StopPoint.fromJson(Map<String, dynamic> j) => StopPoint(
+        name: (j['name'] ?? '') as String,
+        lat: (j['lat'] as num?)?.toDouble(),
+        lon: (j['lon'] as num?)?.toDouble(),
+        landmark: j['landmark'] as String?,
+      );
+}
+
 /// A lesson in the week.
 class Lesson {
   Lesson({
@@ -1078,6 +1157,31 @@ class ParentApi {
   Future<List<MemoryAlbum>> memories(String studentId) async {
     final json = await _api.get('/parent/children/$studentId/memories?pageSize=24');
     return Paged.from<MemoryAlbum>(json, MemoryAlbum.fromJson).rows;
+  }
+
+  /// Where the school thinks this family lives, and the stops that produced.
+  Future<HomeLocation> homeLocation() async {
+    final json = await _api.get('/parent/home') as Map<String, dynamic>;
+    return HomeLocation.fromJson(json);
+  }
+
+  /// Tell the school where home is.
+  ///
+  /// This does NOT move a child's bus stop — a route is planned and sequenced,
+  /// and the office decides which stop each child uses. It is what they read
+  /// when deciding.
+  Future<void> saveHomeLocation({
+    double? lat,
+    double? lon,
+    String? address,
+    String? note,
+  }) async {
+    await _api.put('/parent/home', {
+      'lat': ?lat,
+      'lon': ?lon,
+      if (address != null) 'address': address.trim(),
+      if (note != null) 'note': note.trim(),
+    });
   }
 
   /// The child's own record, as the school holds it.

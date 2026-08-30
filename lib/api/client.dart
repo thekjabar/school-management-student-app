@@ -172,6 +172,13 @@ class ApiClient {
 
   Future<dynamic> patch(String path, [Object? body]) => _send('PATCH', path, body);
 
+  /// Replace a whole record, as against PATCH's "change these fields".
+  ///
+  /// Used where the server models the thing as a single value a caller sets
+  /// outright — the family's home location, where sending half of it is a bug
+  /// rather than a partial update.
+  Future<dynamic> put(String path, [Object? body]) => _send('PUT', path, body);
+
   Future<dynamic> delete(String path, [Object? body]) => _send('DELETE', path, body);
 
   Future<dynamic> _send(String method, String path, [Object? body, bool retry = true]) async {
