@@ -43,7 +43,7 @@ class _DriverFeedbackScreenState extends State<DriverFeedbackScreen> {
         bottom: false,
         child: Column(
           children: [
-            ScreenHeader(title: t('crew.title'), onBell: () {}),
+            ScreenHeader(title: t('crew.title')),
             Expanded(
               child: Loader<List<CrewFeedbackItem>>(
                 key: _loader,

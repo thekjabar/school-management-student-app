@@ -38,7 +38,7 @@ class _AttitudeScreenState extends State<AttitudeScreen> {
         bottom: false,
         child: Column(
           children: [
-            ScreenHeader(title: t('quick.attitude'), onBell: () {}),
+            ScreenHeader(title: t('quick.attitude')),
             Expanded(
               child: Loader<AttitudeSummary>(
                 tint: tint,

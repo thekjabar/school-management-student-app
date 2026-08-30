@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../ui/tab_memory.dart';
 
 import '../../api/session.dart';
 import '../../api/teacher_api.dart';
@@ -35,7 +36,11 @@ class _TeacherAppState extends State<TeacherApp> {
   // Held so the header's menu button can open the drawer: the Scaffold that
   // owns it is built by this method, so there is no context above it to ask.
   final _scaffold = GlobalKey<ScaffoldState>();
-  int _tab = 0;
+  // A getter and setter over TabMemory rather than a field, so that every
+  // `_tab = i` below keeps working untouched while the value itself survives
+  // the remount a theme change causes.
+  int get _tab => TabMemory.teacher;
+  set _tab(int v) => TabMemory.teacher = v;
   int _unread = 0;
 
   @override

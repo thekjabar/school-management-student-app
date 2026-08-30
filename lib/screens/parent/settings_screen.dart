@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../ui/screen_kit.dart';
 
 import '../../api/session.dart';
 import '../../i18n/strings.dart';
@@ -22,9 +23,14 @@ class SettingsScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppTheme.canvas,
-      appBar: AppBar(title: Text(t('settings.title'))),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 4, 14, 24),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            ScreenHeader(title: t('settings.title')),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 24),
         children: [
           _Section(t('settings.signedInAs')),
           Card16(
@@ -101,7 +107,11 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           ),
-        ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

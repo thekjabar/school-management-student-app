@@ -28,7 +28,7 @@ class TimetableScreen extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
-            ScreenHeader(title: t('quick.timetable'), onBell: () {}),
+            ScreenHeader(title: t('quick.timetable')),
             Expanded(child: TimetableTab(child: child, showChildCard: true)),
           ],
         ),

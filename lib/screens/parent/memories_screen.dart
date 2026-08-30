@@ -34,7 +34,7 @@ class MemoriesScreen extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
-            ScreenHeader(title: t('memories.title'), onBell: () {}),
+            ScreenHeader(title: t('memories.title')),
             Expanded(
               child: Loader<List<MemoryAlbum>>(
                 tint: tint,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../ui/screen_kit.dart';
 
 import '../../api/parent_api.dart';
 import '../../i18n/strings.dart';
@@ -23,125 +24,129 @@ class MarksScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.canvas,
-      appBar: AppBar(
-        title: Text(t('quick.marks')),
-        backgroundColor: Role.parent.wash,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: Loader<_Marks>(
-        tint: Role.parent.tint,
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
-        load: () async {
-          final r = await Future.wait([
-            ParentApi.instance.results(child.studentId),
-            ParentApi.instance.homework(child.studentId),
-          ]);
-          return _Marks(
-            exams: r[0] as List<ExamResultItem>,
-            homework: r[1] as List<HomeworkItem>,
-          );
-        },
-        empty: t('marks.none'),
-        isEmpty: (d) => d.exams.isEmpty && d.markedHomework.isEmpty,
-        builder: (context, d) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
           children: [
-            // The one figure a parent came for, before the list.
-            if (d.average != null)
-              Card16(
-                child: Row(
-                  children: [
-                    PercentRing(
-                      percent: d.average!.toDouble(),
-                      color: d.average! >= 80
-                          ? AppTheme.green
-                          : d.average! >= 50
-                              ? AppTheme.amber
-                              : AppTheme.rose,
-                      size: 104,
-                      label: t('marks.average'),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            t('marks.acrossEverything'),
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.text,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            tn('marks.countedFrom', d.markedHomework.length + d.exams.length),
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: AppTheme.textMuted,
-                              height: 1.45,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            if (d.average != null) const SizedBox(height: 14),
-
-            if (d.exams.isNotEmpty) ...[
-              Card16(
-                child: Column(
+            ScreenHeader(title: t('quick.marks')),
+            Expanded(
+              child: Loader<_Marks>(
+                tint: Role.parent.tint,
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+                load: () async {
+                  final r = await Future.wait([
+                    ParentApi.instance.results(child.studentId),
+                    ParentApi.instance.homework(child.studentId),
+                  ]);
+                  return _Marks(
+                    exams: r[0] as List<ExamResultItem>,
+                    homework: r[1] as List<HomeworkItem>,
+                  );
+                },
+                empty: t('marks.none'),
+                isEmpty: (d) => d.exams.isEmpty && d.markedHomework.isEmpty,
+                builder: (context, d) => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SectionRow(title: t('reports.exams')),
-                    for (final r in d.exams)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _MarkRow(
-                          title: r.examTitle,
-                          subtitle: '${r.subject} · ${longDate(r.date)}',
-                          score: r.score?.toDouble(),
-                          outOf: r.maxScore.toDouble(),
-                          percent: r.percent?.toDouble(),
-                          absent: r.wasAbsent,
-                          grade: r.gradeLetter,
+                    // The one figure a parent came for, before the list.
+                    if (d.average != null)
+                      Card16(
+                        child: Row(
+                          children: [
+                            PercentRing(
+                              percent: d.average!.toDouble(),
+                              color: d.average! >= 80
+                                  ? AppTheme.green
+                                  : d.average! >= 50
+                                      ? AppTheme.amber
+                                      : AppTheme.rose,
+                              size: 104,
+                              label: t('marks.average'),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    t('marks.acrossEverything'),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.text,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    tn('marks.countedFrom', d.markedHomework.length + d.exams.length),
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: AppTheme.textMuted,
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (d.average != null) const SizedBox(height: 14),
+
+                    if (d.exams.isNotEmpty) ...[
+                      Card16(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SectionRow(title: t('reports.exams')),
+                            for (final r in d.exams)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _MarkRow(
+                                  title: r.examTitle,
+                                  subtitle: '${r.subject} · ${longDate(r.date)}',
+                                  score: r.score?.toDouble(),
+                                  outOf: r.maxScore.toDouble(),
+                                  percent: r.percent?.toDouble(),
+                                  absent: r.wasAbsent,
+                                  grade: r.gradeLetter,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
+                    if (d.markedHomework.isNotEmpty)
+                      Card16(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SectionRow(title: t('marks.markedWork')),
+                            for (final h in d.markedHomework)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _MarkRow(
+                                  title: h.title,
+                                  subtitle: '${h.subject} · ${longDate(h.dueDate)}',
+                                  score: h.score?.toDouble(),
+                                  outOf: (h.maxScore ?? 0).toDouble(),
+                                  percent: h.maxScore == null || h.maxScore == 0
+                                      ? null
+                                      : h.score!.toDouble() / h.maxScore!.toDouble() * 100,
+                                  absent: false,
+                                  grade: null,
+                                  feedback: h.feedback,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
-            ],
-
-            if (d.markedHomework.isNotEmpty)
-              Card16(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SectionRow(title: t('marks.markedWork')),
-                    for (final h in d.markedHomework)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _MarkRow(
-                          title: h.title,
-                          subtitle: '${h.subject} · ${longDate(h.dueDate)}',
-                          score: h.score?.toDouble(),
-                          outOf: (h.maxScore ?? 0).toDouble(),
-                          percent: h.maxScore == null || h.maxScore == 0
-                              ? null
-                              : h.score!.toDouble() / h.maxScore!.toDouble() * 100,
-                          absent: false,
-                          grade: null,
-                          feedback: h.feedback,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+            ),
           ],
         ),
       ),

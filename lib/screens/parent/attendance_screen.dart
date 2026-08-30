@@ -38,7 +38,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         bottom: false,
         child: Column(
           children: [
-            ScreenHeader(title: t('quick.attendance'), onBell: () {}),
+            ScreenHeader(title: t('quick.attendance')),
             Expanded(
               child: Loader<AttendanceSummary>(
                 tint: tint,

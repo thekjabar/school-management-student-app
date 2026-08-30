@@ -286,8 +286,20 @@ class _Children extends StatelessWidget {
               MaterialPageRoute(
                 builder: (_) => Scaffold(
                   backgroundColor: AppTheme.canvas,
-                  appBar: AppBar(title: Text(t('more.yourChildren'))),
-                  body: ChildrenTab(children: children, selected: children.first),
+                  body: SafeArea(
+                    bottom: false,
+                    child: Column(
+                      children: [
+                        ScreenHeader(title: t('more.yourChildren')),
+                        Expanded(
+                          child: ChildrenTab(
+                            children: children,
+                            selected: children.first,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -406,8 +418,20 @@ class _Settings extends StatelessWidget {
                       MaterialPageRoute(
                         builder: (_) => Scaffold(
                           backgroundColor: AppTheme.canvas,
-                          appBar: AppBar(title: Text(t('nav.children'))),
-                          body: ChildrenTab(children: children, selected: children.first),
+                          body: SafeArea(
+                            bottom: false,
+                            child: Column(
+                              children: [
+                                ScreenHeader(title: t('nav.children')),
+                                Expanded(
+                                  child: ChildrenTab(
+                                    children: children,
+                                    selected: children.first,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../ui/tab_memory.dart';
 
 import '../../api/session.dart';
 import '../../i18n/strings.dart';
@@ -31,7 +32,11 @@ class DriverApp extends StatefulWidget {
 }
 
 class _DriverAppState extends State<DriverApp> {
-  int _tab = 0;
+  // A getter and setter over TabMemory rather than a field, so that every
+  // `_tab = i` below keeps working untouched while the value itself survives
+  // the remount a theme change causes.
+  int get _tab => TabMemory.driver;
+  set _tab(int v) => TabMemory.driver = v;
 
   List<NavItem> get _nav => [
         NavItem(Icons.home_rounded, Icons.home_outlined, t('nav.home'), glyph: NavGlyph.home),

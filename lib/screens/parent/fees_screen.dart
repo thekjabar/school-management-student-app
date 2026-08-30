@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../ui/screen_kit.dart';
 
 import '../../api/parent_api.dart';
 import '../../theme/app_theme.dart';
@@ -19,120 +20,124 @@ class FeesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.canvas,
-      appBar: AppBar(
-        title: Text(t('fees.title')),
-        backgroundColor: Role.parent.wash,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: Loader<FeeSummary>(
-        tint: Role.parent.tint,
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
-        load: () => ParentApi.instance.fees(),
-        builder: (context, f) {
-          final settled = f.outstandingIqd <= 0;
-          final late = f.overdueIqd > 0;
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            ScreenHeader(title: t('fees.title')),
+            Expanded(
+              child: Loader<FeeSummary>(
+                tint: Role.parent.tint,
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+                load: () => ParentApi.instance.fees(),
+                builder: (context, f) {
+                  final settled = f.outstandingIqd <= 0;
+                  final late = f.overdueIqd > 0;
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Card16(
-                color: settled
-                    ? AppTheme.greenSoft
-                    : late
-                        ? AppTheme.roseSoft
-                        : AppTheme.amberSoft,
-                child: Row(
-                  children: [
-                    Chip36(
-                      icon: settled ? Icons.check_circle_rounded : Icons.account_balance_wallet_rounded,
-                      color: settled
-                          ? AppTheme.green
-                          : late
-                              ? AppTheme.rose
-                              : AppTheme.amber,
-                      background: AppTheme.surface,
-                      size: 44,
-                    ),
-                    const SizedBox(width: 13),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            settled ? t('fees.nothingOwed') : iqd(f.outstandingIqd),
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.6,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            settled
-                                ? t('fees.upToDate')
-                                : late
-                                    ? tn('fees.overdueAmount', iqd(f.overdueIqd))
-                                    : f.dueAt == null
-                                        ? t('fees.dueNow')
-                                        : tn('fees.dueOn', longDate(f.dueAt)) +
-                                            (f.daysUntilDue != null ? tn('fees.inDays', f.daysUntilDue!) : ''),
-                            style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted, height: 1.4),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              if (!settled) ...[
-                Heading(t('fees.howToPay')),
-                Card16(
-                  child: Column(
+                  return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Written out rather than left to a parent to ask at the
-                      // gate. "How do I pay" is the single most common call the
-                      // office takes about fees.
-                      _Way(
-                        icon: Icons.payments_rounded,
-                        title: t('fees.cash'),
-                        body: t('fees.cashBody'),
+                      Card16(
+                        color: settled
+                            ? AppTheme.greenSoft
+                            : late
+                                ? AppTheme.roseSoft
+                                : AppTheme.amberSoft,
+                        child: Row(
+                          children: [
+                            Chip36(
+                              icon: settled ? Icons.check_circle_rounded : Icons.account_balance_wallet_rounded,
+                              color: settled
+                                  ? AppTheme.green
+                                  : late
+                                      ? AppTheme.rose
+                                      : AppTheme.amber,
+                              background: AppTheme.surface,
+                              size: 44,
+                            ),
+                            const SizedBox(width: 13),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    settled ? t('fees.nothingOwed') : iqd(f.outstandingIqd),
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.6,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    settled
+                                        ? t('fees.upToDate')
+                                        : late
+                                            ? tn('fees.overdueAmount', iqd(f.overdueIqd))
+                                            : f.dueAt == null
+                                                ? t('fees.dueNow')
+                                                : tn('fees.dueOn', longDate(f.dueAt)) +
+                                                    (f.daysUntilDue != null ? tn('fees.inDays', f.daysUntilDue!) : ''),
+                                    style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted, height: 1.4),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      Divider(height: 22, color: AppTheme.border),
-                      _Way(
-                        icon: Icons.account_balance_rounded,
-                        title: t('fees.transfer'),
-                        body: t('fees.transferBody'),
-                      ),
-                      Divider(height: 22, color: AppTheme.border),
-                      _Way(
-                        icon: Icons.directions_bus_rounded,
-                        title: t('fees.driver'),
-                        body: t('fees.driverBody'),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
 
-              Heading(t('fees.yourBills')),
-              if (f.invoices.isEmpty)
-                Card16(
-                  child: Text(
-                    t('fees.nothingBilled'),
-                    style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
-                  ),
-                )
-              else
-                ...f.invoices.map((i) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _InvoiceCard(invoice: i),
-                    )),
-            ],
-          );
-        },
+                      if (!settled) ...[
+                        Heading(t('fees.howToPay')),
+                        Card16(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Written out rather than left to a parent to ask at the
+                              // gate. "How do I pay" is the single most common call the
+                              // office takes about fees.
+                              _Way(
+                                icon: Icons.payments_rounded,
+                                title: t('fees.cash'),
+                                body: t('fees.cashBody'),
+                              ),
+                              Divider(height: 22, color: AppTheme.border),
+                              _Way(
+                                icon: Icons.account_balance_rounded,
+                                title: t('fees.transfer'),
+                                body: t('fees.transferBody'),
+                              ),
+                              Divider(height: 22, color: AppTheme.border),
+                              _Way(
+                                icon: Icons.directions_bus_rounded,
+                                title: t('fees.driver'),
+                                body: t('fees.driverBody'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      Heading(t('fees.yourBills')),
+                      if (f.invoices.isEmpty)
+                        Card16(
+                          child: Text(
+                            t('fees.nothingBilled'),
+                            style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                          ),
+                        )
+                      else
+                        ...f.invoices.map((i) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _InvoiceCard(invoice: i),
+                            )),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1026,17 +1026,19 @@ class CenterActionNav extends StatelessWidget {
     final on = i == index;
     final item = items[i];
 
-    // Where you are is a filled block on the dark canvas and a rule under the
-    // word on the light one — exactly as the design draws it. A tint that works
-    // on white is invisible on navy, and a rule on navy is invisible full stop.
+    // Where you are is the colour of the icon and the word, and on the light
+    // canvas a short rule under them as well.
+    //
+    // The dark canvas had a tinted block behind the whole slot. It was there
+    // because a rule that reads on white disappears on navy — but the block
+    // was heavier than anything else in the bar, and against a dark ground the
+    // violet icon is already the brightest thing on the screen. It does not
+    // need a box drawn round it to be found.
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => onChanged(i),
-      child: Container(
+      child: SizedBox(
         height: _bar,
-        color: on && AppTheme.dark
-            ? tint.withValues(alpha: 0.18)
-            : Colors.transparent,
         child: Stack(
           alignment: Alignment.center,
           children: [

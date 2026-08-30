@@ -81,7 +81,7 @@ class _TrackScreenState extends State<TrackScreen> {
         bottom: false,
         child: Column(
           children: [
-            ScreenHeader(title: t('track.title'), onBell: () {}),
+            ScreenHeader(title: t('track.title')),
             Expanded(
               child: Loader<LiveBus?>(
                 key: _loader,

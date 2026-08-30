@@ -8,6 +8,7 @@ import 'api/client.dart';
 import 'api/push.dart';
 import 'i18n/delegates.dart';
 import 'ui/async.dart';
+import 'ui/tab_memory.dart';
 import 'i18n/strings.dart';
 import 'api/session.dart';
 import 'screens/driver/driver_app.dart';
@@ -157,7 +158,26 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
       // check happens underneath instead of after — and `ready` holds the
       // curtain until the work started at boot has finished, so the clip is
       // never followed by a second loading screen.
-      home: SplashGate(ready: Boot.instance.start(), child: _Gate()),
+      // KEYED ON THE BRIGHTNESS, and that is what makes a theme change take
+      // effect at all. The palette is static getters over AppTheme.dark, read
+      // during build. Flutter skips rebuilding a child whose widget is
+      // IDENTICAL to the mounted one, and every `const Something()` is
+      // canonicalised to a single instance — so it is always identical, and
+      // those widgets kept their old colours until something else forced a
+      // rebuild. That is why a page only looked right after navigating away
+      // and coming back.
+      //
+      // A changed key is a different widget rather than the same one with new
+      // arguments, so the tree is torn down and rebuilt and every widget
+      // re-reads the palette exactly once. No call site has to remember
+      // anything, which matters when there are eleven hundred of them.
+      //
+      // The shells remember their tab across the remount (see TabMemory), so
+      // this is invisible rather than jarring.
+      home: KeyedSubtree(
+        key: ValueKey(AppTheme.dark),
+        child: SplashGate(ready: Boot.instance.start(), child: _Gate()),
+      ),
     );
   }
 }
@@ -187,6 +207,9 @@ class _GateState extends State<_Gate> {
     // Fired when a refresh fails for good. Handled here, once, rather than by
     // every screen checking after every call.
     _signedOut = ApiClient.instance.onSignedOut.listen((_) {
+      // The next person to sign in on this handset must not open on a tab
+      // somebody else chose.
+      TabMemory.reset();
       if (mounted) setState(() => _me = null);
     });
   }

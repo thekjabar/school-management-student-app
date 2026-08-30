@@ -43,7 +43,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
         bottom: false,
         child: Column(
           children: [
-            ScreenHeader(title: t('leave.title'), onBell: () {}),
+            ScreenHeader(title: t('leave.title')),
             ChildCard(
               name: widget.child.name,
               line: '${widget.child.className}  •  ${widget.child.code}',

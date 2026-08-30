@@ -40,7 +40,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
         bottom: false,
         child: Column(
           children: [
-            ScreenHeader(title: t('quick.assignments'), onBell: () {}),
+            ScreenHeader(title: t('quick.assignments')),
             Expanded(
               child: Loader<List<HomeworkItem>>(
                 tint: tint,

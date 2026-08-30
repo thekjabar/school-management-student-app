@@ -34,7 +34,7 @@ class StudentInfoScreen extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
-            ScreenHeader(title: t('info.title'), onBell: () {}),
+            ScreenHeader(title: t('info.title')),
             Expanded(
               child: Loader<ChildProfile>(
                 tint: tint,

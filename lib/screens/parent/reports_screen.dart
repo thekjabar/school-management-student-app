@@ -39,7 +39,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         bottom: false,
         child: Column(
           children: [
-            ScreenHeader(title: t('quick.reports'), onBell: () {}),
+            ScreenHeader(title: t('quick.reports')),
             Expanded(
               child: Loader<_Report>(
                 tint: tint,

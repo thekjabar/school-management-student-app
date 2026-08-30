@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../ui/screen_kit.dart';
 
 import 'package:flutter/material.dart';
 
@@ -36,59 +37,63 @@ class _ChildDetailState extends State<ChildDetail> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.canvas,
-      appBar: AppBar(
-        title: Text(widget.child.name.split(' ').first, overflow: TextOverflow.ellipsis),
-        backgroundColor: Role.parent.wash,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          Container(
-            color: Role.parent.wash,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: SizedBox(
-              height: 34,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _sections.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, i) {
-                  final on = i == _section;
-                  return GestureDetector(
-                    onTap: () => setState(() => _section = i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 140),
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: on ? Role.parent.tint : AppTheme.surface,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        _sections[i],
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: on ? Colors.white : AppTheme.textMuted,
-                        ),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            ScreenHeader(title: widget.child.name.split(' ').first),
+            Expanded(
+              child: Column(
+                children: [
+                  Container(
+                    color: Role.parent.wash,
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: SizedBox(
+                      height: 34,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _sections.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (context, i) {
+                          final on = i == _section;
+                          return GestureDetector(
+                            onTap: () => setState(() => _section = i),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 140),
+                              padding: const EdgeInsets.symmetric(horizontal: 14),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: on ? Role.parent.tint : AppTheme.surface,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                _sections[i],
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: on ? Colors.white : AppTheme.textMuted,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
-                  );
-                },
+                  ),
+                  Expanded(
+                    child: switch (_section) {
+                      0 => _BusSection(child: widget.child),
+                      1 => _TimetableSection(child: widget.child),
+                      2 => _HomeworkSection(child: widget.child),
+                      3 => _MarksSection(child: widget.child),
+                      _ => _AttendanceSection(child: widget.child),
+                    },
+                  ),
+                ],
               ),
             ),
-          ),
-          Expanded(
-            child: switch (_section) {
-              0 => _BusSection(child: widget.child),
-              1 => _TimetableSection(child: widget.child),
-              2 => _HomeworkSection(child: widget.child),
-              3 => _MarksSection(child: widget.child),
-              _ => _AttendanceSection(child: widget.child),
-            },
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
