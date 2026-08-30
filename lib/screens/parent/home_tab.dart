@@ -20,6 +20,7 @@ import 'memories_screen.dart';
 import 'reports_screen.dart';
 import 'student_info_screen.dart';
 import 'timetable_screen.dart';
+import 'track_screen.dart';
 
 /// The one screen a parent opens on the way out of the door.
 ///
@@ -74,6 +75,12 @@ class HomeTab extends StatelessWidget {
 
           QuickActions(
             actions: [
+              QuickAction(
+                icon: Icons.my_location_rounded,
+                label: t('quick.track'),
+                color: AppTheme.green,
+                onTap: () => _push(context, TrackScreen(child: child)),
+              ),
               QuickAction(
                 icon: Icons.directions_bus_outlined,
                 label: t('quick.bus'),

@@ -57,6 +57,13 @@ dependencies:
   # school on their child's behalf.
   local_auth: ^2.3.0
 
+  # A real map, with real tiles. Chosen over the Google Maps SDK because it
+  # needs no API key and no billing account: every school that deploys this
+  # would otherwise have to hold one, and OpenStreetMap's coverage of Erbil and
+  # Sulaymaniyah is good.
+  flutter_map: ^8.1.1
+  latlong2: ^0.9.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

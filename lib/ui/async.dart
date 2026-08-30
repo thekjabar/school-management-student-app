@@ -88,9 +88,31 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
 
   /// Re-runs the load. Called by pull-to-refresh, and by screens that have just
   /// changed something on the server and need the list to catch up.
-  Future<void> reload() async {
+  ///
+  /// [quiet] is for a screen on a timer. The ordinary reload replaces the
+  /// future, so the builder drops back to a spinner for the length of the
+  /// request — on a fifteen-second poll that means a live map that blinks out
+  /// four times a minute. A quiet reload fetches first and swaps the data in
+  /// only once it has arrived, and on failure keeps what is already on screen:
+  /// a bus position from thirty seconds ago, which the screen already labels as
+  /// stale, beats an error page while a parent is watching for their child.
+  Future<void> reload({bool quiet = false}) async {
     if (!mounted) return;
     _loadedIn = AppLocale.current.value;
+
+    if (quiet) {
+      try {
+        final value = await widget.load();
+        if (!mounted) return;
+        setState(() {
+          _future = Future<T>.value(value);
+        });
+      } catch (_) {
+        // Deliberately swallowed. See above.
+      }
+      return;
+    }
+
     // A BLOCK body, not an arrow. `() => _future = widget.load()` returns the
     // assignment's value — a Future — and Flutter rejects a setState callback
     // that returns one, as a guard against async work inside setState. It threw

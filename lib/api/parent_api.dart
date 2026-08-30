@@ -883,6 +883,16 @@ class LiveBus {
     required this.stale,
     required this.stopName,
     required this.etaMinutes,
+    required this.stopLat,
+    required this.stopLon,
+    required this.childState,
+    required this.boardedAt,
+    required this.alightedAt,
+    required this.headingDeg,
+    required this.speedKph,
+    required this.busLabel,
+    required this.plate,
+    required this.driverName,
   });
 
   final String studentId;
@@ -895,6 +905,36 @@ class LiveBus {
   final bool stale;
   final String? stopName;
   final int? etaMinutes;
+
+  /// Where the stop is, so the map can draw it. Null on a stop the office has
+  /// not placed yet, which is ordinary in a first term.
+  final double? stopLat;
+  final double? stopLon;
+
+  /// Where the CHILD is, which is not the same question as where the bus is.
+  ///
+  /// `WAITING`, `ON_BOARD`, `ARRIVED` or `NOT_RIDING`. Null when the server is
+  /// WITHHOLDING the answer rather than answering "no" — a guardian without
+  /// location permission is being told nothing, not being told she is off the
+  /// bus, and the screen must not render those the same way.
+  final String? childState;
+  final DateTime? boardedAt;
+  final DateTime? alightedAt;
+
+  /// Which way the bus is pointing, for the marker.
+  final double? headingDeg;
+  final double? speedKph;
+
+  final String? busLabel;
+  final String? plate;
+  final String? driverName;
+
+  /// She is aboard right now. The only state in which the bus marker is also
+  /// the child marker.
+  bool get onBoard => childState == 'ON_BOARD';
+
+  /// The bus has a position worth drawing.
+  bool get hasFix => visible && lat != null && lon != null;
 
   /// The reasons, in words a parent should read rather than an enum.
   String get reasonText {
@@ -922,6 +962,8 @@ class LiveBus {
     final student = (j['student'] ?? {}) as Map<String, dynamic>;
     final position = j['position'] as Map<String, dynamic>?;
     final stop = j['stop'] as Map<String, dynamic>?;
+    final child = j['child'] as Map<String, dynamic>?;
+    final trip = j['trip'] as Map<String, dynamic>?;
     return LiveBus(
       studentId: (student['id'] ?? '') as String,
       studentName: (student['name'] ?? '') as String,
@@ -933,6 +975,16 @@ class LiveBus {
       stale: (j['stale'] ?? true) as bool,
       stopName: stop?['name'] as String?,
       etaMinutes: (j['etaMinutes'] as num?)?.toInt(),
+      stopLat: (stop?['lat'] as num?)?.toDouble(),
+      stopLon: (stop?['lon'] as num?)?.toDouble(),
+      childState: child?['state'] as String?,
+      boardedAt: DateTime.tryParse((child?['boardedAt'] ?? '') as String)?.toLocal(),
+      alightedAt: DateTime.tryParse((child?['alightedAt'] ?? '') as String)?.toLocal(),
+      headingDeg: (position?['headingDeg'] as num?)?.toDouble(),
+      speedKph: (position?['speedKph'] as num?)?.toDouble(),
+      busLabel: trip?['busLabel'] as String?,
+      plate: trip?['plate'] as String?,
+      driverName: trip?['driverName'] as String?,
     );
   }
 }
