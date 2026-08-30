@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+
+// Panel and SectionHead at the foot of this file are now spellings of the
+// kit's Card16 and SectionRow. The kit reads AppTheme's statics and imports no
+// widget from here, so leaning on it this way does not make a cycle.
+import '../ui/home_kit.dart';
+import '../ui/kit.dart';
 import 'package:flutter/services.dart';
 
 /// Who is holding the phone.
@@ -96,6 +102,14 @@ class AppTheme {
   static Color get blueSoft => _pick(const Color(0xFFE9F0FE), const Color(0xFF15233A));
   static Color get rose => _pick(const Color(0xFFF43F5E), const Color(0xFFFF6B84));
   static Color get roseSoft => _pick(const Color(0xFFFDECF0), const Color(0xFF251D2E));
+
+  /// The ground for something that carries no meaning at all — a placeholder
+  /// while an image loads, a chip for a fact with no status attached.
+  ///
+  /// Several screens hardcoded #F1F3F6 for this. It is a light grey, so on the
+  /// dark theme those became near-white blocks on navy, and the one element on
+  /// the screen that meant nothing in particular was the loudest thing on it.
+  static Color get neutralSoft => _pick(const Color(0xFFF1F3F6), const Color(0xFF1B2434));
 
   /// The deep green the teacher design uses for the one thing it wants read
   /// first — the lesson count and the button under it. Not [Role.teacher.tint]:
@@ -336,6 +350,19 @@ class AppTheme {
 }
 
 /// The white card everything sits in.
+/// The card, as it was named before the redesign.
+///
+/// Now nothing more than a spelling of [Card16], and that is the point. Twenty
+/// call sites use it — every one of them in the teacher or driver app, none in
+/// the parent app, which is exactly why those two looked a generation behind.
+///
+/// Its real fault was not that it looked slightly different. It lifted on a
+/// shadow in BOTH themes, and nothing casts a shadow on navy: in dark mode its
+/// cards had no visible edge at all, so a page of them read as one flat
+/// surface. Card16 draws a border there instead.
+///
+/// New code should say Card16. This exists so the screens written before that
+/// name got fixed rather than left behind.
 class Panel extends StatelessWidget {
   const Panel({
     super.key,
@@ -351,29 +378,13 @@ class Panel extends StatelessWidget {
   final Color? color;
 
   @override
-  Widget build(BuildContext context) {
-    final content = Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: color ?? AppTheme.surface,
-        borderRadius: BorderRadius.circular(AppTheme.radius),
-        boxShadow: AppTheme.lift,
-      ),
-      child: child,
-    );
-    if (onTap == null) return content;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppTheme.radius),
-        child: content,
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      Card16(padding: padding, onTap: onTap, color: color, child: child);
 }
 
-/// A section title with an optional "View All" on the right.
+/// A section title with an optional action on the right, as it was named
+/// before the redesign. Now a spelling of [SectionRow], so the six screens
+/// still calling it match the twenty-five that do not.
 class SectionHead extends StatelessWidget {
   const SectionHead(this.title, {super.key, this.action, this.tint, this.onAction});
 
@@ -383,40 +394,8 @@ class SectionHead extends StatelessWidget {
   final VoidCallback? onAction;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 22, 2, 11),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 15.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.3,
-                color: AppTheme.text,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          if (action != null)
-            GestureDetector(
-              onTap: onAction,
-              child: Text(
-                action!,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: tint ?? AppTheme.violet,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      SectionRow(title: title, actionLabel: action, onAction: onAction);
 }
 
 /// A small status word: Pending, High Priority, Excellent.

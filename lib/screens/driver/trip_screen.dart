@@ -233,7 +233,7 @@ class _RunControls extends StatelessWidget {
               IconChip(
                 icon: Icons.directions_bus_filled_rounded,
                 color: AppTheme.textMuted,
-                background: Color(0xFFF1F3F6),
+                background: AppTheme.neutralSoft,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -526,7 +526,7 @@ class _RiderRow extends StatelessWidget {
                   ? AppTheme.greenSoft
                   : onBus
                       ? AppTheme.blueSoft
-                      : const Color(0xFFF1F3F6),
+                      : AppTheme.neutralSoft,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(

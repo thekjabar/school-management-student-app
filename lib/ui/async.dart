@@ -190,7 +190,7 @@ class _Waiting extends StatelessWidget {
           height: i == 0 ? 96 : 72,
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFFEDEFF3),
+            color: AppTheme.neutralSoft,
             borderRadius: BorderRadius.circular(AppTheme.radius),
           ),
         ),

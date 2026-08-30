@@ -140,7 +140,7 @@ class _Card extends StatelessWidget {
                 Tag(
                   dueWord(days),
                   color: late ? AppTheme.rose : AppTheme.textMuted,
-                  background: late ? AppTheme.roseSoft : const Color(0xFFF1F3F6),
+                  background: late ? AppTheme.roseSoft : AppTheme.neutralSoft,
                 ),
               ],
             ),

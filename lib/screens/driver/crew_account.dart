@@ -124,7 +124,7 @@ class _CredentialRow extends StatelessWidget {
     final days = expires?.difference(DateTime.now()).inDays;
 
     final (Color colour, Color wash) = days == null
-        ? (AppTheme.textMuted, const Color(0xFFF1F3F6))
+        ? (AppTheme.textMuted, AppTheme.neutralSoft)
         : days < 0
             ? (AppTheme.rose, AppTheme.roseSoft)
             : days < 30

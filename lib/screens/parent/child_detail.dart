@@ -454,7 +454,7 @@ class _DropoffCardState extends State<_DropoffCard> {
       return Container(
         height: 92,
         decoration: BoxDecoration(
-          color: const Color(0xFFEDEFF3),
+          color: AppTheme.neutralSoft,
           borderRadius: BorderRadius.circular(16),
         ),
       );
