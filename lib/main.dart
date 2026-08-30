@@ -204,7 +204,11 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
       // check happens underneath instead of after — and `ready` holds the
       // curtain until the work started at boot has finished, so the clip is
       // never followed by a second loading screen.
-      home: SplashGate(ready: Boot.instance.start(), child: _Gate()),
+      home: SplashGate(
+        tint: _role.tint,
+        ready: Boot.instance.start(),
+        child: _Gate(),
+      ),
     );
   }
 }

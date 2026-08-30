@@ -130,7 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: AppTheme.canvas,
       body: ColoredBox(
-        color: AppTheme.dark ? AppTheme.canvas : role.wash,
+        color: role.wash,
         child: Stack(
           children: [
             // The hills along the foot of the page, under everything.
@@ -157,9 +157,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Align(
-                          alignment: AlignmentDirectional.centerEnd,
-                          child: LanguagePicker(tint: role.tint),
+                        // Language on the left, theme on the right, and
+                        // NOT AlignmentDirectional — that mirrors with the
+                        // text direction, so choosing Kurdish threw the chip
+                        // you had just tapped to the far side of the screen.
+                        Row(
+                          textDirection: TextDirection.ltr,
+                          children: [
+                            LanguagePicker(tint: role.tint),
+                            const Spacer(),
+                            ThemeToggle(tint: role.tint),
+                          ],
                         ),
                         const SizedBox(height: 10),
                         Image.asset(
@@ -655,6 +663,9 @@ class LanguagePicker extends StatelessWidget {
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
+          // Fixed order. Inside an RTL page the three chips reversed, so the
+          // one under your finger became a different language on the way up.
+          textDirection: TextDirection.ltr,
           children: [
             for (final lang in Lang.values)
               GestureDetector(
@@ -679,6 +690,60 @@ class LanguagePicker extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Light or dark, before anybody has signed in.
+///
+/// The setting used to live behind the profile screen, which needs an account —
+/// so the one moment a person is most likely to notice the app is the wrong
+/// brightness for the room, they could do nothing about it.
+///
+/// ONE button, not two. A sun while the app is light and a moon while it is
+/// dark, each showing what tapping will give you. A pair of buttons asks
+/// somebody to answer a question they were not asking.
+///
+/// Tapping resolves "follow the system" into a real choice first: if the phone
+/// is dark and the app is following it, the first tap gives light rather than
+/// appearing to do nothing.
+class ThemeToggle extends StatelessWidget {
+  const ThemeToggle({super.key, this.tint});
+
+  final Color? tint;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = tint ?? AppTheme.violet;
+
+    return ValueListenableBuilder<AppThemeMode>(
+      valueListenable: AppThemeSetting.current,
+      builder: (context, _, _) {
+        final dark = AppTheme.dark;
+
+        return GestureDetector(
+          onTap: () => AppThemeSetting.set(dark ? AppThemeMode.light : AppThemeMode.dark),
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              shape: BoxShape.circle,
+              boxShadow: AppTheme.dark
+                  ? null
+                  : const [
+                      BoxShadow(color: Color(0x0F101828), blurRadius: 10, offset: Offset(0, 3)),
+                    ],
+            ),
+            child: Icon(
+              dark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+              size: 20,
+              color: accent,
+            ),
+          ),
+        );
+      },
     );
   }
 }

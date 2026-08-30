@@ -1082,7 +1082,7 @@ class ParentApi {
 
   /// The child's own record, as the school holds it.
   Future<ChildProfile> profile(String studentId) async {
-    final json = await _api.get('/parent/children//profile') as Map<String, dynamic>;
+    final json = await _api.get('/parent/children/$studentId/profile') as Map<String, dynamic>;
     return ChildProfile.fromJson(json);
   }
 

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The teacher app's own pale green, so the window the OS paints while the
+         process starts is already this app's colour rather than another's. -->
+    <color name="launch_background">#E7F1E6</color>
+</resources>

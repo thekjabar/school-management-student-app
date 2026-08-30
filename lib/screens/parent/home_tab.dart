@@ -14,7 +14,6 @@ import 'bus_screen.dart';
 import 'driver_feedback_screen.dart';
 import 'attendance_screen.dart';
 import 'attitude_screen.dart';
-import 'child_detail.dart';
 import 'homework_detail.dart';
 import 'marks_screen.dart';
 import 'memories_screen.dart';
@@ -517,7 +516,7 @@ class _ChildCard extends StatelessWidget {
               const SizedBox(width: 6),
               _ProfileButton(
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => ChildDetail(child: child)),
+                  MaterialPageRoute(builder: (_) => StudentInfoScreen(child: child)),
                 ),
               ),
             ],

@@ -11,9 +11,21 @@ import 'package:video_player/video_player.dart';
 /// going to spend anyway, rather than adding its length to how long the app
 /// takes to open.
 class SplashGate extends StatefulWidget {
-  const SplashGate({super.key, required this.child, this.ready});
+  const SplashGate({
+    super.key,
+    required this.child,
+    required this.tint,
+    this.ready,
+  });
 
   final Widget child;
+
+  /// The colour behind the clip, and under it before the first frame decodes.
+  ///
+  /// Passed in rather than read from a global. This used to be the parent tint
+  /// written as a hex literal, so opening the DRIVER app began with a flash of
+  /// the parent app's violet before the driver's own clip appeared.
+  final Color tint;
 
   /// Completes when the app underneath has what it needs to draw a real
   /// screen. The curtain waits for BOTH this and the end of the clip, so a
@@ -138,7 +150,7 @@ class _SplashGateState extends State<SplashGate> {
             opacity: _done ? 0 : 1,
             duration: const Duration(milliseconds: 420),
             curve: Curves.easeOut,
-            child: _Curtain(video: _video),
+            child: _Curtain(video: _video, tint: widget.tint),
           ),
         ),
       ],
@@ -147,9 +159,12 @@ class _SplashGateState extends State<SplashGate> {
 }
 
 class _Curtain extends StatelessWidget {
-  const _Curtain({required this.video});
+  const _Curtain({required this.video, required this.tint});
 
   final VideoPlayerController? video;
+
+  /// The role's own colour, behind and around the clip.
+  final Color tint;
 
   @override
   Widget build(BuildContext context) {
@@ -158,7 +173,7 @@ class _Curtain extends StatelessWidget {
     // Before the first frame decodes there is nothing to show — but it still
     // has to cover the app, or the screen underneath flashes through.
     if (!ready) {
-      return const SizedBox.expand(child: ColoredBox(color: Color(0xFF6D3FF7)));
+      return SizedBox.expand(child: ColoredBox(color: tint));
     }
 
     final frame = SizedBox(

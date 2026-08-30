@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The driver app's own pale orange, so the window the OS paints while the
+         process starts is already this app's colour rather than another's. -->
+    <color name="launch_background">#FFEFE2</color>
+</resources>

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'student_info_screen.dart';
 
 import '../../api/parent_api.dart';
 import '../../theme/app_theme.dart';
@@ -6,7 +7,6 @@ import '../../ui/async.dart';
 import '../../i18n/strings.dart';
 import '../../ui/format.dart';
 import '../../ui/kit.dart';
-import 'child_detail.dart';
 import 'leave_screen.dart';
 
 /// Every child on this account, with the one number that matters next to each.
@@ -103,7 +103,7 @@ class _ChildCard extends StatelessWidget {
 
     return Card16(
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => ChildDetail(child: child)),
+        MaterialPageRoute(builder: (_) => StudentInfoScreen(child: child)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,7 +185,7 @@ class _ChildCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => ChildDetail(child: child)),
+                    MaterialPageRoute(builder: (_) => StudentInfoScreen(child: child)),
                   ),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, 42),
