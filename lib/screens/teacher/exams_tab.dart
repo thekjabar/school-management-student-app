@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../ui/screen_kit.dart';
 
 import '../../api/client.dart';
 import '../../api/session.dart';
@@ -222,11 +223,6 @@ class _MarksScreenState extends State<MarksScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.canvas,
-      appBar: AppBar(
-        title: Text(widget.exam.title, overflow: TextOverflow.ellipsis),
-        backgroundColor: Role.teacher.wash,
-        surfaceTintColor: Colors.transparent,
-      ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -276,61 +272,71 @@ class _MarksScreenState extends State<MarksScreen> {
           ),
         ),
       ),
-      body: Loader<({bool published, num maxScore, List<MarkRow> rows})>(
-        key: _loaderKey,
-        tint: Role.teacher.tint,
-        load: () async {
-          final data = await TeacherApi.instance.marks(widget.exam.id);
-          _rows = data.rows;
-          _published = data.published;
-          return data;
-        },
-        isEmpty: (d) => d.rows.isEmpty,
-        empty: t('teacher.noRoster'),
-        builder: (context, data) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
           children: [
-            const SizedBox(height: 10),
-            Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: data.published ? AppTheme.greenSoft : AppTheme.amberSoft,
-                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    data.published ? Icons.visibility_rounded : Icons.visibility_off_rounded,
-                    size: 17,
-                    color: data.published ? AppTheme.green : AppTheme.amber,
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Text(
-                      data.published
-                          ? t('teacher.familiesSeeMarks')
-                          : _mayRelease
-                              ? t('teacher.onlyYouSee')
-                              : t('teacher.officeReleases'),
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.45,
-                        color: data.published ? AppTheme.green : AppTheme.text,
+            ScreenHeader(title: widget.exam.title),
+            Expanded(
+              child: Loader<({bool published, num maxScore, List<MarkRow> rows})>(
+                key: _loaderKey,
+                tint: Role.teacher.tint,
+                load: () async {
+                  final data = await TeacherApi.instance.marks(widget.exam.id);
+                  _rows = data.rows;
+                  _published = data.published;
+                  return data;
+                },
+                isEmpty: (d) => d.rows.isEmpty,
+                empty: t('teacher.noRoster'),
+                builder: (context, data) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 10),
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: data.published ? AppTheme.greenSoft : AppTheme.amberSoft,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            data.published ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                            size: 17,
+                            color: data.published ? AppTheme.green : AppTheme.amber,
+                          ),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: Text(
+                              data.published
+                                  ? t('teacher.familiesSeeMarks')
+                                  : _mayRelease
+                                      ? t('teacher.onlyYouSee')
+                                      : t('teacher.officeReleases'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.45,
+                                color: data.published ? AppTheme.green : AppTheme.text,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                    ...data.rows.map(
+                      (r) => _MarkEntry(
+                        row: r,
+                        maxScore: data.maxScore,
+                        onChanged: () => setState(() => _dirty = true),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
             ),
-            ...data.rows.map(
-              (r) => _MarkEntry(
-                row: r,
-                maxScore: data.maxScore,
-                onChanged: () => setState(() => _dirty = true),
-              ),
-            ),
-            const SizedBox(height: 16),
           ],
         ),
       ),

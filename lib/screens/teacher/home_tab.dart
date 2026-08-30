@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../api/boot.dart';
 
 import '../../api/teacher_api.dart';
 import '../../i18n/strings.dart';
@@ -32,20 +33,13 @@ class TeacherHome extends StatelessWidget {
       tint: Role.teacher.tint,
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
       load: () async {
-        final r = await Future.wait([
-          TeacherApi.instance.me(),
-          TeacherApi.instance.timetable(),
-          TeacherApi.instance.classes(),
-          TeacherApi.instance.homework(),
-          TeacherApi.instance.exams(),
-        ]);
-        return _Today(
-          profile: r[0] as TeacherProfile,
-          slots: r[1] as List<TeacherSlot>,
-          classes: r[2] as List<TeachingSlot>,
-          homework: r[3] as List<TeacherHomework>,
-          exams: r[4] as List<TeacherExam>,
-        );
+        // Already fetched, while the splash clip was playing. Taken once: a
+        // pull-to-refresh after this gets live data rather than the snapshot
+        // the app opened with.
+        final early = Boot.instance.takeTeacherHome();
+        if (early != null) return _Today.from(early);
+
+        return _Today.from(await TeacherPayload.fetch());
       },
       builder: (context, day) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -238,6 +232,16 @@ class _Today {
     required this.homework,
     required this.exams,
   });
+
+  /// The same five answers, however they arrived — fetched here, or
+  /// prefetched during the splash. The screen must not be able to tell.
+  factory _Today.from(TeacherPayload p) => _Today(
+        profile: p.profile,
+        slots: p.slots,
+        classes: p.classes,
+        homework: p.homework,
+        exams: p.exams,
+      );
 
   final TeacherProfile profile;
   final List<TeacherSlot> slots;

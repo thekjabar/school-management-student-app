@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../ui/screen_kit.dart';
 
 import '../../api/client.dart';
 import '../../api/teacher_api.dart';
@@ -26,13 +27,17 @@ class ClassesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.canvas,
-      appBar: AppBar(
-        title: Text(t('teacher.myClasses')),
-        backgroundColor: Role.teacher.wash,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            ScreenHeader(title: t('teacher.myClasses')),
+            Expanded(
+              child: const ClassesTab(),
+            ),
+          ],
+        ),
       ),
-      body: const ClassesTab(),
     );
   }
 }
@@ -193,19 +198,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.canvas,
-      appBar: AppBar(
-        title: Text(widget.slot.className),
-        backgroundColor: Role.teacher.wash,
-        surfaceTintColor: Colors.transparent,
-        actions: [
-          TextButton.icon(
-            onPressed: _pickDate,
-            icon: const Icon(Icons.calendar_today_rounded, size: 16),
-            label: Text(shortDate(_date)),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.text),
-          ),
-        ],
-      ),
       bottomNavigationBar: _dirty
           ? SafeArea(
               child: Padding(
@@ -235,75 +227,93 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             )
           : null,
-      body: Loader<({bool alreadyTaken, List<RegisterMark> marks})>(
-        key: _loaderKey,
-        tint: Role.teacher.tint,
-        load: () async {
-          final data = await TeacherApi.instance.register(widget.slot.classId, date: _dateString);
-          _marks = data.marks;
-          return data;
-        },
-        isEmpty: (d) => d.marks.isEmpty,
-        empty: t('teacher.noRoster'),
-        builder: (context, data) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
           children: [
-            const SizedBox(height: 10),
-            if (data.alreadyTaken)
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppTheme.greenSoft,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.check_circle_rounded, size: 17, color: AppTheme.green),
-                    SizedBox(width: 9),
-                    Expanded(
-                      child: Text(
-                        t('teacher.registerTaken'),
-                        style: TextStyle(fontSize: 12, height: 1.45, color: AppTheme.green),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppTheme.amberSoft,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_rounded, size: 17, color: AppTheme.amber),
-                    SizedBox(width: 9),
-                    Expanded(
-                      child: Text(
-                        // Said plainly, because the screen opens with everyone
-                        // showing Present and that is a default, not a record.
-                        t('teacher.nothingMarked'),
-                        style: TextStyle(fontSize: 12, height: 1.45, color: AppTheme.text),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ...data.marks.map(
-              (m) => _MarkRow(
-                mark: m,
-                onChanged: (status) => setState(() {
-                  m.status = status;
-                  if (status != 'LATE') m.minutesLate = null;
-                  _dirty = true;
-                }),
+            ScreenHeader(
+              title: widget.slot.className,
+              trailing: TextButton.icon(
+                onPressed: _pickDate,
+                icon: const Icon(Icons.calendar_today_rounded, size: 16),
+                label: Text(shortDate(_date)),
+                style: TextButton.styleFrom(foregroundColor: AppTheme.text),
               ),
             ),
-            const SizedBox(height: 12),
+            Expanded(
+              child: Loader<({bool alreadyTaken, List<RegisterMark> marks})>(
+                key: _loaderKey,
+                tint: Role.teacher.tint,
+                load: () async {
+                  final data = await TeacherApi.instance.register(widget.slot.classId, date: _dateString);
+                  _marks = data.marks;
+                  return data;
+                },
+                isEmpty: (d) => d.marks.isEmpty,
+                empty: t('teacher.noRoster'),
+                builder: (context, data) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 10),
+                    if (data.alreadyTaken)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.greenSoft,
+                          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.check_circle_rounded, size: 17, color: AppTheme.green),
+                            SizedBox(width: 9),
+                            Expanded(
+                              child: Text(
+                                t('teacher.registerTaken'),
+                                style: TextStyle(fontSize: 12, height: 1.45, color: AppTheme.green),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.amberSoft,
+                          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_rounded, size: 17, color: AppTheme.amber),
+                            SizedBox(width: 9),
+                            Expanded(
+                              child: Text(
+                                // Said plainly, because the screen opens with everyone
+                                // showing Present and that is a default, not a record.
+                                t('teacher.nothingMarked'),
+                                style: TextStyle(fontSize: 12, height: 1.45, color: AppTheme.text),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ...data.marks.map(
+                      (m) => _MarkRow(
+                        mark: m,
+                        onChanged: (status) => setState(() {
+                          m.status = status;
+                          if (status != 'LATE') m.minutesLate = null;
+                          _dirty = true;
+                        }),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -398,63 +408,68 @@ class ClassRosterScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.canvas,
-      appBar: AppBar(
-        title: Text('${slot.className} — children'),
-        backgroundColor: Role.teacher.wash,
-        surfaceTintColor: Colors.transparent,
-      ),
-      body: Loader<List<ClassStudent>>(
-        tint: Role.teacher.tint,
-        load: () => TeacherApi.instance.students(slot.classId),
-        isEmpty: (rows) => rows.isEmpty,
-        empty: t('teacher.noRoster'),
-        builder: (context, students) => Column(
+      body: SafeArea(
+        bottom: false,
+        child: Column(
           children: [
-            const SizedBox(height: 10),
-            ...students.map(
-              (s) => Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Panel(
-                  padding: const EdgeInsets.all(13),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: Role.teacher.wash,
-                          borderRadius: BorderRadius.circular(11),
-                        ),
-                        child: Text(
-                          s.rollNumber ?? '·',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Role.teacher.tint,
+            ScreenHeader(title: '${slot.className} — children'),
+            Expanded(
+              child: Loader<List<ClassStudent>>(
+                tint: Role.teacher.tint,
+                load: () => TeacherApi.instance.students(slot.classId),
+                isEmpty: (rows) => rows.isEmpty,
+                empty: t('teacher.noRoster'),
+                builder: (context, students) => Column(
+                  children: [
+                    const SizedBox(height: 10),
+                    ...students.map(
+                      (s) => Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: Panel(
+                          padding: const EdgeInsets.all(13),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 32,
+                                height: 32,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: Role.teacher.wash,
+                                  borderRadius: BorderRadius.circular(11),
+                                ),
+                                child: Text(
+                                  s.rollNumber ?? '·',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Role.teacher.tint,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 11),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      s.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                                    ),
+                                    Text(
+                                      s.code,
+                                      style: TextStyle(fontSize: 11, color: AppTheme.textFaint),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                      const SizedBox(width: 11),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              s.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
-                            ),
-                            Text(
-                              s.code,
-                              style: TextStyle(fontSize: 11, color: AppTheme.textFaint),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),

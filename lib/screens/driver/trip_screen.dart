@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../ui/screen_kit.dart';
 
 import '../../api/client.dart';
 import '../../api/crew_api.dart';
@@ -59,65 +60,70 @@ class _TripScreenState extends State<TripScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.canvas,
-      appBar: AppBar(
-        title: Text(t('driver.theRun')),
-        backgroundColor: Role.driver.wash,
-        surfaceTintColor: Colors.transparent,
-      ),
-      body: Loader<_TripData>(
-        key: _loaderKey,
-        tint: Role.driver.tint,
-        load: _load,
-        builder: (context, data) {
-          final counts = data.plan.counts;
-          final trip = data.trip;
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            ScreenHeader(title: t('driver.theRun')),
+            Expanded(
+              child: Loader<_TripData>(
+                key: _loaderKey,
+                tint: Role.driver.tint,
+                load: _load,
+                builder: (context, data) {
+                  final counts = data.plan.counts;
+                  final trip = data.trip;
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 12),
-              _HeadcountCard(counts: counts),
-              if (trip != null) ...[
-                const SizedBox(height: 12),
-                _RunControls(
-                  trip: trip,
-                  busy: _busy,
-                  onStart: () => _act(t('driver.shiftStarted'), () => CrewApi.instance.startShift(trip.id)),
-                  onDepart: () => _act(t('driver.departed'), () => CrewApi.instance.depart(trip.id)),
-                  onEnd: () => _act(t('driver.runEnded'), () => CrewApi.instance.endTrip(trip.id)),
-                ),
-              ],
-              SectionHead(t('driver.stops')),
-              _OrderToggle(
-                nearestFirst: _nearestFirst,
-                note: data.plan.orderingNote,
-                onChanged: (v) {
-                  setState(() => _nearestFirst = v);
-                  _loaderKey.currentState?.reload();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 12),
+                      _HeadcountCard(counts: counts),
+                      if (trip != null) ...[
+                        const SizedBox(height: 12),
+                        _RunControls(
+                          trip: trip,
+                          busy: _busy,
+                          onStart: () => _act(t('driver.shiftStarted'), () => CrewApi.instance.startShift(trip.id)),
+                          onDepart: () => _act(t('driver.departed'), () => CrewApi.instance.depart(trip.id)),
+                          onEnd: () => _act(t('driver.runEnded'), () => CrewApi.instance.endTrip(trip.id)),
+                        ),
+                      ],
+                      SectionHead(t('driver.stops')),
+                      _OrderToggle(
+                        nearestFirst: _nearestFirst,
+                        note: data.plan.orderingNote,
+                        onChanged: (v) {
+                          setState(() => _nearestFirst = v);
+                          _loaderKey.currentState?.reload();
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      ...data.plan.stops.map(
+                        (s) => _StopCard(
+                          stop: s,
+                          tripId: widget.tripId,
+                          leg: trip?.leg ?? 'OUT',
+                          onChanged: () => _loaderKey.currentState?.reload(),
+                        ),
+                      ),
+                      SectionHead(t('driver.beforeYouLeave')),
+                      _SweepCard(
+                        sweep: data.sweep,
+                        busy: _busy != null,
+                        onConfirm: () => _act(
+                          t('driver.sweepConfirmed'),
+                          () => CrewApi.instance.confirmSweep(widget.tripId),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  );
                 },
               ),
-              const SizedBox(height: 12),
-              ...data.plan.stops.map(
-                (s) => _StopCard(
-                  stop: s,
-                  tripId: widget.tripId,
-                  leg: trip?.leg ?? 'OUT',
-                  onChanged: () => _loaderKey.currentState?.reload(),
-                ),
-              ),
-              SectionHead(t('driver.beforeYouLeave')),
-              _SweepCard(
-                sweep: data.sweep,
-                busy: _busy != null,
-                onConfirm: () => _act(
-                  t('driver.sweepConfirmed'),
-                  () => CrewApi.instance.confirmSweep(widget.tripId),
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
-          );
-        },
+            ),
+          ],
+        ),
       ),
     );
   }

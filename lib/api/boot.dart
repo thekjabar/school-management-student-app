@@ -1,8 +1,10 @@
 import 'dart:async';
 
-import 'parent_api.dart';
+import '../main.dart' show kRole;
 import 'client.dart';
+import 'parent_api.dart';
 import 'session.dart';
+import 'teacher_api.dart';
 
 /// Everything the app needs before it can draw a real screen, fetched WHILE the
 /// splash clip is playing.
@@ -45,6 +47,16 @@ class Boot {
 
   HomePayload? _home;
 
+  /// The teacher's opening screen, if it arrived in time. Taken once, like
+  /// [takeHome].
+  TeacherPayload? takeTeacherHome() {
+    final t = _teacher;
+    _teacher = null;
+    return t;
+  }
+
+  TeacherPayload? _teacher;
+
   Future<BootState> _run() async {
     await ApiClient.instance.restore();
     if (!ApiClient.instance.hasSession) {
@@ -62,17 +74,31 @@ class Boot {
     }
     if (me == null) return const BootState(me: null);
 
-    // The children, and then the first child's home screen. Only worth doing
-    // for the parent build — a teacher's and a driver's first screens are
-    // different work, and guessing wrong just wastes a school connection.
+    // Whichever opening screen THIS BUILD will actually draw. Decided by the
+    // flavour rather than by the person's role: somebody can hold two, and
+    // fetching the wrong one spends a school connection at the one minute of
+    // the day when the whole city opens the app.
     List<Child> children = const [];
     try {
-      children = await ParentApi.instance.children();
-      if (children.isNotEmpty) {
-        _home = await HomePayload.fetch(children.first.studentId);
+      switch (kRole) {
+        case 'teacher':
+          _teacher = await TeacherPayload.fetch();
+
+        case 'driver':
+          // Nothing to prefetch that is worth the risk. The driver's home
+          // resolves today's duty trip and then asks for its plan — two
+          // dependent calls, and the second is large. Better spent when the
+          // screen is on top and can show its own progress.
+          break;
+
+        default:
+          children = await ParentApi.instance.children();
+          if (children.isNotEmpty) {
+            _home = await HomePayload.fetch(children.first.studentId);
+          }
       }
     } catch (_) {
-      // Left null. The home screen fetches for itself.
+      // Left null. The screen fetches for itself, exactly as it did before.
     }
 
     return BootState(me: me, children: children);
@@ -82,6 +108,7 @@ class Boot {
   void resetForTest() {
     _future = null;
     _home = null;
+    _teacher = null;
   }
 }
 
@@ -136,6 +163,44 @@ class HomePayload {
       homework: r[3] as List<HomeworkItem>,
       attitude: r[4] as AttitudeSummary,
       announcements: r[5] as List<Announcement>,
+    );
+  }
+}
+
+/// The five calls the teacher home screen opens with.
+///
+/// Same arrangement as [HomePayload]: the screen owns the shape, this owns only
+/// the timing.
+class TeacherPayload {
+  TeacherPayload({
+    required this.profile,
+    required this.slots,
+    required this.classes,
+    required this.homework,
+    required this.exams,
+  });
+
+  final TeacherProfile profile;
+  final List<TeacherSlot> slots;
+  final List<TeachingSlot> classes;
+  final List<TeacherHomework> homework;
+  final List<TeacherExam> exams;
+
+  static Future<TeacherPayload> fetch() async {
+    final api = TeacherApi.instance;
+    final r = await Future.wait([
+      api.me(),
+      api.timetable(),
+      api.classes(),
+      api.homework(),
+      api.exams(),
+    ]);
+    return TeacherPayload(
+      profile: r[0] as TeacherProfile,
+      slots: r[1] as List<TeacherSlot>,
+      classes: r[2] as List<TeachingSlot>,
+      homework: r[3] as List<TeacherHomework>,
+      exams: r[4] as List<TeacherExam>,
     );
   }
 }
