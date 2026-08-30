@@ -10,11 +10,13 @@ import '../../ui/kit.dart';
 import '../../ui/nav_glyphs.dart';
 import 'assignments_screen.dart';
 import 'bus_screen.dart';
+import 'driver_feedback_screen.dart';
 import 'attendance_screen.dart';
 import 'attitude_screen.dart';
 import 'child_detail.dart';
 import 'homework_detail.dart';
 import 'marks_screen.dart';
+import 'memories_screen.dart';
 import 'reports_screen.dart';
 import 'student_info_screen.dart';
 import 'timetable_screen.dart';
@@ -120,6 +122,18 @@ class HomeTab extends StatelessWidget {
                 label: t('quick.info'),
                 color: AppTheme.blue,
                 onTap: () => _push(context, StudentInfoScreen(child: child)),
+              ),
+              QuickAction(
+                icon: Icons.photo_library_outlined,
+                label: t('quick.memories'),
+                color: AppTheme.rose,
+                onTap: () => _push(context, MemoriesScreen(child: child)),
+              ),
+              QuickAction(
+                icon: Icons.rate_review_outlined,
+                label: t('quick.driverFeedback'),
+                color: AppTheme.green,
+                onTap: () => _push(context, DriverFeedbackScreen(child: child)),
               ),
             ],
           ),

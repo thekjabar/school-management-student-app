@@ -230,6 +230,159 @@ class SupportSummary {
       );
 }
 
+/// One of the crew who actually carried this child recently.
+///
+/// Offered in the feedback form so a parent can pick a name instead of
+/// describing a man. Drawn from the journeys the child was manifested on, not
+/// from the roster — the roster says who was supposed to drive.
+class RecentCrew {
+  RecentCrew({
+    required this.personId,
+    required this.name,
+    required this.role,
+    required this.lastRodeOn,
+  });
+
+  final String personId;
+  final String name;
+
+  /// `DRIVER` or `ATTENDANT`.
+  final String role;
+
+  /// The last day this person carried the child, which is what a parent
+  /// recognises them by.
+  final DateTime? lastRodeOn;
+
+  factory RecentCrew.fromJson(Map<String, dynamic> j) => RecentCrew(
+        personId: j['personId'] as String,
+        name: (j['name'] ?? '') as String,
+        role: (j['role'] ?? '') as String,
+        lastRodeOn: DateTime.tryParse((j['lastRodeOn'] ?? '') as String),
+      );
+}
+
+/// Something a family has said about the crew, and where it got to.
+class CrewFeedbackItem {
+  CrewFeedbackItem({
+    required this.id,
+    required this.sentiment,
+    required this.topics,
+    required this.comment,
+    required this.occurredOn,
+    required this.direction,
+    required this.status,
+    required this.submittedAt,
+    required this.crewName,
+  });
+
+  final String id;
+
+  /// `PRAISE` or `CONCERN`.
+  final String sentiment;
+  final List<String> topics;
+  final String? comment;
+  final DateTime? occurredOn;
+
+  /// `MORNING`, `AFTERNOON` or `UNSPECIFIED`.
+  final String direction;
+
+  /// `NEW`, `UNDER_REVIEW`, `RESOLVED`, `ESCALATED` or `CLOSED_NO_ACTION`.
+  final String status;
+  final DateTime? submittedAt;
+  final String? crewName;
+
+  bool get isPraise => sentiment == 'PRAISE';
+
+  /// The office has finished with it, whatever it decided. What it decided is
+  /// deliberately not sent to the family.
+  bool get isClosed =>
+      status == 'RESOLVED' || status == 'CLOSED_NO_ACTION' || status == 'ESCALATED';
+
+  factory CrewFeedbackItem.fromJson(Map<String, dynamic> j) => CrewFeedbackItem(
+        id: j['id'] as String,
+        sentiment: (j['sentiment'] ?? 'CONCERN') as String,
+        topics: ((j['topics'] as List?) ?? const []).map((e) => '$e').toList(),
+        comment: j['comment'] as String?,
+        occurredOn: DateTime.tryParse((j['occurredOn'] ?? '') as String),
+        direction: (j['direction'] ?? 'UNSPECIFIED') as String,
+        status: (j['status'] ?? 'NEW') as String,
+        submittedAt: DateTime.tryParse((j['submittedAt'] ?? '') as String)?.toLocal(),
+        crewName: j['crewName'] as String?,
+      );
+}
+
+/// A day at school the family can look at, and the pictures from it.
+class MemoryAlbum {
+  MemoryAlbum({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.happenedOn,
+    required this.campusName,
+    required this.items,
+  });
+
+  final String id;
+  final String title;
+  final String? description;
+  final DateTime? happenedOn;
+  final String? campusName;
+  final List<MemoryItem> items;
+
+  factory MemoryAlbum.fromJson(Map<String, dynamic> j) => MemoryAlbum(
+        id: j['id'] as String,
+        title: (j['title'] ?? '') as String,
+        description: j['description'] as String?,
+        happenedOn: DateTime.tryParse((j['happenedOn'] ?? '') as String),
+        campusName: j['campusName'] as String?,
+        items: ((j['items'] as List?) ?? const [])
+            .map((e) => MemoryItem.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+/// One photograph or clip the child is in.
+class MemoryItem {
+  MemoryItem({
+    required this.id,
+    required this.caption,
+    required this.isVideo,
+    required this.url,
+    required this.thumbnailUrl,
+    required this.width,
+    required this.height,
+    required this.durationMs,
+    required this.takenAt,
+  });
+
+  final String id;
+  final String? caption;
+  final bool isVideo;
+  final String? url;
+  final String? thumbnailUrl;
+  final int? width;
+  final int? height;
+  final int? durationMs;
+  final DateTime? takenAt;
+
+  /// For laying the grid out before the image has loaded. Falls back to square,
+  /// which is wrong for nothing badly.
+  double get aspect =>
+      (width != null && height != null && height! > 0) ? width! / height! : 1;
+
+  factory MemoryItem.fromJson(Map<String, dynamic> j) => MemoryItem(
+        id: j['id'] as String,
+        caption: j['caption'] as String?,
+        isVideo: (j['isVideo'] ?? false) as bool,
+        url: j['url'] as String?,
+        thumbnailUrl: (j['thumbnailUrl'] ?? j['url']) as String?,
+        width: (j['width'] as num?)?.toInt(),
+        height: (j['height'] as num?)?.toInt(),
+        durationMs: (j['durationMs'] as num?)?.toInt(),
+        takenAt: DateTime.tryParse((j['takenAt'] ?? '') as String)?.toLocal(),
+      );
+}
+
 /// A lesson in the week.
 class Lesson {
   Lesson({
@@ -818,6 +971,51 @@ class ParentApi {
   Future<List<Child>> children() async {
     final json = await _api.get('/parent/children');
     return (json as List).map((e) => Child.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Who has actually carried this child lately, so the feedback form can
+  /// offer a name rather than a text box.
+  Future<List<RecentCrew>> recentCrew(String studentId) async {
+    final json = await _api.get('/parent/children/$studentId/recent-crew');
+    return (json as List)
+        .map((e) => RecentCrew.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// What this parent has already said about the crew, and where it got to.
+  Future<List<CrewFeedbackItem>> crewFeedback(String studentId) async {
+    final json = await _api.get('/parent/children/$studentId/crew-feedback?pageSize=50');
+    return Paged.from<CrewFeedbackItem>(json, CrewFeedbackItem.fromJson).rows;
+  }
+
+  /// Send praise or a concern to the school office.
+  ///
+  /// [topics] may be empty and [comment] may be null against praise; the server
+  /// insists on a comment for a concern, since the office cannot look into
+  /// "he was rude" without knowing what happened.
+  Future<void> sendCrewFeedback({
+    required String studentId,
+    required String sentiment,
+    required DateTime occurredOn,
+    required List<String> topics,
+    String? comment,
+    String? direction,
+    String? crewPersonId,
+  }) async {
+    await _api.post('/parent/children/$studentId/crew-feedback', {
+      'sentiment': sentiment,
+      'occurredOn': _dateOnly(occurredOn),
+      'topics': topics,
+      if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+      'direction': ?direction,
+      'crewPersonId': ?crewPersonId,
+    });
+  }
+
+  /// Photographs of this child at school, newest day first.
+  Future<List<MemoryAlbum>> memories(String studentId) async {
+    final json = await _api.get('/parent/children/$studentId/memories?pageSize=24');
+    return Paged.from<MemoryAlbum>(json, MemoryAlbum.fromJson).rows;
   }
 
   /// The child's own record, as the school holds it.
