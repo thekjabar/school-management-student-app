@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../ui/tab_memory.dart';
 
 import '../../api/parent_api.dart';
 import '../../api/session.dart';
@@ -39,15 +38,7 @@ class _ParentAppState extends State<ParentApp> {
   /// gesture unwinds the tab rather than the app.
   final _navKeys = List.generate(4, (_) => GlobalKey<NavigatorState>());
 
-  // A getter and setter over TabMemory rather than a field, so that every
-
-  // `_tab = i` below keeps working untouched while the value itself survives
-
-  // the remount a theme change causes.
-
-  int get _tab => TabMemory.parent;
-
-  set _tab(int v) => TabMemory.parent = v;
+  int _tab = 0;
   List<Child>? _children;
   String? _selectedId;
   String? _error;

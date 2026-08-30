@@ -8,7 +8,6 @@ import 'api/client.dart';
 import 'api/push.dart';
 import 'i18n/delegates.dart';
 import 'ui/async.dart';
-import 'ui/tab_memory.dart';
 import 'i18n/strings.dart';
 import 'api/session.dart';
 import 'screens/driver/driver_app.dart';
@@ -68,6 +67,13 @@ class KspApp extends StatefulWidget {
 /// on most phones happens on a schedule nobody thinks about — an app that only
 /// read the setting at launch stays light all evening.
 class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
+  /// The brightness the tree was last actually PAINTED with.
+  ///
+  /// Compared against the newly resolved one to notice a change, because the
+  /// widgets that need telling cannot notice it themselves — see
+  /// [_repaintEverything].
+  bool? _painted;
+
   @override
   void initState() {
     super.initState();
@@ -103,6 +109,30 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
     );
   }
 
+  /// Mark every mounted element dirty, so all of them rebuild next frame.
+  ///
+  /// Unusual, and deliberate. The ordinary way to make a value reactive is an
+  /// InheritedWidget, and every reader calls `of(context)` so Flutter knows to
+  /// rebuild it. This app reads its palette through 1,112 static getters across
+  /// 49 files; converting them all is a large change with a lot of places to
+  /// get one wrong, and a single missed call site is an invisible bug that only
+  /// shows up in the theme somebody uses less.
+  ///
+  /// Marking the tree dirty gets the same result — every widget rebuilds and
+  /// re-reads the palette — while unmounting nothing, so all State survives.
+  /// It costs one traversal on a gesture that happens rarely.
+  void _repaintEverything() {
+    void mark(Element el) {
+      el.markNeedsBuild();
+      el.visitChildren(mark);
+    }
+
+    // From the root down, so pushed routes and hidden tabs are included: they
+    // are mounted elements too, and they are exactly the pages that used to
+    // come back in the wrong colours.
+    context.visitChildElements(mark);
+  }
+
   Widget _app(Lang lang, AppThemeMode mode) {
     // The palette reads one global flag, so it has to be set BEFORE the
     // ThemeData and the widgets below are built — not from inside a builder
@@ -115,6 +145,22 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
       AppThemeMode.system => platformDark,
     };
     SystemChrome.setSystemUIOverlayStyle(AppTheme.systemOverlay);
+
+    // The palette is static getters over the flag set just above, read during
+    // build — so a widget picks up a new colour only when it rebuilds, and
+    // Flutter SKIPS rebuilding a child whose widget is identical to the mounted
+    // one. Every `const Something()` is canonicalised to a single instance and
+    // is therefore always identical, so those widgets kept the old colours
+    // until something unrelated forced them to rebuild. That is why a page used
+    // to look right only after navigating away and coming back.
+    //
+    // Marked dirty in place, once, after this frame — rather than by replacing
+    // the tree, which unmounts the running app, replays the splash clip and
+    // drops the person somewhere they were not.
+    if (_painted != null && _painted != AppTheme.dark) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _repaintEverything());
+    }
+    _painted = AppTheme.dark;
 
     return MaterialApp(
       title: _title,
@@ -158,26 +204,7 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
       // check happens underneath instead of after — and `ready` holds the
       // curtain until the work started at boot has finished, so the clip is
       // never followed by a second loading screen.
-      // KEYED ON THE BRIGHTNESS, and that is what makes a theme change take
-      // effect at all. The palette is static getters over AppTheme.dark, read
-      // during build. Flutter skips rebuilding a child whose widget is
-      // IDENTICAL to the mounted one, and every `const Something()` is
-      // canonicalised to a single instance — so it is always identical, and
-      // those widgets kept their old colours until something else forced a
-      // rebuild. That is why a page only looked right after navigating away
-      // and coming back.
-      //
-      // A changed key is a different widget rather than the same one with new
-      // arguments, so the tree is torn down and rebuilt and every widget
-      // re-reads the palette exactly once. No call site has to remember
-      // anything, which matters when there are eleven hundred of them.
-      //
-      // The shells remember their tab across the remount (see TabMemory), so
-      // this is invisible rather than jarring.
-      home: KeyedSubtree(
-        key: ValueKey(AppTheme.dark),
-        child: SplashGate(ready: Boot.instance.start(), child: _Gate()),
-      ),
+      home: SplashGate(ready: Boot.instance.start(), child: _Gate()),
     );
   }
 }
@@ -207,9 +234,6 @@ class _GateState extends State<_Gate> {
     // Fired when a refresh fails for good. Handled here, once, rather than by
     // every screen checking after every call.
     _signedOut = ApiClient.instance.onSignedOut.listen((_) {
-      // The next person to sign in on this handset must not open on a tab
-      // somebody else chose.
-      TabMemory.reset();
       if (mounted) setState(() => _me = null);
     });
   }
