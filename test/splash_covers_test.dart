@@ -24,6 +24,9 @@ void main() {
     await tester.pumpWidget(
       const MaterialApp(
         home: SplashGate(
+          // The role colour the curtain paints while the clip decodes. Green
+          // here so a failure to cover shows as magenta rather than as this.
+          tint: Color(0xFF149447),
           // Something unmistakable underneath: if any of it shows, the curtain
           // is not doing its job.
           child: ColoredBox(color: Color(0xFFFF00FF)),
