@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
+import 'student_info_screen.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/settings_widgets.dart';
 import 'children_tab.dart';
@@ -302,7 +303,16 @@ class _Children extends StatelessWidget {
           else
             for (var i = 0; i < children.take(3).length; i++) ...[
               if (i > 0) Divider(height: 1, color: AppTheme.border),
-              _ChildRow(child: children[i], onTap: () => onOpen?.call(children[i])),
+              _ChildRow(
+                child: children[i],
+                onTap: () {
+                  final c = children[i];
+                  onOpen?.call(c);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => StudentInfoScreen(child: c)),
+                  );
+                },
+              ),
             ],
         ],
       ),

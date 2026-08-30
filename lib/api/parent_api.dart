@@ -34,6 +34,202 @@ class Child {
       );
 }
 
+/// Everything the school has written down about one child.
+///
+/// The office answers this on the telephone a dozen times a term. This is that
+/// answer, in the app: her names as enrolled, her class, who teaches her, who
+/// else is on the account, and what the medical card says.
+class ChildProfile {
+  ChildProfile({
+    required this.studentId,
+    required this.code,
+    required this.name,
+    required this.fullName,
+    required this.nickname,
+    required this.gender,
+    required this.dob,
+    required this.ageYears,
+    required this.nationality,
+    required this.photoUrl,
+    required this.className,
+    required this.gradeLevel,
+    required this.gradeLabel,
+    required this.section,
+    required this.room,
+    required this.shift,
+    required this.homeroomTeacher,
+    required this.campusName,
+    required this.campusAddress,
+    required this.academicYear,
+    required this.rollNo,
+    required this.enrolledAt,
+    required this.guardians,
+    required this.medical,
+    required this.support,
+  });
+
+  final String studentId;
+  final String code;
+  final String name;
+  final String fullName;
+  final String? nickname;
+  final String? gender;
+  final DateTime? dob;
+  final int? ageYears;
+  final String? nationality;
+  final String? photoUrl;
+
+  final String? className;
+  final int? gradeLevel;
+  final String? gradeLabel;
+  final String? section;
+  final String? room;
+  final String? shift;
+  final String? homeroomTeacher;
+
+  final String? campusName;
+  final String? campusAddress;
+  final String? academicYear;
+  final String? rollNo;
+  final DateTime? enrolledAt;
+
+  final List<GuardianOnAccount> guardians;
+  final MedicalSummary? medical;
+  final SupportSummary? support;
+
+  factory ChildProfile.fromJson(Map<String, dynamic> j) => ChildProfile(
+        studentId: j['studentId'] as String,
+        code: (j['code'] ?? '') as String,
+        name: (j['name'] ?? '') as String,
+        fullName: (j['fullName'] ?? j['name'] ?? '') as String,
+        nickname: j['nickname'] as String?,
+        gender: j['gender'] as String?,
+        dob: _date(j['dob']),
+        ageYears: (j['ageYears'] as num?)?.toInt(),
+        nationality: j['nationality'] as String?,
+        photoUrl: j['photoUrl'] as String?,
+        className: j['className'] as String?,
+        gradeLevel: (j['gradeLevel'] as num?)?.toInt(),
+        gradeLabel: j['gradeLabel'] as String?,
+        section: j['section'] as String?,
+        room: j['room'] as String?,
+        shift: j['shift'] as String?,
+        homeroomTeacher: j['homeroomTeacher'] as String?,
+        campusName: j['campusName'] as String?,
+        campusAddress: j['campusAddress'] as String?,
+        academicYear: j['academicYear'] as String?,
+        rollNo: j['rollNo'] as String?,
+        enrolledAt: _date(j['enrolledAt']),
+        guardians: ((j['guardians'] as List?) ?? const [])
+            .map((e) => GuardianOnAccount.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        medical: j['medical'] == null
+            ? null
+            : MedicalSummary.fromJson(j['medical'] as Map<String, dynamic>),
+        support: j['support'] == null
+            ? null
+            : SupportSummary.fromJson(j['support'] as Map<String, dynamic>),
+      );
+
+  static DateTime? _date(Object? v) =>
+      v is String ? DateTime.tryParse(v)?.toLocal() : null;
+}
+
+/// One of the adults the school will ring.
+class GuardianOnAccount {
+  GuardianOnAccount({
+    required this.name,
+    required this.relationship,
+    required this.isPrimary,
+    required this.isYou,
+  });
+
+  final String name;
+  final String relationship;
+  final bool isPrimary;
+
+  /// So the list reads as "you and her mother", not two strangers.
+  final bool isYou;
+
+  factory GuardianOnAccount.fromJson(Map<String, dynamic> j) => GuardianOnAccount(
+        name: (j['name'] ?? '') as String,
+        relationship: (j['relationship'] ?? '') as String,
+        isPrimary: (j['isPrimary'] ?? false) as bool,
+        isYou: (j['isYou'] ?? false) as bool,
+      );
+}
+
+/// The medical card, shown back to the family who supplied it.
+class MedicalSummary {
+  MedicalSummary({
+    required this.flags,
+    required this.actionText,
+    required this.carriesMedication,
+    required this.medicationLocation,
+    required this.emergencyContacts,
+    required this.reviewDueAt,
+  });
+
+  final List<String> flags;
+  final String? actionText;
+  final bool carriesMedication;
+  final String? medicationLocation;
+  final List<String> emergencyContacts;
+  final DateTime? reviewDueAt;
+
+  /// Medical information ages badly, and a card nobody has looked at since
+  /// year one is worse than no card, because everyone assumes it is current.
+  bool get needsReview =>
+      reviewDueAt != null && reviewDueAt!.isBefore(DateTime.now());
+
+  bool get isEmpty =>
+      flags.isEmpty &&
+      (actionText == null || actionText!.isEmpty) &&
+      !carriesMedication &&
+      emergencyContacts.isEmpty;
+
+  factory MedicalSummary.fromJson(Map<String, dynamic> j) => MedicalSummary(
+        flags: ((j['flags'] as List?) ?? const []).map((e) => '$e').toList(),
+        actionText: j['actionText'] as String?,
+        carriesMedication: (j['carriesMedication'] ?? false) as bool,
+        medicationLocation: j['medicationLocation'] as String?,
+        emergencyContacts:
+            ((j['emergencyContacts'] as List?) ?? const []).map((e) => '$e').toList(),
+        reviewDueAt: ChildProfile._date(j['reviewDueAt']),
+      );
+}
+
+/// What the school has arranged for this child on the bus and at the door.
+class SupportSummary {
+  SupportSummary({
+    required this.escortRequired,
+    required this.wheelchairVehicleRequired,
+    required this.fixedSeat,
+    required this.doNotReleaseAlone,
+  });
+
+  final bool escortRequired;
+  final bool wheelchairVehicleRequired;
+
+  /// The seat label where there is one, `true` for "a fixed seat, unnamed",
+  /// null for no such arrangement.
+  final Object? fixedSeat;
+  final bool doNotReleaseAlone;
+
+  bool get isEmpty =>
+      !escortRequired &&
+      !wheelchairVehicleRequired &&
+      fixedSeat == null &&
+      !doNotReleaseAlone;
+
+  factory SupportSummary.fromJson(Map<String, dynamic> j) => SupportSummary(
+        escortRequired: (j['escortRequired'] ?? false) as bool,
+        wheelchairVehicleRequired: (j['wheelchairVehicleRequired'] ?? false) as bool,
+        fixedSeat: j['fixedSeat'],
+        doNotReleaseAlone: (j['doNotReleaseAlone'] ?? false) as bool,
+      );
+}
+
 /// A lesson in the week.
 class Lesson {
   Lesson({
@@ -622,6 +818,12 @@ class ParentApi {
   Future<List<Child>> children() async {
     final json = await _api.get('/parent/children');
     return (json as List).map((e) => Child.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// The child's own record, as the school holds it.
+  Future<ChildProfile> profile(String studentId) async {
+    final json = await _api.get('/parent/children//profile') as Map<String, dynamic>;
+    return ChildProfile.fromJson(json);
   }
 
   Future<List<DayOfLessons>> timetable(String studentId) async {

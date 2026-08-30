@@ -16,6 +16,7 @@ import 'child_detail.dart';
 import 'homework_detail.dart';
 import 'marks_screen.dart';
 import 'reports_screen.dart';
+import 'student_info_screen.dart';
 import 'timetable_screen.dart';
 
 /// The one screen a parent opens on the way out of the door.
@@ -113,6 +114,12 @@ class HomeTab extends StatelessWidget {
                 label: t('quick.reports'),
                 color: AppTheme.violet,
                 onTap: () => _push(context, ReportsScreen(child: child)),
+              ),
+              QuickAction(
+                icon: Icons.badge_outlined,
+                label: t('quick.info'),
+                color: AppTheme.blue,
+                onTap: () => _push(context, StudentInfoScreen(child: child)),
               ),
             ],
           ),
