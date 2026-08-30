@@ -138,7 +138,7 @@ class _LoginScreenState extends State<LoginScreen> {
               start: 0,
               end: 0,
               bottom: 0,
-              child: Image.asset('assets/art/login_wave.png', fit: BoxFit.fitWidth),
+              child: Image.asset(_wave(role), fit: BoxFit.fitWidth),
             ),
             SafeArea(
               child: LayoutBuilder(
@@ -163,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 10),
                         Image.asset(
-                          'assets/art/login_family.png',
+                          _scene(role),
                           height: art,
                           fit: BoxFit.contain,
                         ),
@@ -183,6 +183,22 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  /// The picture above the card.
+  ///
+  /// One per audience: a driver signing in wants to see a driver, and the
+  /// family illustration on a crew phone reads as the wrong app. Falls back to
+  /// the family scene for roles with no artwork of their own yet.
+  static String _scene(Role role) => switch (role) {
+        Role.driver => 'assets/art/driver_scene.png',
+        _ => 'assets/art/login_family.png',
+      };
+
+  /// The hills along the foot of the page, in that audience's colour.
+  static String _wave(Role role) => switch (role) {
+        Role.driver => 'assets/art/driver_wave.png',
+        _ => 'assets/art/login_wave.png',
+      };
+
   /* --- The form ---------------------------------------------------------- */
 
   Widget _signInForm(Role role) {
@@ -190,7 +206,7 @@ class _LoginScreenState extends State<LoginScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          t('login.welcomeBack'),
+          tv('login.welcomeRole', {'role': t('role.${role.name}')}),
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 24,
