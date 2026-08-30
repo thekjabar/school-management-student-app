@@ -190,12 +190,25 @@ class _LoginScreenState extends State<LoginScreen> {
   /// the family scene for roles with no artwork of their own yet.
   static String _scene(Role role) => switch (role) {
         Role.driver => 'assets/art/driver_scene.png',
+        Role.teacher => 'assets/art/teacher_scene.png',
         _ => 'assets/art/login_family.png',
+      };
+
+  /// The line under the greeting.
+  ///
+  /// Each audience opens this screen for a different reason, and saying so is
+  /// most of what makes an app feel like it was built for you rather than
+  /// configured for you.
+  static String _subtitle(Role role) => switch (role) {
+        Role.parent => 'login.subtitle',
+        Role.teacher => 'login.subTeacher',
+        _ => 'login.signInToContinue',
       };
 
   /// The hills along the foot of the page, in that audience's colour.
   static String _wave(Role role) => switch (role) {
         Role.driver => 'assets/art/driver_wave.png',
+        Role.teacher => 'assets/art/teacher_wave.png',
         _ => 'assets/art/login_wave.png',
       };
 
@@ -217,7 +230,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          t('login.signInToContinue'),
+          t(_subtitle(role)),
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 14, color: AppTheme.textMuted),
         ),
