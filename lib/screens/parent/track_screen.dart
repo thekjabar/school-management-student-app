@@ -108,6 +108,12 @@ class _TrackScreenState extends State<TrackScreen> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Above everything, and deliberately loud. A rehearsal
+                      // that looks like a real bus is worse than no bus at all.
+                      if (bus.simulated) ...[
+                        const _DemoBand(),
+                        const SizedBox(height: kCardGap),
+                      ],
                       _StateCard(bus: bus, child: widget.child),
                       const SizedBox(height: kCardGap),
                       _MapCard(bus: bus, controller: _map, onRecentre: () => _frame(bus, force: true)),
@@ -476,6 +482,46 @@ class _MapCard extends StatelessWidget {
     if (seconds == null) return '—';
     if (seconds < 60) return tv('track.secondsAgo', {'n': '$seconds'});
     return tv('track.minutesAgo', {'n': '${seconds ~/ 60}'});
+  }
+}
+
+/// Says, unmissably, that this is not a bus on a road.
+///
+/// A stripe rather than a footnote. The platform will only ever send simulated
+/// positions to a tenant marked as a demonstration, but the moment one is on
+/// screen it has to be impossible to read as real — somebody showing this to a
+/// school must not be able to imply otherwise, even by saying nothing.
+class _DemoBand extends StatelessWidget {
+  const _DemoBand();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+      decoration: BoxDecoration(
+        color: AppTheme.amber,
+        borderRadius: BorderRadius.circular(kCardRadius),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.science_outlined, size: 19, color: Colors.white),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              t('track.demoData'),
+              style: const TextStyle(
+                fontSize: 13,
+                height: 1.35,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.2,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

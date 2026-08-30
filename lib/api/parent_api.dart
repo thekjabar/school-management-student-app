@@ -893,6 +893,7 @@ class LiveBus {
     required this.busLabel,
     required this.plate,
     required this.driverName,
+    required this.simulated,
   });
 
   final String studentId;
@@ -928,6 +929,14 @@ class LiveBus {
   final String? busLabel;
   final String? plate;
   final String? driverName;
+
+  /// This position was GENERATED, not reported by a bus on a road.
+  ///
+  /// Only ever true on a tenant the platform marks as a demonstration; a real
+  /// school never receives a simulated position at all. It must be rendered as
+  /// something nobody can miss — the entire reason for carrying the flag is
+  /// that a person must not mistake a rehearsal for their child.
+  final bool simulated;
 
   /// She is aboard right now. The only state in which the bus marker is also
   /// the child marker.
@@ -985,6 +994,7 @@ class LiveBus {
       busLabel: trip?['busLabel'] as String?,
       plate: trip?['plate'] as String?,
       driverName: trip?['driverName'] as String?,
+      simulated: (j['simulated'] ?? false) as bool,
     );
   }
 }

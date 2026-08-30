@@ -726,6 +726,7 @@ const Map<String, String> _en = {
   'track.boarded': 'Got on',
   'track.alighted': 'Got off',
   'quick.track': 'Where is she',
+  'track.demoData': 'DEMONSTRATION — this bus is not real. Nothing on this map is a vehicle on a road.',
   'grade.n': 'Grade {n}',
   'leave.notConfirmed': 'Not confirmed. Nothing has been sent.',
   'leave.busNote':
@@ -1602,6 +1603,7 @@ const Map<String, String> _ckb = {
   'track.boarded': 'سواربوو',
   'track.alighted': 'دابەزی',
   'quick.track': 'لەکوێیە',
+  'track.demoData': 'نمایش — ئەم پاسە ڕاستەقینە نییە. هیچ شتێک لەسەر ئەم نەخشەیە ئۆتۆمبێلێکی سەر ڕێگا نییە.',
   'grade.n': 'قۆناغی {n}',
   'leave.notConfirmed': 'پشتڕاست نەکرایەوە. هیچ نەنێردرا.',
   'leave.busNote': 'ئەگەر نووسینگە پەسەندی بکات، پاس لەو ڕۆژانەدا چاوەڕێی منداڵەکەت ناکات.',
@@ -2472,6 +2474,7 @@ const Map<String, String> _ar = {
   'track.boarded': 'صعد',
   'track.alighted': 'نزل',
   'quick.track': 'أين هو',
+  'track.demoData': 'عرض توضيحي — هذه الحافلة ليست حقيقية. لا شيء على هذه الخريطة مركبة على الطريق.',
   'grade.n': 'المرحلة {n}',
   'leave.notConfirmed': 'لم يتم التأكيد. لم يُرسل شيء.',
   'leave.busNote': 'إذا وافق المكتب، لن تنتظر الحافلة طفلك في تلك الأيام.',
