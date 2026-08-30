@@ -53,6 +53,10 @@ dependencies:
   # needs a real decoder; there is no image format that plays.
   video_player: ^2.9.2
 
+  # Fingerprint or face, for the one thing in this app a parent SENDS to the
+  # school on their child's behalf.
+  local_auth: ^2.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

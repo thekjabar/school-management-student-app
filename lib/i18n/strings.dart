@@ -604,6 +604,8 @@ const Map<String, String> _en = {
   'leave.reason': 'Reason',
   'leave.reasonHint': 'High temperature since last night, seeing the doctor this morning.',
   'leave.reasonNeeded': 'Say briefly why — the office decides on this.',
+  'leave.confirmWithBiometrics': 'Confirm it is you before the school is told',
+  'leave.notConfirmed': 'Not confirmed. Nothing has been sent.',
   'leave.busNote':
       'If the office approves this, the bus will not wait for your child on those days.',
   'leave.send': 'Send to the office',
@@ -1367,6 +1369,8 @@ const Map<String, String> _ckb = {
   'leave.reason': 'هۆکار',
   'leave.reasonHint': 'لە دوێنێ شەوەوە تایەکی بەرزی هەیە، ئەمڕۆ بەیانی دەچینە لای پزیشک.',
   'leave.reasonNeeded': 'بە کورتی بڵێ بۆچی — نووسینگە لەسەر ئەمە بڕیار دەدات.',
+  'leave.confirmWithBiometrics': 'پێش ئەوەی قوتابخانە ئاگادار بکرێتەوە، دڵنیای بکەرەوە کە خۆتی',
+  'leave.notConfirmed': 'پشتڕاست نەکرایەوە. هیچ نەنێردرا.',
   'leave.busNote': 'ئەگەر نووسینگە پەسەندی بکات، پاس لەو ڕۆژانەدا چاوەڕێی منداڵەکەت ناکات.',
   'leave.send': 'بنێرە بۆ نووسینگە',
 
@@ -2124,6 +2128,8 @@ const Map<String, String> _ar = {
   'leave.reason': 'السبب',
   'leave.reasonHint': 'حرارة مرتفعة منذ الليلة الماضية، سنراجع الطبيب هذا الصباح.',
   'leave.reasonNeeded': 'اذكر السبب باختصار — المكتب يقرر بناءً عليه.',
+  'leave.confirmWithBiometrics': 'أكّد هويتك قبل إبلاغ المدرسة',
+  'leave.notConfirmed': 'لم يتم التأكيد. لم يُرسل شيء.',
   'leave.busNote': 'إذا وافق المكتب، لن تنتظر الحافلة طفلك في تلك الأيام.',
   'leave.send': 'إرسال إلى المكتب',
 

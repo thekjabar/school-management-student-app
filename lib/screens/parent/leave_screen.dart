@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/biometrics.dart';
 import '../../api/client.dart';
 import '../../api/parent_api.dart';
 import '../../i18n/strings.dart';
@@ -454,6 +455,15 @@ class _AskSheetState extends State<_AskSheet> {
       _error = null;
     });
     try {
+      // Prove it is the guardian holding the phone, not whoever picked it up.
+      // A leave request takes a child off the register and tells the driver
+      // not to wait, so it is the one thing in this app that acts on the
+      // school on the child's behalf.
+      final ok = await Biometrics.confirm(reason: Biometrics.leaveReason);
+      if (!ok) {
+        if (mounted) setState(() => _error = t('leave.notConfirmed'));
+        return;
+      }
       await ParentApi.instance.requestLeave(
         studentId: widget.child.studentId,
         kind: _kind,
