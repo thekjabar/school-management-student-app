@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../ui/screen_kit.dart';
 
-import '../../api/client.dart';
 import '../../api/crew_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
+import '../../ui/kit.dart';
+import '../../ui/screen_kit.dart';
 
 /// One run, from the driver's seat.
 ///
@@ -15,9 +15,17 @@ import '../../ui/format.dart';
 /// of its children are outstanding, and the sweep at the bottom is the last
 /// check before the bus is left.
 class TripScreen extends StatefulWidget {
-  const TripScreen({super.key, required this.tripId});
+  const TripScreen({super.key, required this.tripId, this.serviceDate});
 
   final String tripId;
+
+  /// The day this run belongs to.
+  ///
+  /// The run's own row — and with it the start/depart/end button — was looked
+  /// up in TODAY's duty list only. On a Friday evening the home screen offers
+  /// Sunday's run quite correctly, and opening it produced a stop list with no
+  /// way to start anything, because Sunday's run is not in today's list.
+  final DateTime? serviceDate;
 
   @override
   State<TripScreen> createState() => _TripScreenState();
@@ -28,10 +36,19 @@ class _TripScreenState extends State<TripScreen> {
   bool _nearestFirst = false;
   String? _busy;
 
+  Future<List<CrewTrip>> _dutyList() {
+    final day = widget.serviceDate;
+    if (day == null) return CrewApi.instance.today();
+    final stamp = '${day.year.toString().padLeft(4, '0')}-'
+        '${day.month.toString().padLeft(2, '0')}-'
+        '${day.day.toString().padLeft(2, '0')}';
+    return CrewApi.instance.trips(date: stamp);
+  }
+
   Future<_TripData> _load() async {
     final api = CrewApi.instance;
     final results = await Future.wait([
-      api.today(),
+      _dutyList(),
       api.plan(widget.tripId, nearest: _nearestFirst),
       api.sweepState(widget.tripId),
     ]);
@@ -49,8 +66,11 @@ class _TripScreenState extends State<TripScreen> {
       await action();
       _loaderKey.currentState?.reload();
       if (mounted) showNote(context, label);
-    } on ApiException catch (e) {
-      if (mounted) showNote(context, e.message, bad: true);
+    } catch (e) {
+      // Every failure, not just the ones the API answered. A dropped
+      // connection threw straight past this and left the driver looking at a
+      // button that had apparently done nothing.
+      if (mounted) showNote(context, errorText(e), bad: true);
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -160,7 +180,14 @@ class _HeadcountCard extends StatelessWidget {
         children: [
           Text(
             counts.summary.isEmpty
-                ? '${counts.onRegister} on the register, ${counts.notComingToday} away, ${counts.expected} to carry.'
+                // The server writes this sentence in the reader's language and
+                // usually sends it. When it does not, the fallback has to be a
+                // translated sentence too — it was English on every screen.
+                ? tv('driver.headcountLine', {
+                    'a': counts.onRegister,
+                    'b': counts.notComingToday,
+                    'c': counts.expected,
+                  })
                 : counts.summary,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, height: 1.4),
           ),
@@ -255,19 +282,34 @@ class _RunControls extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: FilledButton(
-              onPressed: busy != null ? null : action,
-              style: FilledButton.styleFrom(
-                backgroundColor: action == null ? AppTheme.border : Role.driver.tint,
-                foregroundColor: action == null ? AppTheme.textMuted : AppTheme.surface,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusSm)),
-              ),
-              child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          // A finished run gets a sentence, not a button that cannot be
+          // pressed. A dead control on a moving bus is pressed anyway, and
+          // then pressed harder.
+          if (action == null)
+            Row(
+              children: [
+                Icon(Icons.check_circle_rounded, size: 18, color: AppTheme.green),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textMuted,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else
+            BigButton(
+              label: label,
+              color: Role.driver.tint,
+              busy: busy != null,
+              height: 52,
+              onPressed: action,
             ),
-          ),
         ],
       ),
     );
@@ -334,8 +376,9 @@ class _StopCard extends StatefulWidget {
 class _StopCardState extends State<_StopCard> {
   bool _open = false;
   String? _busyStudent;
+  bool _busyStop = false;
 
-  Future<void> _mark(RiderOnStop rider, String eventType) async {
+  Future<void> _mark(RiderOnStop rider, String eventType, String label) async {
     setState(() => _busyStudent = rider.studentId);
     try {
       await CrewApi.instance.recordCustody(
@@ -345,13 +388,28 @@ class _StopCardState extends State<_StopCard> {
         stopId: widget.stop.stopId,
       );
       widget.onChanged();
-      if (mounted) {
-        showNote(context, '${rider.name.split(' ').first} — ${humanise(eventType).toLowerCase()}');
-      }
-    } on ApiException catch (e) {
-      if (mounted) showNote(context, e.message, bad: true);
+      // The label, not humanise(EVENT_TYPE): that spelled the server's enum
+      // out in English on a Kurdish screen.
+      if (mounted) showNote(context, '${rider.name.split(' ').first} — $label');
+    } catch (e) {
+      if (mounted) showNote(context, errorText(e), bad: true);
     } finally {
       if (mounted) setState(() => _busyStudent = null);
+    }
+  }
+
+  /// Arriving at the stop and leaving it — the two things that move the run on.
+  Future<void> _stopAction(Future<void> Function() call, String label) async {
+    if (_busyStop) return;
+    setState(() => _busyStop = true);
+    try {
+      await call();
+      widget.onChanged();
+      if (mounted) showNote(context, label);
+    } catch (e) {
+      if (mounted) showNote(context, errorText(e), bad: true);
+    } finally {
+      if (mounted) setState(() => _busyStop = false);
     }
   }
 
@@ -414,7 +472,8 @@ class _StopCardState extends State<_StopCard> {
                             // can navigate by; "opposite the mosque" is.
                             [
                               if (s.landmark != null) s.landmark!,
-                              if (s.metresAway != null) '${s.metresAway} m away',
+                              if (s.metresAway != null)
+                                tn('driver.metresAway', s.metresAway!),
                             ].join(' · '),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -424,7 +483,7 @@ class _StopCardState extends State<_StopCard> {
                       ),
                     ),
                     Tag(
-                      remaining == 0 ? 'Done' : '$remaining left',
+                      remaining == 0 ? t('driver.done') : tn('driver.nLeft', remaining),
                       color: remaining == 0 ? AppTheme.green : AppTheme.amber,
                       background: remaining == 0 ? AppTheme.greenSoft : AppTheme.amberSoft,
                     ),
@@ -443,41 +502,43 @@ class _StopCardState extends State<_StopCard> {
                     rider: r,
                     leg: widget.leg,
                     busy: _busyStudent == r.studentId,
-                    onBoard: () => _mark(r, 'BOARDED'),
-                    onOff: () => _mark(r, widget.leg == 'OUT' ? 'ALIGHTED' : 'HANDOVER'),
-                    onNoShow: () => _mark(r, 'NO_SHOW'),
+                    // The note names the state the child is now in, in the
+                    // reader's language.
+                    onBoard: () => _mark(r, 'BOARDED', t('driver.onBoard')),
+                    onOff: () => _mark(
+                      r,
+                      widget.leg == 'OUT' ? 'ALIGHTED' : 'HANDOVER',
+                      widget.leg == 'OUT' ? t('driver.atSchool') : t('driver.handedOver'),
+                    ),
+                    onNoShow: () => _mark(r, 'NO_SHOW', t('driver.notRiding')),
                   )),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
                 child: Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
-                        onPressed: () async {
-                          try {
-                            await CrewApi.instance
-                                .arriveAtStop(widget.tripId, s.plannedSequence);
-                            widget.onChanged();
-                          } on ApiException catch (e) {
-                            if (context.mounted) showNote(context, e.message, bad: true);
-                          }
-                        },
-                        child: Text(t('driver.arrived')),
+                      child: BigButton(
+                        label: t('driver.arrived'),
+                        color: Role.driver.tint,
+                        busy: _busyStop,
+                        onPressed: () => _stopAction(
+                          () => CrewApi.instance
+                              .arriveAtStop(widget.tripId, s.plannedSequence),
+                          t('driver.arrived'),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: OutlinedButton(
-                        onPressed: () async {
-                          try {
-                            await CrewApi.instance
-                                .leaveStop(widget.tripId, s.plannedSequence);
-                            widget.onChanged();
-                          } on ApiException catch (e) {
-                            if (context.mounted) showNote(context, e.message, bad: true);
-                          }
-                        },
-                        child: Text(t('driver.movingOn')),
+                      child: BigButton(
+                        label: t('driver.movingOn'),
+                        color: AppTheme.blue,
+                        busy: _busyStop,
+                        onPressed: () => _stopAction(
+                          () => CrewApi.instance
+                              .leaveStop(widget.tripId, s.plannedSequence),
+                          t('driver.movingOn'),
+                        ),
                       ),
                     ),
                   ],
@@ -596,6 +657,12 @@ class _RiderRow extends StatelessWidget {
   }
 }
 
+/// The board / drop / no-show buttons on a rider's row.
+///
+/// 46 square. These are pressed by somebody standing in an aisle, one handed,
+/// often wearing gloves, while the child is still in front of them — the 36 dp
+/// square they used to be is under every guideline there is and was missed
+/// often enough to be marked on the wrong row.
 class _Mini extends StatelessWidget {
   const _Mini({required this.icon, required this.colour, required this.onTap});
 
@@ -607,15 +674,16 @@ class _Mini extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Container(
-        width: 36,
-        height: 36,
+        width: 46,
+        height: 46,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: colour.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
         ),
-        child: Icon(icon, size: 18, color: colour),
+        child: Icon(icon, size: 21, color: colour),
       ),
     );
   }
@@ -716,20 +784,12 @@ class _SweepCard extends StatelessWidget {
             style: TextStyle(fontSize: 12.5, height: 1.5, color: AppTheme.textMuted),
           ),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: FilledButton(
-              onPressed: busy ? null : onConfirm,
-              style: FilledButton.styleFrom(
-                backgroundColor: late ? AppTheme.rose : AppTheme.amber,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusSm)),
-              ),
-              child: Text(
-                t('driver.walkedTheBus'),
-                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
-              ),
-            ),
+          BigButton(
+            label: t('driver.walkedTheBus'),
+            color: late ? AppTheme.rose : AppTheme.amber,
+            busy: busy,
+            height: 54,
+            onPressed: onConfirm,
           ),
         ],
       ),

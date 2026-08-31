@@ -6,10 +6,38 @@ import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
+import '../../ui/kit.dart';
+import '../../ui/screen_kit.dart';
 
-/// The teacher's own record, their week, and the way out.
+/// The teacher's week as a screen of its own.
+///
+/// [TeacherWeek] is the same thing without the furniture, for the slot it fills
+/// in the bottom bar. The two were one widget, which meant the drawer and the
+/// home card pushed a bare Loader onto a route with no Scaffold under it: no
+/// canvas, no safe area, and no way back but the system gesture.
 class TeacherWeekScreen extends StatelessWidget {
   const TeacherWeekScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.canvas,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            ScreenHeader(title: t('teacher.yourWeek')),
+            const Expanded(child: TeacherWeek()),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The teacher's own record, and their week.
+class TeacherWeek extends StatelessWidget {
+  const TeacherWeek({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -33,19 +61,9 @@ class TeacherWeekScreen extends StatelessWidget {
             Panel(
               child: Row(
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Role.teacher.wash,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      (me?.firstName ?? '?').characters.first.toUpperCase(),
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Role.teacher.tint),
-                    ),
-                  ),
+                  // Tinted, always. Left to itself CircleInitials hashes the
+                  // name into a hue of its own, and the teacher app is green.
+                  CircleInitials(label: me?.name ?? '?', tint: Role.teacher.tint, size: 48),
                   const SizedBox(width: 13),
                   Expanded(
                     child: Column(
@@ -58,6 +76,9 @@ class TeacherWeekScreen extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           me?.phone ?? '',
+                          // A phone number reads left-to-right even on a
+                          // Kurdish screen; mirroring it makes it unusable.
+                          textDirection: TextDirection.ltr,
                           style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                         ),
                         const SizedBox(height: 2),
@@ -95,14 +116,19 @@ class TeacherWeekScreen extends StatelessWidget {
                         Row(
                           children: [
                             Text(
-                              humanise(day),
+                              // weekdayName, not humanise: humanise only
+                              // sentence-cases the API's enum, so every day on
+                              // a Kurdish screen read "Sunday", "Monday".
+                              weekdayName(day),
                               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
                             ),
                             const SizedBox(width: 8),
                             if (isToday) Tag(t('teacher.today'), color: Role.teacher.tint, background: AppTheme.surface),
                             const Spacer(),
                             Text(
-                              '${lessons.length} lesson${lessons.length == 1 ? '' : 's'}',
+                              lessons.length == 1
+                                  ? t('teacher.oneLesson')
+                                  : tn('teacher.nLessons', lessons.length),
                               style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                             ),
                           ],
@@ -160,5 +186,4 @@ class TeacherWeekScreen extends StatelessWidget {
       },
     );
   }
-
 }

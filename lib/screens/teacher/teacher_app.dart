@@ -98,7 +98,10 @@ class _TeacherAppState extends State<TeacherApp> {
                 children: [
                   TeacherHome(onOpenTab: (i) => setState(() => _tab = i)),
                   const TeacherMessages(),
-                  const TeacherWeekScreen(),
+                  // The body, not the pushable screen: inside the bar there is
+                  // nothing above this to go back to, and a header with a dead
+                  // back arrow on it is the thing this sweep is removing.
+                  const TeacherWeek(),
                   const TeacherProfileTab(),
                 ],
               ),

@@ -137,6 +137,25 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// "Forgot password?" — which here means asking the school office, not
+  /// following a link in an email.
+  ///
+  /// Nobody in this system holds an email address to send a reset to, and the
+  /// office is the only place that can hand a password to a person it has
+  /// recognised. So the tap sends the office a note and then says what happens
+  /// next, which is the whole of what this app can honestly promise.
+  ///
+  /// The number already in the form travels with it. Somebody who got their
+  /// password wrong has almost always typed their phone right, and asking for
+  /// it again two centimetres below where they just typed it reads as an app
+  /// that was not paying attention.
+  Future<void> _forgot() => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _ForgotSheet(tint: widget.role.tint, phone: _phone.text),
+      );
+
   @override
   Widget build(BuildContext context) {
     final role = widget.role;
@@ -370,7 +389,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Align(
           alignment: AlignmentDirectional.centerEnd,
           child: GestureDetector(
-            onTap: () => showNote(context, t('login.forgot')),
+            onTap: _forgot,
             behavior: HitTestBehavior.opaque,
             child: Text(
               t('login.forgotShort'),
@@ -760,4 +779,255 @@ class ThemeToggle extends StatelessWidget {
       },
     );
   }
+}
+
+/* ---------------------------------------------------------------------------
+ * Forgotten password
+ * ------------------------------------------------------------------------- */
+
+/// Asks the school office to issue a new password.
+///
+/// It never says whether the number is known, and it must not. The endpoint
+/// answers identically for a registered number and an unregistered one — that
+/// is deliberate, so somebody working through numbers cannot learn which
+/// families are on the system. "We found your account" would hand exactly that
+/// back. "If that number is registered" is the same sentence for everybody, and
+/// it is also the true one.
+class _ForgotSheet extends StatefulWidget {
+  const _ForgotSheet({required this.tint, required this.phone});
+
+  /// The colour of whichever app this is — parent, teacher or driver. One login
+  /// screen serves all three, so nothing here may assume the parent violet.
+  final Color tint;
+
+  /// Whatever was already typed into the login form's number field.
+  final String phone;
+
+  @override
+  State<_ForgotSheet> createState() => _ForgotSheetState();
+}
+
+class _ForgotSheetState extends State<_ForgotSheet> {
+  final _phone = TextEditingController();
+
+  bool _busy = false;
+
+  /// Sent. The sheet then shows what to expect rather than closing — a snack
+  /// bar that slides away in three seconds is not where you put "ring the
+  /// office", which is a thing somebody has to act on later.
+  bool _sent = false;
+
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _phone.text = widget.phone;
+    // The tick beside the field follows what is typed, so the sheet rebuilds
+    // on every keystroke.
+    _phone.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _phone.dispose();
+    super.dispose();
+  }
+
+  /// The same shape the sign-in form insists on: eleven digits starting 07.
+  bool get _looksRight {
+    final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
+    return digits.length == _LoginScreenState._phoneDigits && digits.startsWith('0');
+  }
+
+  Future<void> _send() async {
+    // Checked here rather than by grabbing the button out of reach. A dead
+    // button is a question nobody can answer; this one names what is wrong.
+    if (!_looksRight) {
+      setState(() => _error = t('login.phoneNeeded'));
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      // Unauthenticated and throttled, and it answers the same either way.
+      await ApiClient.instance.post(
+        '/auth/password/reset-request',
+        {'phone': _phone.text.trim()},
+      );
+      if (!mounted) return;
+      FocusScope.of(context).unfocus();
+      setState(() => _sent = true);
+    } catch (e) {
+      if (!mounted) return;
+      // errorText rather than the object: a phone with no signal and a server
+      // that answered are different problems, and only one of them is worth
+      // trying again in the same second.
+      setState(() => _error = errorText(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 20),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              ...(_sent ? _afterwards() : _form()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _form() => [
+        Row(
+          children: [
+            Chip36(icon: Icons.support_agent_rounded, color: widget.tint, size: 42),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                t('forgot.title'),
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                  color: AppTheme.text,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 11),
+        Text(
+          t('forgot.body'),
+          style: TextStyle(fontSize: 12.5, height: 1.5, color: AppTheme.textMuted),
+        ),
+        const SizedBox(height: 18),
+        _Field(
+          icon: Icons.smartphone_rounded,
+          tint: widget.tint,
+          label: t('login.phone'),
+          trailing: _looksRight
+              ? Icon(Icons.check_circle_rounded, size: 22, color: AppTheme.green)
+              : null,
+          child: TextField(
+            controller: _phone,
+            keyboardType: TextInputType.phone,
+            textInputAction: TextInputAction.done,
+            // Only when there is nothing to carry over. Throwing the keyboard
+            // up over a number already filled in hides the line that says what
+            // happens next, which is the part worth reading.
+            autofocus: widget.phone.isEmpty,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(_LoginScreenState._phoneDigits),
+            ],
+            onSubmitted: (_) => _busy ? null : _send(),
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.left,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+              color: AppTheme.text,
+            ),
+            decoration: InputDecoration(
+              hintText: t('login.phoneHint'),
+              filled: false,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+            ),
+          ),
+        ),
+        const SizedBox(height: 7),
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 4),
+          child: Text(
+            t('login.phoneFormat'),
+            style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+          ),
+        ),
+        if (_error != null) _ErrorLine(_error!),
+        const SizedBox(height: 18),
+        BigButton(
+          label: t('forgot.send'),
+          color: widget.tint,
+          busy: _busy,
+          height: 52,
+          onPressed: _send,
+        ),
+      ];
+
+  /// What was actually done, and what to do now.
+  ///
+  /// Not "we have found you", and not "check your messages" either — the office
+  /// rings people or hands them a password across the counter, and this is the
+  /// only screen that will ever say so.
+  List<Widget> _afterwards() => [
+        Center(
+          child: Container(
+            width: 58,
+            height: 58,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppTheme.greenSoft,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.task_alt_rounded, size: 29, color: AppTheme.green),
+          ),
+        ),
+        const SizedBox(height: 15),
+        Text(
+          t('forgot.sentTitle'),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.4,
+            color: AppTheme.text,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          t('forgot.sentBody'),
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, height: 1.55, color: AppTheme.textMuted),
+        ),
+        const SizedBox(height: 20),
+        BigButton(
+          label: t('common.close'),
+          color: widget.tint,
+          height: 50,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ];
 }

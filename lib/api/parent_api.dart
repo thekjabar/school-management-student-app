@@ -1268,6 +1268,51 @@ class ParentApi {
 
   Future<void> cancelLeave(String id) => _api.post('/parent/leave-requests/$id/cancel');
 
+  // ---- Asking the office to correct your own details ----------------------
+  //
+  // Under /auth, not /parent: the gateway sends /api/auth/ to identity-service,
+  // which owns people, and /api/parent/ to students-service, which does not.
+  // The same path under the wrong prefix is a 404 in production and works
+  // perfectly against a laptop.
+
+  /// The corrections this person has asked for, newest first.
+  Future<List<ProfileChange>> profileChanges() async {
+    final json = await _api.get('/auth/profile/change-requests');
+    final rows = json is Map ? (json['rows'] as List?) ?? const [] : (json as List?) ?? const [];
+    return rows.map((e) => ProfileChange.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Ask the office to correct one or more of your own details.
+  ///
+  /// Every argument is optional and only what is passed is asked for. An empty
+  /// string clears a field; leaving it null means "not changing this one".
+  ///
+  /// The phone number is deliberately absent. It is how a person signs in and
+  /// how the school knows who may collect their child, so it has its own
+  /// request with a confirmation code, and the server refuses it here by name.
+  Future<void> askProfileChange({
+    String? nameGiven,
+    String? nameFather,
+    String? nameGrandfather,
+    String? nameFamily,
+    String? email,
+    String? reason,
+  }) =>
+      _api.post('/auth/profile/change-requests', {
+        'nameGiven': ?nameGiven,
+        'nameFather': ?nameFather,
+        'nameGrandfather': ?nameGrandfather,
+        'nameFamily': ?nameFamily,
+        'email': ?email,
+        if (reason != null && reason.isNotEmpty) 'reason': reason,
+      });
+
+  /// Withdraw a correction the office has not answered yet.
+  Future<void> cancelProfileChange(String id) =>
+      _api.post('/auth/profile/change-requests/$id/cancel');
+
+
+
   Future<({String? usualStop, List<DropoffOption> options, String note})> dropoffOptions(
     String studentId,
   ) async {
@@ -1466,4 +1511,69 @@ String? _colorOf(Map<String, dynamic> j) {
   final raw = j['subject'];
   if (raw is Map<String, dynamic>) return raw['colorHex'] as String?;
   return null;
+}
+
+/// A correction a parent has asked the office to make to their own record.
+class ProfileChange {
+  ProfileChange({
+    required this.id,
+    required this.status,
+    required this.requestedAt,
+    required this.fields,
+    this.reason,
+    this.decisionNote,
+    this.decidedAt,
+  });
+
+  final String id;
+
+  /// PENDING, APPROVED, REJECTED or CANCELLED — the same four the office's
+  /// screen shows, and the same four a leave request has.
+  final String status;
+  final DateTime requestedAt;
+
+  /// What was asked for, as label and value, ready to print. Built from
+  /// whichever of the name parts and the email the request actually carried,
+  /// so a correction to one field does not render four empty rows.
+  final List<({String field, String value})> fields;
+
+  final String? reason;
+
+  /// Why the office refused, in their words. The reason a rejection is worth
+  /// showing at all.
+  final String? decisionNote;
+  final DateTime? decidedAt;
+
+  bool get pending => status == 'PENDING';
+
+  factory ProfileChange.fromJson(Map<String, dynamic> j) {
+    final asked = <({String field, String value})>[];
+    void take(String key) {
+      final v = j[key];
+      if (v is String) asked.add((field: key, value: v));
+    }
+
+    // The server may send the proposal flat or under a 'proposed' object;
+    // both shapes are read rather than guessing which one this build talks to.
+    final flat = (j['proposed'] as Map<String, dynamic>?) ?? j;
+    for (final key in const ['nameGiven', 'nameFather', 'nameGrandfather', 'nameFamily', 'email']) {
+      final v = flat[key];
+      if (v is String) asked.add((field: key, value: v));
+    }
+    if (asked.isEmpty) {
+      for (final key in const ['nameGiven', 'nameFather', 'nameGrandfather', 'nameFamily', 'email']) {
+        take(key);
+      }
+    }
+
+    return ProfileChange(
+      id: j['id'] as String,
+      status: (j['status'] ?? 'PENDING') as String,
+      requestedAt: DateTime.tryParse((j['requestedAt'] ?? '') as String)?.toLocal() ?? DateTime.now(),
+      fields: asked,
+      reason: j['reason'] as String?,
+      decisionNote: j['decisionNote'] as String?,
+      decidedAt: DateTime.tryParse((j['decidedAt'] ?? '') as String)?.toLocal(),
+    );
+  }
 }

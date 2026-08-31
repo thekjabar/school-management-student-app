@@ -6,6 +6,8 @@ import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
+import '../../ui/kit.dart';
+import '../../ui/screen_kit.dart';
 
 /// The crew member's own record: who they are, and the papers that let them
 /// drive.
@@ -18,6 +20,25 @@ class CrewPapersScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A Scaffold and a header. This screen was pushed as a bare Loader: no
+    // background of its own, and no back button — the only way off it was the
+    // phone's own gesture, which on a handset in a cradle is not a way off it
+    // at all.
+    return Scaffold(
+      backgroundColor: AppTheme.canvas,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            ScreenHeader(title: t('driver.papers')),
+            Expanded(child: _body(context)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _body(BuildContext context) {
     final me = Session.instance.me;
 
     return Loader<Map<String, dynamic>>(
@@ -36,18 +57,13 @@ class CrewPapersScreen extends StatelessWidget {
             Panel(
               child: Row(
                 children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Role.driver.wash,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      ((person['fullName'] ?? me?.name ?? '?') as String).characters.first.toUpperCase(),
-                      style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: Role.driver.tint),
-                    ),
+                  // The kit's initials, tinted. The hand-rolled square took the
+                  // first character of the name and nothing else, so two of the
+                  // three crew on a bus showed the same letter.
+                  CircleInitials(
+                    label: (person['fullName'] ?? me?.name ?? '') as String,
+                    tint: Role.driver.tint,
+                    size: 50,
                   ),
                   const SizedBox(width: 13),
                   Expanded(
@@ -161,7 +177,7 @@ class _CredentialRow extends StatelessWidget {
             ),
             if (days != null)
               Tag(
-                days < 0 ? 'expired' : '$days days',
+                days < 0 ? t('driver.expired') : tn('driver.nDays', days),
                 color: colour,
                 background: wash,
               ),

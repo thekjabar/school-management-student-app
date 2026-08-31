@@ -162,7 +162,13 @@ class TeacherHome extends StatelessWidget {
   /// several and it asks which — rather than opening a list of classes whose
   /// only purpose is to be tapped once.
   static Future<void> _register(BuildContext context, List<TeachingSlot> classes) async {
-    if (classes.isEmpty) return;
+    // With no classes there is nothing to pick from, and a button that does
+    // nothing at all is worse than one that opens the list and says why it is
+    // empty. The class screen already has that sentence.
+    if (classes.isEmpty) {
+      _push(context, const ClassesScreen());
+      return;
+    }
     if (classes.length == 1) {
       _push(context, RegisterScreen(slot: classes.first));
       return;
@@ -196,11 +202,15 @@ class TeacherHome extends StatelessWidget {
       title: '${slot.subjectName} · ${slot.className}',
       tint: Role.teacher.tint,
       options: [
-        PickOption(
-          value: 'register',
-          label: t('teacher.takeRegister'),
-          icon: Icons.how_to_reg_rounded,
-        ),
+        // Only offered when this teacher actually holds the class on their
+        // assignment list — the register writes against that, and without one
+        // the choice used to be silently swallowed.
+        if (owned.isNotEmpty)
+          PickOption(
+            value: 'register',
+            label: t('teacher.takeRegister'),
+            icon: Icons.how_to_reg_rounded,
+          ),
         PickOption(
           value: 'homework',
           label: t('teacher.setHomework'),
@@ -209,9 +219,9 @@ class TeacherHome extends StatelessWidget {
       ],
     );
     if (picked == null || !context.mounted) return;
-    if (picked == 'register' && owned.isNotEmpty) {
+    if (picked == 'register') {
       _push(context, RegisterScreen(slot: owned.first));
-    } else if (picked == 'homework') {
+    } else {
       _push(context, const HomeworkTab());
     }
   }
@@ -485,39 +495,11 @@ class _ClassesCard extends StatelessWidget {
               if (i > 0) Divider(height: 1, color: AppTheme.border),
               _ClassRow(slot: classes[i]),
             ],
+          // No "Add new class" row. The office owns the class list, there is no
+          // endpoint for a teacher to add one, and the row did nothing but
+          // raise a snack bar saying so — an affordance whose only function was
+          // to apologise for existing.
           const SizedBox(height: 12),
-          // The office owns the class list; this says where to go rather than
-          // pretending a teacher can add one and failing at the server.
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(t('teacher.classNotEditable'))),
-            ),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: Role.teacher.tint.withValues(alpha: AppTheme.dark ? 0.14 : 0.09),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      t('teacher.addClass'),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Role.teacher.tint,
-                      ),
-                    ),
-                  ),
-                  Icon(Icons.add_circle_outline_rounded, size: 17, color: Role.teacher.tint),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );

@@ -34,6 +34,11 @@ class DriverApp extends StatefulWidget {
 class _DriverAppState extends State<DriverApp> {
   int _tab = 0;
 
+  /// Guards the Drive button. Finding the run can take a few seconds on a yard
+  /// connection, and a driver who gets no answer presses again — which used to
+  /// stack two copies of the run on top of each other.
+  bool _finding = false;
+
   List<NavItem> get _nav => [
         NavItem(Icons.home_rounded, Icons.home_outlined, t('nav.home'), glyph: NavGlyph.home),
         NavItem(Icons.map_rounded, Icons.map_outlined, t('driver.route'), glyph: NavGlyph.route),
@@ -65,7 +70,6 @@ class _DriverAppState extends State<DriverApp> {
               greeting: greeting,
               name: me?.name ?? '',
               school: me?.schoolName ?? '',
-              onBell: () => setState(() => _tab = 1),
             ),
             Expanded(
               child: IndexedStack(
@@ -96,38 +100,45 @@ class _DriverAppState extends State<DriverApp> {
   /// Straight into the run. Not a menu: at 06:40 there is exactly one thing a
   /// driver wants from a big button in the middle of the screen.
   Future<void> _drive() async {
+    if (_finding) return;
+    setState(() => _finding = true);
     try {
       final trip = await loadDutyTrip();
       if (!mounted) return;
       if (trip == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(t('driver.noRunsToday'))),
-        );
+        showNote(context, t('driver.noRunsToday'));
         return;
       }
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => TripScreen(tripId: trip.id)),
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => TripScreen(tripId: trip.id, serviceDate: trip.serviceDate),
+        ),
       );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorText(e))));
+      // errorText, never the exception. "SocketException: Failed host lookup"
+      // in front of a driver is a bug report, not a message.
+      if (mounted) showNote(context, errorText(e), bad: true);
+    } finally {
+      if (mounted) setState(() => _finding = false);
     }
   }
 }
 
-/// The driver's header. No menu button — there is no drawer to open.
+/// The driver's header.
+///
+/// No menu button — there is no drawer to open — and no bell either: nothing in
+/// this app keeps a list of notifications, and the one that was here jumped to
+/// the Route tab, which is not what a bell promises.
 class _DriverHeader extends StatelessWidget {
   const _DriverHeader({
     required this.greeting,
     required this.name,
     required this.school,
-    required this.onBell,
   });
 
   final String greeting;
   final String name;
   final String school;
-  final VoidCallback onBell;
 
   @override
   Widget build(BuildContext context) {
@@ -206,8 +217,6 @@ class _DriverHeader extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          SquareButton(icon: Icons.notifications_none_rounded, onTap: onBell),
         ],
       ),
     );

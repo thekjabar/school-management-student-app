@@ -8,6 +8,7 @@ import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
+import 'teacher_kit.dart';
 
 /// What the school has told the staff.
 ///
@@ -52,17 +53,76 @@ class _Notice extends StatelessWidget {
 
     return Card16(
       padding: const EdgeInsets.all(14),
+      // The card shows three lines of the notice; this is the rest of it. Not
+      // an AlertDialog — that arrives with Material's own radius, its own
+      // title size and its own grey button, none of which are this app's.
       onTap: () => showDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: Text(item.title),
-          content: SingleChildScrollView(child: Text(item.body)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(t('common.close')),
+        barrierColor: Colors.black.withValues(alpha: AppTheme.dark ? 0.62 : 0.34),
+        builder: (context) => Dialog(
+          backgroundColor: AppTheme.surface,
+          surfaceTintColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 44),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Chip36(
+                      icon: urgent ? Icons.priority_high_rounded : Icons.campaign_outlined,
+                      color: tint,
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.title,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                              height: 1.3,
+                              color: AppTheme.text,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            longDate(item.sentAt),
+                            style: TextStyle(fontSize: 11, color: AppTheme.textFaint),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Text(
+                      item.body,
+                      style: TextStyle(fontSize: 13.5, height: 1.55, color: AppTheme.textMuted),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: SoftButton(
+                    label: t('common.close'),
+                    tint: tint,
+                    onTap: () => Navigator.of(context).pop(),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
       child: Column(

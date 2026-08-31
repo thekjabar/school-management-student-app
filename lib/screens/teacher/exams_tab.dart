@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../ui/screen_kit.dart';
 
 import '../../api/client.dart';
 import '../../api/session.dart';
@@ -8,7 +7,10 @@ import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
+import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
+import '../../ui/screen_kit.dart';
+import 'teacher_kit.dart';
 
 /// Exams, and the mark sheet behind each one.
 ///
@@ -37,32 +39,43 @@ class _ExamsTabState extends State<ExamsTab> {
         icon: const Icon(Icons.add_rounded),
         label: Text(t('teacher.newTest')),
       ),
-      body: Loader<List<TeacherExam>>(
-        key: _loaderKey,
-        tint: Role.teacher.tint,
-        load: () => TeacherApi.instance.exams(),
-        isEmpty: (rows) => rows.isEmpty,
-        empty: t('teacher.noTestsYet'),
-        builder: (context, rows) {
-          final sorted = [...rows]..sort((a, b) => b.date.compareTo(a.date));
-          return Column(
-            children: [
-              const SizedBox(height: 12),
-              ...sorted.map(
-                (e) => _ExamCard(
-                  exam: e,
-                  onOpen: () async {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => MarksScreen(exam: e)),
-                    );
-                    _loaderKey.currentState?.reload();
-                  },
-                ),
+      // Always pushed, never a tab, so it carries its own way back.
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            ScreenHeader(title: t('teacher.exams')),
+            Expanded(
+              child: Loader<List<TeacherExam>>(
+                key: _loaderKey,
+                tint: Role.teacher.tint,
+                load: () => TeacherApi.instance.exams(),
+                isEmpty: (rows) => rows.isEmpty,
+                empty: t('teacher.noTestsYet'),
+                builder: (context, rows) {
+                  final sorted = [...rows]..sort((a, b) => b.date.compareTo(a.date));
+                  return Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      ...sorted.map(
+                        (e) => _ExamCard(
+                          exam: e,
+                          onOpen: () async {
+                            await Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => MarksScreen(exam: e)),
+                            );
+                            _loaderKey.currentState?.reload();
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 80),
+                    ],
+                  );
+                },
               ),
-              const SizedBox(height: 80),
-            ],
-          );
-        },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -135,7 +148,10 @@ class _ExamCard extends StatelessWidget {
                 Icon(Icons.edit_note_rounded, size: 15, color: AppTheme.textFaint),
                 const SizedBox(width: 6),
                 Text(
-                  '${exam.resultCount} marked · out of ${exam.maxScore}',
+                  tv('teacher.markedOutOf', {
+                    'n': exam.resultCount,
+                    'max': exam.maxScore,
+                  }),
                   style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                 ),
                 const Spacer(),
@@ -190,22 +206,17 @@ class _MarksScreenState extends State<MarksScreen> {
   }
 
   Future<void> _publish() async {
-    final yes = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(t('teacher.releaseAsk')),
-        content: Text(t('teacher.releaseWarning')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t('teacher.notYet'))),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Role.teacher.tint),
-            child: Text(t('teacher.release')),
-          ),
-        ],
-      ),
+    final yes = await confirmDialog(
+      context,
+      icon: Icons.visibility_rounded,
+      tone: AppTheme.green,
+      title: t('teacher.releaseAsk'),
+      body: t('teacher.releaseWarning'),
+      confirmLabel: t('teacher.release'),
+      confirmIcon: Icons.send_rounded,
+      cancelLabel: t('teacher.notYet'),
     );
-    if (yes != true) return;
+    if (!yes || !mounted) return;
 
     try {
       await TeacherApi.instance.publishMarks(widget.exam.id);
@@ -229,42 +240,22 @@ class _MarksScreenState extends State<MarksScreen> {
           child: Row(
             children: [
               Expanded(
-                child: SizedBox(
+                child: BigButton(
+                  label: tn('teacher.saveCount', '$marked/${_rows.length}'),
+                  color: Role.teacher.tint,
                   height: 50,
-                  child: FilledButton(
-                    onPressed: _dirty && !_saving ? _save : null,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Role.teacher.tint,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                      ),
-                    ),
-                    child: _saving
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
-                          )
-                        : Text(tn('teacher.saveCount', '$marked/${_rows.length}')),
-                  ),
+                  busy: _saving,
+                  onPressed: _dirty ? _save : null,
                 ),
               ),
               if (_mayRelease) ...[
                 const SizedBox(width: 10),
                 Expanded(
-                  child: SizedBox(
+                  child: SoftButton(
+                    label: _published ? t('teacher.released') : t('teacher.release'),
+                    tint: AppTheme.green,
                     height: 50,
-                    child: OutlinedButton(
-                      onPressed: _published || _dirty ? null : _publish,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.green,
-                        side: BorderSide(color: AppTheme.green),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                        ),
-                      ),
-                      child: Text(_published ? t('teacher.released') : t('teacher.release')),
-                    ),
+                    onTap: _published || _dirty ? null : _publish,
                   ),
                 ),
               ],
@@ -417,7 +408,7 @@ class _MarkEntryState extends State<_MarkEntry> {
                   borderRadius: BorderRadius.circular(11),
                 ),
                 child: Text(
-                  'Ab',
+                  t('teacher.absentShort'),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
@@ -455,6 +446,18 @@ class _MarkEntryState extends State<_MarkEntry> {
       ),
     );
   }
+}
+
+/// What kind of test this is, in the reader's language.
+///
+/// The API speaks in enum names because they are stable across releases, and
+/// humanise only sentence-cases them — which left a Kurdish teacher choosing
+/// between six English words. Falls back to humanise so a kind the server adds
+/// after this release still reads as a word rather than as a missing key.
+String _kindName(String kind) {
+  final key = 'teacher.kind.$kind';
+  final label = t(key);
+  return label == key ? humanise(kind) : label;
 }
 
 class _NewExamSheet extends StatefulWidget {
@@ -629,7 +632,7 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                           border: Border.all(color: on ? Role.teacher.tint : AppTheme.border),
                         ),
                         child: Text(
-                          humanise(k),
+                          _kindName(k),
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,
@@ -714,25 +717,12 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                   Text(_error!, style: TextStyle(color: AppTheme.rose, fontSize: 12.5)),
                 ],
                 const SizedBox(height: 16),
-                SizedBox(
+                BigButton(
+                  label: t('teacher.create'),
+                  color: Role.teacher.tint,
                   height: 50,
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _busy ? null : _save,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Role.teacher.tint,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                      ),
-                    ),
-                    child: _busy
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
-                          )
-                        : Text(t('teacher.create'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                  ),
+                  busy: _busy,
+                  onPressed: _save,
                 ),
               ],
             ],

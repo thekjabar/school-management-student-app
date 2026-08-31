@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../ui/screen_kit.dart';
 
 import '../../api/client.dart';
 import '../../api/teacher_api.dart';
@@ -7,7 +6,10 @@ import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
+import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
+import '../../ui/screen_kit.dart';
+import 'teacher_kit.dart';
 
 /// A teacher's classes, and the register for one of them.
 ///
@@ -83,8 +85,11 @@ class ClassesTab extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                '${c.subjectName} · ${c.studentCount} children'
-                                '${c.room != null ? ' · ${c.room}' : ''}',
+                                tv('teacher.classMeta', {
+                                      'subject': c.subjectName,
+                                      'n': c.studentCount,
+                                    }) +
+                                    (c.room != null ? ' · ${c.room}' : ''),
                                 style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                               ),
                             ],
@@ -98,28 +103,22 @@ class ClassesTab extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: FilledButton(
+                          child: BigButton(
+                            label: t('teacher.takeRegister'),
+                            color: Role.teacher.tint,
+                            height: 44,
                             onPressed: () => Navigator.of(context).push(
                               MaterialPageRoute(builder: (_) => RegisterScreen(slot: c)),
                             ),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Role.teacher.tint,
-                              minimumSize: const Size(0, 44),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                              ),
-                            ),
-                            child: Text(t('teacher.takeRegister')),
                           ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.of(context).push(
+                          child: SoftButton(
+                            label: t('teacher.theChildren'),
+                            onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(builder: (_) => ClassRosterScreen(slot: c)),
                             ),
-                            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
-                            child: Text(t('teacher.theChildren')),
                           ),
                         ),
                       ],
@@ -202,27 +201,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ? SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: SizedBox(
-                  height: 50,
-                  child: FilledButton(
-                    onPressed: _saving ? null : _save,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Role.teacher.tint,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                      ),
-                    ),
-                    child: _saving
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
-                          )
-                        : Text(
-                            tn('teacher.saveTally', t('teacher.tally').replaceAll('{n}', '$present').replaceAll('{a}', '$absent').replaceAll('{l}', '$late')),
-                            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
-                          ),
+                child: BigButton(
+                  label: tn(
+                    'teacher.saveTally',
+                    tv('teacher.tally', {'n': present, 'a': absent, 'l': late}),
                   ),
+                  color: Role.teacher.tint,
+                  height: 50,
+                  busy: _saving,
+                  onPressed: _save,
                 ),
               ),
             )
@@ -233,11 +220,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
           children: [
             ScreenHeader(
               title: widget.slot.className,
-              trailing: TextButton.icon(
-                onPressed: _pickDate,
-                icon: const Icon(Icons.calendar_today_rounded, size: 16),
-                label: Text(shortDate(_date)),
-                style: TextButton.styleFrom(foregroundColor: AppTheme.text),
+              trailing: SoftButton(
+                label: shortDate(_date),
+                icon: Icons.calendar_today_rounded,
+                height: 40,
+                onTap: _pickDate,
               ),
             ),
             Expanded(
@@ -327,11 +314,14 @@ class _MarkRow extends StatelessWidget {
   final RegisterMark mark;
   final ValueChanged<String> onChanged;
 
+  // A getter, not a const: the letter on each chip is the first letter of the
+  // word in the language the app is showing, and a Kurdish register marked
+  // with P, A, L and E is four English initials nobody can read.
   static List<(String, String, Color, Color)> get _options => [
-    ('PRESENT', 'P', AppTheme.green, AppTheme.greenSoft),
-    ('ABSENT', 'A', AppTheme.rose, AppTheme.roseSoft),
-    ('LATE', 'L', AppTheme.amber, AppTheme.amberSoft),
-    ('EXCUSED', 'E', AppTheme.blue, AppTheme.blueSoft),
+    ('PRESENT', t('teacher.markPresent'), AppTheme.green, AppTheme.greenSoft),
+    ('ABSENT', t('teacher.markAbsent'), AppTheme.rose, AppTheme.roseSoft),
+    ('LATE', t('teacher.markLate'), AppTheme.amber, AppTheme.amberSoft),
+    ('EXCUSED', t('teacher.markExcused'), AppTheme.blue, AppTheme.blueSoft),
   ];
 
   @override
@@ -412,7 +402,7 @@ class ClassRosterScreen extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
-            ScreenHeader(title: '${slot.className} — children'),
+            ScreenHeader(title: '${slot.className} · ${t('teacher.theChildren')}'),
             Expanded(
               child: Loader<List<ClassStudent>>(
                 tint: Role.teacher.tint,

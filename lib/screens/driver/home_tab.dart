@@ -54,14 +54,45 @@ CrewTrip? pickLiveTrip(List<CrewTrip> trips) {
 /// One question first — which run, and can I start it — then the four numbers
 /// that decide whether they are ahead or behind, then the stop they are
 /// actually driving to. Everything below that is reference.
-class DriverHome extends StatelessWidget {
+class DriverHome extends StatefulWidget {
   const DriverHome({super.key, required this.onOpenTab});
 
   final void Function(int tab) onOpenTab;
 
   @override
+  State<DriverHome> createState() => _DriverHomeState();
+}
+
+class _DriverHomeState extends State<DriverHome> {
+  final _loaderKey = GlobalKey<LoaderState<_Duty>>();
+  bool _busy = false;
+
+  void Function(int tab) get onOpenTab => widget.onOpenTab;
+
+  /// Arriving at a stop, and leaving it.
+  ///
+  /// Both were buttons on this card that only opened the run screen. They are
+  /// the two calls the platform actually offers, they are what the driver is
+  /// pressing the card for, and doing them here saves four taps at the one
+  /// moment nobody has four taps to spare.
+  Future<void> _stopAction(Future<void> Function() call, String label) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await call();
+      _loaderKey.currentState?.reload();
+      if (mounted) showNote(context, label);
+    } catch (e) {
+      if (mounted) showNote(context, errorText(e), bad: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Loader<_Duty>(
+      key: _loaderKey,
       tint: Role.driver.tint,
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
       load: () async {
@@ -135,11 +166,33 @@ class DriverHome extends StatelessWidget {
             _NextStopCard(
               stop: next,
               leg: trip.leg,
+              busy: _busy,
               onOpen: () => _open(context, trip),
+              // Only while the run is actually under way. Recording an arrival
+              // at a stop on a run nobody has started is a call the server is
+              // right to refuse, and offering it invites the refusal.
+              onStopAction: next == null || !trip.running
+                  ? null
+                  : () => next.arrivedAt == null
+                      ? _stopAction(
+                          () => CrewApi.instance
+                              .arriveAtStop(trip.id, next.plannedSequence),
+                          t('driver.arrived'),
+                        )
+                      : _stopAction(
+                          () => CrewApi.instance
+                              .leaveStop(trip.id, next.plannedSequence),
+                          t('driver.movingOn'),
+                        ),
             ),
             const SizedBox(height: kCardGap),
 
             // ---- The four things they DO ----------------------------------
+            //
+            // Four tiles, four different places. Attendance used to open the
+            // Profile tab — tab three, counted from a list that had changed —
+            // and Notifications opened the run, because this app keeps no
+            // notifications at all.
             Row(
               children: [
                 Expanded(
@@ -158,19 +211,17 @@ class DriverHome extends StatelessWidget {
                     top: t('driver.attendance'),
                     bottom: t('driver.mark'),
                     color: AppTheme.green,
-                    onTap: () => onOpenTab(3),
+                    onTap: () => onOpenTab(2),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _ActionTile(
-                    icon: Icons.notifications_none_rounded,
-                    top: t('driver.notifications'),
-                    bottom: trip.sweepRequired && trip.sweepConfirmedAt == null
-                        ? t('driver.sweepDue')
-                        : t('driver.allGood'),
+                    icon: Icons.route_outlined,
+                    top: t('driver.route'),
+                    bottom: t('driver.stops'),
                     color: AppTheme.amber,
-                    onTap: () => _open(context, trip),
+                    onTap: () => onOpenTab(1),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -178,7 +229,9 @@ class DriverHome extends StatelessWidget {
                   child: _ActionTile(
                     icon: Icons.verified_user_outlined,
                     top: t('driver.safety'),
-                    bottom: t('driver.check'),
+                    bottom: trip.sweepRequired && trip.sweepConfirmedAt == null
+                        ? t('driver.sweepDue')
+                        : t('driver.allGood'),
                     color: AppTheme.blue,
                     onTap: () => _open(context, trip),
                   ),
@@ -213,9 +266,11 @@ class DriverHome extends StatelessWidget {
   static String _percent(int part, int whole) =>
       whole <= 0 ? '—' : '(${(part / whole * 100).round()}%)';
 
-  static void _open(BuildContext context, CrewTrip trip) {
+  void _open(BuildContext context, CrewTrip trip) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => TripScreen(tripId: trip.id)),
+      MaterialPageRoute(
+        builder: (_) => TripScreen(tripId: trip.id, serviceDate: trip.serviceDate),
+      ),
     );
   }
 }
@@ -358,11 +413,14 @@ class _DutyCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 13),
+                      // 46 high. The primary action on the driver's first
+                      // screen was a 39 dp pill.
                       GestureDetector(
                         onTap: onOpen,
                         behavior: HitTestBehavior.opaque,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          height: 46,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
                           decoration: BoxDecoration(
                             color: tint,
                             borderRadius: BorderRadius.circular(999),
@@ -384,13 +442,13 @@ class _DutyCard extends StatelessWidget {
                               ),
                               const SizedBox(width: 7),
                               Container(
-                                width: 20,
-                                height: 20,
+                                width: 22,
+                                height: 22,
                                 decoration: const BoxDecoration(
                                   color: Colors.white,
                                   shape: BoxShape.circle,
                                 ),
-                                child: Icon(Icons.play_arrow_rounded, size: 14, color: tint),
+                                child: Icon(Icons.play_arrow_rounded, size: 15, color: tint),
                               ),
                             ],
                           ),
@@ -460,11 +518,22 @@ class _Fact extends StatelessWidget {
  * ------------------------------------------------------------------------- */
 
 class _NextStopCard extends StatelessWidget {
-  const _NextStopCard({required this.stop, required this.leg, required this.onOpen});
+  const _NextStopCard({
+    required this.stop,
+    required this.leg,
+    required this.busy,
+    required this.onOpen,
+    required this.onStopAction,
+  });
 
   final PlannedStop? stop;
   final String leg;
+  final bool busy;
   final VoidCallback onOpen;
+
+  /// Arrive, or move on — whichever the stop is owed. Null when there is no
+  /// stop left to act on.
+  final VoidCallback? onStopAction;
 
   @override
   Widget build(BuildContext context) {
@@ -534,6 +603,19 @@ class _NextStopCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
                             ),
+                            // The landmark. In much of the Region this is the
+                            // only usable address, and it was on the run screen
+                            // three taps away instead of on the card naming the
+                            // stop the driver is heading for.
+                            if (s.landmark != null && s.landmark!.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                s.landmark!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 11, color: AppTheme.textFaint),
+                              ),
+                            ],
                             if (s.metresAway != null) ...[
                               const SizedBox(height: 4),
                               Row(
@@ -563,18 +645,32 @@ class _NextStopCard extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
+                        // Records the arrival, or the departure once the bus is
+                        // there. It used to open the run screen and record
+                        // nothing, under a label that said it had.
                         child: _Button(
-                          icon: Icons.check_circle_outline_rounded,
-                          label: t('driver.iveArrived'),
+                          // Nothing directional: an east arrow points the wrong
+                          // way on a Kurdish or Arabic screen.
+                          icon: s.arrivedAt == null
+                              ? Icons.check_circle_outline_rounded
+                              : Icons.directions_bus_rounded,
+                          label: s.arrivedAt == null
+                              ? t('driver.iveArrived')
+                              : t('driver.movingOn'),
                           filled: true,
-                          onTap: onOpen,
+                          busy: busy,
+                          onTap: onStopAction,
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
+                        // Was "Navigate", and opened the same run screen. There
+                        // is no navigation in this build — no maps app is
+                        // launched from anywhere — so the button now says what
+                        // it does.
                         child: _Button(
-                          icon: Icons.near_me_outlined,
-                          label: t('driver.navigate'),
+                          icon: Icons.list_alt_rounded,
+                          label: t('driver.openRun'),
                           filled: false,
                           onTap: onOpen,
                         ),
@@ -590,50 +686,71 @@ class _NextStopCard extends StatelessWidget {
   }
 }
 
+/// One of the two buttons under the next stop.
+///
+/// 48 high, because a bus is not a desk. The pair used to be 40, which is under
+/// every platform's floor and well under what a gloved thumb hits at the first
+/// attempt.
 class _Button extends StatelessWidget {
   const _Button({
     required this.icon,
     required this.label,
     required this.filled,
     required this.onTap,
+    this.busy = false,
   });
 
   final IconData icon;
   final String label;
   final bool filled;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
     final tint = Role.driver.tint;
+    final off = onTap == null || busy;
+    final ink = filled ? Colors.white : tint;
+
     return GestureDetector(
-      onTap: onTap,
+      onTap: busy ? null : onTap,
       behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 11),
-        decoration: BoxDecoration(
-          color: filled ? tint : AppTheme.surface,
-          borderRadius: BorderRadius.circular(11),
-          border: Border.all(color: filled ? tint : tint.withValues(alpha: 0.45)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 15, color: filled ? Colors.white : tint),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: filled ? Colors.white : tint,
+      child: Opacity(
+        opacity: off ? 0.55 : 1,
+        child: Container(
+          height: 48,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: filled ? tint : AppTheme.surface,
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: filled ? tint : tint.withValues(alpha: 0.45)),
+          ),
+          child: busy
+              ? SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2.2, color: ink),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 16, color: ink),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: ink,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -731,6 +848,9 @@ class _ProgressCard extends StatelessWidget {
 
     return Card16(
       padding: const EdgeInsets.all(12),
+      // The whole card, not only the ten-point "Full route" link in its
+      // corner. That link is the smallest thing on the driver's home screen.
+      onTap: onOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

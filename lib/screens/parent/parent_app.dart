@@ -14,7 +14,6 @@ import 'home_tab.dart';
 import 'leave_screen.dart';
 import 'messages_tab.dart';
 import 'parent_profile_tab.dart';
-import 'profile_drawer.dart';
 
 /// The parent app.
 ///
@@ -31,10 +30,6 @@ class ParentApp extends StatefulWidget {
 }
 
 class _ParentAppState extends State<ParentApp> {
-  // Held so the avatar can open the drawer: the Scaffold that owns it is
-  // built by this very method, so there is no context above it to ask.
-  final _scaffold = GlobalKey<ScaffoldState>();
-
   /// One per destination, so each tab remembers where it was and the back
   /// gesture unwinds the tab rather than the app.
   final _navKeys = List.generate(4, (_) => GlobalKey<NavigatorState>());
@@ -143,33 +138,23 @@ class _ParentAppState extends State<ParentApp> {
         }
       },
       child: Scaffold(
-      key: _scaffold,
       backgroundColor: AppTheme.canvas,
-      // The account lives behind the avatar rather than in a fourth tab. A
-      // "⋯ More" tab spends a quarter of the bottom bar on a drawer's worth of
-      // settings, and hides the three things a parent opens the app for.
-      drawer: children == null
-          ? null
-          : ProfileDrawer(
-              children: children,
-              selected: child,
-              onSelectChild: (id) => setState(() => _selectedId = id),
-              onGoTab: (i) => setState(() => _tab = i),
-              unread: _unread,
-            ),
+      // No drawer. Everything the old one listed is reachable without it — the
+      // account rows from the Profile tab, the child's screens from the Home
+      // tab's quick actions, Home and Messages from the bottom bar — so the
+      // menu button it hung from was spending the best 52pt in the header on a
+      // second copy of the app's navigation.
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            ParentHeader(
+            _Header(
               greeting: greeting,
               parentName: me?.name ?? '',
-              child: child == null
-                  ? null
-                  : ChildBrief(name: child.name, className: child.className),
+              childName: child?.name ?? '',
+              className: child?.className ?? '',
               schoolName: me?.schoolName ?? '',
               tint: role.tint,
-              onMenu: () => _scaffold.currentState?.openDrawer(),
               onBell: () => setState(() => _tab = 1),
               notificationCount: _unread,
               // Only a family with more than one child gets the switcher.
@@ -255,6 +240,190 @@ class _ParentAppState extends State<ParentApp> {
   }
 }
 
+
+/* ---------------------------------------------------------------------------
+ * The header
+ * ------------------------------------------------------------------------- */
+
+/// Who this screen is about, and the bell.
+///
+/// The leading menu button is gone with the drawer it opened, and the 52pt it
+/// held has gone to the child: a bigger ring on the face, and a text column
+/// wide enough that a real school name and a real class stop ellipsing on a
+/// small handset. The face is the child switcher — the chevron on it is the
+/// only affordance in the header now, so it is the only one that has to read.
+class _Header extends StatelessWidget {
+  const _Header({
+    required this.greeting,
+    required this.parentName,
+    required this.childName,
+    required this.className,
+    required this.schoolName,
+    required this.tint,
+    required this.onBell,
+    this.notificationCount = 0,
+    this.canSwitchChild = false,
+    this.onSwitchChild,
+  });
+
+  final String greeting;
+  final String parentName;
+  final String childName;
+  final String className;
+  final String schoolName;
+  final Color tint;
+  final VoidCallback onBell;
+  final int notificationCount;
+  final bool canSwitchChild;
+  final VoidCallback? onSwitchChild;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(kGutter, 8, kGutter, 12),
+      child: Row(
+        children: [
+          _Face(
+            label: childName.isEmpty ? parentName : childName,
+            tint: tint,
+            canSwitch: canSwitchChild,
+            onTap: canSwitchChild ? onSwitchChild : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  greeting,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  '$parentName 👋',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                    height: 1.2,
+                    color: AppTheme.text,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                // School, then the child's name and class — an emoji rather
+                // than an icon because the design's glyph is a rendered
+                // building, and a flat Material outline beside it reads as a
+                // different app.
+                Row(
+                  children: [
+                    const Text('🏫', style: TextStyle(fontSize: 11.5)),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        schoolName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                      ),
+                    ),
+                    if (className.isNotEmpty) ...[
+                      Text(
+                        '  •  ',
+                        style: TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
+                      ),
+                      Flexible(
+                        child: Text(
+                          className,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: tint,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          SquareButton(
+            icon: Icons.notifications_none_rounded,
+            onTap: onBell,
+            badge: notificationCount,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The child's face, ringed, with the switcher on it.
+class _Face extends StatelessWidget {
+  const _Face({required this.label, required this.tint, required this.canSwitch, this.onTap});
+
+  final String label;
+  final Color tint;
+  final bool canSwitch;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 52,
+        height: 52,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              padding: const EdgeInsets.all(2.5),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: tint, width: 1.6),
+              ),
+              child: CircleInitials(label: label, tint: tint, size: 45),
+            ),
+            PositionedDirectional(
+              bottom: -1,
+              end: -1,
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: tint,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppTheme.canvas, width: 1.8),
+                ),
+                child: Icon(
+                  canSwitch ? Icons.expand_more_rounded : Icons.check_rounded,
+                  size: 11,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _NoChildren extends StatelessWidget {
   const _NoChildren();

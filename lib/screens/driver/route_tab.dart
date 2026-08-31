@@ -108,9 +108,7 @@ class DriverRoute extends StatelessWidget {
                   SectionRow(
                     title: t('driver.theRun'),
                     actionLabel: t('driver.openRun'),
-                    onAction: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => TripScreen(tripId: trip.id)),
-                    ),
+                    onAction: () => _openRun(context, trip),
                   ),
                   if (stops.isEmpty)
                     Padding(
@@ -128,9 +126,7 @@ class DriverRoute extends StatelessWidget {
                         first: i == 0,
                         last: i == stops.length - 1,
                         live: i == liveIndex,
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => TripScreen(tripId: trip.id)),
-                        ),
+                        onTap: () => _openRun(context, trip),
                       ),
                 ],
               ),
@@ -140,6 +136,19 @@ class DriverRoute extends StatelessWidget {
       },
     );
   }
+}
+
+/// The run screen, told which day it belongs to.
+///
+/// Without the date it looks the run up in TODAY's list, so a run this screen
+/// is quite correctly showing on a Friday for the coming Sunday opened with no
+/// start button on it.
+void _openRun(BuildContext context, CrewTrip trip) {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => TripScreen(tripId: trip.id, serviceDate: trip.serviceDate),
+    ),
+  );
 }
 
 class _Run {

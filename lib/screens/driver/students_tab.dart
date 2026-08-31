@@ -22,12 +22,62 @@ class DriverStudents extends StatefulWidget {
 }
 
 class _DriverStudentsState extends State<DriverStudents> {
+  final _loaderKey = GlobalKey<LoaderState<_Roster>>();
   _Filter _filter = _Filter.all;
   String _query = '';
+  String? _busyStudent;
+
+  /// Board, drop off, or not travelling — written to the custody ledger.
+  ///
+  /// This list is where a driver looks for one name out of forty. It used to be
+  /// read-only, so finding the name meant remembering which stop it was under
+  /// and going to look for it again on the run screen.
+  Future<void> _record(String tripId, _Rider entry, String eventType, String label) async {
+    setState(() => _busyStudent = entry.rider.studentId);
+    try {
+      await CrewApi.instance.recordCustody(
+        tripId: tripId,
+        studentId: entry.rider.studentId,
+        eventType: eventType,
+        stopId: entry.stop.stopId,
+      );
+      _loaderKey.currentState?.reload();
+      if (mounted) {
+        showNote(context, '${entry.rider.name.split(' ').first} — $label');
+      }
+    } catch (e) {
+      if (mounted) showNote(context, errorText(e), bad: true);
+    } finally {
+      if (mounted) setState(() => _busyStudent = null);
+    }
+  }
+
+  Future<void> _openActions(String tripId, _Rider entry, String leg) async {
+    final choice = await showModalBottomSheet<_Mark>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _MarkSheet(entry: entry, leg: leg),
+    );
+    if (choice == null || !mounted) return;
+    switch (choice) {
+      case _Mark.boarded:
+        await _record(tripId, entry, 'BOARDED', t('driver.onBoard'));
+      case _Mark.dropped:
+        await _record(
+          tripId,
+          entry,
+          leg == 'OUT' ? 'ALIGHTED' : 'HANDOVER',
+          leg == 'OUT' ? t('driver.atSchool') : t('driver.handedOver'),
+        );
+      case _Mark.noShow:
+        await _record(tripId, entry, 'NO_SHOW', t('driver.notRiding'));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Loader<_Roster>(
+      key: _loaderKey,
       tint: Role.driver.tint,
       padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 18),
       load: () async {
@@ -114,7 +164,10 @@ class _DriverStudentsState extends State<DriverStudents> {
             const SizedBox(height: 10),
 
             SizedBox(
-              height: 34,
+              // 44, not 34. These four are the fastest way to answer "who is
+              // still not on", and they were the smallest targets on the
+              // screen.
+              height: 44,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
@@ -159,7 +212,21 @@ class _DriverStudentsState extends State<DriverStudents> {
                   children: [
                     for (var i = 0; i < shown.length; i++) ...[
                       if (i > 0) Divider(height: 1, color: AppTheme.border),
-                      _RiderRow(entry: shown[i], leg: roster.trip!.leg),
+                      _RiderRow(
+                        entry: shown[i],
+                        leg: roster.trip!.leg,
+                        busy: _busyStudent == shown[i].rider.studentId,
+                        // A child already off the bus has nothing left to
+                        // record, so that row is not a tap that does nothing —
+                        // it is not a tap.
+                        onTap: shown[i].isDone
+                            ? null
+                            : () => _openActions(
+                                  roster.trip!.id,
+                                  shown[i],
+                                  roster.trip!.leg,
+                                ),
+                      ),
                     ],
                   ],
                 ),
@@ -251,10 +318,17 @@ class _Chip extends StatelessWidget {
 }
 
 class _RiderRow extends StatelessWidget {
-  const _RiderRow({required this.entry, required this.leg});
+  const _RiderRow({
+    required this.entry,
+    required this.leg,
+    required this.busy,
+    required this.onTap,
+  });
 
   final _Rider entry;
   final String leg;
+  final bool busy;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -264,8 +338,10 @@ class _RiderRow extends StatelessWidget {
             ? (AppTheme.green, t('driver.onBoard'))
             : (AppTheme.amber, t('driver.waiting'));
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 11),
+    final row = Padding(
+      // 14 top and bottom puts the row at 66 — a name on a list a driver
+      // scrolls with a thumb while the engine is running.
+      padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
         children: [
           CircleInitials(label: entry.rider.name, tint: colour, size: 38),
@@ -308,8 +384,151 @@ class _RiderRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Pill(word, color: colour),
+          if (busy)
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2.2, color: colour),
+            )
+          else ...[
+            Pill(word, color: colour),
+            // The chevron only where there is something to open, so the rows
+            // that do nothing do not look like the rows that do.
+            if (onTap != null)
+              Icon(Icons.chevron_right_rounded, size: 20, color: AppTheme.textFaint),
+          ],
         ],
+      ),
+    );
+
+    if (onTap == null || busy) return row;
+    // The Material is inside the card, so the ripple lands on the card's own
+    // surface. Without it the ink paints on the Scaffold, underneath an opaque
+    // white card, and the row gives no sign of having been pressed at all.
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(onTap: onTap, child: row),
+    );
+  }
+}
+
+/// What a tap on a name can record.
+enum _Mark { boarded, dropped, noShow }
+
+/// The sheet behind a name.
+///
+/// Full-width buttons, one per thing that can be written to the ledger, and
+/// only the ones that make sense for where this child currently is. Every one
+/// of them is a real event on the custody ledger — there is nothing here that
+/// only closes the sheet.
+class _MarkSheet extends StatelessWidget {
+  const _MarkSheet({required this.entry, required this.leg});
+
+  final _Rider entry;
+  final String leg;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = Role.driver.tint;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                CircleInitials(label: entry.rider.name, tint: tint, size: 44),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.rider.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        entry.stop.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            if (!entry.isOnBoard) ...[
+              BigButton(
+                label: t('driver.markBoarded'),
+                color: tint,
+                height: 52,
+                onPressed: () => Navigator.of(context).pop(_Mark.boarded),
+              ),
+              const SizedBox(height: 10),
+            ],
+            if (entry.isOnBoard) ...[
+              BigButton(
+                label: leg == 'RETURN' ? t('driver.handedOver') : t('driver.markDropped'),
+                color: AppTheme.green,
+                height: 52,
+                onPressed: () => Navigator.of(context).pop(_Mark.dropped),
+              ),
+              const SizedBox(height: 10),
+            ],
+            if (entry.isWaiting)
+              BigButton(
+                label: t('driver.markNoShow'),
+                color: AppTheme.rose,
+                height: 52,
+                onPressed: () => Navigator.of(context).pop(_Mark.noShow),
+              ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(
+                  t('common.cancel'),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

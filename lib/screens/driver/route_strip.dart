@@ -41,6 +41,10 @@ class RouteStrip extends StatelessWidget {
                 track: AppTheme.dark
                     ? Colors.white.withValues(alpha: 0.14)
                     : Colors.black.withValues(alpha: 0.10),
+                // The ground a marker sits on, not white. On the dark theme a
+                // white pin is the brightest thing on the screen, and this
+                // strip is behind the run's own name.
+                ground: AppTheme.surface,
               ),
             ),
           ),
@@ -68,12 +72,14 @@ class _StripPainter extends CustomPainter {
     required this.done,
     required this.tint,
     required this.track,
+    required this.ground,
   });
 
   final int total;
   final int done;
   final Color tint;
   final Color track;
+  final Color ground;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -139,7 +145,7 @@ class _StripPainter extends CustomPainter {
       canvas.drawCircle(
         pos,
         passed ? 5.0 : 4.2,
-        Paint()..color = passed ? tint : Colors.white,
+        Paint()..color = passed ? tint : ground,
       );
       canvas.drawCircle(
         pos,
@@ -161,12 +167,16 @@ class _StripPainter extends CustomPainter {
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.6
-          ..color = Colors.white,
+          ..color = ground,
       );
     }
   }
 
   @override
   bool shouldRepaint(_StripPainter old) =>
-      old.total != total || old.done != done || old.tint != tint || old.track != track;
+      old.total != total ||
+      old.done != done ||
+      old.tint != tint ||
+      old.track != track ||
+      old.ground != ground;
 }

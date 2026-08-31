@@ -20,7 +20,7 @@ import 'settings_screen.dart';
 
 /// The guardian's own tab.
 ///
-/// Who they are, who their children are, and the six things they can change.
+/// Who they are, who their children are, and everything they can change.
 /// Not a settings screen with a name on top: the children come second, above
 /// the settings, because a parent opening this is far likelier to be checking
 /// which of their children is on the account than changing a password.
@@ -381,7 +381,7 @@ class _ChildRow extends StatelessWidget {
 }
 
 /* ---------------------------------------------------------------------------
- * The six things they can change
+ * Everything they can change
  * ------------------------------------------------------------------------- */
 
 class _Settings extends StatelessWidget {
@@ -456,18 +456,26 @@ class _Settings extends StatelessWidget {
             ),
           ),
           Divider(height: 1, color: AppTheme.border),
+          // Named for the screen it opens. It was "Notification settings",
+          // which was one quarter of what is behind it — the theme, the
+          // language and the password are in there too, and with the drawer's
+          // Settings row gone this row is the only way to any of them.
           _Row(
-            icon: Icons.notifications_none_rounded,
-            title: t('profile.notifications'),
+            icon: Icons.settings_outlined,
+            title: t('settings.title'),
             sub: t('profile.notificationsSub'),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const SettingsScreen()),
             ),
           ),
           Divider(height: 1, color: AppTheme.border),
+          // The screen's own title, not a second name for it. This row used to
+          // say "Payment methods", which promised a wallet the school does not
+          // have — there is no payment API, and the page is a balance, a set of
+          // invoices and three ways to hand over cash.
           _Row(
-            icon: Icons.credit_card_rounded,
-            title: t('profile.payments'),
+            icon: Icons.receipt_long_rounded,
+            title: t('fees.title'),
             sub: t('profile.paymentsSub'),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const FeesScreen()),
