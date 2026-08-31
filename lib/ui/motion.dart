@@ -30,6 +30,42 @@ import 'package:flutter/material.dart';
 /// The one place the setting is read. Everything below funnels through it.
 bool motionOff(BuildContext context) => MediaQuery.disableAnimationsOf(context);
 
+/// Whether the app is actually being looked at yet.
+///
+/// The splash is a lid over an app that is already running — that is the whole
+/// point of it, and it is why the app opens as fast as it does. But it means
+/// the shell mounts on the first frame and the home screen builds itself
+/// underneath an opaque video.
+///
+/// Every entrance below keys off mounting. So all of it started, ran and
+/// FINISHED behind the curtain, and the curtain lifted onto a screen that had
+/// already settled. The motion was real, it ran every launch, and not one frame
+/// of it was ever visible — which is why the app looked static however much was
+/// added to it.
+///
+/// Starts true, because an app with nothing covering it is being looked at.
+/// [SplashGate] sets it false while its curtain is down.
+final ValueNotifier<bool> appRevealed = ValueNotifier<bool>(true);
+
+/// Runs [start] once the app is on screen — now, if it already is.
+///
+/// Returns the listener to hand back to [ValueNotifier.removeListener] in
+/// dispose, or null when it fired immediately and registered nothing.
+VoidCallback? whenRevealed(VoidCallback start) {
+  if (appRevealed.value) {
+    start();
+    return null;
+  }
+  late final VoidCallback listener;
+  listener = () {
+    if (!appRevealed.value) return;
+    appRevealed.removeListener(listener);
+    start();
+  };
+  appRevealed.addListener(listener);
+  return listener;
+}
+
 /// How far apart two neighbours in a staggered run start.
 const kStaggerStep = Duration(milliseconds: 50);
 
@@ -99,6 +135,7 @@ class _RiseState extends State<Rise> with SingleTickerProviderStateMixin {
   /// when the screen APPEARS rather than every time something rebuilds it.
   bool _played = false;
   bool _still = false;
+  VoidCallback? _waiting;
 
   @override
   void didChangeDependencies() {
@@ -111,13 +148,18 @@ class _RiseState extends State<Rise> with SingleTickerProviderStateMixin {
     // the middle of somebody else's build.
     if (_still) {
       _controller.value = 1;
-    } else {
-      _controller.forward();
+      return;
     }
+    // Held until the splash is out of the way. Mounting is not the same thing
+    // as being seen, and this used to run its whole entrance behind the clip.
+    _waiting = whenRevealed(() {
+      if (mounted) _controller.forward();
+    });
   }
 
   @override
   void dispose() {
+    if (_waiting != null) appRevealed.removeListener(_waiting!);
     _t.dispose();
     _controller.dispose();
     super.dispose();
@@ -188,6 +230,7 @@ class _PopState extends State<Pop> with SingleTickerProviderStateMixin {
 
   bool _played = false;
   bool _still = false;
+  VoidCallback? _waiting;
 
   @override
   void didChangeDependencies() {
@@ -197,13 +240,17 @@ class _PopState extends State<Pop> with SingleTickerProviderStateMixin {
     _played = true;
     if (_still) {
       _controller.value = 1;
-    } else {
-      _controller.forward();
+      return;
     }
+    // Held until the splash is out of the way — see [appRevealed].
+    _waiting = whenRevealed(() {
+      if (mounted) _controller.forward();
+    });
   }
 
   @override
   void dispose() {
+    if (_waiting != null) appRevealed.removeListener(_waiting!);
     _t.dispose();
     _controller.dispose();
     super.dispose();
@@ -251,11 +298,18 @@ class CountUp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (motionOff(context)) return builder(context, value);
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: value),
-      duration: duration,
-      curve: curve,
-      builder: (context, shown, _) => builder(context, shown),
+    // The TARGET waits, rather than the animation: held at zero until the app
+    // is on screen, then the change of end value is what drives the count. A
+    // TweenAnimationBuilder starts the moment it is built, so behind the splash
+    // this used to finish counting before anybody could see a digit move.
+    return ValueListenableBuilder<bool>(
+      valueListenable: appRevealed,
+      builder: (context, revealed, _) => TweenAnimationBuilder<double>(
+        tween: Tween<double>(begin: 0, end: revealed ? value : 0),
+        duration: duration,
+        curve: curve,
+        builder: (context, shown, _) => builder(context, shown),
+      ),
     );
   }
 }

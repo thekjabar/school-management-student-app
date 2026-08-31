@@ -117,11 +117,17 @@ class Boot {
     // just no longer happens in the doorway.
     final cached = await Session.instance.restoreMe();
     if (cached != null) {
-      // Confirm first, then prefetch — in that order deliberately. If the
-      // access token has expired, letting both run at once means two requests
-      // discovering it together and two concurrent renewals racing for one
-      // refresh token, where the loser's is already spent.
-      _warm = _confirm().then((_) => _prefetch()).catchError((_) {});
+      // Both at once, and only the prefetch is what anything waits on.
+      //
+      // These were serialised, to stop two requests discovering an expired
+      // access token together and racing two renewals for one refresh token.
+      // They cannot: _renew() memoises the attempt that is in flight, so
+      // concurrent callers share one renewal and no token is spent twice. All
+      // the ordering bought was a whole /auth/me round trip in front of the
+      // home data, on every launch — which is the one thing a prefetch exists
+      // to avoid.
+      unawaited(_confirm());
+      _warm = _prefetch().catchError((_) {});
       return BootState(me: cached);
     }
 

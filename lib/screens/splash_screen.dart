@@ -4,6 +4,8 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../ui/motion.dart';
+
 /// The opening clip, played once over the app while it starts up.
 ///
 /// The app underneath is built and running from the first frame — the splash is
@@ -89,6 +91,10 @@ class _SplashGateState extends State<SplashGate> {
   @override
   void initState() {
     super.initState();
+    // Down from here until the curtain is gone. Everything underneath builds
+    // immediately — that is the design — but nothing should spend its entrance
+    // animation where it cannot be seen.
+    appRevealed.value = false;
     // The deadline is the backstop for both halves. A codec the handset cannot
     // open used to be a permanently black screen; a server that never answers
     // would now be the same thing, and one rule covers both.
@@ -177,6 +183,11 @@ class _SplashGateState extends State<SplashGate> {
       _release();
       if (mounted) setState(() => _curtainGone = true);
     });
+
+    // Slightly BEFORE the curtain finishes going, so the app is already moving
+    // as the last of the clip dissolves rather than sitting still for a beat
+    // and then starting. The two overlap by design.
+    Timer(_fade ~/ 3, () => appRevealed.value = true);
   }
 
   /// Take the sound down with the picture.
