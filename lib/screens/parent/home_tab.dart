@@ -8,6 +8,7 @@ import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
+import '../../ui/motion.dart';
 import '../../ui/nav_glyphs.dart';
 import 'assignments_screen.dart';
 import 'bus_screen.dart';
@@ -57,123 +58,139 @@ class HomeTab extends StatelessWidget {
         final payload = await HomePayload.fetch(child.studentId);
         return _Home.from(payload);
       },
+      // The five blocks arrive in the order they are read, a step apart. It is
+      // the page's own entrance and nothing more: it plays when the screen
+      // appears — see the latch in motion.dart — not every time the Loader
+      // refetches, or the screen would ripple at every poll.
       builder: (context, home) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _BusCard(
-            child: child,
-            transport: home.transport,
-            onTap: () => _push(context, BusScreen(child: child)),
+          Rise(
+            child: _BusCard(
+              child: child,
+              transport: home.transport,
+              onTap: () => _push(context, BusScreen(child: child)),
+            ),
           ),
           const SizedBox(height: kCardGap),
 
-          QuickActions(
-            actions: [
-              QuickAction(
-                icon: Icons.my_location_rounded,
-                label: t('quick.track'),
-                color: AppTheme.green,
-                onTap: () => _push(context, TrackScreen(child: child)),
-              ),
-              QuickAction(
-                icon: Icons.directions_bus_outlined,
-                label: t('quick.bus'),
-                color: AppTheme.violet,
-                onTap: () => _push(context, BusScreen(child: child)),
-              ),
-              QuickAction(
-                icon: Icons.description_outlined,
-                label: t('quick.assignments'),
-                color: AppTheme.violet,
-                onTap: () => _push(context, AssignmentsScreen(child: child)),
-              ),
-              QuickAction(
-                icon: Icons.verified_user_outlined,
-                label: t('quick.attendance'),
-                color: AppTheme.green,
-                onTap: () => _push(context, AttendanceScreen(child: child)),
-              ),
-              QuickAction(
-                icon: Icons.bar_chart_rounded,
-                label: t('quick.marks'),
-                color: AppTheme.blue,
-                onTap: () => _push(context, MarksScreen(child: child)),
-              ),
-              QuickAction(
-                icon: Icons.favorite_border_rounded,
-                glyph: (colour, size) => HeartPersonIcon(color: colour, size: size),
-                label: t('quick.attitude'),
-                color: AppTheme.rose,
-                onTap: () => _push(context, AttitudeScreen(child: child)),
-              ),
-              QuickAction(
-                icon: Icons.calendar_today_outlined,
-                label: t('quick.timetable'),
-                color: AppTheme.amber,
-                onTap: () => _push(context, TimetableScreen(child: child)),
-              ),
-              QuickAction(
-                icon: Icons.pie_chart_outline_rounded,
-                label: t('quick.reports'),
-                color: AppTheme.violet,
-                onTap: () => _push(context, ReportsScreen(child: child)),
-              ),
-              QuickAction(
-                icon: Icons.badge_outlined,
-                label: t('quick.info'),
-                color: AppTheme.blue,
-                onTap: () => _push(context, StudentInfoScreen(child: child)),
-              ),
-              QuickAction(
-                icon: Icons.photo_library_outlined,
-                label: t('quick.memories'),
-                color: AppTheme.rose,
-                onTap: () => _push(context, MemoriesScreen(child: child)),
-              ),
-              QuickAction(
-                icon: Icons.rate_review_outlined,
-                label: t('quick.driverFeedback'),
-                color: AppTheme.green,
-                onTap: () => _push(context, DriverFeedbackScreen(child: child)),
-              ),
-            ],
-          ),
-          const SizedBox(height: kCardGap),
-
-          // ---- Today's schedule -------------------------------------------
-          Card16(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SectionRow(
-                  title: t('home.todaySchedule'),
-                  actionLabel: t('home.fullTimetable'),
-                  onAction: () => _push(context, TimetableScreen(child: child)),
+          Rise(
+            index: 1,
+            child: QuickActions(
+              actions: [
+                QuickAction(
+                  icon: Icons.my_location_rounded,
+                  label: t('quick.track'),
+                  color: AppTheme.green,
+                  onTap: () => _push(context, TrackScreen(child: child)),
                 ),
-                if (home.today.isEmpty)
-                  _Quiet(text: t('home.nothingToday'))
-                else
-                  ScheduleTimeline(
-                    onTap: (_) => _push(context, TimetableScreen(child: child)),
-                    entries: [
-                      for (final l in home.today)
-                        ScheduleEntry(
-                          time: clock(l.startMinute),
-                          subject: l.subject,
-                          teacher: l.teacher,
-                          room: l.room,
-                          color: parseHex(l.colorHex, AppTheme.violet),
-                        ),
-                    ],
-                  ),
+                QuickAction(
+                  icon: Icons.directions_bus_outlined,
+                  label: t('quick.bus'),
+                  color: AppTheme.violet,
+                  onTap: () => _push(context, BusScreen(child: child)),
+                ),
+                QuickAction(
+                  icon: Icons.description_outlined,
+                  label: t('quick.assignments'),
+                  color: AppTheme.violet,
+                  onTap: () => _push(context, AssignmentsScreen(child: child)),
+                ),
+                QuickAction(
+                  icon: Icons.verified_user_outlined,
+                  label: t('quick.attendance'),
+                  color: AppTheme.green,
+                  onTap: () => _push(context, AttendanceScreen(child: child)),
+                ),
+                QuickAction(
+                  icon: Icons.bar_chart_rounded,
+                  label: t('quick.marks'),
+                  color: AppTheme.blue,
+                  onTap: () => _push(context, MarksScreen(child: child)),
+                ),
+                QuickAction(
+                  icon: Icons.favorite_border_rounded,
+                  glyph: (colour, size) => HeartPersonIcon(color: colour, size: size),
+                  label: t('quick.attitude'),
+                  color: AppTheme.rose,
+                  onTap: () => _push(context, AttitudeScreen(child: child)),
+                ),
+                QuickAction(
+                  icon: Icons.calendar_today_outlined,
+                  label: t('quick.timetable'),
+                  color: AppTheme.amber,
+                  onTap: () => _push(context, TimetableScreen(child: child)),
+                ),
+                QuickAction(
+                  icon: Icons.pie_chart_outline_rounded,
+                  label: t('quick.reports'),
+                  color: AppTheme.violet,
+                  onTap: () => _push(context, ReportsScreen(child: child)),
+                ),
+                QuickAction(
+                  icon: Icons.badge_outlined,
+                  label: t('quick.info'),
+                  color: AppTheme.blue,
+                  onTap: () => _push(context, StudentInfoScreen(child: child)),
+                ),
+                QuickAction(
+                  icon: Icons.photo_library_outlined,
+                  label: t('quick.memories'),
+                  color: AppTheme.rose,
+                  onTap: () => _push(context, MemoriesScreen(child: child)),
+                ),
+                QuickAction(
+                  icon: Icons.rate_review_outlined,
+                  label: t('quick.driverFeedback'),
+                  color: AppTheme.green,
+                  onTap: () => _push(context, DriverFeedbackScreen(child: child)),
+                ),
               ],
             ),
           ),
           const SizedBox(height: kCardGap),
 
+          // ---- Today's schedule -------------------------------------------
+          Rise(
+            index: 2,
+            child: Card16(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SectionRow(
+                    title: t('home.todaySchedule'),
+                    actionLabel: t('home.fullTimetable'),
+                    onAction: () => _push(context, TimetableScreen(child: child)),
+                  ),
+                  if (home.today.isEmpty)
+                    _Quiet(text: t('home.nothingToday'))
+                  else
+                    // The lessons are NOT staggered inside the card. The rail
+                    // down the left is one continuous line through every dot,
+                    // and drawing it a row at a time reads as a list being cut
+                    // off rather than as a day arriving.
+                    ScheduleTimeline(
+                      onTap: (_) => _push(context, TimetableScreen(child: child)),
+                      entries: [
+                        for (final l in home.today)
+                          ScheduleEntry(
+                            time: clock(l.startMinute),
+                            subject: l.subject,
+                            teacher: l.teacher,
+                            room: l.room,
+                            color: parseHex(l.colorHex, AppTheme.violet),
+                          ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: kCardGap),
+
           // ---- The child ---------------------------------------------------
-          _ChildCard(child: child, home: home),
+          Rise(index: 3, child: _ChildCard(child: child, home: home)),
           const SizedBox(height: kCardGap),
 
           // ---- Attendance, and what has happened ---------------------------
@@ -181,20 +198,23 @@ class HomeTab extends StatelessWidget {
           // Side by side, as the design has them. Two half-width cards read as
           // "here is the summary" in one glance where two stacked full-width
           // ones read as two more sections to scroll past.
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(child: _AttendanceCard(summary: home.attendance)),
-                const SizedBox(width: kCardGap),
-                Expanded(
-                  child: _UpdatesCard(
-                    home: home,
-                    child: child,
-                    onSeeAll: () => onOpenTab(1),
+          Rise(
+            index: 4,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: _AttendanceCard(summary: home.attendance)),
+                  const SizedBox(width: kCardGap),
+                  Expanded(
+                    child: _UpdatesCard(
+                      home: home,
+                      child: child,
+                      onSeeAll: () => onOpenTab(1),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import 'kit.dart';
+import 'motion.dart';
 
 /// The pieces the parent home screen is made of.
 ///
@@ -495,6 +496,12 @@ IconData subjectIcon(String subject) {
 /// The number is in the middle regardless — the ring is there so a glance says
 /// "nearly full" without reading it, which is what a parent checking on the way
 /// out of the door actually needs.
+///
+/// The arc sweeps up to its figure over about 900ms, and the number in the
+/// middle is read off the SAME animated value rather than counted separately,
+/// so the two cannot disagree on any frame — a ring three-quarters drawn under
+/// the words "92%" is worse than no animation at all. When the figure changes
+/// it sweeps from the old one to the new one, not back down to zero first.
 class PercentRing extends StatelessWidget {
   const PercentRing({
     super.key,
@@ -515,35 +522,38 @@ class PercentRing extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(
-        painter: _RingPainter(
-          percent: percent.clamp(0, 100) / 100,
-          color: color,
-          track: AppTheme.border,
-          stroke: stroke,
-        ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '${percent.round()}%',
-                style: TextStyle(
-                  fontSize: size * 0.24,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.8,
-                  height: 1.1,
-                  color: AppTheme.text,
-                ),
-              ),
-              if (label != null)
+      child: CountUp(
+        value: percent.clamp(0, 100).toDouble(),
+        builder: (context, shown) => CustomPaint(
+          painter: _RingPainter(
+            percent: shown / 100,
+            color: color,
+            track: AppTheme.border,
+            stroke: stroke,
+          ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 Text(
-                  label!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: size * 0.115, color: AppTheme.textMuted),
+                  '${shown.round()}%',
+                  style: TextStyle(
+                    fontSize: size * 0.24,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.8,
+                    height: 1.1,
+                    color: AppTheme.text,
+                  ),
                 ),
-            ],
+                if (label != null)
+                  Text(
+                    label!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: size * 0.115, color: AppTheme.textMuted),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -625,6 +635,10 @@ class IconFigure {
 /// Marks" is a third longer than "Attitude" and in four columns on a narrow
 /// phone something has to give. A shrunk label still answers the question; a
 /// label reading "Average Mar…" does not.
+///
+/// They arrive left to right a twentieth of a second apart, hairlines included,
+/// so the strip reads as four figures rather than as one block that appeared.
+/// The last of the four is settled inside 600ms.
 class IconFigureStrip extends StatelessWidget {
   const IconFigureStrip({super.key, required this.figures});
 
@@ -638,11 +652,20 @@ class IconFigureStrip extends StatelessWidget {
         children: [
           for (var i = 0; i < figures.length; i++) ...[
             if (i > 0)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Container(width: 1, color: AppTheme.border),
+              Rise(
+                index: i,
+                distance: 6,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Container(width: 1, color: AppTheme.border),
+                ),
               ),
-            Expanded(child: _Figure(figure: figures[i], first: i == 0)),
+            Expanded(
+              child: Rise(
+                index: i,
+                child: _Figure(figure: figures[i], first: i == 0, index: i),
+              ),
+            ),
           ],
         ],
       ),
@@ -651,10 +674,13 @@ class IconFigureStrip extends StatelessWidget {
 }
 
 class _Figure extends StatelessWidget {
-  const _Figure({required this.figure, required this.first});
+  const _Figure({required this.figure, required this.first, required this.index});
 
   final IconFigure figure;
   final bool first;
+
+  /// Position in the strip, so the glyph lands just after its own column.
+  final int index;
 
   @override
   Widget build(BuildContext context) {
@@ -673,14 +699,18 @@ class _Figure extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              color: figure.color.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
-              shape: BoxShape.circle,
+          Pop(
+            index: index,
+            extraDelay: const Duration(milliseconds: 60),
+            child: Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: figure.color.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(figure.icon, size: 13, color: figure.color),
             ),
-            child: Icon(figure.icon, size: 13, color: figure.color),
           ),
           const SizedBox(width: 5),
           Expanded(

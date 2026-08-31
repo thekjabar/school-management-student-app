@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show SynchronousFuture;
 import 'package:flutter/material.dart';
 
 import '../api/client.dart';
@@ -105,7 +106,18 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
         final value = await widget.load();
         if (!mounted) return;
         setState(() {
-          _future = Future<T>.value(value);
+          // A SYNCHRONOUS future, not `Future.value`. Handing FutureBuilder a
+          // future it has not seen before makes it drop to
+          // ConnectionState.waiting and only come back on the next microtask —
+          // so even an already-completed `Future.value` costs one frame of the
+          // grey skeleton, which is the exact blink `quiet` exists to avoid.
+          // Worse than the flicker: that frame tears down the whole content
+          // subtree and builds it again, so every entrance animation on the
+          // screen replays on every poll. SynchronousFuture resolves inside
+          // FutureBuilder's own subscribe — the case its source calls out by
+          // name — so the data swaps in place, the elements survive, and
+          // nothing re-enters.
+          _future = SynchronousFuture<T>(value);
         });
       } catch (_) {
         // Deliberately swallowed. See above.
@@ -134,8 +146,17 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
       child: FutureBuilder<T>(
         future: _future,
         builder: (context, snap) {
+          // The skeleton belongs to a screen with nothing on it yet. Once
+          // there is something to look at, a refresh leaves it alone and swaps
+          // the values in when they arrive — the RefreshIndicator's own spinner
+          // is what says "working".
+          //
+          // Dropping to the skeleton on every pull also tore down the content
+          // subtree, which replayed every entrance animation under it: a
+          // cascade of eleven tiles and a ring counting up from zero, on a
+          // gesture that means "I am already here".
           if (snap.connectionState == ConnectionState.waiting) {
-            return _scrollable(const _Waiting());
+            if (!snap.hasData) return _scrollable(const _Waiting());
           }
 
           if (snap.hasError) {

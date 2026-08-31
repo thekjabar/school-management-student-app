@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
+import 'motion.dart';
 import 'nav_glyphs.dart';
 
 /// The pieces the mockup is made of.
@@ -499,13 +500,17 @@ class QuickActions extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, box) {
           final fits = actions.length * _tile <= box.maxWidth;
+          // Left to right, a step apart. The stagger is capped inside `Rise`,
+          // so eleven tiles do not take eleven steps to arrive — the ones past
+          // the fold come in together, and the whole row is settled inside
+          // two-thirds of a second however many there are.
           final row = Row(
             mainAxisSize: fits ? MainAxisSize.max : MainAxisSize.min,
             children: [
-              for (final a in actions)
+              for (var i = 0; i < actions.length; i++)
                 SizedBox(
                   width: fits ? box.maxWidth / actions.length : _tile,
-                  child: _Tile(action: a),
+                  child: _Tile(action: actions[i], index: i),
                 ),
             ],
           );
@@ -527,48 +532,58 @@ class QuickActions extends StatelessWidget {
 }
 
 class _Tile extends StatelessWidget {
-  const _Tile({required this.action});
+  const _Tile({required this.action, this.index = 0});
 
   final QuickAction action;
+
+  /// Position in the row, which is all the tile knows about the stagger.
+  final int index;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: action.onTap,
       behavior: HitTestBehavior.opaque,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: action.color.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
-              borderRadius: BorderRadius.circular(13),
+      child: Rise(
+        index: index,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Pop(
+              index: index,
+              extraDelay: const Duration(milliseconds: 60),
+              child: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: action.color.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: action.glyph == null
+                    ? Icon(action.icon, size: 22, color: action.color)
+                    : Center(child: action.glyph!(action.color, 22)),
+              ),
             ),
-            child: action.glyph == null
-                ? Icon(action.icon, size: 22, color: action.color)
-                : Center(child: action.glyph!(action.color, 22)),
-          ),
-          const SizedBox(height: 9),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                action.label,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.2,
-                  color: AppTheme.text,
+            const SizedBox(height: 9),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  action.label,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                    color: AppTheme.text,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -655,9 +670,13 @@ class _Rule extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
             ),
           ),
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 90),
-            left: (rail - thumb) * progress,
+          AnimatedPositionedDirectional(
+            duration: motionOff(context) ? Duration.zero : const Duration(milliseconds: 90),
+            // start, not left. This row scrolls horizontally, so in Kurdish and
+            // Arabic its origin is the visual RIGHT: with a physical `left` the
+            // thumb sat at the wrong end un-scrolled and then travelled
+            // backwards as the row moved.
+            start: (rail - thumb) * progress,
             child: Container(
               width: thumb,
               height: 3,
@@ -803,8 +822,10 @@ class BottomNav extends StatelessWidget {
                   onTap: () => onChanged(i),
                   child: AnimatedContainer(
                     // Short enough to feel like a response to the tap rather
-                    // than an animation being played at you.
-                    duration: const Duration(milliseconds: 180),
+                    // than an animation being played at you — and nothing at
+                    // all for somebody who has asked their phone to stop
+                    // moving things.
+                    duration: motionOff(context) ? Duration.zero : const Duration(milliseconds: 180),
                     curve: Curves.easeOutCubic,
                     height: 46,
                     margin: const EdgeInsets.symmetric(horizontal: 3),
@@ -820,7 +841,7 @@ class BottomNav extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         AnimatedScale(
-                          duration: const Duration(milliseconds: 180),
+                          duration: motionOff(context) ? Duration.zero : const Duration(milliseconds: 180),
                           curve: Curves.easeOutBack,
                           scale: on ? 1.0 : 0.92,
                           child: Icon(
@@ -835,12 +856,12 @@ class BottomNav extends StatelessWidget {
                         // the rest, and the one that matters says its name.
                         ClipRect(
                           child: AnimatedAlign(
-                            duration: const Duration(milliseconds: 180),
+                            duration: motionOff(context) ? Duration.zero : const Duration(milliseconds: 180),
                             curve: Curves.easeOutCubic,
                             alignment: AlignmentDirectional.centerStart,
                             widthFactor: on ? 1.0 : 0.0,
                             child: AnimatedOpacity(
-                              duration: const Duration(milliseconds: 140),
+                              duration: motionOff(context) ? Duration.zero : const Duration(milliseconds: 140),
                               opacity: on ? 1 : 0,
                               child: Padding(
                                 padding: const EdgeInsetsDirectional.only(start: 7),
