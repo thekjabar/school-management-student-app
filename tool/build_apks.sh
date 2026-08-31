@@ -31,8 +31,18 @@ for role in "${ROLES[@]}"; do
     echo "splash: none"
   fi
 
-  # A stale incremental build is how a half-updated bundle ships; the whole
-  # point of this script is that the assets differ between runs.
+  # Drop the cached asset bundle before every build.
+  #
+  # This is not belt and braces, it is the actual bug: the staged path
+  # assets/video/splash.mp4 is IDENTICAL for all three roles and only its
+  # contents differ, so Flutter's build cache and Gradle's merged-assets task
+  # will both happily reuse the previous role's bundle. That is how the parent
+  # APK once shipped carrying the teacher's clip.
+  rm -rf .dart_tool/flutter_build
+  rm -rf build/flutter_assets
+  rm -rf build/app/intermediates/merged_assets
+  rm -rf build/app/intermediates/assets
+
   flutter build apk --release \
     --flavor "$role" \
     --dart-define="APP_ROLE=$role" \
@@ -48,6 +58,28 @@ for role in "${ROLES[@]}"; do
   esac
 
   cp "build/app/outputs/flutter-apk/app-arm64-v8a-$role-release.apk" "$OUT/$name.apk"
+
+  # Prove the APK carries THIS role's clip.
+  #
+  # The failure this catches was completely silent: the build reported success,
+  # the package name and the label were both correct, and the wrong video was
+  # inside. Byte size is enough to tell three clips apart and needs no tools
+  # beyond unzip.
+  if [ -f "design/splash/$role.mp4" ]; then
+    want=$(wc -c < "design/splash/$role.mp4" | tr -d ' ')
+    got=$(unzip -l "$OUT/$name.apk" | awk '/assets\/flutter_assets\/assets\/video\/splash.mp4/ {print $1}')
+    if [ "$want" != "$got" ]; then
+      echo
+      echo "FAILED: $name.apk carries the wrong splash clip."
+      echo "  expected $want bytes (design/splash/$role.mp4)"
+      echo "  found    ${got:-no splash at all}"
+      echo "  The staged assets/video/splash.mp4 is shared by every flavour, so a"
+      echo "  stale bundle or a second build running alongside this one will do"
+      echo "  exactly this. Never run two of these at once."
+      exit 1
+    fi
+    echo "splash verified: $got bytes"
+  fi
   echo "→ $OUT/$name.apk  ($(du -h "$OUT/$name.apk" | cut -f1))"
 done
 
