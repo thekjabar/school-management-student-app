@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 // latlong2 exports a generic Path<T>, which shadows dart:ui's Path.
 import 'package:latlong2/latlong.dart' hide Path;
 
 import '../../api/client.dart';
+import '../../api/geocode.dart';
 import '../../api/parent_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
@@ -50,6 +53,34 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
   /// its time under the thumb that is dragging it.
   LatLng? _pin;
 
+  /// Reverse geocoding, held back until the map stops moving.
+  ///
+  /// Dragging a map produces a position on every frame. Asking for an address
+  /// on each of those would be both useless and, on a shared public geocoder,
+  /// rude enough to get the app blocked.
+  Timer? _finding;
+  bool _looking = false;
+
+  /// The last address this screen wrote into the box by itself.
+  ///
+  /// Kept so a parent's own words are never overwritten. Once they have typed
+  /// something, the pin stops filling the field and only their edit stands —
+  /// the point of the box is the part a map cannot know, like which door.
+  String? _autoFilled;
+
+  /// Nothing on this screen moves until Edit is pressed.
+  ///
+  /// The map is full-bleed in the middle of a scrolling form, so trying to
+  /// scroll past it dragged the pin instead — and the pin is what the office
+  /// reads to decide which stop a child rides from. It moved silently, and Save
+  /// could not tell an accident from an intention.
+  bool _editing = false;
+
+  /// What was on screen when editing started, to put back on Cancel.
+  String _wasAddress = '';
+  String _wasNote = '';
+  LatLng? _wasPin;
+
   bool _busy = false;
   bool _dirty = false;
   String? _error;
@@ -60,9 +91,65 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
 
   @override
   void dispose() {
+    _finding?.cancel();
     _address.dispose();
     _note.dispose();
     super.dispose();
+  }
+
+  void _startEditing() {
+    setState(() {
+      _editing = true;
+      _wasAddress = _address.text;
+      _wasNote = _note.text;
+      _wasPin = _pin;
+    });
+  }
+
+  /// Put everything back the way it was found.
+  void _cancelEditing() {
+    _finding?.cancel();
+    setState(() {
+      _editing = false;
+      _looking = false;
+      _address.text = _wasAddress;
+      _note.text = _wasNote;
+      _pin = _wasPin;
+      _dirty = false;
+      _error = null;
+    });
+    if (_wasPin != null) _map.move(_wasPin!, _map.camera.zoom);
+  }
+
+  /// Ask for the address once the map has been still for a moment.
+  void _scheduleLookUp(LatLng at) {
+    _finding?.cancel();
+    _finding = Timer(const Duration(milliseconds: 900), () => _lookUp(at));
+  }
+
+  /// Fill the box in from the pin, without ever taking words off a parent.
+  ///
+  /// The box is only written to while it is empty or still holds exactly what
+  /// this screen last put there. The moment somebody types their own — which is
+  /// the whole point of the field, since a map does not know which door or
+  /// which floor — the pin stops touching it.
+  Future<void> _lookUp(LatLng at) async {
+    final typed = _address.text.trim();
+    if (typed.isNotEmpty && typed != _autoFilled) return;
+
+    if (mounted) setState(() => _looking = true);
+    final found = await Geocode.at(at.latitude, at.longitude);
+    if (!mounted) return;
+
+    setState(() {
+      _looking = false;
+      if (found == null) return;
+      // Checked again: the parent may have started typing while we were asking.
+      final now = _address.text.trim();
+      if (now.isNotEmpty && now != _autoFilled) return;
+      _address.text = found;
+      _autoFilled = found;
+    });
   }
 
   @override
@@ -89,6 +176,12 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
                     _address.text = h.address ?? '';
                     _note.text = h.note ?? '';
                     _pin = h.hasPin ? LatLng(h.lat!, h.lon!) : null;
+
+                    // A pin already saved, but no words against it — which is
+                    // every family who dropped the pin before this existed.
+                    if (_pin != null && _address.text.trim().isEmpty) {
+                      _lookUp(_pin!);
+                    }
                   }
                   return h;
                 },
@@ -97,23 +190,68 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
                   children: [
                     _Explainer(tint: tint),
                     const SizedBox(height: kCardGap),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _editing ? t(_pin == null ? 'home.dragToPlace' : 'home.dragToAdjust') : t('home.locked'),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              height: 1.35,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        _EditToggle(
+                          editing: _editing,
+                          tint: tint,
+                          onTap: _editing ? _cancelEditing : _startEditing,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
                     _MapCard(
                       pin: _pin ?? _fallback,
                       placed: _pin != null,
+                      enabled: _editing,
                       controller: _map,
                       tint: tint,
-                      onMoved: (c) => setState(() {
-                        _pin = c;
-                        _dirty = true;
-                      }),
+                      onMoved: (c) {
+                        setState(() {
+                          _pin = c;
+                          _dirty = true;
+                        });
+                        _scheduleLookUp(c);
+                      },
                     ),
                     const SizedBox(height: kCardGap),
 
-                    _Label(t('home.address')),
+                    Row(
+                      children: [
+                        _Label(t('home.address')),
+                        if (_looking) ...[
+                          const SizedBox(width: 9),
+                          SizedBox(
+                            width: 11,
+                            height: 11,
+                            child: CircularProgressIndicator(strokeWidth: 1.6, color: tint),
+                          ),
+                          const SizedBox(width: 7),
+                          Text(
+                            t('home.findingAddress'),
+                            style: TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
+                          ),
+                        ],
+                      ],
+                    ),
                     const SizedBox(height: 7),
                     _Box(
                       child: TextField(
                         controller: _address,
+                        readOnly: !_editing,
                         maxLength: 400,
                         textCapitalization: TextCapitalization.sentences,
                         decoration: _plain(t('home.addressHint')),
@@ -133,6 +271,7 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
                     _Box(
                       child: TextField(
                         controller: _note,
+                        readOnly: !_editing,
                         maxLines: 4,
                         minLines: 3,
                         maxLength: 600,
@@ -155,14 +294,16 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
                       ),
                     ],
 
-                    const SizedBox(height: 16),
-                    BigButton(
-                      label: t('home.save'),
-                      color: tint,
-                      height: 52,
-                      busy: _busy,
-                      onPressed: _save,
-                    ),
+                    if (_editing) ...[
+                      const SizedBox(height: 16),
+                      BigButton(
+                        label: t('home.save'),
+                        color: tint,
+                        height: 52,
+                        busy: _busy,
+                        onPressed: _save,
+                      ),
+                    ],
 
                     if (home.children.isNotEmpty) ...[
                       const SizedBox(height: 22),
@@ -267,10 +408,49 @@ class _Explainer extends StatelessWidget {
 }
 
 /// The map, with a pin fixed at the centre and the map moving under it.
+/// Edit, and then Cancel. Small, because it sits beside a line of guidance
+/// rather than under it.
+class _EditToggle extends StatelessWidget {
+  const _EditToggle({required this.editing, required this.tint, required this.onTap});
+
+  final bool editing;
+  final Color tint;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colour = editing ? AppTheme.textMuted : tint;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: editing ? Colors.transparent : tint.withValues(alpha: AppTheme.dark ? 0.18 : 0.08),
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: editing ? AppTheme.border : Colors.transparent),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(editing ? Icons.close_rounded : Icons.edit_rounded, size: 15, color: colour),
+            const SizedBox(width: 7),
+            Text(
+              editing ? t('common.cancel') : t('common.edit'),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: colour),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _MapCard extends StatelessWidget {
   const _MapCard({
     required this.pin,
     required this.placed,
+    required this.enabled,
     required this.controller,
     required this.tint,
     required this.onMoved,
@@ -278,6 +458,9 @@ class _MapCard extends StatelessWidget {
 
   final LatLng pin;
   final bool placed;
+
+  /// Whether a finger on this map moves the pin or scrolls the page past it.
+  final bool enabled;
   final MapController controller;
   final Color tint;
   final ValueChanged<LatLng> onMoved;
@@ -301,10 +484,14 @@ class _MapCard extends StatelessWidget {
                   maxZoom: 19,
                   // No rotation. North stays up so the streets match the ones
                   // in somebody's head.
-                  interactionOptions: const InteractionOptions(
-                    flags: InteractiveFlag.pinchZoom |
-                        InteractiveFlag.drag |
-                        InteractiveFlag.doubleTapZoom,
+                  // Nothing until Edit. Otherwise a finger meant for the page
+                  // drags the pin, silently, and the page does not scroll.
+                  interactionOptions: InteractionOptions(
+                    flags: enabled
+                        ? InteractiveFlag.pinchZoom |
+                            InteractiveFlag.drag |
+                            InteractiveFlag.doubleTapZoom
+                        : InteractiveFlag.none,
                   ),
                   // The pin IS the centre. Reported as the map settles rather
                   // than on every frame of a drag.

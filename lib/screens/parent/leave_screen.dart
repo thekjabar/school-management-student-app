@@ -312,7 +312,7 @@ class _RequestCard extends StatelessWidget {
       tone: AppTheme.rose,
       title: t('leave.withdraw'),
       body: t('leave.${item.kind.toLowerCase()}'),
-      confirmLabel: t('leave.withdraw'),
+      confirmLabel: t('leave.withdrawDo'),
       confirmIcon: Icons.undo_rounded,
     );
     if (!yes) return;
@@ -700,6 +700,11 @@ class _Label extends StatelessWidget {
 }
 
 /// One reason, with a tick on the chosen one.
+/// The label box is fixed at this many lines so every tile is the same height.
+const int _labelLines = 2;
+const double _labelSize = 11.5;
+const double _labelHeight = 1.3;
+
 class _ReasonCard extends StatelessWidget {
   const _ReasonCard({
     required this.label,
@@ -721,6 +726,15 @@ class _ReasonCard extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Stack(
+        // passthrough, not the default loose.
+        //
+        // The Stack is exactly one column wide, because the grid wraps it in a
+        // SizedBox. Loose constraints let the Container inside shrink-wrap to
+        // its own label instead — so "Unwell" came out narrow, "Doctor or
+        // dentist" came out wide, no two columns lined up, and the tick, which
+        // is positioned against the STACK's edge, floated out in the gap a
+        // hundred pixels from the tile it marks.
+        fit: StackFit.passthrough,
         clipBehavior: Clip.none,
         children: [
           Container(
@@ -737,17 +751,29 @@ class _ReasonCard extends StatelessWidget {
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(icon, size: 19, color: on ? tint : AppTheme.textMuted),
                 const SizedBox(height: 8),
-                Text(
-                  label,
-                  maxLines: 2,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    height: 1.3,
-                    color: on ? tint : AppTheme.text,
+                // Both lines are reserved whether or not this label needs them.
+                //
+                // Otherwise a label that wraps makes its tile taller than the
+                // ones beside it and the row sits crooked — which is what the
+                // longer translations do, not just the English. Reserving the
+                // second line costs the height the two-line tile already had.
+                SizedBox(
+                  height: _labelSize * _labelHeight * _labelLines,
+                  width: double.infinity,
+                  child: Text(
+                    label,
+                    maxLines: _labelLines,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: _labelSize,
+                      fontWeight: FontWeight.w600,
+                      height: _labelHeight,
+                      color: on ? tint : AppTheme.text,
+                    ),
                   ),
                 ),
               ],

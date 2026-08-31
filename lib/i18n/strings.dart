@@ -616,6 +616,10 @@ const Map<String, String> _en = {
   'leave.ask': 'Ask for leave',
   'leave.none': 'No leave has been asked for. Tap “Ask for leave” when you need a day.',
   'leave.withdraw': 'Withdraw this request',
+  // The button, not the sentence. The dialog title above it has already said
+  // what is being withdrawn, and the full phrase did not fit — it rendered as
+  // "Withdraw this r...".
+  'leave.withdrawDo': 'Withdraw',
   'leave.withdrawn': 'Request withdrawn',
   'leave.sent': 'Sent to the school office',
   'leave.for': 'Leave for {n}',
@@ -751,6 +755,8 @@ const Map<String, String> _en = {
   'home.explainBody': 'The school office uses this to choose which stop your child rides from. It does not move the stop by itself — the office decides that.',
   'home.dragToPlace': 'Move the map to place the pin',
   'home.dragToAdjust': 'Move the map to adjust the pin',
+  'home.findingAddress': 'Finding the address…',
+  'home.locked': 'Press Edit to move the pin or change the address.',
   'home.address': 'Address',
   'home.addressHint': 'District, street, house number',
   'home.note': 'How to find the door',
@@ -807,6 +813,7 @@ const Map<String, String> _en = {
   'status.cancelled': 'Cancelled',
 
   // Common
+  'common.edit': 'Edit',
   'common.cancel': 'Cancel',
   'common.save': 'Save',
   'common.saving': 'Saving…',
@@ -1530,6 +1537,7 @@ const Map<String, String> _ckb = {
   'leave.ask': 'داوای مۆڵەت',
   'leave.none': 'هیچ مۆڵەتێک داوا نەکراوە. کاتێک پێویستت بە ڕۆژێک بوو دەست بنێ.',
   'leave.withdraw': 'ئەم داواکارییە بگەڕێنەوە',
+  'leave.withdrawDo': 'بگەڕێنەوە',
   'leave.withdrawn': 'داواکارییەکە گەڕێندرایەوە',
   'leave.sent': 'نێردرا بۆ نووسینگەی قوتابخانە',
   'leave.for': 'مۆڵەت بۆ {n}',
@@ -1665,6 +1673,8 @@ const Map<String, String> _ckb = {
   'home.explainBody': 'نووسینگەی قوتابخانە ئەمە بەکاردەهێنێت بۆ دیاریکردنی ئەو وەستانەی منداڵەکەت لێی سوار دەبێت. خۆی وەستانەکە ناگۆڕێت — نووسینگە بڕیاری لەسەر دەدات.',
   'home.dragToPlace': 'نەخشەکە بجوڵێنە بۆ دانانی نیشانەکە',
   'home.dragToAdjust': 'نەخشەکە بجوڵێنە بۆ ڕێککردنی نیشانەکە',
+  'home.findingAddress': 'ناونیشان دەدۆزرێتەوە…',
+  'home.locked': 'بۆ گۆڕینی شوێن یان ناونیشان دەستکاری دابگرە.',
   'home.address': 'ناونیشان',
   'home.addressHint': 'گەڕەک، شەقام، ژمارەی ماڵ',
   'home.note': 'چۆن دەرگاکە بدۆزرێتەوە',
@@ -1717,6 +1727,7 @@ const Map<String, String> _ckb = {
   'status.rejected': 'ڕەتکراوە',
   'status.cancelled': 'هەڵوەشێنراوە',
 
+  'common.edit': 'دەستکاری',
   'common.cancel': 'هەڵوەشاندنەوە',
   'common.save': 'پاشەکەوتکردن',
   'common.saving': 'پاشەکەوت دەکرێت…',
@@ -2438,6 +2449,7 @@ const Map<String, String> _ar = {
   'leave.ask': 'طلب إجازة',
   'leave.none': 'لم تُطلب أي إجازة. اضغط "طلب إجازة" عندما تحتاج يوماً.',
   'leave.withdraw': 'سحب هذا الطلب',
+  'leave.withdrawDo': 'سحب',
   'leave.withdrawn': 'سُحب الطلب',
   'leave.sent': 'أُرسل إلى مكتب المدرسة',
   'leave.for': 'إجازة لـ {n}',
@@ -2573,6 +2585,8 @@ const Map<String, String> _ar = {
   'home.explainBody': 'يستخدم مكتب المدرسة هذا لاختيار الموقف الذي يركب منه طفلك. لا يغيّر الموقف من تلقاء نفسه — المكتب هو من يقرر ذلك.',
   'home.dragToPlace': 'حرّك الخريطة لوضع العلامة',
   'home.dragToAdjust': 'حرّك الخريطة لضبط العلامة',
+  'home.findingAddress': 'جارٍ العثور على العنوان…',
+  'home.locked': 'اضغط تعديل لتحريك الدبوس أو تغيير العنوان.',
   'home.address': 'العنوان',
   'home.addressHint': 'الحي، الشارع، رقم المنزل',
   'home.note': 'كيف يُعثر على الباب',
@@ -2624,6 +2638,7 @@ const Map<String, String> _ar = {
   'status.rejected': 'مرفوض',
   'status.cancelled': 'ملغى',
 
+  'common.edit': 'تعديل',
   'common.cancel': 'إلغاء',
   'common.save': 'حفظ',
   'common.saving': 'جارٍ الحفظ…',
