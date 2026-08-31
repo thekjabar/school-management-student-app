@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../api/boot.dart';
 
+import '../../api/boot.dart';
 import '../../api/teacher_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
@@ -33,12 +33,6 @@ class TeacherHome extends StatelessWidget {
       tint: Role.teacher.tint,
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
       load: () async {
-        // Already fetched, while the splash clip was playing. Taken once: a
-        // pull-to-refresh after this gets live data rather than the snapshot
-        // the app opened with.
-        final early = await Boot.instance.takeTeacherHome();
-        if (early != null) return _Today.from(early);
-
         return _Today.from(await TeacherPayload.fetch());
       },
       builder: (context, day) => Column(

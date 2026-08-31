@@ -45,14 +45,6 @@ class HomeTab extends StatelessWidget {
       tint: Role.parent.tint,
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
       load: () async {
-        // Already fetched, while the splash clip was playing. Taken once: a
-        // pull-to-refresh after this gets live data rather than the snapshot
-        // the app opened with.
-        final early = await Boot.instance.takeHome();
-        if (early != null && early.studentId == child.studentId) {
-          return _Home.from(early);
-        }
-
         // One pass, all at once. Six sequential round trips on a school
         // connection is the difference between a screen and a wait.
         final payload = await HomePayload.fetch(child.studentId);

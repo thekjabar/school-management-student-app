@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import '../main.dart' show kRole;
 import 'client.dart';
 import 'parent_api.dart';
 import 'session.dart';
@@ -35,66 +34,15 @@ class Boot {
   /// Starts the work, once. Safe to call from anywhere; later callers get the
   /// same future rather than a second round of requests.
   ///
-  /// Completes as soon as the SESSION is known. The screen data keeps loading
-  /// behind it — see [warm].
+  /// Answers one question — who is signed in — and nothing else.
+  ///
+  /// It used to prefetch the whole opening screen here too, so that the home
+  /// screen would already have its data by the time the splash lifted. It
+  /// worked, and it was wrong: the app arrived fully formed, with no loading
+  /// state to see and every entrance animation already played out behind the
+  /// clip. The screens fetch for themselves, where a person can watch it
+  /// happen.
   Future<BootState> start() => _future ??= _run();
-
-  /// The screen data, still in flight when [start] completes.
-  ///
-  /// Kept separate because the two answer different questions. The shell needs
-  /// to know who you are, which is one call; the home screen needs six more,
-  /// and the header and the bottom bar have no business waiting for those —
-  /// they are chrome, and they can be on screen the instant the splash lifts.
-  Future<void>? _warm;
-
-  /// Awaited by nothing that draws. Exposed so a test can settle.
-  Future<void> get warm => _warm ?? Future<void>.value();
-
-  /// The home payload. Taken ONCE — the home screen uses it for its first build
-  /// and fetches for itself from then on, so a pull-to-refresh gets live data
-  /// rather than this snapshot again.
-  ///
-  /// Waits for the prefetch to land rather than asking whether it already has.
-  /// It never had: the shell mounts on the microtask after [start] completes,
-  /// which is before the prefetch has sent a single byte, so this returned null
-  /// every time and every screen fetched the same thing over again — ten
-  /// requests where five were intended, at the one minute of the day when a
-  /// whole school opens the app at once.
-  ///
-  /// Costs nothing to wait now. The screen is already up, with its skeleton,
-  /// which is the entire point of it.
-  Future<HomePayload?> takeHome() async {
-    await warm;
-    final h = _home;
-    _home = null;
-    return h;
-  }
-
-  HomePayload? _home;
-
-  /// The children, from the same call the prefetch had to make anyway.
-  ///
-  /// It asks for them to work out whose home payload to fetch, and the shell
-  /// then asked for exactly the same list again to draw the child switcher.
-  /// Taken once, like the payloads.
-  Future<List<Child>?> takeChildren() async {
-    await warm;
-    final c = _children;
-    _children = null;
-    return c;
-  }
-
-  List<Child>? _children;
-
-  /// The teacher's opening screen. Taken once, and waited for, like [takeHome].
-  Future<TeacherPayload?> takeTeacherHome() async {
-    await warm;
-    final t = _teacher;
-    _teacher = null;
-    return t;
-  }
-
-  TeacherPayload? _teacher;
 
   Future<BootState> _run() async {
     await ApiClient.instance.restore();
@@ -126,8 +74,10 @@ class Boot {
       // the ordering bought was a whole /auth/me round trip in front of the
       // home data, on every launch — which is the one thing a prefetch exists
       // to avoid.
+      // The identity is confirmed behind the app. Not awaited: a rejected
+      // session tears itself down through onSignedOut, which the gate listens
+      // to, and an unreachable one leaves what the phone remembers standing.
       unawaited(_confirm());
-      _warm = _prefetch().catchError((_) {});
       return BootState(me: cached);
     }
 
@@ -150,20 +100,6 @@ class Boot {
       return const BootState(me: null, offline: true);
     }
     if (me == null) return const BootState(me: null);
-
-    // The screen data is started here and NOT awaited.
-    //
-    // Whichever opening screen this build will draw, decided by the flavour
-    // rather than by the person's role: somebody can hold two, and fetching the
-    // wrong one spends a school connection at the one minute of the day when
-    // the whole city opens the app.
-    //
-    // Deliberately not awaited: the shell is chrome and needs none of it. The
-    // curtain lifts on the line below, the header and the bottom bar draw
-    // immediately, and the content sits under its skeleton until this lands.
-    _warm = _prefetch().catchError((_) {
-      // Swallowed. Every screen still fetches for itself if this never arrives.
-    });
 
     return BootState(me: me);
   }
@@ -189,36 +125,9 @@ class Boot {
     if (me == null) await Session.instance.signOut();
   }
 
-  /// The opening screen's data, running behind the shell.
-  Future<void> _prefetch() async {
-    switch (kRole) {
-      case 'teacher':
-        _teacher = await TeacherPayload.fetch();
-
-      case 'driver':
-        // Nothing worth prefetching. The driver's home resolves today's duty
-        // trip and then asks for that trip's plan — two dependent calls where
-        // the second is large, better spent when the screen is on top and can
-        // show its own progress.
-        break;
-
-      default:
-        final children = await ParentApi.instance.children();
-        // Kept, not just used. The shell needs this same list.
-        _children = children;
-        if (children.isNotEmpty) {
-          _home = await HomePayload.fetch(children.first.studentId);
-        }
-    }
-  }
-
   /// Only for tests, which must not inherit a previous test's boot.
   void resetForTest() {
     _future = null;
-    _warm = null;
-    _home = null;
-    _children = null;
-    _teacher = null;
   }
 }
 

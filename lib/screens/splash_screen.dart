@@ -29,10 +29,12 @@ class SplashGate extends StatefulWidget {
   /// the parent app's violet before the driver's own clip appeared.
   final Color tint;
 
-  /// Completes when the app underneath has what it needs to draw a real
-  /// screen. The curtain lifts once this has landed AND the clip has had its
-  /// moment, so a fast connection never sees a second loading screen and a
-  /// slow one spends the wait watching the clip rather than a spinner.
+  /// Completes when the app underneath knows WHO is signed in — one call, not
+  /// a screenful of data.
+  ///
+  /// The curtain waits for both this and the end of the clip. In practice the
+  /// clip is much the longer of the two, which is the point: the sign-in check
+  /// costs nothing because it happens while the clip is playing anyway.
   ///
   /// Null means "do not wait" — the clip alone decides.
   final Future<void>? ready;
@@ -51,28 +53,11 @@ class _SplashGateState extends State<SplashGate> {
   /// to decode, a device with video disabled — every one of those used to be a
   /// permanently black first screen in apps that do this, and the fix is a
   /// deadline rather than a list of cases.
-  static const _limit = Duration(seconds: 6);
-
-  /// The shortest the clip is allowed to hold the screen, measured from the
-  /// moment its first frame is up.
   ///
-  /// This gate used to wait for the WHOLE clip. The parent clip runs just over
-  /// five seconds and the sign-in check lands in about one, so the app spent
-  /// nearly four seconds of every launch finished and idle behind an opaque
-  /// video. Worse, it made the home screen's skeleton unreachable: the skeleton
-  /// exists so a slow connection sees the shell filling in rather than a blank,
-  /// and the clip outlasted it every time, so it could never once be seen.
-  ///
-  /// So the clip is a floor rather than a duration — on screen long enough to
-  /// read as deliberate instead of a flash, then out of the way the moment the
-  /// app is ready.
-  ///
-  /// Timed from the first frame rather than from startup, because opening a
-  /// 15MB clip on a cold cheap handset is not instant. Started at startup, a
-  /// slow decode would spend the floor on the flat tint and then show a
-  /// fraction of a second of video before cutting — which looks like a fault,
-  /// not a splash. This way the clip always gets its moment.
-  static const _floor = Duration(milliseconds: 1900);
+  /// Comfortably past the longest clip. It was six seconds, and the driver's
+  /// clip runs 6.04 — so the driver's splash was being cut by the backstop on
+  /// every launch, and cut by the branch that ignores whether the app is ready.
+  static const _limit = Duration(seconds: 12);
 
   /// How long the curtain takes to fade out.
   static const _fade = Duration(milliseconds: 420);
@@ -81,10 +66,8 @@ class _SplashGateState extends State<SplashGate> {
   bool _done = false;
   bool _clipOver = false;
   bool _appReady = false;
-  bool _floorOver = false;
   bool _curtainGone = false;
   Timer? _deadline;
-  Timer? _minimum;
   Timer? _settle;
   Timer? _duck;
 
@@ -110,14 +93,12 @@ class _SplashGateState extends State<SplashGate> {
     }
   }
 
-  /// Lift once the app is ready AND the clip has had its moment — whichever
-  /// comes first of the floor and the clip's own end, so a clip shorter than
-  /// the floor is never padded out with a frozen last frame.
-  void _mark({bool clip = false, bool ready = false, bool floor = false}) {
+  /// One half is done. Lift only when both are: the clip has played out, and
+  /// the app knows who is signed in.
+  void _mark({bool clip = false, bool ready = false}) {
     if (clip) _clipOver = true;
     if (ready) _appReady = true;
-    if (floor) _floorOver = true;
-    if (_appReady && (_floorOver || _clipOver)) _finish();
+    if (_clipOver && _appReady) _finish();
   }
 
   Future<void> _start(String asset) async {
@@ -132,9 +113,6 @@ class _SplashGateState extends State<SplashGate> {
         return;
       }
       setState(() => _video = video);
-      // The floor starts here, with a frame decoded and about to be painted —
-      // not back in initState, where a slow open would have eaten it.
-      _minimum = Timer(_floor, () => _mark(floor: true));
       video.addListener(_watch);
       await video.play();
     } catch (_) {
@@ -163,7 +141,6 @@ class _SplashGateState extends State<SplashGate> {
     if (_done) return;
     _done = true;
     _deadline?.cancel();
-    _minimum?.cancel();
     // Nothing below is worth doing for a gate that is already off screen —
     // dispose has cancelled the timers and let go of the controller, and a
     // settle timer armed after that point is a leak that outlives the widget.
@@ -245,7 +222,6 @@ class _SplashGateState extends State<SplashGate> {
   @override
   void dispose() {
     _deadline?.cancel();
-    _minimum?.cancel();
     _settle?.cancel();
     _duck?.cancel();
     _release();
