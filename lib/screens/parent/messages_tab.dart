@@ -158,15 +158,13 @@ class _MessageRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: () => showDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: Text(item.title),
-          content: SingleChildScrollView(child: Text(item.body)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(t('common.close')),
-            ),
-          ],
+        // Dimmed by the app's own scrim rather than Material's near-black, which
+        // sits oddly over a page that is already dark.
+        barrierColor: Colors.black.withValues(alpha: AppTheme.dark ? 0.62 : 0.34),
+        builder: (context) => _AnnouncementDialog(
+          item: item,
+          icon: urgent ? Icons.priority_high_rounded : icon,
+          tint: tint,
         ),
       ),
       child: Padding(
@@ -270,5 +268,181 @@ class _MessageRow extends StatelessWidget {
     if (days == 1) return t('due.yesterday');
     if (days < 7) return t('day.${at.weekday}').characters.take(3).toString();
     return shortDate(at);
+  }
+}
+
+/// One announcement, opened.
+///
+/// Carries the same glyph and the same tint as the row that was tapped, so the
+/// dialog reads as that row expanding rather than as a different screen
+/// arriving. An urgent notice keeps its rose colouring here too — the one place
+/// a parent will actually read the words.
+class _AnnouncementDialog extends StatelessWidget {
+  const _AnnouncementDialog({
+    required this.item,
+    required this.icon,
+    required this.tint,
+  });
+
+  final Announcement item;
+  final IconData icon;
+  final Color tint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppTheme.surface,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 40),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+      child: ConstrainedBox(
+        // A long notice scrolls INSIDE the card. Without a ceiling the dialog
+        // grows until the button is off the bottom of the screen, which is the
+        // one control it has.
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.76,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(20, 16, 12, 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 74,
+                    height: 74,
+                    decoration: BoxDecoration(
+                      color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: Icon(icon, size: 34, color: tint),
+                  ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.title,
+                            style: TextStyle(
+                              fontSize: 21,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.6,
+                              height: 1.2,
+                              color: AppTheme.text,
+                            ),
+                          ),
+                          const SizedBox(height: 11),
+                          // A short rule in the notice's own colour, sitting on
+                          // a longer track — the design's way of tying the
+                          // title to the tile beside it.
+                          Row(
+                            children: [
+                              Container(
+                                width: 34,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: tint,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                              ),
+                              Expanded(
+                                child: Container(
+                                  height: 4,
+                                  margin: const EdgeInsetsDirectional.only(start: 3, end: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.border,
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Sized to the finger rather than to the glyph.
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    tooltip: t('common.close'),
+                    iconSize: 22,
+                    color: AppTheme.textMuted,
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                child: Text(
+                  item.body,
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    height: 1.62,
+                    color: AppTheme.text,
+                  ),
+                ),
+              ),
+            ),
+
+            // No band behind the button. A footer strip separates several
+            // actions from the content above them, and there is one action.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
+              child: Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: _GotIt(tint: tint, onTap: () => Navigator.of(context).pop()),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GotIt extends StatelessWidget {
+  const _GotIt({required this.tint, required this.onTap});
+
+  final Color tint;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: tint,
+      borderRadius: BorderRadius.circular(15),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(15),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                t('msg.gotIt'),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 9),
+              const Icon(Icons.check_circle_outline_rounded, size: 19, color: Colors.white),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

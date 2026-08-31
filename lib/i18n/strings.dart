@@ -566,6 +566,7 @@ const Map<String, String> _en = {
 
   // Messages
   'msg.none': 'Nothing from the school yet.',
+  'msg.gotIt': 'Got it',
   'msg.pinned': 'Pinned by the school',
   'msg.fromSchool': 'From the school',
   'msg.earlier': 'Earlier',
@@ -1472,6 +1473,7 @@ const Map<String, String> _ckb = {
   'att.minutesLate': '{n} خولەک دواکەوتوو',
 
   'msg.none': 'هێشتا هیچ شتێک لە قوتابخانەوە نییە.',
+  'msg.gotIt': 'تێگەیشتم',
   'msg.pinned': 'گرنگ — لەلایەن قوتابخانەوە',
   'msg.fromSchool': 'لە قوتابخانەوە',
   'msg.earlier': 'پێشتر',
@@ -2372,6 +2374,7 @@ const Map<String, String> _ar = {
   'att.minutesLate': 'متأخر {n} دقيقة',
 
   'msg.none': 'لا شيء من المدرسة بعد.',
+  'msg.gotIt': 'فهمت',
   'msg.pinned': 'مثبّت من المدرسة',
   'msg.fromSchool': 'من المدرسة',
   'msg.earlier': 'سابقاً',
