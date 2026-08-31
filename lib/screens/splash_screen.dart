@@ -51,7 +51,8 @@ class _SplashGateState extends State<SplashGate> {
   /// deadline rather than a list of cases.
   static const _limit = Duration(seconds: 6);
 
-  /// The shortest the clip is allowed to hold the screen.
+  /// The shortest the clip is allowed to hold the screen, measured from the
+  /// moment its first frame is up.
   ///
   /// This gate used to wait for the WHOLE clip. The parent clip runs just over
   /// five seconds and the sign-in check lands in about one, so the app spent
@@ -63,6 +64,12 @@ class _SplashGateState extends State<SplashGate> {
   /// So the clip is a floor rather than a duration — on screen long enough to
   /// read as deliberate instead of a flash, then out of the way the moment the
   /// app is ready.
+  ///
+  /// Timed from the first frame rather than from startup, because opening a
+  /// 15MB clip on a cold cheap handset is not instant. Started at startup, a
+  /// slow decode would spend the floor on the flat tint and then show a
+  /// fraction of a second of video before cutting — which looks like a fault,
+  /// not a splash. This way the clip always gets its moment.
   static const _floor = Duration(milliseconds: 1900);
 
   /// How long the curtain takes to fade out.
@@ -85,7 +92,6 @@ class _SplashGateState extends State<SplashGate> {
     // open used to be a permanently black screen; a server that never answers
     // would now be the same thing, and one rule covers both.
     _deadline = Timer(_limit, _finish);
-    _minimum = Timer(_floor, () => _mark(floor: true));
     _start(_asset);
 
     if (widget.ready == null) {
@@ -116,6 +122,9 @@ class _SplashGateState extends State<SplashGate> {
         return;
       }
       setState(() => _video = video);
+      // The floor starts here, with a frame decoded and about to be painted —
+      // not back in initState, where a slow open would have eaten it.
+      _minimum = Timer(_floor, () => _mark(floor: true));
       video.addListener(_watch);
       await video.play();
     } catch (_) {
