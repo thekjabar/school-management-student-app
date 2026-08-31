@@ -207,7 +207,11 @@ class _ParentAppState extends State<ParentApp> {
             ),
             Expanded(
               child: children == null
-                  ? const Center(child: CircularProgressIndicator())
+                  // Not a spinner. The header and the bottom bar are already
+                  // drawn by this point, so a spinner in the middle of them
+                  // reads as one broken panel; blocks in the shape of the
+                  // content read as the rest of it arriving.
+                  ? const _HomeSkeleton()
                   : child == null
                       ? const _NoChildren()
                       : IndexedStack(
@@ -299,3 +303,64 @@ class _NoChildren extends StatelessWidget {
   }
 }
 
+
+/// The home screen's shape, before it has anything to put in it.
+///
+/// Deliberately the same geometry as the real thing — a wide bus card, a row of
+/// tiles, two columns — so nothing moves sideways when the data lands. A
+/// skeleton whose blocks are in different places from the content it becomes is
+/// worse than a spinner, because the screen jumps at the exact moment somebody
+/// starts reading it.
+class _HomeSkeleton extends StatelessWidget {
+  const _HomeSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
+        const _Block(height: 92),
+        const SizedBox(height: kCardGap),
+        SizedBox(
+          height: 86,
+          child: Row(
+            children: List.generate(
+              4,
+              (i) => Padding(
+                padding: EdgeInsetsDirectional.only(end: i == 3 ? 0 : 10),
+                child: const _Block(width: 74, height: 86),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: kCardGap),
+        const _Block(height: 168),
+        const SizedBox(height: kCardGap),
+        const _Block(height: 132),
+      ],
+    );
+  }
+}
+
+/// One grey block. No shimmer: a sweep across five blocks on a cheap handset
+/// costs a repaint of the whole column every frame, for a screen that is on
+/// its way out.
+class _Block extends StatelessWidget {
+  const _Block({this.width, required this.height});
+
+  final double? width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: AppTheme.neutralSoft,
+        borderRadius: BorderRadius.circular(kCardRadius),
+      ),
+    );
+  }
+}

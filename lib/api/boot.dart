@@ -34,7 +34,21 @@ class Boot {
 
   /// Starts the work, once. Safe to call from anywhere; later callers get the
   /// same future rather than a second round of requests.
+  ///
+  /// Completes as soon as the SESSION is known. The screen data keeps loading
+  /// behind it — see [warm].
   Future<BootState> start() => _future ??= _run();
+
+  /// The screen data, still in flight when [start] completes.
+  ///
+  /// Kept separate because the two answer different questions. The shell needs
+  /// to know who you are, which is one call; the home screen needs six more,
+  /// and the header and the bottom bar have no business waiting for those —
+  /// they are chrome, and they can be on screen the instant the splash lifts.
+  Future<void>? _warm;
+
+  /// Awaited by nothing that draws. Exposed so a test can settle.
+  Future<void> get warm => _warm ?? Future<void>.value();
 
   /// The home payload, if it arrived in time. Taken ONCE — the home screen uses
   /// it for its first build and fetches for itself from then on, so a
@@ -74,50 +88,59 @@ class Boot {
     }
     if (me == null) return const BootState(me: null);
 
-    // Whichever opening screen THIS BUILD will actually draw. Decided by the
-    // flavour rather than by the person's role: somebody can hold two, and
-    // fetching the wrong one spends a school connection at the one minute of
-    // the day when the whole city opens the app.
-    List<Child> children = const [];
-    try {
-      switch (kRole) {
-        case 'teacher':
-          _teacher = await TeacherPayload.fetch();
+    // The screen data is started here and NOT awaited.
+    //
+    // Whichever opening screen this build will draw, decided by the flavour
+    // rather than by the person's role: somebody can hold two, and fetching the
+    // wrong one spends a school connection at the one minute of the day when
+    // the whole city opens the app.
+    //
+    // Deliberately not awaited: the shell is chrome and needs none of it. The
+    // curtain lifts on the line below, the header and the bottom bar draw
+    // immediately, and the content sits under its skeleton until this lands.
+    _warm = _prefetch().catchError((_) {
+      // Swallowed. Every screen still fetches for itself if this never arrives.
+    });
 
-        case 'driver':
-          // Nothing to prefetch that is worth the risk. The driver's home
-          // resolves today's duty trip and then asks for its plan — two
-          // dependent calls, and the second is large. Better spent when the
-          // screen is on top and can show its own progress.
-          break;
+    return BootState(me: me);
+  }
 
-        default:
-          children = await ParentApi.instance.children();
-          if (children.isNotEmpty) {
-            _home = await HomePayload.fetch(children.first.studentId);
-          }
-      }
-    } catch (_) {
-      // Left null. The screen fetches for itself, exactly as it did before.
+  /// The opening screen's data, running behind the shell.
+  Future<void> _prefetch() async {
+    switch (kRole) {
+      case 'teacher':
+        _teacher = await TeacherPayload.fetch();
+
+      case 'driver':
+        // Nothing worth prefetching. The driver's home resolves today's duty
+        // trip and then asks for that trip's plan — two dependent calls where
+        // the second is large, better spent when the screen is on top and can
+        // show its own progress.
+        break;
+
+      default:
+        final children = await ParentApi.instance.children();
+        if (children.isNotEmpty) {
+          _home = await HomePayload.fetch(children.first.studentId);
+        }
     }
-
-    return BootState(me: me, children: children);
   }
 
   /// Only for tests, which must not inherit a previous test's boot.
   void resetForTest() {
     _future = null;
+    _warm = null;
     _home = null;
     _teacher = null;
   }
 }
 
-/// What the app knew by the time the splash lifted.
+/// What the app knew by the time the splash lifted: who you are, and nothing
+/// else. The screens ask for their own data.
 class BootState {
-  const BootState({required this.me, this.children = const []});
+  const BootState({required this.me});
 
   final Me? me;
-  final List<Child> children;
 }
 
 /// The six calls the parent home screen opens with.
