@@ -13,6 +13,31 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
+    <!--
+      The camera. The driver app cannot open a shift without a photograph of
+      the crew member standing at the bus: shift-start refuses any asset id
+      that is not a real file this person uploaded, so a handset with no way to
+      take a picture cannot file the pre-trip walk-around, and without the
+      walk-around the bus is not allowed to depart.
+
+      Declared, and therefore ASKED FOR at the moment the driver taps "take the
+      photo" — image_picker looks for exactly this line in the merged manifest
+      and requests it at runtime when it finds it. Nothing else in the app opens
+      a camera.
+
+      No storage permission goes with it. The photograph is handed back through
+      a file the plugin owns in the app's own cache directory; nothing here
+      reads the gallery, and READ_EXTERNAL_STORAGE on a modern Android would be
+      asking a driver for their whole photo library to take one picture.
+    -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <!--
+      Used, not required. One codebase builds five apps from this manifest and
+      only the driver's ever opens a camera, so a camera-less handset must
+      still be able to install the parent app.
+    -->
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"

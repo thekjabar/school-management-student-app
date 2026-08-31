@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show ValueNotifier;
+
 import 'client.dart';
 import 'parent_api.dart' show Announcement;
 
@@ -302,6 +304,15 @@ class TeacherApi {
   static final TeacherApi instance = TeacherApi._();
   final ApiClient _api = ApiClient.instance;
 
+  /// How many notices this teacher has not opened yet.
+  ///
+  /// The dot on Messages is drawn from a count the shell takes once, at
+  /// start-up, from [announcements] — so nothing a teacher does afterwards can
+  /// move it. This is that same number kept live: seeded by every fetch, and
+  /// moved by the messages tab as notices are read. Anything drawing the dot
+  /// should listen to this rather than count rows itself.
+  final ValueNotifier<int> unreadAnnouncements = ValueNotifier<int>(0);
+
   Future<TeacherProfile> me() async =>
       TeacherProfile.fromJson(await _api.get('/teacher/me') as Map<String, dynamic>);
 
@@ -311,7 +322,25 @@ class TeacherApi {
   /// aimed at staff — the client cannot work that out and should not try.
   Future<List<Announcement>> announcements() async {
     final json = await _api.get('/teacher/announcements?pageSize=50');
-    return Paged.from<Announcement>(json, Announcement.fromJson).rows;
+    final rows = Paged.from<Announcement>(json, Announcement.fromJson).rows;
+    unreadAnnouncements.value = rows.where((a) => a.readAt == null).length;
+    return rows;
+  }
+
+  /// This teacher has read one notice.
+  ///
+  /// Scoped to the caller by the server — a teacher marks their own reading,
+  /// never a colleague's — and idempotent, so a notice opened twice is not an
+  /// error and the app need not remember what it has already sent.
+  Future<void> markAnnouncementRead(String id) =>
+      _api.post('/teacher/announcements/$id/read');
+
+  /// This teacher has read everything they can see. Returns how many rows the
+  /// server actually stamped, which is not always what was on screen: the list
+  /// is one page long, and the sweep covers the lot.
+  Future<int> markAllAnnouncementsRead() async {
+    final json = await _api.post('/teacher/announcements/read-all');
+    return ((json as Map<String, dynamic>?)?['marked'] as num?)?.toInt() ?? 0;
   }
 
   Future<List<TeachingSlot>> classes() async {

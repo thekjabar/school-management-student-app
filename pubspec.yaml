@@ -57,6 +57,18 @@ dependencies:
   # school on their child's behalf.
   local_auth: ^2.3.0
 
+  # The camera, for the one photograph the platform will not open a shift
+  # without: the crew member standing at the bus. `shift-start` refuses any
+  # asset id that is not a real file uploaded by the caller, so a handset that
+  # cannot take a picture cannot file a walk-around at all — and without the
+  # walk-around `depart` refuses to let the bus go. That is the whole morning,
+  # not one button.
+  #
+  # image_picker rather than `camera`: it hands the capture to the phone's own
+  # camera app, so there is no preview surface to keep alive and no CameraX
+  # lifecycle to get wrong across the forty kinds of handset this ships to.
+  image_picker: ^1.1.2
+
   # A real map, with real tiles. Chosen over the Google Maps SDK because it
   # needs no API key and no billing account: every school that deploys this
   # would otherwise have to hold one, and OpenStreetMap's coverage of Erbil and

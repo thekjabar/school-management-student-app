@@ -1351,6 +1351,26 @@ class ParentApi {
     return Paged.from<Announcement>(json, Announcement.fromJson).rows;
   }
 
+  /// "I have read this one."
+  ///
+  /// Scoped to the caller by the server: a guardian marks their own reading,
+  /// never the other parent's. Idempotent, so a second tap on a notice already
+  /// read is a success rather than an error — which is what lets the screen
+  /// fire this on every open without first checking.
+  Future<void> markAnnouncementRead(String id) async {
+    await _api.post('/parent/announcements/$id/read');
+  }
+
+  /// Mark every notice this guardian can see as read.
+  ///
+  /// Answers with how many rows actually CHANGED — the ones already read are
+  /// not counted again — so the screen can say something true afterwards
+  /// instead of repeating the number it optimistically ticked off itself.
+  Future<int> markAllAnnouncementsRead() async {
+    final json = await _api.post('/parent/announcements/read-all');
+    return json is Map ? ((json['marked'] as num?)?.toInt() ?? 0) : 0;
+  }
+
   Future<FeeSummary> fees() async {
     final json = await _api.get('/parent/fees') as Map<String, dynamic>;
     return FeeSummary.fromJson(json);

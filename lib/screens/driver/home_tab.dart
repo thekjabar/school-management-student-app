@@ -39,15 +39,49 @@ Future<CrewTrip?> loadDutyTrip() async {
 
 /// The run that answers "what am I doing now": the one under way, else the next
 /// one due out.
+///
+/// The filter here used to drop `ENDED`, which is not a TripStatus — the real
+/// ones are PLANNED, ROSTERED, BLOCKED, BOARDING, IN_PROGRESS, ARRIVED,
+/// SWEEP_PENDING, SWEEP_OVERDUE, COMPLETED, CANCELLED, ABANDONED and VOID. A
+/// comparison against a value nothing ever holds does not fail; it excludes
+/// nothing. So a COMPLETED morning run stayed in the list, and because the list
+/// is sorted by departure time the run that finished at half past seven beat
+/// the afternoon run that had not left yet. A driver opening the app after
+/// lunch was shown this morning, with "Start / Resume" on it, and the afternoon
+/// run was nowhere.
+///
+/// A run under way outranks a run due out. Within that, the ones that have
+/// stopped carrying children but still owe something come first — a bus that
+/// has arrived with an unconfirmed cabin sweep is the most dangerous state in
+/// the system, and it must not be pushed off the screen by the next departure.
 CrewTrip? pickLiveTrip(List<CrewTrip> trips) {
   if (trips.isEmpty) return null;
-  final live = trips.where((t) => t.status == 'IN_PROGRESS').toList();
-  if (live.isNotEmpty) return live.first;
-  final ahead = trips.where((t) => t.status != 'ENDED' && t.status != 'CANCELLED').toList()
+
+  final busy = trips.where((t) => t.underway).toList()..sort(_byUrgency);
+  if (busy.isNotEmpty) return busy.first;
+
+  // Everything still owed today, earliest first. BLOCKED stays in: the bus is
+  // stopped, the driver has to be told so, and hiding the run does not unblock
+  // it.
+  final ahead = trips.where((t) => t.live).toList()
     ..sort((a, b) => (a.scheduledDepartureAt ?? DateTime(2100))
         .compareTo(b.scheduledDepartureAt ?? DateTime(2100)));
-  return ahead.isNotEmpty ? ahead.first : trips.first;
+
+  // Nothing left. Null rather than a finished run, so the caller goes looking
+  // for the next day instead of offering to start something that is over.
+  return ahead.isNotEmpty ? ahead.first : null;
 }
+
+/// Sweep overdue first, then sweep pending, then the bus on the road.
+int _byUrgency(CrewTrip a, CrewTrip b) => _urgency(a).compareTo(_urgency(b));
+
+int _urgency(CrewTrip t) => switch (t.status) {
+      'SWEEP_OVERDUE' => 0,
+      'SWEEP_PENDING' => 1,
+      'ARRIVED' => 2,
+      'IN_PROGRESS' => 3,
+      _ => 4,
+    };
 
 /// What a driver sees at 06:40 with cold hands.
 ///
@@ -307,7 +341,10 @@ class _DutyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tint = Role.driver.tint;
-    final live = trip.status == 'IN_PROGRESS';
+    // On duty from the walk-around to the cabin sweep, not only while the wheels
+    // are turning. A driver who has checked in and is loading children was
+    // being told "No run under way".
+    final live = trip.underway;
     final school = Session.instance.me?.schoolName ?? '';
 
     return Card16(

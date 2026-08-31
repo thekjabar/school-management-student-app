@@ -1,5 +1,7 @@
 import 'dart:math';
+import 'dart:typed_data';
 
+import '../i18n/strings.dart';
 import 'client.dart';
 
 /// A version 4 uuid, minted on the handset.
@@ -15,6 +17,91 @@ String uuidV4() {
   String hex(int from, int to) =>
       bytes.sublist(from, to).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   return '${hex(0, 4)}-${hex(4, 6)}-${hex(6, 8)}-${hex(8, 10)}-${hex(10, 16)}';
+}
+
+/* ---------------------------------------------------------------------------
+ * The server's vocabulary
+ *
+ * These are copied from transport-service — TripStatus in prisma/schema.prisma
+ * and the event and capture enums at the top of custody.controller.ts. They are
+ * written out rather than guessed at because a status string that is not one of
+ * these matches nothing, and a filter that matches nothing does not fail: it
+ * quietly passes everything through. `ENDED` was exactly that — a value no trip
+ * has ever had, used to exclude finished runs, so none were excluded.
+ * ------------------------------------------------------------------------- */
+
+/// Statuses that mean the bus is still expected to do something today.
+///
+/// The same list as LIVE_TRIP_STATUSES in dispatch.service.ts.
+const Set<String> kLiveTripStatuses = {
+  'PLANNED',
+  'ROSTERED',
+  'BLOCKED',
+  'BOARDING',
+  'IN_PROGRESS',
+  'ARRIVED',
+  'SWEEP_PENDING',
+  'SWEEP_OVERDUE',
+};
+
+/// Statuses that mean the run is over, one way or another. Nothing on a driver's
+/// screen should ever offer to start, resume or end one of these.
+const Set<String> kClosedTripStatuses = {
+  'COMPLETED',
+  'CANCELLED',
+  'ABANDONED',
+  'VOID',
+};
+
+/// Custody events that put a child ON the bus. BOARDING_TYPES in
+/// custody.service.ts.
+const Set<String> kBoardingEvents = {
+  'BOARDED',
+  'WRONG_BUS',
+  'TRANSFER_INTO_VEHICLE',
+};
+
+/// Custody events that take a child OFF it. ALIGHTING_TYPES in the same file,
+/// and the only ones the server judges against the expected stop.
+const Set<String> kAlightingEvents = {
+  'ALIGHTED',
+  'WRONG_STOP',
+  'HANDOVER',
+};
+
+/// The stop the bus is actually standing at when a custody event is recorded.
+///
+/// This mirrors `expectedStopFor()` in custody.service.ts, and it has to,
+/// because the server compares the two and rewrites any mismatch.
+///
+/// The afternoon is not the morning backwards. On the OUT leg children board at
+/// their own stop and get off at the campus gate; on the RETURN leg they board
+/// at the gate and are handed over at their own stop. The app used to send the
+/// child's own stop for every event on every leg — so every ordinary morning
+/// drop-off at the school arrived with the child's HOME stop attached, the
+/// server read that as a child put down somewhere they should not have been,
+/// rewrote the row to WRONG_STOP and raised a CRITICAL safeguarding alert. One
+/// per child, every morning. An office that gets forty of those before eight
+/// o'clock stops reading them, and the one that matters arrives in the middle.
+///
+/// [riderStopId] is the stop the child belongs to — the card the row is drawn
+/// under. [terminalStopId] is the campus gate. Either may be null, and a null
+/// answer is deliberate: an event with no stopId is one the server records as
+/// "not stated", which is honest, whereas the wrong stopId is an alarm.
+///
+/// NO_SHOW is neither a boarding nor an alighting, so the server never judges
+/// its stop. It is sent as the stop the bus genuinely waited at — the child's
+/// own stop in the morning, the gate in the afternoon — because the ledger is
+/// read by people, months later, asking where a child was last seen.
+String? custodyStopId({
+  required String leg,
+  required String eventType,
+  String? riderStopId,
+  String? terminalStopId,
+}) {
+  final alighting = kAlightingEvents.contains(eventType);
+  final atOwnStop = leg == 'RETURN' ? alighting : !alighting;
+  return atOwnStop ? riderStopId : terminalStopId;
 }
 
 /// A run the crew is on today.
@@ -61,7 +148,29 @@ class CrewTrip {
   final String complianceGate;
   final List<String> complianceFailReasons;
 
-  bool get running => status == 'IN_PROGRESS' || status == 'BOARDING';
+  /// The bus is out with children on it, so the stop calls will be accepted.
+  ///
+  /// `stops/:sequence/arrive` refuses anything without `startedAt`, and BOARDING
+  /// is the state AFTER the pre-trip check and BEFORE departure — the bus has
+  /// not moved. Offering "I've arrived" there is offering a call the server is
+  /// right to refuse.
+  bool get running => status == 'IN_PROGRESS' || status == 'ARRIVED';
+
+  /// The driver is on duty: checked in, at any point between the walk-around
+  /// and the cabin sweep.
+  bool get underway =>
+      status == 'BOARDING' ||
+      status == 'IN_PROGRESS' ||
+      status == 'ARRIVED' ||
+      status == 'SWEEP_PENDING' ||
+      status == 'SWEEP_OVERDUE';
+
+  /// Still owes the day something.
+  bool get live => kLiveTripStatuses.contains(status);
+
+  /// Over — completed, called off, or abandoned.
+  bool get closed => kClosedTripStatuses.contains(status);
+
   bool get finished => status == 'COMPLETED';
 
   /// The cabin sweep is owed and has not happened. The single most dangerous
@@ -238,6 +347,75 @@ class TripPlan {
       );
 }
 
+/// The four answers ShiftStartDto will accept for a walk-around.
+///
+/// INSPECTION_OUTCOMES in crew-trip.controller.ts. FAIL and NOT_COMPLETED both
+/// block the trip: the server sets the run to BLOCKED and `depart` then refuses
+/// it. That is the whole point of the check, so neither is offered lightly.
+const String kInspectionPass = 'PASS';
+const String kInspectionPassWithDefects = 'PASS_WITH_DEFECTS';
+const String kInspectionFail = 'FAIL';
+const String kInspectionNotCompleted = 'NOT_COMPLETED';
+
+/// The kind of file a pre-trip photograph is filed as.
+///
+/// One of CREW_KINDS in identity-service's uploads.controller.ts, which is the
+/// short list a crew handset is allowed to produce at all. INSPECTION_PHOTO is
+/// the one that carries a walk-around's evidence: the server keeps it for three
+/// years, which is how long a school would need it if the morning were ever
+/// questioned.
+const String kCrewInspectionPhoto = 'INSPECTION_PHOTO';
+
+/// Which checklist the answers were given against.
+///
+/// Stored beside them, so an answer given in March can still be read against
+/// the questions that were actually asked in March. Bump it when the item list
+/// below changes, never reuse it for a different list.
+const String kPreTripChecklistVersion = 'ksp-crew-pretrip-1';
+
+/// One pre-trip walk-around, exactly as the server asks for it.
+///
+/// Every field here is evidence rather than form-filling, and the server keeps
+/// all of it: an inspection completed in nine seconds from the driver's kitchen
+/// is indistinguishable from a real one unless the duration and the handset's
+/// clock offset are on the row.
+class PreTripCheck {
+  PreTripCheck({
+    required this.clientUuid,
+    required this.items,
+    required this.outcome,
+    required this.durationSeconds,
+    required this.selfieAssetId,
+    this.itemsFailedCount,
+    this.odometerKm,
+    this.notes,
+  });
+
+  /// Minted before the FIRST send, reused on every retry. A crew phone loses
+  /// signal in every basement car park; without this one walk-around becomes
+  /// four inspections and the compliance figure becomes fiction.
+  final String clientUuid;
+
+  /// The answers, keyed by the item's own token — never by its translated
+  /// label. The office reads these months later, in a language nobody chose.
+  final Map<String, String> items;
+
+  final String outcome;
+
+  /// Really measured, from opening the checklist to submitting it. Clamped to
+  /// the range the server accepts rather than invented.
+  final int durationSeconds;
+
+  /// The crew member's own photograph, taken at the bus. Required — it is what
+  /// ties the record to a person rather than to a session token, and a session
+  /// token can be handed to a cousin along with the phone.
+  final String selfieAssetId;
+
+  final int? itemsFailedCount;
+  final int? odometerKm;
+  final String? notes;
+}
+
 class SweepState {
   SweepState({
     required this.required_,
@@ -319,7 +497,125 @@ class CrewApi {
     return SweepState.fromJson(json as Map<String, dynamic>);
   }
 
-  Future<void> startShift(String tripId) => _api.post('/crew/trips/$tripId/shift-start');
+  /// The campus gate on this run, which is the stop the bus is at whenever it
+  /// is not at a child's own stop.
+  ///
+  /// Read off the trip pack, because the plan does not carry it: the plan's
+  /// stops are built from the manifest, every manifest entry points at a
+  /// child's own pick-up or drop-off stop, and no child belongs to the gate. So
+  /// the gate — the one stop where a whole morning's alightings happen — is the
+  /// one stop the plan cannot name.
+  ///
+  /// Matched on `isCampusGate`, taking the LAST one in sequence order. That is
+  /// what the server does: `StopAssignment.isTerminal` defaults to the stop's
+  /// own `isCampusGate`, and custody.service.ts takes the highest sequence of
+  /// them. Null when the route has no gate marked, which the caller must pass
+  /// on as a null stopId rather than substituting something.
+  Future<String?> terminalStopId(String tripId) async {
+    final json = await _api.get('/crew/trips/$tripId/pack') as Map<String, dynamic>;
+    final progress = (json['stopProgress'] as List?) ?? const [];
+    String? gate;
+    for (final row in progress) {
+      final stop = (row as Map<String, dynamic>)['stop'] as Map<String, dynamic>?;
+      if (stop != null && stop['isCampusGate'] == true) {
+        gate = stop['id'] as String?;
+      }
+    }
+    return gate;
+  }
+
+  /// Send a photograph the handset has just taken, and get back the id the
+  /// rest of the platform knows it by.
+  ///
+  /// POST /crew/uploads/direct — the offline-friendly path, described in
+  /// identity-service's CrewUploadsController as "the bytes it has been
+  /// holding in its queue since the bus was underground, in one request, with
+  /// no separate confirm step to lose". The file part is called `file` and
+  /// nothing else; a request with any other field name is read as having no
+  /// file attached at all and answered 400.
+  ///
+  /// [kind] must be one of CREW_KINDS in that controller — HANDOVER_PHOTO,
+  /// INCIDENT_PHOTO, INCIDENT_VIDEO, INCIDENT_AUDIO, INSPECTION_PHOTO,
+  /// DEFECT_PHOTO, SIGNATURE_IMAGE, VEHICLE_PHOTO. A driver's handset has no
+  /// business minting an invoice or a tenant stamp, and the server refuses
+  /// rather than guesses.
+  ///
+  /// The row it writes carries `uploadedByPersonId` = the caller, which is
+  /// exactly what `shift-start` looks for: it will only accept a walk-around
+  /// photograph that is a real, AVAILABLE asset at this school belonging to
+  /// the person filing the check.
+  ///
+  /// Returns the asset id, or throws. It never returns a placeholder — an
+  /// inspection filed against an id the server did not issue is a safeguarding
+  /// record pointing at nothing.
+  Future<String> uploadPhoto({
+    required Uint8List bytes,
+    required String mime,
+    required String filename,
+    String kind = kCrewInspectionPhoto,
+    DateTime? capturedAt,
+  }) async {
+    final json = await _api.upload(
+      '/crew/uploads/direct',
+      field: 'file',
+      bytes: bytes,
+      filename: filename,
+      mime: mime,
+      fields: {
+        'kind': kind,
+        // The moment the shutter went, not the moment the upload finished. On
+        // a bus with no signal those are minutes apart, and the office reads
+        // the first one.
+        'capturedAt': ?capturedAt?.toUtc().toIso8601String(),
+      },
+    );
+    final id = json is Map<String, dynamic> ? json['id'] : null;
+    if (id is! String || id.isEmpty) {
+      throw ApiException(t('driver.pretrip.selfieNoId'), 0);
+    }
+    return id;
+  }
+
+  /// File the pre-trip walk-around and go on duty.
+  ///
+  /// This was posted with an EMPTY BODY, and the endpoint validates a full
+  /// ShiftStartDto — clientUuid, checklistVersion, items, outcome,
+  /// durationSeconds, selfieAssetId and deviceTime are all required — so it
+  /// answered 400 every single time. `depart` then refuses to let the bus go
+  /// without a PRE_TRIP inspection on the trip, so the failure was never one
+  /// button: it was the whole morning.
+  ///
+  /// `deviceTime` is stamped here, at the moment of sending, because the server
+  /// measures the handset's clock against its own from it and stores the
+  /// difference on the inspection row.
+  Future<void> startShift(String tripId, PreTripCheck check) async {
+    await _api.post('/crew/trips/$tripId/shift-start', {
+      'clientUuid': check.clientUuid,
+      'checklistVersion': kPreTripChecklistVersion,
+      'items': check.items,
+      'outcome': check.outcome,
+      'durationSeconds': check.durationSeconds,
+      'selfieAssetId': check.selfieAssetId,
+      'deviceTime': DateTime.now().toUtc().toIso8601String(),
+      'itemsFailedCount': ?check.itemsFailedCount,
+      'odometerKm': ?check.odometerKm,
+      'notes': ?check.notes,
+      // lat, lon and accuracyM are accepted by ShiftStartDto and are NOT sent,
+      // because this build still has no position source: there is no location
+      // plugin in pubspec.yaml, the Android manifest asks for no location
+      // permission, and the stop coordinates the plan carries are the office's
+      // pins rather than a fix. The photograph does not help either — the
+      // camera writes GPS into a picture only when the camera app itself holds
+      // location, and image_picker re-encodes the file and drops the EXIF.
+      //
+      // This is not free. fleet-service's suspicious-inspections report
+      // (inspections.controller.ts) matches, among other things,
+      // `{ kind: 'PRE_TRIP', lat: null }` — so every walk-around this app files
+      // lands on that report, and a report where every row is flagged is a
+      // report nobody reads. Sending a made-up position would be worse; the
+      // fix is a real fix, and it needs a plugin.
+    });
+  }
 
   Future<void> depart(String tripId) => _api.post('/crew/trips/$tripId/depart');
 
@@ -341,6 +637,22 @@ class CrewApi {
   /// retry. That is what stops a dropped connection over a patchy cell from
   /// boarding the same child twice — the server treats a repeat as a duplicate
   /// and says so, rather than writing a second row.
+  /// [stopId] must be the stop the BUS is at, not the stop the child belongs
+  /// to. Work it out with [custodyStopId]; the two differ on exactly the half
+  /// of every run that happens at the school gate.
+  ///
+  /// The position is accepted by the server and this build never has one. There
+  /// is no location plugin in pubspec.yaml and the Android manifest asks for no
+  /// location permission, so nothing on a crew screen knows where the bus is —
+  /// the stop coordinates the plan carries are the office's pins, not a fix,
+  /// and sending one as though it were a fix would tell the server the bus was
+  /// standing exactly on the stop no matter where it really was.
+  ///
+  /// So the geofence half of the wrong-stop check cannot fire, and these
+  /// arguments exist for the day a fix does. Send all four together when that
+  /// day comes: the server grades a lat/lon with no [gpsAccuracyM] as a clean
+  /// GPS fix and lets it raise a CRITICAL alert, so a coarse network fix sent
+  /// without its accuracy is worse than no fix at all.
   Future<void> recordCustody({
     required String tripId,
     required String studentId,
@@ -348,6 +660,8 @@ class CrewApi {
     String? stopId,
     double? lat,
     double? lon,
+    int? gpsAccuracyM,
+    int? positionAgeMs,
   }) async {
     final now = DateTime.now().toUtc().toIso8601String();
     await _api.post('/crew/custody/events', {
@@ -368,6 +682,8 @@ class CrewApi {
           'manualReason': 'Marked by the crew on the bus.',
           'lat': ?lat,
           'lon': ?lon,
+          'gpsAccuracyM': ?gpsAccuracyM,
+          'positionAgeMs': ?positionAgeMs,
         },
       ],
     });

@@ -7,6 +7,7 @@ import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
+import 'handover_screen.dart';
 import 'home_tab.dart' show loadDutyTrip;
 
 /// Every child on today's run, and where each one is.
@@ -26,6 +27,17 @@ class _DriverStudentsState extends State<DriverStudents> {
   _Filter _filter = _Filter.all;
   String _query = '';
   String? _busyStudent;
+
+  /// What the collector-verification screen wrote, for the children it was
+  /// opened on this session.
+  ///
+  /// `POST /crew/handover` writes the custody ledger but does not itself
+  /// recompute the manifest, so the roster this list is drawn from can still
+  /// say "on board" for a child who has been handed over and signed for. The
+  /// row would then invite the driver to do it all again. This is not a state
+  /// the app invented — it is the answer the server gave, held on to until the
+  /// roster catches up.
+  final Map<String, HandoverOutcome> _settled = {};
 
   /// Board, drop off, or not travelling — written to the custody ledger.
   ///
@@ -52,6 +64,41 @@ class _DriverStudentsState extends State<DriverStudents> {
     }
   }
 
+  /// The afternoon run, at the door.
+  ///
+  /// This used to be one more tap on the sheet, writing a plain HANDOVER event
+  /// with no collector on it at all — a row saying a child left the bus and
+  /// nothing whatever about who took her, which is the only part anybody asks
+  /// about afterwards. It goes to the verification screen now, and every way
+  /// out of that screen is a recorded decision.
+  Future<void> _openHandover(String tripId, _Rider entry) async {
+    final outcome = await Navigator.of(context).push<HandoverOutcome?>(
+      MaterialPageRoute<HandoverOutcome?>(
+        builder: (_) => HandoverScreen(
+          tripId: tripId,
+          studentId: entry.rider.studentId,
+          studentName: entry.rider.name,
+          stopId: entry.stop.stopId,
+          stopName: entry.stop.name,
+        ),
+      ),
+    );
+    if (!mounted || outcome == null) return;
+    setState(() => _settled[entry.rider.studentId] = outcome);
+    _loaderKey.currentState?.reload();
+    showNote(
+      context,
+      '${entry.rider.name.split(' ').first} — ${_settledWord(outcome)}',
+      bad: outcome == HandoverOutcome.refused,
+    );
+  }
+
+  static String _settledWord(HandoverOutcome outcome) => switch (outcome) {
+        HandoverOutcome.handedOver => t('driver.handedOver'),
+        HandoverOutcome.refused => t('handover.evRefused'),
+        HandoverOutcome.nobodyAtStop => t('handover.nobodyTitle'),
+      };
+
   Future<void> _openActions(String tripId, _Rider entry, String leg) async {
     final choice = await showModalBottomSheet<_Mark>(
       context: context,
@@ -63,12 +110,11 @@ class _DriverStudentsState extends State<DriverStudents> {
       case _Mark.boarded:
         await _record(tripId, entry, 'BOARDED', t('driver.onBoard'));
       case _Mark.dropped:
-        await _record(
-          tripId,
-          entry,
-          leg == 'OUT' ? 'ALIGHTED' : 'HANDOVER',
-          leg == 'OUT' ? t('driver.atSchool') : t('driver.handedOver'),
-        );
+        // Only ever the morning leg. Coming home, a child does not simply get
+        // off — they are given to somebody.
+        await _record(tripId, entry, 'ALIGHTED', t('driver.atSchool'));
+      case _Mark.handover:
+        await _openHandover(tripId, entry);
       case _Mark.noShow:
         await _record(tripId, entry, 'NO_SHOW', t('driver.notRiding'));
     }
@@ -215,6 +261,7 @@ class _DriverStudentsState extends State<DriverStudents> {
                       _RiderRow(
                         entry: shown[i],
                         leg: roster.trip!.leg,
+                        settled: _settled[shown[i].rider.studentId],
                         busy: _busyStudent == shown[i].rider.studentId,
                         // A child already off the bus has nothing left to
                         // record, so that row is not a tap that does nothing —
@@ -321,22 +368,32 @@ class _RiderRow extends StatelessWidget {
   const _RiderRow({
     required this.entry,
     required this.leg,
+    required this.settled,
     required this.busy,
     required this.onTap,
   });
 
   final _Rider entry;
   final String leg;
+
+  /// What the verification screen recorded for this child, where the roster has
+  /// not caught up with it yet.
+  final HandoverOutcome? settled;
   final bool busy;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final (colour, word) = entry.isDone
-        ? (AppTheme.blue, leg == 'RETURN' ? t('driver.handedOver') : t('driver.atSchool'))
-        : entry.isOnBoard
-            ? (AppTheme.green, t('driver.onBoard'))
-            : (AppTheme.amber, t('driver.waiting'));
+    final (colour, word) = switch (settled) {
+      HandoverOutcome.handedOver => (AppTheme.green, t('driver.handedOver')),
+      HandoverOutcome.refused => (AppTheme.rose, t('handover.evRefused')),
+      HandoverOutcome.nobodyAtStop => (AppTheme.amber, t('handover.nobodyTitle')),
+      null => entry.isDone
+          ? (AppTheme.blue, leg == 'RETURN' ? t('driver.handedOver') : t('driver.atSchool'))
+          : entry.isOnBoard
+              ? (AppTheme.green, t('driver.onBoard'))
+              : (AppTheme.amber, t('driver.waiting')),
+    };
 
     final row = Padding(
       // 14 top and bottom puts the row at 66 — a name on a list a driver
@@ -413,7 +470,11 @@ class _RiderRow extends StatelessWidget {
 }
 
 /// What a tap on a name can record.
-enum _Mark { boarded, dropped, noShow }
+///
+/// [handover] is the odd one out: it records nothing by itself. It opens the
+/// screen where the driver checks the adult at the door against the list the
+/// school keeps, and the recording happens there.
+enum _Mark { boarded, dropped, handover, noShow }
 
 /// The sheet behind a name.
 ///
@@ -495,9 +556,24 @@ class _MarkSheet extends StatelessWidget {
               ),
               const SizedBox(height: 10),
             ],
-            if (entry.isOnBoard) ...[
+            // Coming home this records nothing by itself: it opens the list of
+            // adults this child may be given to, which is the whole question at
+            // that door and the one this sheet used to answer by not asking it.
+            //
+            // Offered whether or not the boarding tap was made. A child is
+            // standing at the door either way, and a missed tap this morning is
+            // not a reason the driver cannot check who is taking her home.
+            if (leg == 'RETURN' && !entry.isDone) ...[
               BigButton(
-                label: leg == 'RETURN' ? t('driver.handedOver') : t('driver.markDropped'),
+                label: t('handover.open'),
+                color: tint,
+                height: 56,
+                onPressed: () => Navigator.of(context).pop(_Mark.handover),
+              ),
+              const SizedBox(height: 10),
+            ] else if (entry.isOnBoard) ...[
+              BigButton(
+                label: t('driver.markDropped'),
                 color: AppTheme.green,
                 height: 52,
                 onPressed: () => Navigator.of(context).pop(_Mark.dropped),

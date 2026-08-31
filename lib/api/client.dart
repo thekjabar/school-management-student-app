@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -278,6 +280,107 @@ class ApiClient {
           // Not refused — not reached. Tearing the session down here is what
           // turned a two-second gateway blip into a whole city retyping their
           // passwords. The tokens stay exactly where they are.
+          throw OfflineException();
+        case Renewal.rejected:
+          await clear();
+          signalSignedOut();
+          throw ApiException('Your session has ended. Please sign in again.', 401);
+      }
+    }
+
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      if (res.body.isEmpty) return null;
+      return jsonDecode(utf8.decode(res.bodyBytes));
+    }
+
+    throw ApiException(_messageFrom(res), res.statusCode);
+  }
+
+  /// Send one file to an endpoint that expects a form rather than JSON.
+  ///
+  /// Written out by hand instead of with http's MultipartRequest because
+  /// naming a part's Content-Type needs `MediaType` from http_parser, and that
+  /// is a whole package in pubspec.yaml for one line. The type is not optional:
+  /// the upload endpoint checks it against the kind of file it was told to
+  /// expect, and a part sent without one arrives as application/octet-stream
+  /// and is refused.
+  ///
+  /// The bytes stay in memory, so the request can be built again after a token
+  /// renewal. A 401 at the moment of upload then costs the person holding the
+  /// phone nothing — which matters when the thing being uploaded is a
+  /// photograph they would otherwise have to walk back and take again.
+  Future<dynamic> upload(
+    String path, {
+    required String field,
+    required Uint8List bytes,
+    required String filename,
+    required String mime,
+    Map<String, String> fields = const {},
+  }) =>
+      _sendFile(path, field, bytes, filename, mime, fields);
+
+  Future<dynamic> _sendFile(
+    String path,
+    String field,
+    Uint8List bytes,
+    String filename,
+    String mime,
+    Map<String, String> fields, [
+    bool retry = true,
+  ]) async {
+    final uri = Uri.parse('$kApiBase$path');
+
+    // Only has to be a string that does not occur inside the photograph. The
+    // clock alone is not enough on a handset that uploads twice in the same
+    // microsecond, so there is randomness in it as well.
+    final boundary = '----ksp'
+        '${DateTime.now().microsecondsSinceEpoch.toRadixString(16)}'
+        '${Random.secure().nextInt(0x7fffffff).toRadixString(16)}';
+
+    // A filename arrives from a plugin, not from us, and it is written into a
+    // header. Anything that could close the quotes or start a new header line
+    // is taken out rather than trusted.
+    final safeName = filename.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+
+    final form = BytesBuilder();
+    void line(String s) => form.add(utf8.encode('$s\r\n'));
+    fields.forEach((name, value) {
+      line('--$boundary');
+      line('Content-Disposition: form-data; name="$name"');
+      line('');
+      line(value);
+    });
+    line('--$boundary');
+    line('Content-Disposition: form-data; name="$field"; filename="$safeName"');
+    line('Content-Type: $mime');
+    line('');
+    form.add(bytes);
+    line('');
+    line('--$boundary--');
+
+    http.Response res;
+    try {
+      final request = http.Request('POST', uri)
+        ..headers.addAll(_headers())
+        ..headers['Content-Type'] = 'multipart/form-data; boundary=$boundary'
+        ..bodyBytes = form.takeBytes();
+      // Longer than the twenty-five seconds a JSON call gets. This is a few
+      // hundred kilobytes leaving a bus yard on one bar, and a driver told
+      // "not answering" too early will take the photograph again rather than
+      // wait for the one already going up.
+      final streamed = await _http.send(request).timeout(const Duration(seconds: 90));
+      res = await http.Response.fromStream(streamed);
+    } on TimeoutException {
+      throw ApiException('The school system is not answering. Try again in a moment.', 0);
+    } catch (_) {
+      throw OfflineException();
+    }
+
+    if (res.statusCode == 401 && retry) {
+      switch (await _renew()) {
+        case Renewal.renewed:
+          return _sendFile(path, field, bytes, filename, mime, fields, false);
+        case Renewal.unreachable:
           throw OfflineException();
         case Renewal.rejected:
           await clear();
