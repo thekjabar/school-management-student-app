@@ -48,7 +48,7 @@ class HomeTab extends StatelessWidget {
         // Already fetched, while the splash clip was playing. Taken once: a
         // pull-to-refresh after this gets live data rather than the snapshot
         // the app opened with.
-        final early = Boot.instance.takeHome();
+        final early = await Boot.instance.takeHome();
         if (early != null && early.studentId == child.studentId) {
           return _Home.from(early);
         }

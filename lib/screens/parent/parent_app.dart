@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/boot.dart';
 import '../../api/parent_api.dart';
 import '../../api/session.dart';
 import '../../i18n/strings.dart';
@@ -62,7 +63,10 @@ class _ParentAppState extends State<ParentApp> {
 
   Future<void> _load() async {
     try {
-      final children = await ParentApi.instance.children();
+      // Whatever the prefetch already has, rather than asking again. Null on a
+      // retry, or if the prefetch failed, and then this asks for itself.
+      final children =
+          await Boot.instance.takeChildren() ?? await ParentApi.instance.children();
       if (!mounted) return;
       setState(() {
         _children = children;

@@ -44,6 +44,19 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// What came of trying to renew the access token.
+///
+/// Three outcomes, not two. This was a bool, and false meant all of: there is
+/// no refresh token, the server refused it, the server answered 502, the
+/// request timed out, the phone has no signal. The caller treated every one of
+/// them as the end of the session and erased the tokens — so a gateway hiccup
+/// at 07:40, the one minute of the day when the whole city opens the app at
+/// once, signed everybody out and made them retype a password that was never
+/// wrong.
+///
+/// A refresh token is only spent once the server has actually judged it.
+enum Renewal { renewed, rejected, unreachable }
+
 /// Thrown when the phone genuinely cannot reach the platform.
 class OfflineException extends ApiException {
   OfflineException()
@@ -149,6 +162,18 @@ class ApiClient {
   final StreamController<void> _signedOut = StreamController<void>.broadcast();
   Stream<void> get onSignedOut => _signedOut.stream;
 
+  /// Say out loud that the session is over.
+  ///
+  /// clear() only forgets the tokens. Signing out used to do exactly that and
+  /// leave the gate still holding a person, so their app stayed on screen until
+  /// some later request happened to come back 401 — and with no signal nothing
+  /// comes back at all. On a handset passed between two parents, which the note
+  /// in signOut says is normal here, the first one's children were still on
+  /// screen after they had signed out.
+  void signalSignedOut() {
+    if (!_signedOut.isClosed) _signedOut.add(null);
+  }
+
   Map<String, String> _headers({bool json = false}) => {
         if (json) 'Content-Type': 'application/json',
         if (_access != null) 'Authorization': 'Bearer $_access',
@@ -167,12 +192,14 @@ class ApiClient {
   /// present the same refresh token five times, the second would be read as a
   /// reuse, and the driver would be thrown out mid-run. One shared future means
   /// concurrent callers all wait on the same renewal.
-  Future<bool>? _renewing;
+  Future<Renewal>? _renewing;
 
-  Future<bool> _renew() {
+  Future<Renewal> _renew() {
     return _renewing ??= () async {
       try {
-        if (_refresh == null) return false;
+        // Nothing to present. Only the phone is involved in that answer, so it
+        // is as final as a refusal.
+        if (_refresh == null) return Renewal.rejected;
         final res = await _http
             .post(
               Uri.parse('$kApiBase/auth/refresh'),
@@ -180,17 +207,28 @@ class ApiClient {
               body: jsonEncode({'refreshToken': _refresh}),
             )
             .timeout(const Duration(seconds: 15));
-        if (res.statusCode != 200 && res.statusCode != 201) return false;
+        // The server answered, and the answer was no.
+        if (res.statusCode == 400 || res.statusCode == 401 || res.statusCode == 403) {
+          return Renewal.rejected;
+        }
+        // Anything else it said — 500, 502, a proxy's own error page — is not a
+        // judgement on the token. It has not been spent, so it is kept.
+        if (res.statusCode != 200 && res.statusCode != 201) return Renewal.unreachable;
+
         final body = jsonDecode(res.body) as Map<String, dynamic>;
         final token = body['accessToken'] as String?;
-        if (token == null) return false;
+        if (token == null) return Renewal.unreachable;
         await saveSession(
           access: token,
           refresh: body['refreshToken'] as String?,
         );
-        return true;
+        return Renewal.renewed;
+      } on TimeoutException {
+        return Renewal.unreachable;
       } catch (_) {
-        return false;
+        // Transport, or a body that would not parse. Either way the token was
+        // never judged.
+        return Renewal.unreachable;
       } finally {
         // Cleared on the next microtask so everyone awaiting this attempt sees
         // the same answer before another can start.
@@ -233,10 +271,19 @@ class ApiClient {
     // One retry, and only for an expired token. A 403 is a permission answer;
     // asking the same question twice does not change it.
     if (res.statusCode == 401 && retry) {
-      if (await _renew()) return _send(method, path, body, false);
-      await clear();
-      if (!_signedOut.isClosed) _signedOut.add(null);
-      throw ApiException('Your session has ended. Please sign in again.', 401);
+      switch (await _renew()) {
+        case Renewal.renewed:
+          return _send(method, path, body, false);
+        case Renewal.unreachable:
+          // Not refused — not reached. Tearing the session down here is what
+          // turned a two-second gateway blip into a whole city retyping their
+          // passwords. The tokens stay exactly where they are.
+          throw OfflineException();
+        case Renewal.rejected:
+          await clear();
+          signalSignedOut();
+          throw ApiException('Your session has ended. Please sign in again.', 401);
+      }
     }
 
     if (res.statusCode >= 200 && res.statusCode < 300) {

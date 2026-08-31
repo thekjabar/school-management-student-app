@@ -216,6 +216,10 @@ class Session {
     }
     _me = null;
     await _api.clear();
+    // Said out loud, so the gate returns to sign-in now rather than whenever
+    // the next request happens to fail. With no signal there is no next
+    // request, and the previous person's app simply stayed on screen.
+    _api.signalSignedOut();
     // Phones get shared here — one handset between two parents, or handed down
     // to an older child. A device still subscribed after sign-out delivers one
     // family's alerts to another.

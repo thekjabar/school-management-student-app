@@ -229,6 +229,11 @@ class _Gate extends StatefulWidget {
 class _GateState extends State<_Gate> {
   Me? _me;
   bool _ready = false;
+
+  /// Start-up could not reach the platform. Carried through to the sign-in
+  /// screen so it can say so instead of waiting for a password to fail.
+  bool _offline = false;
+
   StreamSubscription<void>? _signedOut;
 
   @override
@@ -258,6 +263,7 @@ class _GateState extends State<_Gate> {
     if (!mounted) return;
     setState(() {
       _me = boot.me;
+      _offline = boot.offline;
       _ready = true;
     });
   }
@@ -265,15 +271,25 @@ class _GateState extends State<_Gate> {
   @override
   Widget build(BuildContext context) {
     if (!_ready) {
-      // Deliberately bare. The splash is drawn over this, and the wordmark and
-      // spinner that used to live here read as a SECOND splash screen the
-      // moment the clip lifted — which is the part that felt slow, because by
-      // then a person is waiting rather than watching.
-      return Scaffold(backgroundColor: AppTheme.canvas, body: const SizedBox.expand());
+      // Deliberately bare of CONTENT — the wordmark and spinner that used to
+      // live here read as a second splash screen the moment the clip lifted,
+      // which is the part that felt slow, because by then a person is waiting
+      // rather than watching.
+      //
+      // But in the ROLE'S OWN COLOUR, not the page white. Almost always this is
+      // covered by the splash and nobody sees it. When it is not — a fresh
+      // install on a network that connects and never answers, where start-up
+      // waits out its timeout — white was a screen that looked broken. The
+      // tint just looks like the clip has not finished.
+      return Scaffold(backgroundColor: _role.tint, body: const SizedBox.expand());
     }
 
     if (_me == null) {
-      return LoginScreen(role: _role, onSignedIn: (me) => setState(() => _me = me));
+      return LoginScreen(
+        role: _role,
+        offline: _offline,
+        onSignedIn: (me) => setState(() => _me = me),
+      );
     }
 
     // The BUILD decides which app this is, not the account.

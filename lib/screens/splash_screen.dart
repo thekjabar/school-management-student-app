@@ -84,6 +84,7 @@ class _SplashGateState extends State<SplashGate> {
   Timer? _deadline;
   Timer? _minimum;
   Timer? _settle;
+  Timer? _duck;
 
   @override
   void initState() {
@@ -117,7 +118,10 @@ class _SplashGateState extends State<SplashGate> {
     final video = VideoPlayerController.asset(asset);
     try {
       await video.initialize();
-      if (!mounted) {
+      // _done as well as !mounted. A slow open landing after the deadline has
+      // already lifted the curtain would otherwise start playing — audible,
+      // behind a curtain that is transparent or gone.
+      if (!mounted || _done) {
         await video.dispose();
         return;
       }
@@ -159,6 +163,7 @@ class _SplashGateState extends State<SplashGate> {
     // settle timer armed after that point is a leak that outlives the widget.
     if (!mounted) return;
     setState(() {});
+    _fadeSound();
 
     // The curtain fades rather than vanishing, so the clip carries on decoding
     // behind a transparent layer while the home screen draws its first frames —
@@ -169,9 +174,61 @@ class _SplashGateState extends State<SplashGate> {
     // Once the fade is over the clip has nothing left to show: stop it, and
     // take it out of the tree.
     _settle = Timer(_fade + const Duration(milliseconds: 40), () {
-      _video?.pause();
+      _release();
       if (mounted) setState(() => _curtainGone = true);
     });
+  }
+
+  /// Take the sound down with the picture.
+  ///
+  /// All three clips carry an audio track and nothing sets the volume, so the
+  /// splash plays out of the speaker on every cold start. That was harmless
+  /// while the clip ran to its end — the audio resolved along with it. Cutting
+  /// the clip short does not: AnimatedOpacity moves the WIDGET's opacity, not
+  /// the controller's volume, so the soundtrack ran on at full level through
+  /// the whole dissolve and was then stopped dead, mid-phrase, every launch.
+  void _fadeSound() {
+    final video = _video;
+    if (video == null) return;
+
+    const step = Duration(milliseconds: 20);
+    final steps = _fade.inMilliseconds ~/ step.inMilliseconds;
+    var done = 0;
+
+    _duck?.cancel();
+    _duck = Timer.periodic(step, (timer) {
+      done++;
+      // Squared, so it fades the way loudness is heard rather than the way the
+      // number falls. A linear ramp stays audible almost to the end and then
+      // disappears, which reads as a cut with extra steps.
+      final left = (1 - done / steps).clamp(0.0, 1.0);
+      _video?.setVolume(left * left);
+      if (done >= steps) timer.cancel();
+    });
+  }
+
+  /// Let the clip go for good.
+  ///
+  /// Pausing is not enough. VideoPlayerController.initialize registers a
+  /// lifecycle observer with WidgetsBinding, and only dispose() ever removes
+  /// it: that observer latches "was playing" when the app goes to the
+  /// background and calls play() again when it comes back.
+  ///
+  /// This gate is MaterialApp.home, and the theme switch deliberately unmounts
+  /// nothing, so this State's own dispose never runs in a shipped build — the
+  /// observer would outlive the splash for the life of the process. The clips
+  /// carry a soundtrack, so backgrounding the app while one played and coming
+  /// back later restarted it: splash audio over the home screen, nothing on
+  /// screen to explain it, and nothing left that could stop it.
+  void _release() {
+    _duck?.cancel();
+    final video = _video;
+    if (video == null) return;
+    // Cleared first, so nothing rebuilds around a controller being torn down.
+    _video = null;
+    video.removeListener(_watch);
+    video.pause();
+    video.dispose();
   }
 
   @override
@@ -179,8 +236,8 @@ class _SplashGateState extends State<SplashGate> {
     _deadline?.cancel();
     _minimum?.cancel();
     _settle?.cancel();
-    _video?.removeListener(_watch);
-    _video?.dispose();
+    _duck?.cancel();
+    _release();
     super.dispose();
   }
 

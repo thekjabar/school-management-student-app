@@ -19,10 +19,22 @@ import '../ui/kit.dart';
 /// needs reading — somebody who cannot read the form cannot find the setting
 /// that would let them read it.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.role, required this.onSignedIn});
+  const LoginScreen({
+    super.key,
+    required this.role,
+    required this.onSignedIn,
+    this.offline = false,
+  });
 
   final Role role;
   final void Function(Me me) onSignedIn;
+
+  /// Start-up could not reach the platform at all.
+  ///
+  /// Not the same as being signed out, and the screen says so before anybody
+  /// types anything. Without it the first thing a person did on a dead
+  /// connection was enter a password, wait, and be told something vague.
+  final bool offline;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -46,6 +58,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    // Named up front rather than discovered by failing.
+    if (widget.offline) _error = t('common.offline');
     _phone.addListener(() => setState(() {}));
   }
 

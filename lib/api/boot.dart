@@ -50,10 +50,21 @@ class Boot {
   /// Awaited by nothing that draws. Exposed so a test can settle.
   Future<void> get warm => _warm ?? Future<void>.value();
 
-  /// The home payload, if it arrived in time. Taken ONCE — the home screen uses
-  /// it for its first build and fetches for itself from then on, so a
-  /// pull-to-refresh gets live data rather than this snapshot again.
-  HomePayload? takeHome() {
+  /// The home payload. Taken ONCE — the home screen uses it for its first build
+  /// and fetches for itself from then on, so a pull-to-refresh gets live data
+  /// rather than this snapshot again.
+  ///
+  /// Waits for the prefetch to land rather than asking whether it already has.
+  /// It never had: the shell mounts on the microtask after [start] completes,
+  /// which is before the prefetch has sent a single byte, so this returned null
+  /// every time and every screen fetched the same thing over again — ten
+  /// requests where five were intended, at the one minute of the day when a
+  /// whole school opens the app at once.
+  ///
+  /// Costs nothing to wait now. The screen is already up, with its skeleton,
+  /// which is the entire point of it.
+  Future<HomePayload?> takeHome() async {
+    await warm;
     final h = _home;
     _home = null;
     return h;
@@ -61,9 +72,23 @@ class Boot {
 
   HomePayload? _home;
 
-  /// The teacher's opening screen, if it arrived in time. Taken once, like
-  /// [takeHome].
-  TeacherPayload? takeTeacherHome() {
+  /// The children, from the same call the prefetch had to make anyway.
+  ///
+  /// It asks for them to work out whose home payload to fetch, and the shell
+  /// then asked for exactly the same list again to draw the child switcher.
+  /// Taken once, like the payloads.
+  Future<List<Child>?> takeChildren() async {
+    await warm;
+    final c = _children;
+    _children = null;
+    return c;
+  }
+
+  List<Child>? _children;
+
+  /// The teacher's opening screen. Taken once, and waited for, like [takeHome].
+  Future<TeacherPayload?> takeTeacherHome() async {
+    await warm;
     final t = _teacher;
     _teacher = null;
     return t;
@@ -102,9 +127,16 @@ class Boot {
 
     // Nothing remembered — a fresh install, or an upgrade from a build that
     // kept no identity. There is no app to draw, so this one has to be asked.
+    // Capped well under the client's own 25 second timeout. That timeout is
+    // sized for a person who pressed something and is watching for an answer;
+    // this is the app deciding which screen to open, with nothing on screen
+    // behind the splash but the role's colour. Waiting out twenty-five seconds
+    // there is the white screen the customer reported.
     final Me? me;
     try {
-      me = await Session.instance.refresh();
+      me = await Session.instance.refresh().timeout(const Duration(seconds: 7));
+    } on TimeoutException {
+      return const BootState(me: null, offline: true);
     } on ApiException {
       // Unreachable rather than rejected. With no remembered identity there is
       // still nothing to draw, so sign-in is the honest screen — and it says so
@@ -166,6 +198,8 @@ class Boot {
 
       default:
         final children = await ParentApi.instance.children();
+        // Kept, not just used. The shell needs this same list.
+        _children = children;
         if (children.isNotEmpty) {
           _home = await HomePayload.fetch(children.first.studentId);
         }
@@ -177,6 +211,7 @@ class Boot {
     _future = null;
     _warm = null;
     _home = null;
+    _children = null;
     _teacher = null;
   }
 }
