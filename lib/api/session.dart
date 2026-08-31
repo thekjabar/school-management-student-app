@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'client.dart';
 import 'push.dart';
 
@@ -148,18 +150,52 @@ class Session {
     );
   }
 
-  /// Re-read the account. Returns null when the stored token is no longer good.
+  /// Re-read the account from the server.
+  ///
+  /// Returns null only when the server has ANSWERED that the session is no
+  /// longer good. Anything else — no signal, a timeout, the platform being
+  /// down — is rethrown, because the caller has to be able to tell those apart.
+  ///
+  /// It used to catch every ApiException and return null, and OfflineException
+  /// is an ApiException: a phone in a lift produced the same answer as a
+  /// stood-down account, and the app sent both to the login screen.
   Future<Me?> refresh() async {
+    final Map<String, dynamic> json;
     try {
-      final json = await _api.get('/auth/me') as Map<String, dynamic>;
-      _me = Me.fromJson(json);
-      await _api.setTenant(_me!.active.tenantId);
-      // Also here, not only in signIn: a session restored from disk on a cold
-      // start never passes through signIn, and would be subscribed to nothing.
-      await Push.identify(_me!.id);
+      json = await _api.get('/auth/me') as Map<String, dynamic>;
+    } on ApiException catch (e) {
+      if (e.isAuth) {
+        _me = null;
+        return null;
+      }
+      rethrow;
+    }
+
+    _me = Me.fromJson(json);
+    await _api.setTenant(_me!.active.tenantId);
+    // Kept so the app can open offline next time.
+    await _api.saveMe(jsonEncode(json));
+    // Also here, not only in signIn: a session restored from disk on a cold
+    // start never passes through signIn, and would be subscribed to nothing.
+    await Push.identify(_me!.id);
+    return _me;
+  }
+
+  /// Who this phone last knew to be signed in, read from disk.
+  ///
+  /// Used to draw the app before — and, with no signal, instead of — an answer
+  /// from the server. Never used to decide whether a session is VALID: the
+  /// tokens are the authority on that and the server is the judge of the
+  /// tokens. This only decides what to put on screen meanwhile.
+  Future<Me?> restoreMe() async {
+    try {
+      final raw = await _api.loadMe();
+      if (raw == null) return null;
+      _me = Me.fromJson(jsonDecode(raw) as Map<String, dynamic>);
       return _me;
-    } on ApiException {
-      _me = null;
+    } catch (_) {
+      // A payload written by an older build whose shape has since changed. Not
+      // worth a crash on start-up — the server will supply a fresh one.
       return null;
     }
   }

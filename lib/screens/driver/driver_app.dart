@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
+import '../../ui/async.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/nav_glyphs.dart';
@@ -109,7 +110,7 @@ class _DriverAppState extends State<DriverApp> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorText(e))));
     }
   }
 }

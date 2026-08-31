@@ -5,6 +5,23 @@ import '../api/client.dart';
 import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
 
+/// The sentence to put in front of a person when a call fails.
+///
+/// Three cases, and the difference between them is the only thing anybody can
+/// act on:
+///
+///   unreachable — our own English sentence, so it is translated here;
+///   answered    — the API writes its messages for the person rather than for
+///                 a log, and every request sends the language the app is
+///                 showing, so it already arrived in the right one;
+///   anything else — a bug rather than a condition, and a stack trace helps
+///                 nobody holding a phone.
+String errorText(Object? e) => e is OfflineException
+    ? t('common.offline')
+    : e is ApiException
+        ? e.message
+        : t('common.loadFailed');
+
 /// Lets a [Loader] know when the screen it sits on is uncovered again.
 ///
 /// One observer for the whole app, handed to MaterialApp.navigatorObservers.
@@ -163,9 +180,7 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
             final error = snap.error;
             return _scrollable(
               _Failed(
-                message: error is ApiException
-                    ? error.message
-                    : t('common.loadFailed'),
+                message: errorText(error),
                 onRetry: reload,
                 tint: tint,
               ),

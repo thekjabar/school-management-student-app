@@ -506,7 +506,7 @@ class _NewExamSheetState extends State<_NewExamSheet> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = errorText(e);
         _loading = false;
       });
     }

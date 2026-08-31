@@ -7,6 +7,7 @@ import '../../theme/app_theme.dart';
 import '../../ui/kit.dart';
 import '../../ui/nav_glyphs.dart';
 import '../../ui/pickers.dart';
+import '../../ui/async.dart';
 import '../../ui/home_kit.dart';
 import 'calendar_tab.dart';
 import 'home_tab.dart';
@@ -70,7 +71,7 @@ class _ParentAppState extends State<ParentApp> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      setState(() => _error = errorText(e));
     }
 
     // The bell's count. Loaded after the children because it is the least
@@ -120,36 +121,6 @@ class _ParentAppState extends State<ParentApp> {
     final me = Session.instance.me;
     final children = _children;
     final child = _selected;
-
-    if (_error != null && children == null) {
-      return Scaffold(
-        backgroundColor: AppTheme.canvas,
-        body: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.wifi_off_rounded, size: 36, color: AppTheme.textFaint),
-                  const SizedBox(height: 14),
-                  Text(
-                    _error!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: AppTheme.textMuted, height: 1.5, fontSize: 13),
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: 180,
-                    child: BigButton(label: t('common.tryAgain'), color: role.tint, onPressed: _load),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
 
     final hour = DateTime.now().hour;
     final greeting = hour < 12
@@ -207,11 +178,22 @@ class _ParentAppState extends State<ParentApp> {
             ),
             Expanded(
               child: children == null
-                  // Not a spinner. The header and the bottom bar are already
-                  // drawn by this point, so a spinner in the middle of them
-                  // reads as one broken panel; blocks in the shape of the
-                  // content read as the rest of it arriving.
-                  ? const _HomeSkeleton()
+                  // Nothing yet — either still coming, or it failed and we know
+                  // why. Both belong HERE, in the space the content would have
+                  // filled, with the header and the bottom bar still above and
+                  // below them.
+                  //
+                  // The failure used to replace the whole app with a centred
+                  // error page. A parent who could not reach the school lost
+                  // the entire interface, which reads as "the app is broken"
+                  // rather than "this list did not arrive".
+                  ? (_error != null
+                      ? _CannotReach(message: _error!, tint: role.tint, onRetry: _load)
+                      // Not a spinner. The header and the bottom bar are
+                      // already drawn by this point, so a spinner in the middle
+                      // of them reads as one broken panel; blocks in the shape
+                      // of the content read as the rest of it arriving.
+                      : const _HomeSkeleton())
                   : child == null
                       ? const _NoChildren()
                       : IndexedStack(
@@ -311,6 +293,43 @@ class _NoChildren extends StatelessWidget {
 /// skeleton whose blocks are in different places from the content it becomes is
 /// worse than a spinner, because the screen jumps at the exact moment somebody
 /// starts reading it.
+/// Shown in the content area when the first load failed and there is still
+/// nothing to show. Sits inside the shell, so the header and the bottom bar
+/// stay where they are.
+class _CannotReach extends StatelessWidget {
+  const _CannotReach({required this.message, required this.tint, required this.onRetry});
+
+  final String message;
+  final Color tint;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.wifi_off_rounded, size: 36, color: AppTheme.textFaint),
+            const SizedBox(height: 14),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppTheme.textMuted, height: 1.5, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: 180,
+              child: BigButton(label: t('common.tryAgain'), color: tint, onPressed: onRetry),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _HomeSkeleton extends StatelessWidget {
   const _HomeSkeleton();
 

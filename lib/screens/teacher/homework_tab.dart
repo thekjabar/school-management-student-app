@@ -222,7 +222,7 @@ class _SetSheetState extends State<_SetSheet> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = errorText(e);
         _loading = false;
       });
     }

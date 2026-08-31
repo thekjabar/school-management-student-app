@@ -4,6 +4,7 @@ import '../api/push.dart';
 import '../api/session.dart';
 import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
+import 'async.dart';
 import 'kit.dart';
 
 /// The settings rows every app's account drawer needs.
@@ -201,7 +202,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
         SnackBar(content: Text(t('more.passwordChanged'))),
       );
     } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('ApiException: ', ''));
+      setState(() => _error = errorText(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

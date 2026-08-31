@@ -64,6 +64,18 @@ class ApiClient {
   static const _refreshKey = 'sm_refresh_token';
   static const _tenantKey = 'sm_tenant_id';
 
+  /// The last confirmed answer from /auth/me, verbatim.
+  ///
+  /// Kept so the app can open on a phone with no signal. Without it the only
+  /// way to know who is signed in was to ask the server, and being unable to
+  /// ask was indistinguishable from being told no — which is how a parent in a
+  /// basement ended up back at the login screen holding a perfectly good
+  /// session.
+  ///
+  /// The tokens are the authority on whether the session is valid; this is only
+  /// what to draw while the server is out of reach.
+  static const _meKey = 'sm_me';
+
   final http.Client _http = http.Client();
 
   String? _access;
@@ -100,6 +112,18 @@ class ApiClient {
     if (tenantId != null) await prefs.setString(_tenantKey, tenantId);
   }
 
+  /// Store the identity payload as it arrived, to be replayed offline.
+  Future<void> saveMe(String json) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_meKey, json);
+  }
+
+  /// The last identity this phone saw, or null on a fresh install.
+  Future<String?> loadMe() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_meKey);
+  }
+
   /// Record which school this session is acting for, without touching the token.
   Future<void> setTenant(String id) async {
     _tenantId = id;
@@ -115,6 +139,9 @@ class ApiClient {
     await prefs.remove(_tokenKey);
     await prefs.remove(_refreshKey);
     await prefs.remove(_tenantKey);
+    // Goes with the tokens. Left behind, the next person to open this handset
+    // would be greeted by the last one's name.
+    await prefs.remove(_meKey);
   }
 
   /// Fires when the session ends for good, so the app can return to sign-in

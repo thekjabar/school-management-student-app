@@ -77,14 +77,39 @@ class Boot {
       return const BootState(me: null);
     }
 
-    // Confirmed against the server rather than trusted. A driver stood down
-    // last night must not open a manifest this morning, and the only thing
-    // that knows is the server.
+    // Open from the identity on the phone, and ask the server to confirm it
+    // BEHIND the app rather than in front of it.
+    //
+    // The confirm used to block. On a bad connection that was a white screen
+    // for as long as the request took, and with no connection at all it was
+    // read as "signed out" — splash, white screen, login, for a parent whose
+    // session was perfectly good and who was simply in a basement.
+    //
+    // Nothing is given away by trusting it for a moment. A driver stood down
+    // last night still cannot DO anything this morning: every call the app
+    // makes comes back 401, the client clears the tokens and fires
+    // onSignedOut, and the gate drops to sign-in. The check still happens. It
+    // just no longer happens in the doorway.
+    final cached = await Session.instance.restoreMe();
+    if (cached != null) {
+      // Confirm first, then prefetch — in that order deliberately. If the
+      // access token has expired, letting both run at once means two requests
+      // discovering it together and two concurrent renewals racing for one
+      // refresh token, where the loser's is already spent.
+      _warm = _confirm().then((_) => _prefetch()).catchError((_) {});
+      return BootState(me: cached);
+    }
+
+    // Nothing remembered — a fresh install, or an upgrade from a build that
+    // kept no identity. There is no app to draw, so this one has to be asked.
     final Me? me;
     try {
       me = await Session.instance.refresh();
-    } catch (_) {
-      return const BootState(me: null);
+    } on ApiException {
+      // Unreachable rather than rejected. With no remembered identity there is
+      // still nothing to draw, so sign-in is the honest screen — and it says so
+      // for itself when the attempt fails.
+      return const BootState(me: null, offline: true);
     }
     if (me == null) return const BootState(me: null);
 
@@ -103,6 +128,27 @@ class Boot {
     });
 
     return BootState(me: me);
+  }
+
+  /// Confirms the remembered identity against the server, behind the app.
+  ///
+  /// Failure here is not the app's problem to solve. Rejected, and the client
+  /// has already cleared the tokens and fired onSignedOut, which the gate
+  /// listens to. Unreachable, and the remembered identity stands — each screen
+  /// says so when its own call fails, which is where a person can see it.
+  Future<void> _confirm() async {
+    final Me? me;
+    try {
+      me = await Session.instance.refresh();
+    } on ApiException {
+      return; // Unreachable. Carry on with what the phone remembers.
+    }
+
+    // Answered, and the answer was no. Normally the client has already torn the
+    // session down by this point; this covers the case where a renewal
+    // succeeded and the account was still refused, which leaves the tokens in
+    // place and every later call failing silently.
+    if (me == null) await Session.instance.signOut();
   }
 
   /// The opening screen's data, running behind the shell.
@@ -138,9 +184,16 @@ class Boot {
 /// What the app knew by the time the splash lifted: who you are, and nothing
 /// else. The screens ask for their own data.
 class BootState {
-  const BootState({required this.me});
+  const BootState({required this.me, this.offline = false});
 
   final Me? me;
+
+  /// The platform could not be reached at all during start-up.
+  ///
+  /// Only meaningful alongside a null [me]: it separates "we asked and you are
+  /// not signed in" from "we could not ask", so the sign-in screen can lead
+  /// with the connection rather than with a password that was never wrong.
+  final bool offline;
 }
 
 /// The six calls the parent home screen opens with.
