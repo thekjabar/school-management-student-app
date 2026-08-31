@@ -46,18 +46,34 @@ class StudentInfoScreen extends StatelessWidget {
                     _IdentityCard(profile: p, tint: tint),
                     const SizedBox(height: kCardGap),
 
+                    // Each row carries its own mark. Seven labels in a column
+                    // are seven identical greys to scan; seven marks are seven
+                    // different shapes, and the eye finds "Room" without
+                    // reading the other six.
                     _Section(
                       title: t('info.atSchool'),
                       icon: Icons.school_outlined,
                       color: tint,
                       rows: [
-                        _Row(t('info.class'), p.className),
-                        _Row(t('info.grade'), p.gradeLabel ?? _grade(p.gradeLevel)),
-                        _Row(t('info.section'), p.section),
-                        _Row(t('info.room'), p.room),
-                        _Row(t('info.shift'), humanise(p.shift)),
-                        _Row(t('info.teacher'), p.homeroomTeacher),
-                        _Row(t('info.rollNo'), p.rollNo),
+                        _Row(Icons.class_outlined, t('info.class'), p.className),
+                        _Row(
+                          Icons.stairs_outlined,
+                          t('info.grade'),
+                          p.gradeLabel ?? _grade(p.gradeLevel),
+                        ),
+                        _Row(Icons.grid_view_rounded, t('info.section'), p.section),
+                        _Row(Icons.meeting_room_outlined, t('info.room'), p.room),
+                        _Row(Icons.schedule_rounded, t('info.shift'), humanise(p.shift)),
+                        _Row(
+                          Icons.person_outline_rounded,
+                          t('info.teacher'),
+                          p.homeroomTeacher,
+                        ),
+                        _Row(
+                          Icons.format_list_numbered_rounded,
+                          t('info.rollNo'),
+                          p.rollNo,
+                        ),
                       ],
                     ),
                     const SizedBox(height: kCardGap),
@@ -67,11 +83,23 @@ class StudentInfoScreen extends StatelessWidget {
                       icon: Icons.badge_outlined,
                       color: AppTheme.blue,
                       rows: [
-                        _Row(t('info.studentNo'), p.code),
-                        _Row(t('info.year'), p.academicYear),
-                        _Row(t('info.campus'), p.campusName),
-                        _Row(t('info.address'), p.campusAddress),
-                        _Row(t('info.since'), longDate(p.enrolledAt)),
+                        _Row(Icons.tag_rounded, t('info.studentNo'), p.code),
+                        _Row(
+                          Icons.calendar_today_outlined,
+                          t('info.year'),
+                          p.academicYear,
+                        ),
+                        _Row(
+                          Icons.location_city_outlined,
+                          t('info.campus'),
+                          p.campusName,
+                        ),
+                        _Row(Icons.place_outlined, t('info.address'), p.campusAddress),
+                        _Row(
+                          Icons.event_available_outlined,
+                          t('info.since'),
+                          longDate(p.enrolledAt),
+                        ),
                       ],
                     ),
 
@@ -119,7 +147,11 @@ class StudentInfoScreen extends StatelessWidget {
   static String? _grade(int? level) => level == null ? null : tv('grade.n', {'n': '$level'});
 }
 
-/// The photograph, the name, and the two things everyone asks for first.
+/* ---------------------------------------------------------------------------
+ * Who they are
+ * ------------------------------------------------------------------------- */
+
+/// The face, the name, and the two things everyone asks for first.
 class _IdentityCard extends StatelessWidget {
   const _IdentityCard({required this.profile, required this.tint});
 
@@ -130,86 +162,146 @@ class _IdentityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = profile;
 
+    // Born, Gender and Nationality — whichever of the three the record holds.
+    // Built as a list rather than as three `if`s in a Row so the hairline
+    // rules fall BETWEEN whatever survives, instead of leaving a rule standing
+    // against an empty column.
+    final facts = <_FactData>[
+      if (p.dob != null)
+        _FactData(
+          icon: Icons.cake_outlined,
+          label: t('info.born'),
+          value: shortDate(p.dob),
+          // The age is the part a parent reads; the date is the part they
+          // check.
+          caption: p.ageYears == null
+              ? null
+              : tv('info.yearsOld', {'n': '${p.ageYears}'}),
+        ),
+      if (p.gender != null)
+        _FactData(
+          icon: Icons.wc_rounded,
+          label: t('info.gender'),
+          value: humanise(p.gender),
+        ),
+      if (p.nationality != null)
+        _FactData(
+          icon: Icons.flag_outlined,
+          label: t('info.nationality'),
+          value: p.nationality!,
+        ),
+    ];
+
     return Card16(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _Avatar(url: p.photoUrl, name: p.name, tint: tint),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 2),
-                    // The full enrolled name, because the reason to look is
-                    // usually to check a spelling against a document.
-                    Text(
-                      p.fullName,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.4,
-                        height: 1.25,
-                        color: AppTheme.text,
-                      ),
-                    ),
-                    if (p.nickname != null && p.nickname!.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        tv('info.knownAs', {'name': p.nickname!}),
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textMuted,
+      padding: EdgeInsets.zero,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(kCardRadius),
+        child: Stack(
+          children: [
+            // The school, at the end of the card, as a wash rather than as a
+            // picture. The illustration is twice as wide as it is tall, so at
+            // any size where it reads as a drawing it eats the width the
+            // child's full name needs — and the name is the one thing on this
+            // card that cannot afford to wrap to three lines. Behind and
+            // faint, it still does the job it was there to do.
+            PositionedDirectional(
+              end: -18,
+              bottom: -16,
+              child: Opacity(
+                opacity: AppTheme.dark ? 0.10 : 0.16,
+                child: Image.asset('assets/art/school_shield.png', width: 156),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _Avatar(url: p.photoUrl, name: p.name, tint: tint),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 2),
+                            // The full enrolled name, because the reason to
+                            // look is usually to check a spelling against a
+                            // document.
+                            Text(
+                              p.fullName,
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.6,
+                                height: 1.2,
+                                color: AppTheme.text,
+                              ),
+                            ),
+                            if (p.nickname != null && p.nickname!.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                tv('info.knownAs', {'name': p.nickname!}),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.textMuted,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 9),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                if (p.className != null)
+                                  _MarkChip(
+                                    icon: Icons.school_rounded,
+                                    label: p.className!,
+                                    color: tint,
+                                  ),
+                                _MarkChip(
+                                  icon: Icons.badge_outlined,
+                                  label: '#${p.code}',
+                                  color: AppTheme.blue,
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        if (p.className != null) StatusChip(p.className!, color: tint),
-                        StatusChip('#${p.code}', color: AppTheme.blue),
-                      ],
+                  ),
+                  if (facts.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Divider(height: 1, color: AppTheme.border),
+                    const SizedBox(height: 13),
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (var i = 0; i < facts.length; i++) ...[
+                            if (i > 0)
+                              Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                  start: 10,
+                                  end: 12,
+                                ),
+                                child: Container(width: 1, color: AppTheme.border),
+                              ),
+                            Expanded(child: _Fact(fact: facts[i], tint: tint)),
+                          ],
+                        ],
+                      ),
                     ),
                   ],
-                ),
+                ],
               ),
-            ],
-          ),
-          if (p.dob != null || p.gender != null || p.nationality != null) ...[
-            const SizedBox(height: 13),
-            Divider(height: 1, color: AppTheme.border),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                if (p.dob != null)
-                  Expanded(
-                    child: _Fact(
-                      label: t('info.born'),
-                      value: shortDate(p.dob),
-                      // The age is the part a parent reads; the date is the
-                      // part they check.
-                      caption: p.ageYears == null
-                          ? null
-                          : tv('info.yearsOld', {'n': '${p.ageYears}'}),
-                    ),
-                  ),
-                if (p.gender != null)
-                  Expanded(child: _Fact(label: t('info.gender'), value: humanise(p.gender))),
-                if (p.nationality != null)
-                  Expanded(
-                    child: _Fact(label: t('info.nationality'), value: p.nationality),
-                  ),
-              ],
             ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -224,7 +316,7 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const size = 64.0;
+    const size = 96.0;
 
     // No photograph is the norm rather than the exception here: plenty of
     // families do not consent to one, and the record honours that. Initials
@@ -233,9 +325,9 @@ class _Avatar extends StatelessWidget {
           child: Text(
             _initials(name),
             style: TextStyle(
-              fontSize: 22,
+              fontSize: 30,
               fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
+              letterSpacing: -0.8,
               color: tint,
             ),
           ),
@@ -247,7 +339,7 @@ class _Avatar extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: tint.withValues(alpha: AppTheme.dark ? 0.22 : 0.11),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(26),
       ),
       child: url == null || url!.isEmpty
           ? fallback()
@@ -267,50 +359,133 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-class _Fact extends StatelessWidget {
-  const _Fact({required this.label, required this.value, this.caption});
+/// A tinted pill with a mark in it — the class and the student code.
+class _MarkChip extends StatelessWidget {
+  const _MarkChip({required this.icon, required this.label, required this.color});
 
+  final IconData icon;
   final String label;
-  final String? value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsetsDirectional.fromSTEB(8, 5, 10, 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: AppTheme.dark ? 0.20 : 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FactData {
+  const _FactData({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.caption,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
   final String? caption;
+}
+
+class _Fact extends StatelessWidget {
+  const _Fact({required this.fact, required this.tint});
+
+  final _FactData fact;
+  final Color tint;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.1,
-            color: AppTheme.textMuted,
-          ),
+        Row(
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+                borderRadius: BorderRadius.circular(7),
+              ),
+              child: Icon(fact.icon, size: 13, color: tint),
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                fact.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.1,
+                  color: AppTheme.textMuted,
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: 6),
         Text(
-          value ?? '—',
+          fact.value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 14.5,
+            fontSize: 17,
             fontWeight: FontWeight.w800,
-            letterSpacing: -0.3,
+            letterSpacing: -0.4,
+            height: 1.2,
             color: AppTheme.text,
           ),
         ),
-        if (caption != null)
+        if (fact.caption != null)
           Text(
-            caption!,
-            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppTheme.textMuted),
+            fact.caption!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textMuted,
+            ),
           ),
       ],
     );
   }
 }
 
-/// A label and a value. Null values are dropped by [_Section].
+/* ---------------------------------------------------------------------------
+ * The record
+ * ------------------------------------------------------------------------- */
+
+/// A mark, a label and a value. Null values are dropped by [_Section].
 class _Row {
-  const _Row(this.label, this.value);
+  const _Row(this.icon, this.label, this.value);
+
+  final IconData icon;
   final String label;
   final String? value;
 }
@@ -337,34 +512,38 @@ class _Section extends StatelessWidget {
     if (shown.isEmpty) return const SizedBox.shrink();
 
     return Card16(
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 6),
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _CardTitle(icon: icon, color: color, title: title),
-          const SizedBox(height: 10),
-          for (final r in shown)
+          const SizedBox(height: 12),
+          for (var i = 0; i < shown.length; i++)
             Padding(
-              padding: const EdgeInsets.only(bottom: 9),
+              padding: EdgeInsets.only(top: i == 0 ? 0 : 11),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    width: 108,
-                    child: Text(
-                      r.label,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        height: 1.3,
-                        color: AppTheme.textMuted,
-                      ),
+                  Padding(
+                    // Nudged onto the text's baseline rather than its box.
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Icon(shown[i].icon, size: 16, color: color),
+                  ),
+                  const SizedBox(width: 9),
+                  Text(
+                    shown[i].label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                      color: AppTheme.textMuted,
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Text(
-                      r.value!,
+                      shown[i].value!,
+                      textAlign: TextAlign.end,
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700,
@@ -397,6 +576,7 @@ class _CardTitle extends StatelessWidget {
         Container(
           width: 30,
           height: 30,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: color.withValues(alpha: AppTheme.dark ? 0.22 : 0.11),
             borderRadius: BorderRadius.circular(10),
@@ -429,7 +609,7 @@ class _Guardians extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card16(
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -438,30 +618,41 @@ class _Guardians extends StatelessWidget {
             color: AppTheme.green,
             title: t('info.guardians'),
           ),
-          const SizedBox(height: 4),
-          for (final g in guardians)
+          const SizedBox(height: 12),
+          for (var i = 0; i < guardians.length; i++)
             Padding(
-              padding: const EdgeInsets.only(top: 10),
+              padding: EdgeInsets.only(top: i == 0 ? 0 : 11),
               child: Row(
                 children: [
+                  Icon(
+                    guardians[i].isYou
+                        ? Icons.person_rounded
+                        : Icons.person_outline_rounded,
+                    size: 16,
+                    color: AppTheme.green,
+                  ),
+                  const SizedBox(width: 9),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          g.isYou ? tv('info.you', {'name': g.name}) : g.name,
+                          guardians[i].isYou
+                              ? tv('info.you', {'name': guardians[i].name})
+                              : guardians[i].name,
                           style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.3,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
+                            height: 1.3,
                             color: AppTheme.text,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          humanise(g.relationship),
+                          humanise(guardians[i].relationship),
                           style: TextStyle(
-                            fontSize: 12.5,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: AppTheme.textMuted,
                           ),
@@ -471,7 +662,10 @@ class _Guardians extends StatelessWidget {
                   ),
                   // Who the office rings first. Worth being explicit about,
                   // because families frequently believe it is the other parent.
-                  if (g.isPrimary) StatusChip(t('info.mainContact'), color: tint),
+                  if (guardians[i].isPrimary) ...[
+                    const SizedBox(width: 10),
+                    StatusChip(t('info.mainContact'), color: tint),
+                  ],
                 ],
               ),
             ),
@@ -491,7 +685,7 @@ class _Medical extends StatelessWidget {
     final m = medical;
 
     return Card16(
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -501,7 +695,7 @@ class _Medical extends StatelessWidget {
             title: t('info.medical'),
           ),
           if (m.flags.isNotEmpty) ...[
-            const SizedBox(height: 11),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 6,
               runSpacing: 6,
@@ -522,22 +716,20 @@ class _Medical extends StatelessWidget {
               ),
             ),
           ],
-          if (m.carriesMedication) ...[
-            const SizedBox(height: 10),
+          if (m.carriesMedication)
             _Line(
               icon: Icons.medication_outlined,
+              color: AppTheme.rose,
               text: m.medicationLocation == null || m.medicationLocation!.isEmpty
                   ? t('info.carriesMedication')
                   : tv('info.carriesMedicationAt', {'where': m.medicationLocation!}),
             ),
-          ],
-          if (m.emergencyContacts.isNotEmpty) ...[
-            const SizedBox(height: 10),
+          if (m.emergencyContacts.isNotEmpty)
             _Line(
               icon: Icons.phone_in_talk_outlined,
+              color: AppTheme.rose,
               text: tv('info.ringInOrder', {'names': m.emergencyContacts.join(' → ')}),
             ),
-          ],
           if (m.needsReview) ...[
             const SizedBox(height: 12),
             // Stale medical information is more dangerous than none, because
@@ -566,7 +758,7 @@ class _Support extends StatelessWidget {
     final seat = s.fixedSeat;
 
     return Card16(
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -575,40 +767,58 @@ class _Support extends StatelessWidget {
             color: AppTheme.violet,
             title: t('info.support'),
           ),
-          const SizedBox(height: 6),
           if (s.escortRequired)
-            _Line(icon: Icons.person_pin_rounded, text: t('info.escortRequired')),
+            _Line(
+              icon: Icons.person_pin_rounded,
+              color: AppTheme.violet,
+              text: t('info.escortRequired'),
+            ),
           if (s.wheelchairVehicleRequired)
-            _Line(icon: Icons.accessible_rounded, text: t('info.rampVehicle')),
+            _Line(
+              icon: Icons.accessible_rounded,
+              color: AppTheme.violet,
+              text: t('info.rampVehicle'),
+            ),
           if (seat != null)
             _Line(
               icon: Icons.event_seat_outlined,
+              color: AppTheme.violet,
               text: seat is String && seat.isNotEmpty
                   ? tv('info.fixedSeatAt', {'seat': seat})
                   : t('info.fixedSeat'),
             ),
           if (s.doNotReleaseAlone)
-            _Line(icon: Icons.shield_outlined, text: t('info.neverAlone')),
+            _Line(
+              icon: Icons.shield_outlined,
+              color: AppTheme.violet,
+              text: t('info.neverAlone'),
+            ),
         ],
       ),
     );
   }
 }
 
+/// A sentence with its own leading mark — the same row shape [_Section] uses,
+/// for the facts that are a phrase rather than a label and a value.
 class _Line extends StatelessWidget {
-  const _Line({required this.icon, required this.text});
+  const _Line({required this.icon, required this.text, required this.color});
 
   final IconData icon;
   final String text;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.only(top: 11),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 17, color: AppTheme.textMuted),
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(icon, size: 16, color: color),
+          ),
           const SizedBox(width: 9),
           Expanded(
             child: Text(

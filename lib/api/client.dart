@@ -16,9 +16,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// client never has to know which service answers `/parent/children` — and a
 /// service can be split or moved without an app release, which matters when the
 /// app is on three thousand phones nobody can force to update.
+/// The backend has its own hostname, so the path does not repeat it: a call to
+/// `/parent/children` is exactly that, and nginx maps it onto the gateway's
+/// `/api` prefix at the edge. Changed from school.mrwari.com when the platform
+/// moved to krsprotection.com — an app already on a phone keeps working only
+/// until its next release, so a build carrying the old host is a build that
+/// cannot sign anybody in.
 const String kApiBase = String.fromEnvironment(
   'API_BASE',
-  defaultValue: 'https://school.mrwari.com/api',
+  defaultValue: 'https://api.krsprotection.com',
 );
 
 /// An error worth showing to the person holding the phone.

@@ -701,6 +701,8 @@ const Map<String, String> _en = {
 
   // Memories
   'memories.title': 'School memories',
+  'memories.subtitle': 'Days at school, as the school shared them.',
+  'memories.viewAll': 'View all photos',
   'memories.none': 'Nothing yet. Photographs from school days appear here once the school shares them.',
   'quick.memories': 'Memories',
   'quick.driverFeedback': 'Driver',
@@ -1603,6 +1605,8 @@ const Map<String, String> _ckb = {
 
   // Memories
   'memories.title': 'یادگاری قوتابخانە',
+  'memories.subtitle': 'ڕۆژانی قوتابخانە، وەک قوتابخانە هاوبەشی کردوون.',
+  'memories.viewAll': 'بینینی هەموو وێنەکان',
   'memories.none': 'هێشتا هیچ نییە. وێنەکانی ڕۆژانی قوتابخانە لێرە دەردەکەون کاتێک قوتابخانە هاوبەشیان دەکات.',
   'quick.memories': 'یادگاری',
   'quick.driverFeedback': 'شۆفێر',
@@ -2499,6 +2503,8 @@ const Map<String, String> _ar = {
 
   // Memories
   'memories.title': 'ذكريات المدرسة',
+  'memories.subtitle': 'أيام المدرسة، كما شاركتها المدرسة.',
+  'memories.viewAll': 'عرض كل الصور',
   'memories.none': 'لا شيء بعد. تظهر هنا صور الأيام المدرسية عندما تشاركها المدرسة.',
   'quick.memories': 'الذكريات',
   'quick.driverFeedback': 'السائق',

@@ -356,7 +356,7 @@ class _WrongApp extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   'Your role — ${role.replaceAll('_', ' ').toLowerCase()} — works at '
-                  'school.mrwari.com/portal rather than in this app.',
+                  'admin.krsprotection.com rather than in this app.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppTheme.textMuted, fontSize: 13, height: 1.55),
                 ),
