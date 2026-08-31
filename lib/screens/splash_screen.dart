@@ -28,9 +28,9 @@ class SplashGate extends StatefulWidget {
   final Color tint;
 
   /// Completes when the app underneath has what it needs to draw a real
-  /// screen. The curtain waits for BOTH this and the end of the clip, so a
-  /// fast connection never sees a second loading screen and a slow one spends
-  /// the wait watching the clip rather than a spinner.
+  /// screen. The curtain lifts once this has landed AND the clip has had its
+  /// moment, so a fast connection never sees a second loading screen and a
+  /// slow one spends the wait watching the clip rather than a spinner.
   ///
   /// Null means "do not wait" — the clip alone decides.
   final Future<void>? ready;
@@ -51,11 +51,32 @@ class _SplashGateState extends State<SplashGate> {
   /// deadline rather than a list of cases.
   static const _limit = Duration(seconds: 6);
 
+  /// The shortest the clip is allowed to hold the screen.
+  ///
+  /// This gate used to wait for the WHOLE clip. The parent clip runs just over
+  /// five seconds and the sign-in check lands in about one, so the app spent
+  /// nearly four seconds of every launch finished and idle behind an opaque
+  /// video. Worse, it made the home screen's skeleton unreachable: the skeleton
+  /// exists so a slow connection sees the shell filling in rather than a blank,
+  /// and the clip outlasted it every time, so it could never once be seen.
+  ///
+  /// So the clip is a floor rather than a duration — on screen long enough to
+  /// read as deliberate instead of a flash, then out of the way the moment the
+  /// app is ready.
+  static const _floor = Duration(milliseconds: 1900);
+
+  /// How long the curtain takes to fade out.
+  static const _fade = Duration(milliseconds: 420);
+
   VideoPlayerController? _video;
   bool _done = false;
   bool _clipOver = false;
   bool _appReady = false;
+  bool _floorOver = false;
+  bool _curtainGone = false;
   Timer? _deadline;
+  Timer? _minimum;
+  Timer? _settle;
 
   @override
   void initState() {
@@ -64,6 +85,7 @@ class _SplashGateState extends State<SplashGate> {
     // open used to be a permanently black screen; a server that never answers
     // would now be the same thing, and one rule covers both.
     _deadline = Timer(_limit, _finish);
+    _minimum = Timer(_floor, () => _mark(floor: true));
     _start(_asset);
 
     if (widget.ready == null) {
@@ -75,11 +97,14 @@ class _SplashGateState extends State<SplashGate> {
     }
   }
 
-  /// One half is done. Lift only when both are.
-  void _mark({bool clip = false, bool ready = false}) {
+  /// Lift once the app is ready AND the clip has had its moment — whichever
+  /// comes first of the floor and the clip's own end, so a clip shorter than
+  /// the floor is never padded out with a frozen last frame.
+  void _mark({bool clip = false, bool ready = false, bool floor = false}) {
     if (clip) _clipOver = true;
     if (ready) _appReady = true;
-    if (_clipOver && _appReady) _finish();
+    if (floor) _floorOver = true;
+    if (_appReady && (_floorOver || _clipOver)) _finish();
   }
 
   Future<void> _start(String asset) async {
@@ -119,12 +144,32 @@ class _SplashGateState extends State<SplashGate> {
     if (_done) return;
     _done = true;
     _deadline?.cancel();
-    if (mounted) setState(() {});
+    _minimum?.cancel();
+    // Nothing below is worth doing for a gate that is already off screen —
+    // dispose has cancelled the timers and let go of the controller, and a
+    // settle timer armed after that point is a leak that outlives the widget.
+    if (!mounted) return;
+    setState(() {});
+
+    // The curtain fades rather than vanishing, so the clip carries on decoding
+    // behind a transparent layer while the home screen draws its first frames —
+    // on a cheap handset, a video decoder competing with the one screen whose
+    // smoothness anybody will remember. Now that the clip is no longer played
+    // to its end, that tail is seconds long rather than nothing.
+    //
+    // Once the fade is over the clip has nothing left to show: stop it, and
+    // take it out of the tree.
+    _settle = Timer(_fade + const Duration(milliseconds: 40), () {
+      _video?.pause();
+      if (mounted) setState(() => _curtainGone = true);
+    });
   }
 
   @override
   void dispose() {
     _deadline?.cancel();
+    _minimum?.cancel();
+    _settle?.cancel();
     _video?.removeListener(_watch);
     _video?.dispose();
     super.dispose();
@@ -142,17 +187,20 @@ class _SplashGateState extends State<SplashGate> {
       fit: StackFit.expand,
       children: [
         widget.child,
-        // Faded out rather than removed, so the last frame of the clip melts
-        // into whichever screen the gate settled on instead of cutting to it.
-        IgnorePointer(
-          ignoring: _done,
-          child: AnimatedOpacity(
-            opacity: _done ? 0 : 1,
-            duration: const Duration(milliseconds: 420),
-            curve: Curves.easeOut,
-            child: _Curtain(video: _video, tint: widget.tint),
+        // Faded out rather than cut, so the clip melts into whichever screen
+        // the gate settled on — then dropped entirely once the fade is done,
+        // because a fully transparent video layer still composites and still
+        // decodes.
+        if (!_curtainGone)
+          IgnorePointer(
+            ignoring: _done,
+            child: AnimatedOpacity(
+              opacity: _done ? 0 : 1,
+              duration: _fade,
+              curve: Curves.easeOut,
+              child: _Curtain(video: _video, tint: widget.tint),
+            ),
           ),
-        ),
       ],
     );
   }
