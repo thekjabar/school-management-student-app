@@ -306,25 +306,16 @@ class _RequestCard extends StatelessWidget {
   Future<void> _open(BuildContext context) async {
     // Only a request the office has not answered can be taken back.
     if (item.status != 'PENDING') return;
-    final yes = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t('leave.withdraw')),
-        content: Text(t('leave.${item.kind.toLowerCase()}')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(t('common.cancel')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.rose),
-            child: Text(t('leave.withdraw')),
-          ),
-        ],
-      ),
+    final bool yes = await confirmDialog(
+      context,
+      icon: Icons.undo_rounded,
+      tone: AppTheme.rose,
+      title: t('leave.withdraw'),
+      body: t('leave.${item.kind.toLowerCase()}'),
+      confirmLabel: t('leave.withdraw'),
+      confirmIcon: Icons.undo_rounded,
     );
-    if (yes != true) return;
+    if (!yes) return;
     try {
       await ParentApi.instance.cancelLeave(item.id);
       onCancelled();

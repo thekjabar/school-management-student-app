@@ -133,25 +133,16 @@ class DriverProfile extends StatelessWidget {
   }
 
   Future<void> _signOut(BuildContext context) async {
-    final yes = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t('more.signOutAsk')),
-        content: Text(t('driver.signOutBody')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(t('common.cancel')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.rose),
-            child: Text(t('more.signOut')),
-          ),
-        ],
-      ),
+    final bool yes = await confirmDialog(
+      context,
+      icon: Icons.logout_rounded,
+      tone: AppTheme.rose,
+      title: t('more.signOutAsk'),
+      body: t('driver.signOutBody'),
+      confirmLabel: t('more.signOut'),
+      confirmIcon: Icons.logout_rounded,
     );
-    if (yes != true || !context.mounted) return;
+    if (!yes || !context.mounted) return;
     await Session.instance.signOut();
     await Push.forget();
     if (context.mounted) Navigator.of(context).popUntil((r) => r.isFirst);

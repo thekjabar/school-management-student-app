@@ -1273,3 +1273,199 @@ class TabHost extends StatelessWidget {
     );
   }
 }
+
+/// Ask before doing something the person cannot undo.
+///
+/// Returns true only if they actually chose to go ahead — dismissing by tapping
+/// outside, or by the system back gesture, returns false rather than null, so a
+/// caller can never treat "they walked away" as "they agreed".
+///
+/// [tone] carries the weight: rose for something destructive, the role's own
+/// colour for something merely irreversible. The icon sits in a soft disc of
+/// that tone, which is the whole visual argument the dialog makes before
+/// anybody reads a word.
+Future<bool> confirmDialog(
+  BuildContext context, {
+  required IconData icon,
+  required String title,
+  required String body,
+  required String confirmLabel,
+  IconData confirmIcon = Icons.check_rounded,
+  Color? tone,
+  String? cancelLabel,
+}) async {
+  final colour = tone ?? AppTheme.rose;
+
+  final answer = await showDialog<bool>(
+    context: context,
+    // The app's own dim rather than Material's near-black, which sits oddly
+    // over a page that is already dark.
+    barrierColor: Colors.black.withValues(alpha: AppTheme.dark ? 0.62 : 0.34),
+    builder: (context) => Dialog(
+      backgroundColor: AppTheme.surface,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 26, vertical: 40),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ConfirmMark(icon: icon, colour: colour),
+            const SizedBox(height: 20),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.6,
+                color: AppTheme.text,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              body,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14.5,
+                height: 1.5,
+                color: AppTheme.textMuted,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Divider(height: 1, color: AppTheme.border),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _ConfirmButton(
+                    label: cancelLabel ?? t('common.cancel'),
+                    icon: Icons.close_rounded,
+                    // Outlined, not filled: the safe answer should be the easy
+                    // one to hit and the quiet one to look at.
+                    filled: false,
+                    colour: AppTheme.violet,
+                    onTap: () => Navigator.of(context).pop(false),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _ConfirmButton(
+                    label: confirmLabel,
+                    icon: confirmIcon,
+                    filled: true,
+                    colour: colour,
+                    onTap: () => Navigator.of(context).pop(true),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  return answer ?? false;
+}
+
+/// The disc the dialog opens with, and the specks around it.
+///
+/// The specks are decoration and nothing else — they are what stops a large
+/// flat circle reading as a loading state.
+class _ConfirmMark extends StatelessWidget {
+  const _ConfirmMark({required this.icon, required this.colour});
+
+  final IconData icon;
+  final Color colour;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget speck(double size, bool cross, double opacity) => Icon(
+          cross ? Icons.close_rounded : Icons.circle_outlined,
+          size: size,
+          color: colour.withValues(alpha: opacity),
+        );
+
+    return SizedBox(
+      width: 168,
+      height: 132,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 122,
+            height: 122,
+            decoration: BoxDecoration(
+              color: colour.withValues(alpha: AppTheme.dark ? 0.18 : 0.10),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 50, color: colour),
+          ),
+          PositionedDirectional(start: 16, top: 30, child: speck(11, true, 0.45)),
+          PositionedDirectional(end: 20, top: 18, child: speck(10, true, 0.35)),
+          PositionedDirectional(start: 4, bottom: 26, child: speck(9, false, 0.40)),
+          PositionedDirectional(end: 10, bottom: 34, child: speck(8, false, 0.30)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConfirmButton extends StatelessWidget {
+  const _ConfirmButton({
+    required this.label,
+    required this.icon,
+    required this.filled,
+    required this.colour,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool filled;
+  final Color colour;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = filled ? Colors.white : colour;
+
+    return Material(
+      color: filled ? colour : Colors.transparent,
+      borderRadius: BorderRadius.circular(15),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(15),
+        child: Container(
+          height: 52,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+            border: filled ? null : Border.all(color: colour, width: 1.4),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 19, color: foreground),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                    color: foreground,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
