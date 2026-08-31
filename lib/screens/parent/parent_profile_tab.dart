@@ -14,6 +14,8 @@ import '../../ui/screen_kit.dart';
 import '../../ui/settings_widgets.dart';
 import 'children_tab.dart';
 import 'fees_screen.dart';
+import 'help_screen.dart';
+import 'personal_info_screen.dart';
 import 'settings_screen.dart';
 
 /// The guardian's own tab.
@@ -165,7 +167,9 @@ class _EditButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => showNote(context, t('profile.editAtOffice')),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
+      ),
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -397,7 +401,9 @@ class _Settings extends StatelessWidget {
             icon: Icons.person_outline_rounded,
             title: t('profile.personal'),
             sub: t('profile.personalSub'),
-            onTap: () => showNote(context, t('profile.editAtOffice')),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
+            ),
           ),
           Divider(height: 1, color: AppTheme.border),
           _Row(
@@ -472,7 +478,11 @@ class _Settings extends StatelessWidget {
             icon: Icons.help_outline_rounded,
             title: t('profile.help'),
             sub: t('profile.helpSub'),
-            onTap: () => showNote(context, t('profile.helpNote')),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => HelpScreen(child: children.isEmpty ? null : children.first),
+              ),
+            ),
             last: true,
           ),
         ],
