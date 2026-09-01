@@ -14,6 +14,7 @@ import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
+import '../../ui/map_tiles.dart';
 import '../../ui/screen_kit.dart';
 
 /// Where the child is, on a real map, refreshed while the screen is open.
@@ -355,13 +356,7 @@ class _MapCard extends StatelessWidget {
                   ),
                 ),
                 children: [
-                  TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    // OSM's tile policy asks for an identifying agent. Sending
-                    // one is the condition of using the tiles at all.
-                    userAgentPackageName: 'com.kurdistanstudentprotection.ksp',
-                    maxNativeZoom: 19,
-                  ),
+                  MapTiles.layer(),
 
                   // The line from the bus to the stop. Straight, and drawn
                   // dashed for that reason: it is a distance, not a route, and

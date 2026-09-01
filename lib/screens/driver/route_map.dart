@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart' hide Path;
 import '../../api/crew_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
+import '../../ui/map_tiles.dart';
 
 /// Whether a stop carries a position this app is allowed to draw.
 ///
@@ -163,13 +164,7 @@ class _RouteMapState extends State<RouteMap> {
         ),
       ),
       children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          // OSM's tile policy asks for an identifying agent. Sending one is the
-          // condition of using the tiles at all.
-          userAgentPackageName: 'com.kurdistanstudentprotection.ksp',
-          maxNativeZoom: 19,
-        ),
+        MapTiles.layer(),
         PolylineLayer(polylines: _order(pins)),
         MarkerLayer(
           markers: [

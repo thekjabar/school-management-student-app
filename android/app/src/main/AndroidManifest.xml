@@ -65,23 +65,6 @@
             </intent-filter>
         </activity>
 
-        <!--
-          The Google Maps key, for the parent tracking screen.
-
-          The value is substituted by android/app/build.gradle.kts from
-          `maps.apiKey` in android/local.properties, which is gitignored — the
-          key is never in the repository. With no property set this resolves to
-          an EMPTY STRING rather than being absent: the Maps SDK throws if the
-          tag is missing altogether, and a checkout with no key still has to
-          build and run.
-
-          The app does not then draw a dead map. The tracking screen asks the
-          platform whether this value arrived and, when it did not, says so —
-          see MainActivity.kt and lib/screens/parent/track_screen.dart.
-        -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="${mapsApiKey}" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

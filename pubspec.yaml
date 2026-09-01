@@ -87,7 +87,6 @@ dependencies:
   #
   # flutter_map stays: the driver's route map is built on it, and a driver's
   # handset is the one most likely to have no Play Services at all.
-  google_maps_flutter: ^2.18.0
 
 dev_dependencies:
   flutter_test:

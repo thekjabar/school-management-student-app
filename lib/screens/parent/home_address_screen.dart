@@ -13,6 +13,7 @@ import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
+import '../../ui/map_tiles.dart';
 import '../../ui/screen_kit.dart';
 
 /// Where the family lives, told to the school by the family.
@@ -515,11 +516,8 @@ class _MapCard extends StatelessWidget {
                   },
                 ),
                 children: [
-                  TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.kurdistanstudentprotection.ksp',
-                    maxNativeZoom: 19,
-                  ),
+                  MapTiles.layer(),
+                  MapTiles.attribution(),
                 ],
               ),
 

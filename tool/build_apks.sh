@@ -17,6 +17,18 @@ if [ ${#ROLES[@]} -eq 0 ]; then ROLES=(parent teacher driver); fi
 
 mkdir -p assets/video "$OUT"
 
+# The Mapbox token, from a file this repository does not carry.
+#
+# A public token is meant to ship inside a client and can be read out of any
+# APK, so this is not secrecy. It keeps the token out of a PUBLIC repository,
+# where anyone who cloned the code could spend the quota without ever
+# touching the app. Absent, the build still succeeds and every map says it is
+# not set up rather than showing a grey rectangle.
+MAPBOX_TOKEN="$(tr -d "[:space:]" < tool/mapbox.token 2>/dev/null || true)"
+if [ -z "$MAPBOX_TOKEN" ]; then
+  echo "note: tool/mapbox.token is missing - maps will be blank in these builds"
+fi
+
 for role in "${ROLES[@]}"; do
   echo
   echo "── $role ─────────────────────────────────────────────"
@@ -46,6 +58,7 @@ for role in "${ROLES[@]}"; do
   flutter build apk --release \
     --flavor "$role" \
     --dart-define="APP_ROLE=$role" \
+    --dart-define="MAPBOX_TOKEN=$MAPBOX_TOKEN" \
     --split-per-abi
 
   # Named as the app is named, so the file somebody is handed over Telegram
