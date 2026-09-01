@@ -122,6 +122,25 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
     if (_wasPin != null) _map.move(_wasPin!, _map.camera.zoom);
   }
 
+  /// Move to a place the search offered, and take the pin with you.
+  ///
+  /// Zoom 17 rather than the map's current level: somebody who searched for a
+  /// quarter wants to see the streets in it to place the pin on their own
+  /// house, and arriving zoomed out to the whole city means dragging anyway,
+  /// which is what the search was meant to save.
+  void _goTo(Place p) {
+    final at = LatLng(p.lat, p.lon);
+    setState(() {
+      _pin = at;
+      _dirty = true;
+    });
+    _map.move(at, 17);
+    // The address box follows the pin, exactly as it does after a drag. The
+    // place name from the search is where the family is looking, not
+    // necessarily what the office should read as the address.
+    _lookUp(at, force: true);
+  }
+
   /// Ask for the address once the map has been still for a moment.
   void _scheduleLookUp(LatLng at) {
     _finding?.cancel();
@@ -228,6 +247,20 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
                       ],
                     ),
                     const SizedBox(height: 10),
+
+                    // Only while editing. A search box on a screen that is
+                    // showing a settled address is a control that cannot do
+                    // anything, and it would sit above the map competing with
+                    // the one line that matters.
+                    if (_editing) ...[
+                      _PlaceSearch(
+                        tint: tint,
+                        nearLat: (_pin ?? _fallback).latitude,
+                        nearLon: (_pin ?? _fallback).longitude,
+                        onPicked: _goTo,
+                      ),
+                      const SizedBox(height: 10),
+                    ],
 
                     _MapCard(
                       pin: _pin ?? _fallback,
@@ -442,6 +475,215 @@ class _Explainer extends StatelessWidget {
 /// The map, with a pin fixed at the centre and the map moving under it.
 /// Edit, and then Cancel. Small, because it sits beside a line of guidance
 /// rather than under it.
+/// Find a place by name instead of dragging the map to it.
+///
+/// Shown only while editing. Dragging is fine once you can see roughly where
+/// you are; it is a poor way to reach Bakhtiyari from a map of the whole city,
+/// and worse one-handed, which is how this screen is usually filled in.
+///
+/// It does not touch the pin by itself. Choosing a result moves the map and the
+/// pin together, and the address box is then filled the same way a drag fills
+/// it — so what the office reads is always the address under the pin, never a
+/// search term somebody typed.
+class _PlaceSearch extends StatefulWidget {
+  const _PlaceSearch({
+    required this.tint,
+    required this.nearLat,
+    required this.nearLon,
+    required this.onPicked,
+  });
+
+  final Color tint;
+  final double nearLat;
+  final double nearLon;
+  final ValueChanged<Place> onPicked;
+
+  @override
+  State<_PlaceSearch> createState() => _PlaceSearchState();
+}
+
+class _PlaceSearchState extends State<_PlaceSearch> {
+  final _field = TextEditingController();
+  final _focus = FocusNode();
+  Timer? _debounce;
+  List<Place> _results = const [];
+  bool _looking = false;
+  bool _searched = false;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _field.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  /// One request per pause in typing, not one per letter. A geocoder is charged
+  /// per call and "Bakhtiyari" is eleven of them.
+  void _typed(String q) {
+    _debounce?.cancel();
+    if (q.trim().length < 2) {
+      setState(() {
+        _results = const [];
+        _searched = false;
+        _looking = false;
+      });
+      return;
+    }
+    setState(() => _looking = true);
+    _debounce = Timer(const Duration(milliseconds: 400), () => _run(q));
+  }
+
+  Future<void> _run(String q) async {
+    final found = await PlaceSearch.suggest(q, nearLat: widget.nearLat, nearLon: widget.nearLon);
+    if (!mounted) return;
+    // A slower answer to an older query must not overwrite a newer one.
+    if (_field.text.trim() != q.trim()) return;
+    setState(() {
+      _results = found;
+      _looking = false;
+      _searched = true;
+    });
+  }
+
+  void _clear() {
+    _debounce?.cancel();
+    _field.clear();
+    setState(() {
+      _results = const [];
+      _searched = false;
+      _looking = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // No token, no search. The map already says it is not set up; a box that
+    // answers nothing would be a second, quieter way of saying the same thing.
+    if (!PlaceSearch.available) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.border),
+          ),
+          padding: const EdgeInsetsDirectional.only(start: 12, end: 6),
+          child: Row(
+            children: [
+              Icon(Icons.search_rounded, size: 19, color: AppTheme.textFaint),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _field,
+                  focusNode: _focus,
+                  onChanged: _typed,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (q) => _run(q),
+                  style: const TextStyle(fontSize: 14.5),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    hintText: t('home.searchHint'),
+                    hintStyle: TextStyle(fontSize: 14, color: AppTheme.textFaint),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 13),
+                  ),
+                ),
+              ),
+              if (_looking)
+                const Padding(
+                  padding: EdgeInsets.all(10),
+                  child: SizedBox(
+                    width: 15,
+                    height: 15,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              else if (_field.text.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  color: AppTheme.textFaint,
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _clear,
+                  tooltip: t('common.clear'),
+                ),
+            ],
+          ),
+        ),
+
+        if (_results.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Container(
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (var i = 0; i < _results.length; i++) ...[
+                  if (i > 0) Divider(height: 1, color: AppTheme.border),
+                  InkWell(
+                    onTap: () {
+                      _focus.unfocus();
+                      widget.onPicked(_results[i]);
+                      // The list goes as soon as it has been used. Leaving it up
+                      // would hide the map the choice just moved.
+                      _clear();
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                      child: Row(
+                        children: [
+                          Icon(Icons.place_outlined, size: 18, color: widget.tint),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _results[i].name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                ),
+                                if (_results[i].detail.isNotEmpty)
+                                  Text(
+                                    _results[i].detail,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ] else if (_searched && !_looking) ...[
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 4),
+            child: Text(
+              t('home.searchNone'),
+              style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _EditToggle extends StatelessWidget {
   const _EditToggle({required this.editing, required this.tint, required this.onTap});
 
