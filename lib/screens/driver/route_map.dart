@@ -26,7 +26,7 @@ bool stopIsPlaced(PlannedStop s) {
   return lat.abs() <= 90 && lon.abs() <= 180;
 }
 
-/// The run on a real map — OpenStreetMap tiles, one marker per stop, standing
+/// The run on a real map — Mapbox tiles, one marker per stop, standing
 /// where the stop actually is.
 ///
 /// This replaced a CustomPaint that drew a lazy S-curve with dots on it and
@@ -573,7 +573,7 @@ class _Callout extends StatelessWidget {
       ].join(' · ');
 }
 
-/// OpenStreetMap's licence requires the credit. It is not decoration and it
+/// Mapbox's licence requires the credit. It is not decoration and it
 /// does not come off.
 class _Credit extends StatelessWidget {
   const _Credit({this.small = false});
@@ -594,7 +594,7 @@ class _Credit extends StatelessWidget {
             borderRadius: BorderRadius.circular(5),
           ),
           child: Text(
-            '© OpenStreetMap',
+            MapTiles.credit,
             style: TextStyle(fontSize: small ? 8 : 9.5, color: AppTheme.textMuted),
           ),
         ),

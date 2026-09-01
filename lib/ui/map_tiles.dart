@@ -59,24 +59,15 @@ class MapTiles {
         maxNativeZoom: 20,
       );
 
-  /// Attribution, which is not optional.
+  /// The credit line, which is not optional.
   ///
-  /// Mapbox's terms require their credit and OpenStreetMap's to be visible on
-  /// the map. The screens this replaced already carried an OSM line; losing it
-  /// while swapping the tiles would have been the easiest thing in the world
-  /// and is somebody else's licence.
-  static Widget attribution() => const RichAttributionWidget(
-        alignment: AttributionAlignment.bottomLeft,
-        showFlutterMapAttribution: false,
-        attributions: [
-          // Text, not links. Opening a browser needs url_launcher, and adding
-          // a dependency to this app so that two credits are tappable is a
-          // worse trade than a credit that is simply legible. The requirement
-          // is that they are VISIBLE.
-          TextSourceAttribution('Mapbox', prependCopyright: false),
-          TextSourceAttribution('OpenStreetMap'),
-        ],
-      );
+  /// Mapbox's terms require both their name and OpenStreetMap's on the map:
+  /// Mapbox draws these tiles, and it draws them from OpenStreetMap's data.
+  ///
+  /// It reads as one string rather than a widget because each screen has a
+  /// different free corner and already styles its own. What must not vary is
+  /// the text — three screens spent a day claiming to be a map they were not.
+  static const credit = '© Mapbox © OpenStreetMap';
 }
 
 /// Drawn in place of a map when no token was built in.

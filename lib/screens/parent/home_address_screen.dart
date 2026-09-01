@@ -517,7 +517,6 @@ class _MapCard extends StatelessWidget {
                 ),
                 children: [
                   MapTiles.layer(),
-                  MapTiles.attribution(),
                 ],
               ),
 
@@ -562,7 +561,7 @@ class _MapCard extends StatelessWidget {
                 ),
               ),
 
-              // OpenStreetMap's licence requires the credit.
+              // Mapbox's licence requires the credit.
               PositionedDirectional(
                 start: 8,
                 bottom: 6,
@@ -573,7 +572,7 @@ class _MapCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(5),
                   ),
                   child: Text(
-                    '© OpenStreetMap',
+                    MapTiles.credit,
                     style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted),
                   ),
                 ),

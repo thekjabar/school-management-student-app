@@ -30,7 +30,7 @@ import '../../ui/screen_kit.dart';
 /// her. When she is not, it is a bus, plainly labelled as one, and the state
 /// line says where she actually is.
 ///
-/// The map is OpenStreetMap. Not a decorative diagram: a parent works out
+/// The map is Mapbox. Not a decorative diagram: a parent works out
 /// "twenty minutes away" from streets they recognise, and a drawing of an
 /// invented road tells them nothing. Tiles fail closed — the state line above
 /// them is the answer, and it is readable with no map at all.
@@ -449,7 +449,7 @@ class _MapCard extends StatelessWidget {
                 ),
               ),
 
-              // OpenStreetMap's licence requires the credit. It is not
+              // Mapbox's licence requires the credit. It is not
               // decoration and it does not come off.
               PositionedDirectional(
                 start: 8,
@@ -461,7 +461,7 @@ class _MapCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(5),
                   ),
                   child: Text(
-                    '© OpenStreetMap',
+                    MapTiles.credit,
                     style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted),
                   ),
                 ),
