@@ -71,6 +71,21 @@ class HomeTab extends StatelessWidget {
             index: 1,
             child: QuickActions(
               actions: [
+                // First in the row, and off.
+                //
+                // It leads deliberately: this is the thing parents ask for, and
+                // putting it where the eye lands is the point of showing it at
+                // all. It is still disabled, because no vehicle has a camera
+                // fitted and there is no stream to open, and the note says that
+                // rather than "coming soon" — a promise nobody is in a position
+                // to make about hardware that has not been bought.
+                QuickAction(
+                  icon: Icons.videocam_outlined,
+                  label: t('quick.liveVideo'),
+                  color: AppTheme.blue,
+                  enabled: false,
+                  note: t('quick.liveVideoSoon'),
+                ),
                 QuickAction(
                   icon: Icons.my_location_rounded,
                   label: t('quick.track'),
@@ -137,18 +152,6 @@ class HomeTab extends StatelessWidget {
                   label: t('quick.driverFeedback'),
                   color: AppTheme.green,
                   onTap: () => _push(context, DriverFeedbackScreen(child: child)),
-                ),
-                // Last, and off. Watching the bus live is planned, and there is
-                // no camera on any vehicle and no stream to open, so the tile
-                // says so rather than opening onto nothing. It sits after every
-                // action that works so the row never leads with what it cannot
-                // do.
-                QuickAction(
-                  icon: Icons.videocam_outlined,
-                  label: t('quick.liveVideo'),
-                  color: AppTheme.blue,
-                  enabled: false,
-                  note: t('quick.liveVideoSoon'),
                 ),
               ],
             ),
