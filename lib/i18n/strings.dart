@@ -720,6 +720,8 @@ const Map<String, String> _en = {
   'memories.none': 'Nothing yet. Photographs from school days appear here once the school shares them.',
   'quick.memories': 'Memories',
   'quick.driverFeedback': 'Driver',
+  'quick.liveVideo': 'Live video',
+  'quick.liveVideoSoon': 'Not ready yet. No bus has a camera fitted, so there is nothing to watch.',
 // Where the child is
   'track.title': 'Where is my child',
   'track.onBoard': '{name} is on the bus',
@@ -1906,6 +1908,8 @@ const Map<String, String> _ckb = {
   'memories.none': 'هێشتا هیچ نییە. وێنەکانی ڕۆژانی قوتابخانە لێرە دەردەکەون کاتێک قوتابخانە هاوبەشیان دەکات.',
   'quick.memories': 'یادگاری',
   'quick.driverFeedback': 'شۆفێر',
+  'quick.liveVideo': 'ڤیدیۆی ڕاستەوخۆ',
+  'quick.liveVideoSoon': 'هێشتا ئامادە نییە. هیچ پاسێک کامێرای لەسەر نییە، بۆیە هیچ شتێک نییە بۆ سەیرکردن.',
 // Where the child is
   'track.title': 'منداڵەکەم لەکوێیە',
   'track.onBoard': '{name} لەناو پاسەکەدایە',
@@ -3087,6 +3091,8 @@ const Map<String, String> _ar = {
   'memories.none': 'لا شيء بعد. تظهر هنا صور الأيام المدرسية عندما تشاركها المدرسة.',
   'quick.memories': 'الذكريات',
   'quick.driverFeedback': 'السائق',
+  'quick.liveVideo': 'بث مباشر',
+  'quick.liveVideoSoon': 'غير جاهز بعد. لا توجد كاميرا في أي حافلة، فلا شيء لمشاهدته.',
 // Where the child is
   'track.title': 'أين طفلي',
   'track.onBoard': '{name} في الحافلة',
