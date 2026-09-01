@@ -76,6 +76,19 @@ dependencies:
   flutter_map: ^8.1.1
   latlong2: ^0.9.1
 
+  # Google Maps, for the parent tracking screen only.
+  #
+  # The native Maps SDK for Android and iOS bills nothing for what this screen
+  # does: drawing the map, moving the camera, and placing OUR OWN markers and
+  # polylines. The metered products are Places, Geocoding, Routes and Distance
+  # Matrix, and not one of them is called from here — addresses still come from
+  # Nominatim through lib/api/geocode.dart, and the line to the stop is drawn
+  # from coordinates the platform already sends us.
+  #
+  # flutter_map stays: the driver's route map is built on it, and a driver's
+  # handset is the one most likely to have no Play Services at all.
+  google_maps_flutter: ^2.18.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

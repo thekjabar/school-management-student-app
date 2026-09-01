@@ -9,6 +9,7 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/motion.dart';
+import '../../ui/pickers.dart';
 import '../../ui/nav_glyphs.dart';
 import 'assignments_screen.dart';
 import 'bus_screen.dart';
@@ -137,6 +138,18 @@ class HomeTab extends StatelessWidget {
                   color: AppTheme.green,
                   onTap: () => _push(context, DriverFeedbackScreen(child: child)),
                 ),
+                // Last, and off. Watching the bus live is planned, and there is
+                // no camera on any vehicle and no stream to open, so the tile
+                // says so rather than opening onto nothing. It sits after every
+                // action that works so the row never leads with what it cannot
+                // do.
+                QuickAction(
+                  icon: Icons.videocam_outlined,
+                  label: t('quick.liveVideo'),
+                  color: AppTheme.blue,
+                  enabled: false,
+                  note: t('quick.liveVideoSoon'),
+                ),
               ],
             ),
           ),
@@ -196,7 +209,9 @@ class HomeTab extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(child: _AttendanceCard(summary: home.attendance)),
+                  Expanded(
+                    child: _AttendanceCard(child: child, summary: home.attendance),
+                  ),
                   const SizedBox(width: kCardGap),
                   Expanded(
                     child: _UpdatesCard(
@@ -612,13 +627,99 @@ class _ProfileButton extends StatelessWidget {
  * Attendance
  * ------------------------------------------------------------------------- */
 
-class _AttendanceCard extends StatelessWidget {
-  const _AttendanceCard({required this.summary});
+/// How much of a window a period covers, and what to call it.
+enum _Period { week, month, term }
 
+class _AttendanceCard extends StatefulWidget {
+  const _AttendanceCard({required this.child, required this.summary});
+
+  final Child child;
+
+  /// What came with the home payload: the term, which is what the endpoint
+  /// answers when it is asked for no window at all.
   final AttendanceSummary summary;
 
   @override
+  State<_AttendanceCard> createState() => _AttendanceCardState();
+}
+
+class _AttendanceCardState extends State<_AttendanceCard> {
+  _Period _period = _Period.week;
+
+  /// Null until a different window has been fetched. The term figure arrives
+  /// with the page, so the first frame costs no request.
+  AttendanceSummary? _fetched;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // The card opens on the week, which is the number a parent checks; the
+    // payload carries the term. So one request, once, rather than a figure
+    // whose caption says one thing and whose value means another.
+    _load(_Period.week);
+  }
+
+  String get _label => switch (_period) {
+        _Period.week => t('home.thisWeek'),
+        _Period.month => t('home.thisMonth'),
+        _Period.term => t('home.thisTerm'),
+      };
+
+  ({DateTime? from, DateTime? to}) _window(_Period p) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return switch (p) {
+      // Monday of this week. weekday is 1..7 with Monday at 1.
+      _Period.week => (from: today.subtract(Duration(days: today.weekday - 1)), to: today),
+      _Period.month => (from: DateTime(today.year, today.month, 1), to: today),
+      // No window: the endpoint answers for the term, which is its default.
+      _Period.term => (from: null, to: null),
+    };
+  }
+
+  Future<void> _load(_Period p) async {
+    setState(() {
+      _period = p;
+      _busy = true;
+    });
+    final w = _window(p);
+    try {
+      final got = await ParentApi.instance.attendance(
+        widget.child.studentId,
+        from: w.from,
+        to: w.to,
+      );
+      if (!mounted) return;
+      setState(() {
+        _fetched = got;
+        _busy = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      // The figure on screen stays as it was rather than emptying itself.
+      setState(() => _busy = false);
+      showNote(context, errorText(e), bad: true);
+    }
+  }
+
+  Future<void> _pick() async {
+    final picked = await pickOne<_Period>(
+      context,
+      title: t('quick.attendance'),
+      tint: Role.parent.tint,
+      options: [
+        PickOption(value: _Period.week, label: t('home.thisWeek'), icon: Icons.view_week_outlined),
+        PickOption(value: _Period.month, label: t('home.thisMonth'), icon: Icons.calendar_month_outlined),
+        PickOption(value: _Period.term, label: t('home.thisTerm'), icon: Icons.school_outlined),
+      ],
+    );
+    if (picked != null && picked != _period) await _load(picked);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final summary = _fetched ?? widget.summary;
     final marked = summary.total > 0;
     final rate = summary.ratePercent.toDouble();
     final good = rate >= 95;
@@ -630,9 +731,10 @@ class _AttendanceCard extends StatelessWidget {
         children: [
           SectionRow(
             title: t('quick.attendance'),
-            actionLabel: t('home.thisWeek'),
+            actionLabel: _label,
             actionIcon: Icons.expand_more_rounded,
             dense: true,
+            onAction: _busy ? null : _pick,
           ),
           if (!marked)
             _Quiet(text: t('home.notMarked'))

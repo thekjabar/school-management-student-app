@@ -323,37 +323,39 @@ class _Header extends StatelessWidget {
                 // than an icon because the design's glyph is a rendered
                 // building, and a flat Material outline beside it reads as a
                 // different app.
-                Row(
-                  children: [
-                    const Text('🏫', style: TextStyle(fontSize: 11.5)),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        schoolName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                // One paragraph rather than a row of competing boxes.
+                //
+                // As a Row the school and the class each took half the width
+                // and both were cut, so "Rebaz Basic School — Erbil" showed as
+                // "Rebaz Basic Sch…". A school's name is not decoration: it is
+                // the one line that says which school this account belongs to,
+                // and a parent with children at two of them reads it. Wrapping
+                // to a second line costs nothing here and abbreviating it
+                // costs the only thing the line is for.
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(text: '🏫 ', style: TextStyle(fontSize: 11.5)),
+                      TextSpan(
+                        text: schoolName,
                         style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                       ),
-                    ),
-                    if (className.isNotEmpty) ...[
-                      Text(
-                        '  •  ',
-                        style: TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
-                      ),
-                      Flexible(
-                        child: Text(
-                          className,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      if (className.isNotEmpty) ...[
+                        TextSpan(
+                          text: '  •  ',
+                          style: TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
+                        ),
+                        TextSpan(
+                          text: className,
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w600,
                             color: tint,
                           ),
                         ),
-                      ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ],
             ),

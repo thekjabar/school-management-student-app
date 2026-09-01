@@ -8,7 +8,7 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import 'home_tab.dart' show loadDutyTrip;
-import 'route_strip.dart';
+import 'route_map.dart';
 import 'trip_screen.dart';
 
 /// The run, stop by stop.
@@ -49,55 +49,64 @@ class DriverRoute extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // The run's name above the map rather than floating on it: the map
+            // now has its own callout in that corner, and the one thing a
+            // driver must find there is the next stop.
             Card16(
               padding: EdgeInsets.zero,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(kCardRadius),
-                child: SizedBox(
-                  height: 150,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: RouteStrip(stops: stops, tint: Role.driver.tint),
-                      ),
-                      PositionedDirectional(
-                        start: 12,
-                        top: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: AppTheme.surface,
-                            borderRadius: BorderRadius.circular(11),
-                            border: Border.all(color: AppTheme.border),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                trip.routeName,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.3,
-                                  color: Role.driver.tint,
-                                ),
-                              ),
-                              Text(
-                                '${run.plan?.counts.stopsDone ?? 0} / '
-                                '${run.plan?.counts.stopsTotal ?? stops.length}  '
-                                '${t('driver.stops')}',
-                                style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
-                              ),
-                            ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            trip.routeName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.35,
+                              color: Role.driver.tint,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 10),
+                        Text(
+                          '${run.plan?.counts.stopsDone ?? 0} / '
+                          '${run.plan?.counts.stopsTotal ?? stops.length}  '
+                          '${t('driver.stops')}',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(kCardRadius),
+                    ),
+                    child: SizedBox(
+                      height: 210,
+                      child: RouteMap(
+                        stops: stops,
+                        tint: Role.driver.tint,
+                        leg: trip.leg,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
+            // Which stops the map could not place, if any. Said once, here,
+            // under the map that is missing them.
+            RouteMapNote(stops: stops),
             const SizedBox(height: kCardGap),
 
             Card16(

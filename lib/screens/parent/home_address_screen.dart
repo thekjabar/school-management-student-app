@@ -124,7 +124,9 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
   /// Ask for the address once the map has been still for a moment.
   void _scheduleLookUp(LatLng at) {
     _finding?.cancel();
-    _finding = Timer(const Duration(milliseconds: 900), () => _lookUp(at));
+    // force: the parent moved the pin. That is an instruction to re-read the
+    // address, not a suggestion to fill it in if it happens to be empty.
+    _finding = Timer(const Duration(milliseconds: 900), () => _lookUp(at, force: true));
   }
 
   /// Fill the box in from the pin, without ever taking words off a parent.
@@ -133,9 +135,19 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
   /// this screen last put there. The moment somebody types their own — which is
   /// the whole point of the field, since a map does not know which door or
   /// which floor — the pin stops touching it.
-  Future<void> _lookUp(LatLng at) async {
-    final typed = _address.text.trim();
-    if (typed.isNotEmpty && typed != _autoFilled) return;
+  Future<void> _lookUp(LatLng at, {bool force = false}) async {
+    // Without force, only an empty box — or one still holding exactly what this
+    // screen last wrote — is touched. That is the quiet fill on open, and it
+    // must never talk over words somebody typed.
+    //
+    // With force, the pin has just been dragged, in edit mode, on purpose. The
+    // address that belongs to the old position is no longer the answer to
+    // anything, so it is replaced. This is the whole reason the box and the map
+    // are on the same screen.
+    if (!force) {
+      final typed = _address.text.trim();
+      if (typed.isNotEmpty && typed != _autoFilled) return;
+    }
 
     if (mounted) setState(() => _looking = true);
     final found = await Geocode.at(at.latitude, at.longitude);
@@ -144,11 +156,14 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
     setState(() {
       _looking = false;
       if (found == null) return;
-      // Checked again: the parent may have started typing while we were asking.
-      final now = _address.text.trim();
-      if (now.isNotEmpty && now != _autoFilled) return;
+      if (!force) {
+        // The parent may have started typing while we were asking.
+        final now = _address.text.trim();
+        if (now.isNotEmpty && now != _autoFilled) return;
+      }
       _address.text = found;
       _autoFilled = found;
+      _dirty = true;
     });
   }
 

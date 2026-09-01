@@ -9,6 +9,7 @@ import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
+import 'route_map.dart';
 
 /// One run, from the driver's seat.
 ///
@@ -169,6 +170,27 @@ class _TripScreenState extends State<TripScreen> {
                         },
                       ),
                       const SizedBox(height: 12),
+                      // The same stops as the cards below, in the same order,
+                      // on the ground. This is the one screen that knows which
+                      // stop is the campus gate, so it is the one that can tell
+                      // the school apart from a street corner.
+                      Card16(
+                        padding: EdgeInsets.zero,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(AppTheme.radius),
+                          child: SizedBox(
+                            height: 230,
+                            child: RouteMap(
+                              stops: data.plan.stops,
+                              tint: Role.driver.tint,
+                              leg: trip?.leg ?? 'OUT',
+                              terminalStopId: data.terminalStopId,
+                            ),
+                          ),
+                        ),
+                      ),
+                      RouteMapNote(stops: data.plan.stops),
+                      const SizedBox(height: 14),
                       ...data.plan.stops.map(
                         (s) => _StopCard(
                           stop: s,

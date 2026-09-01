@@ -8,7 +8,7 @@ import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
-import 'route_strip.dart';
+import 'route_map.dart';
 import 'trip_screen.dart';
 
 /// The run every driver screen is about.
@@ -354,17 +354,47 @@ class _DutyCard extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, box) => Stack(
             children: [
-              // The route as a diagram, not a map. There is no tile provider in
-              // this app, and a decorative map that looks live is worse than an
-              // honest diagram — a driver would trust the wrong thing.
+              // The run, on the real map. Small, still, and not interactive —
+              // the whole point of this panel is that it is glanced at, and the
+              // card's own button is what a thumb lands on.
               PositionedDirectional(
                 end: 0,
                 top: 0,
                 bottom: 0,
                 width: box.maxWidth * 0.46,
-                child: RouteStrip(
+                child: RouteMap(
                   stops: plan?.stops ?? const [],
                   tint: tint,
+                  leg: trip.leg,
+                  compact: true,
+                ),
+              ),
+              // The map runs under the last of the text. A fade off its leading
+              // edge keeps a street name from competing with the route's own
+              // name, and softens what would otherwise be a hard rectangle down
+              // the middle of the card.
+              PositionedDirectional(
+                end: 0,
+                top: 0,
+                bottom: 0,
+                width: box.maxWidth * 0.46,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: AlignmentDirectional.centerStart,
+                        end: AlignmentDirectional.centerEnd,
+                        colors: [
+                          AppTheme.surface,
+                          AppTheme.surface.withValues(alpha: 0),
+                        ],
+                        // Short. Just enough to cover the tail of the text
+                        // column — any further and it starts rubbing out the
+                        // stops the map is there to show.
+                        stops: const [0.0, 0.26],
+                      ),
+                    ),
+                  ),
                 ),
               ),
               Padding(

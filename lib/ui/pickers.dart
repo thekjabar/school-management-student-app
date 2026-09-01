@@ -442,11 +442,17 @@ class PickerField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppTheme.textMuted),
-        ),
-        const SizedBox(height: 6),
+        // An empty label is no label, not a blank line. Callers that already
+        // draw their own heading pass '' — and the invisible Text plus its gap
+        // made those fields taller than the ones beside them, which is what
+        // knocked "Out of" off the same line as "Date".
+        if (label.isNotEmpty) ...[
+          Text(
+            label,
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppTheme.textMuted),
+          ),
+          const SizedBox(height: 6),
+        ],
         GestureDetector(
           onTap: onTap,
           behavior: HitTestBehavior.opaque,

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../api/client.dart';
 import '../../api/parent_api.dart';
 import '../../api/session.dart';
 import '../../i18n/strings.dart';
@@ -101,7 +100,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   Widget build(BuildContext context) {
     final tint = Role.parent.tint;
     final me = Session.instance.me;
-    final phone = me?.phone.trim() ?? '';
     final rows = _rows;
     final pending = _pending;
 
@@ -192,17 +190,16 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                               builder: (_) => ChangePasswordSheet(tint: tint),
                             ),
                           ),
-                          // Offered only when the account actually holds a
-                          // number: the reset goes to a number, and offering
-                          // it without one is offering nothing.
-                          if (phone.isNotEmpty)
-                            TileRow(
-                              icon: Icons.lock_reset_rounded,
-                              color: tint,
-                              title: t('personal.forgotPassword'),
-                              subtitle: t('personal.forgotPasswordSub'),
-                              onTap: () => _askReset(phone),
-                            ),
+                          // No "forgotten your password" here.
+                          //
+                          // Somebody reading this screen is signed in, so they
+                          // do not need the office to reset anything — the row
+                          // directly above changes it. Asking the office is for
+                          // the person who cannot get in at all, and that is
+                          // offered on the sign-in screen where they are.
+                          // Two doors to the same thing, one of which is not
+                          // needed by anyone standing in front of it, is how a
+                          // simple screen stops being simple.
                           TileRow(
                             icon: Icons.home_outlined,
                             color: tint,
@@ -277,37 +274,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       await _load();
       if (!mounted) return;
       showNote(context, t('personal.withdrawn'));
-    } catch (e) {
-      if (!mounted) return;
-      showNote(context, errorText(e), bad: true);
-    }
-  }
-
-  /// A password reset, for the parent who cannot fill in "current password".
-  ///
-  /// The server answers this the same way whether or not the number is known —
-  /// deliberately, so that anybody feeding numbers into it learns nothing — so
-  /// the note afterwards says what was ASKED and never that an account was
-  /// found. Claiming a message is on its way to an account that may not exist
-  /// is the one thing the endpoint is shaped to prevent.
-  Future<void> _askReset(String phone) async {
-    final yes = await confirmDialog(
-      context,
-      icon: Icons.lock_reset_rounded,
-      tone: Role.parent.tint,
-      title: t('personal.resetTitle'),
-      body: tv('personal.resetBody', {'phone': phone}),
-      confirmLabel: t('personal.resetDo'),
-      confirmIcon: Icons.send_rounded,
-    );
-    if (!yes || !mounted) return;
-    try {
-      await ApiClient.instance.post(
-        '/auth/password/reset-request',
-        {'phone': phone},
-      );
-      if (!mounted) return;
-      showNote(context, t('personal.resetSent'));
     } catch (e) {
       if (!mounted) return;
       showNote(context, errorText(e), bad: true);

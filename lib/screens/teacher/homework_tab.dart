@@ -341,6 +341,10 @@ class _SetSheetState extends State<_SetSheet> {
                   ),
                 ),
                 Row(
+                  // Top, for the same reason as the exam sheet: two fields side
+                  // by side are one row, and centring the taller against the
+                  // shorter stops their labels lining up.
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Column(

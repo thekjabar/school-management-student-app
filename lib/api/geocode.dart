@@ -80,13 +80,23 @@ class Geocode {
   /// which street the bus turns into.
   static String? _compose(Object? address, Object? fallback) {
     if (address is Map) {
+      // House and street first, then the quarter, then the town. Nominatim's
+      // own display_name runs on through governorate, postcode and country,
+      // which a parent standing in the building does not need and the office
+      // has to read past — but cutting at the district lost the town, and a
+      // street name alone is not an address. Amenity leads because in Erbil a
+      // place is very often named before it is numbered.
       const near = [
+        'amenity',
         'house_number',
         'road',
         'neighbourhood',
         'quarter',
         'suburb',
         'city_district',
+        'city',
+        'town',
+        'village',
       ];
       final parts = <String>[
         for (final k in near)

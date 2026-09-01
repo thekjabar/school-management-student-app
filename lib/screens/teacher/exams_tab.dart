@@ -645,6 +645,10 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                 ),
                 const SizedBox(height: 16),
                 Row(
+                  // Top, not centre. Two fields side by side are read as one
+                  // row; centring makes the taller one hang over the shorter at
+                  // both ends and the labels stop lining up.
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Column(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
+import 'async.dart';
 import 'motion.dart';
 import 'nav_glyphs.dart';
 
@@ -466,12 +467,24 @@ class QuickAction {
     required this.color,
     this.onTap,
     this.glyph,
+    this.enabled = true,
+    this.note,
   });
 
   final IconData icon;
   final String label;
   final Color color;
   final VoidCallback? onTap;
+
+  /// False draws the tile plainly unavailable — flat grey, no ripple — rather
+  /// than live. A tile that looks ready and then apologises is the thing this
+  /// app has been stripping out; one that looks unavailable and says why is
+  /// honest about work that has not happened yet.
+  final bool enabled;
+
+  /// Shown when a disabled tile is pressed. Without it a disabled tile is a
+  /// dead end, which is only marginally better than a lie.
+  final String? note;
 
   /// Set when the design's mark is not in the Material set — see
   /// nav_glyphs.dart. [icon] stays required as the fallback.
@@ -541,8 +554,17 @@ class _Tile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A disabled tile is drawn in the muted colour rather than its own, so it
+    // reads as not-yet from across the room instead of on the second tap.
+    final on = action.enabled;
+    final tint = on ? action.color : AppTheme.textFaint;
+
     return GestureDetector(
-      onTap: action.onTap,
+      onTap: on
+          ? action.onTap
+          : action.note == null
+              ? null
+              : () => showNote(context, action.note!),
       behavior: HitTestBehavior.opaque,
       child: Rise(
         index: index,
@@ -556,12 +578,12 @@ class _Tile extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: action.color.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+                  color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: action.glyph == null
-                    ? Icon(action.icon, size: 22, color: action.color)
-                    : Center(child: action.glyph!(action.color, 22)),
+                    ? Icon(action.icon, size: 22, color: tint)
+                    : Center(child: action.glyph!(tint, 22)),
               ),
             ),
             const SizedBox(height: 9),
@@ -577,7 +599,7 @@ class _Tile extends StatelessWidget {
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     letterSpacing: -0.2,
-                    color: AppTheme.text,
+                    color: on ? AppTheme.text : AppTheme.textFaint,
                   ),
                 ),
               ),

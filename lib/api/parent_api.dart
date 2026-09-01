@@ -1230,10 +1230,26 @@ class ParentApi {
     await _api.post('/parent/attitude/$id/seen');
   }
 
-  Future<AttendanceSummary> attendance(String studentId) async {
-    final json = await _api.get('/parent/children/$studentId/attendance') as Map<String, dynamic>;
+  /// The register for a window, or for the term when none is given.
+  ///
+  /// from and to are what the endpoint has always accepted; nothing asked for
+  /// them until the home card's period picker did.
+  Future<AttendanceSummary> attendance(String studentId, {DateTime? from, DateTime? to}) async {
+    final q = <String>[
+      if (from != null) 'from=${_day(from)}',
+      if (to != null) 'to=${_day(to)}',
+    ];
+    final json = await _api.get(
+      '/parent/children/$studentId/attendance${q.isEmpty ? '' : '?${q.join('&')}'}',
+    ) as Map<String, dynamic>;
     return AttendanceSummary.fromJson(json);
   }
+
+  /// Plain calendar days. The server is comparing against a date column, so an
+  /// instant with a time on it would drop the first or last day depending on
+  /// which side of midnight the phone happens to be.
+  static String _day(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   Future<TransportInfo> transport(String studentId) async {
     final json = await _api.get('/parent/children/$studentId/transport') as Map<String, dynamic>;
