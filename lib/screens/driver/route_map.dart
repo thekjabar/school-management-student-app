@@ -131,6 +131,12 @@ class _RouteMapState extends State<RouteMap> {
         '${p.latitude.toStringAsFixed(4)},${p.longitude.toStringAsFixed(4)}',
     }.length > 1;
 
+    // No token, no tiles, and a driver looking at a blank rectangle before a
+    // shift cannot tell that from a route that has not loaded.
+    if (!MapTiles.configured) {
+      return MapNotConfigured(tint: widget.tint);
+    }
+
     final map = FlutterMap(
       mapController: _map,
       options: MapOptions(

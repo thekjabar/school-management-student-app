@@ -362,7 +362,23 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
         note: _note.text,
       );
       if (!mounted) return;
-      _dirty = false;
+      // Editing is over, and what is on screen IS what was saved.
+      //
+      // Leaving _editing true left the toggle reading "Cancel" over a snapshot
+      // taken BEFORE the edit — and that toggle is the only control on the
+      // screen that leaves edit mode, so a parent who saved and then wanted to
+      // stop editing had nothing else to press. Pressing it restored the old
+      // address and jumped the map back to the old house, while the office held
+      // the new one. A parent would reasonably conclude the save had been
+      // undone. For a family with no previous pin it was worse: _wasPin is null
+      // there, so Cancel unplaced the pin they had just set.
+      setState(() {
+        _editing = false;
+        _dirty = false;
+        _wasAddress = _address.text;
+        _wasNote = _note.text;
+        _wasPin = _pin;
+      });
       showNote(context, t('home.saved'));
       _loader.currentState?.reload(quiet: true);
     } on ApiException catch (e) {
@@ -462,6 +478,31 @@ class _EditToggle extends StatelessWidget {
   }
 }
 
+/// Shown in place of a map when the build carries no Mapbox token.
+///
+/// Without one the tile URL ends "?access_token=", Mapbox answers 401, and
+/// flutter_map leaves the background showing with the pin and the credit drawn
+/// neatly on top — indistinguishable from a map that is still loading. Every
+/// build made outside tool/build_apks.sh has no token, and tool/mapbox.token is
+/// gitignored, so a fresh clone builds exactly that.
+class _NoMap extends StatelessWidget {
+  const _NoMap({required this.height});
+
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => Card16(
+        padding: EdgeInsets.zero,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(kCardRadius),
+          child: SizedBox(
+            height: height,
+            child: MapNotConfigured(tint: Role.parent.tint),
+          ),
+        ),
+      );
+}
+
 class _MapCard extends StatelessWidget {
   const _MapCard({
     required this.pin,
@@ -483,6 +524,7 @@ class _MapCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!MapTiles.configured) return const _NoMap(height: 300);
     return Card16(
       padding: EdgeInsets.zero,
       child: ClipRRect(

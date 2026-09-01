@@ -327,6 +327,18 @@ class _MapCard extends StatelessWidget {
       );
     }
 
+    // Nothing will draw without a token, and a blank map on THIS screen
+    // reads as "the bus is not moving".
+    if (!MapTiles.configured) {
+      return Card16(
+        padding: EdgeInsets.zero,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(kCardRadius),
+          child: SizedBox(height: 320, child: MapNotConfigured(tint: tint)),
+        ),
+      );
+    }
+
     final centre = bus.hasFix
         ? LatLng(bus.lat!, bus.lon!)
         : LatLng(bus.stopLat!, bus.stopLon!);
@@ -349,9 +361,19 @@ class _MapCard extends StatelessWidget {
                   // No rotation. A parent glancing at this needs north to be up
                   // so the streets match the ones in their head; a map twisted
                   // by a stray two-finger drag is a map nobody can read.
+                  //
+                  // And no ONE-FINGER drag. This card sits inside the page's
+                  // scrolling list, and flutter_map wins the gesture arena for
+                  // any vertical drag that starts on it, so a thumb on the map
+                  // — the biggest target on the screen — panned the map instead
+                  // of scrolling to the rows underneath, and pull-to-refresh
+                  // did nothing at all. Two fingers pan, and the recentre
+                  // button puts the bus back. One finger belongs to the page,
+                  // as it already did on the driver's map and this one's own
+                  // address screen.
                   interactionOptions: const InteractionOptions(
                     flags: InteractiveFlag.pinchZoom |
-                        InteractiveFlag.drag |
+                        InteractiveFlag.pinchMove |
                         InteractiveFlag.doubleTapZoom,
                   ),
                 ),
