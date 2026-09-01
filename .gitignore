@@ -50,3 +50,4 @@ assets/video/splash.mp4
 # The Mapbox public token. Shipped inside the APK by necessity, but kept out
 # of a public repository so nobody can clone the code and spend the quota.
 tool/mapbox.token
+tool/mapbox.style

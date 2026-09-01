@@ -24,9 +24,28 @@ mkdir -p assets/video "$OUT"
 # where anyone who cloned the code could spend the quota without ever
 # touching the app. Absent, the build still succeeds and every map says it is
 # not set up rather than showing a grey rectangle.
-MAPBOX_TOKEN="$(tr -d "[:space:]" < tool/mapbox.token 2>/dev/null || true)"
+MAPBOX_TOKEN=""
+if [ -f tool/mapbox.token ]; then
+  MAPBOX_TOKEN="$(tr -d "[:space:]" < tool/mapbox.token)"
+fi
 if [ -z "$MAPBOX_TOKEN" ]; then
   echo "note: tool/mapbox.token is missing - maps will be blank in these builds"
+fi
+
+# The Mapbox style, if the school has one of its own.
+#
+# It MUST be a classic style (Streets, Light, Outdoors, or one built on those).
+# A Mapbox Standard style draws NOTHING through the raster endpoint: 200 OK,
+# 235 bytes, a transparent tile, because it holds no layers of its own -- only
+# an import the raster renderer does not resolve. See lib/ui/map_tiles.dart.
+#
+# Empty falls back to the classic default compiled into the app.
+MAPBOX_STYLE=""
+if [ -f tool/mapbox.style ]; then
+  MAPBOX_STYLE="$(tr -d "[:space:]" < tool/mapbox.style)"
+fi
+if [ -n "$MAPBOX_STYLE" ]; then
+  echo "style: $MAPBOX_STYLE"
 fi
 
 for role in "${ROLES[@]}"; do
@@ -59,6 +78,7 @@ for role in "${ROLES[@]}"; do
     --flavor "$role" \
     --dart-define="APP_ROLE=$role" \
     --dart-define="MAPBOX_TOKEN=$MAPBOX_TOKEN" \
+    --dart-define="MAPBOX_STYLE=$MAPBOX_STYLE" \
     --split-per-abi
 
   # Named as the app is named, so the file somebody is handed over Telegram

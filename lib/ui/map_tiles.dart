@@ -14,7 +14,7 @@ import '../theme/app_theme.dart';
 class MapTiles {
   MapTiles._();
 
-  /// The school's own published Mapbox style, rendered as raster tiles.
+  /// The Mapbox style these tiles are rendered from.
   ///
   /// Raster rather than the native Mapbox SDK deliberately: that SDK downloads
   /// itself from Mapbox's Maven repository and needs a SECRET token to do it
@@ -24,10 +24,52 @@ class MapTiles {
   /// screens — takes the same style as a tile URL and keeps every marker and
   /// polyline already written against it.
   ///
+  /// THE STYLE MUST BE A CLASSIC ONE. It cannot be a Mapbox Standard style.
+  ///
+  /// This is not a preference, it is what the endpoint will draw. A Standard
+  /// style (anything Studio creates from the default template today) carries no
+  /// layers of its own — it is one line, `imports: mapbox://styles/mapbox/
+  /// standard`, resolved at draw time by the GL SDKs. The Raster Tiles API does
+  /// not resolve imports: it renders the style's own layers, finds none, and
+  /// answers 200 with a 235-byte transparent PNG. Every tile. Every zoom.
+  ///
+  /// So it fails as a working map that happens to be empty, not as an error —
+  /// nothing logs, nothing retries, no status code is out of place, and the
+  /// screen shows the grey behind the tiles with the markers and the credit
+  /// drawn neatly on top. `mapbox/standard` asked for by name at least answers
+  /// 400; a style that merely imports it does not.
+  ///
+  /// A classic style — Streets, Light, Outdoors, or one built on those in
+  /// Studio — has real layers and renders. To check any candidate before
+  /// shipping it, fetch one tile over a city and look at the SIZE, never the
+  /// status: a drawn tile is tens to hundreds of kilobytes.
+  ///
+  /// Overridable so that swapping in the school's own classic style, once one
+  /// exists, is a build flag rather than a code change:
+  ///
+  ///   flutter build apk --dart-define=MAPBOX_STYLE=owner/styleid
+  ///
   /// Worth knowing when the bill arrives: raster tiles are charged per TILE,
   /// where the native SDK is charged per map LOAD. A parent panning around a
   /// tracking screen pulls a good many tiles.
-  static const _style = 'thekjabar/cmthwa0e3009501quc2zu73ak';
+  /// Light: near-white land, pale water, muted roads, no POI clutter — the
+  /// closest classic stand-in for the school's Standard style, whose config is
+  /// all pale (land hsl(228,45%,98%), water hsl(209,100%,93%), roads white, POI
+  /// labels off) and which cannot be drawn through this endpoint at all.
+  static const _fallbackStyle = 'mapbox/light-v11';
+
+  static const _styleOverride = String.fromEnvironment('MAPBOX_STYLE');
+
+  /// Checked for EMPTY, not just for absence.
+  ///
+  /// `String.fromEnvironment` treats a define that was passed as blank —
+  /// `--dart-define=MAPBOX_STYLE=`, which is exactly what the build script
+  /// produces when the school has not supplied a style file — as a value, and
+  /// hands back the empty string rather than the default. The URL would then
+  /// read `/styles/v1//tiles/...` and every tile would 404, on a build whose
+  /// output looks completely normal.
+  static String get _style =>
+      _styleOverride.isEmpty ? _fallbackStyle : _styleOverride;
 
   /// Supplied at build time, never committed.
   ///
