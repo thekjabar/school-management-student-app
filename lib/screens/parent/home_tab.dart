@@ -328,7 +328,7 @@ class _BusCard extends StatelessWidget {
     }
 
     final run = _liveRun;
-    final headline = run == null ? t('bus.noRunToday') : run.childLine;
+    final headline = run == null ? t('bus.noRunToday') : t(run.childLineKey);
     final eta = run?.scheduledDepartureAt;
 
     return GestureDetector(

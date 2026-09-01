@@ -892,16 +892,17 @@ class TripToday {
         alightedAt: _at(j['alightedAt']),
       );
 
-  /// What actually happened to this child on this run, said plainly.
-  String get childLine {
+  /// What actually happened to this child on this run — as an i18n key, so
+  /// the screen says it in the parent's language rather than in English.
+  String get childLineKey {
     if (boardedAt != null && alightedAt != null) {
-      return leg == 'OUT' ? 'Arrived at school' : 'Dropped off';
+      return leg == 'OUT' ? 'bus.child.arrivedSchool' : 'bus.child.droppedOff';
     }
-    if (boardedAt != null) return 'On the bus';
-    if (resolution == 'NO_SHOW') return 'Did not board';
-    if (resolution == 'EXCUSED') return 'Excused — not riding';
-    if (status == 'PLANNED' || status == 'ROSTERED') return 'Not started yet';
-    return 'Waiting at the stop';
+    if (boardedAt != null) return 'bus.child.onBus';
+    if (resolution == 'NO_SHOW') return 'bus.child.noShow';
+    if (resolution == 'EXCUSED') return 'bus.child.excused';
+    if (status == 'PLANNED' || status == 'ROSTERED') return 'bus.child.notStarted';
+    return 'bus.child.waiting';
   }
 }
 

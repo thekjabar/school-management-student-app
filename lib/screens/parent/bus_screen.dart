@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../api/parent_api.dart';
 import '../../api/push.dart';
+import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
@@ -175,6 +176,15 @@ class _MapCard extends StatelessWidget {
     final tint = Role.parent.tint;
     final eta = bus.live?.etaMinutes;
     final trip = bus.run;
+    // Where this run is headed. The two corner callouts are origin and
+    // destination, and they trade places between the morning and the
+    // afternoon leg.
+    final toSchool = trip == null || trip.leg != 'RETURN';
+    final school = Session.instance.me?.schoolName ?? t('driver.school');
+    final originName =
+        toSchool ? (bus.transport.pickupStopName ?? t('bus.home')) : school;
+    final destName =
+        toSchool ? school : (bus.transport.dropoffStopName ?? t('bus.home'));
 
     return Card16(
       padding: EdgeInsets.zero,
@@ -301,7 +311,13 @@ class _MapCard extends StatelessWidget {
                           color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
                           borderRadius: BorderRadius.circular(9),
                         ),
-                        child: Icon(Icons.account_balance_rounded, size: 16, color: tint),
+                        child: Icon(
+                          toSchool
+                              ? Icons.account_balance_rounded
+                              : Icons.home_rounded,
+                          size: 16,
+                          color: tint,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Column(
@@ -311,7 +327,7 @@ class _MapCard extends StatelessWidget {
                           ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 120),
                             child: Text(
-                              bus.transport.dropoffStopName ?? t('driver.school'),
+                              destName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -346,7 +362,13 @@ class _MapCard extends StatelessWidget {
                           color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
                           borderRadius: BorderRadius.circular(9),
                         ),
-                        child: Icon(Icons.home_rounded, size: 16, color: tint),
+                        child: Icon(
+                          toSchool
+                              ? Icons.home_rounded
+                              : Icons.account_balance_rounded,
+                          size: 16,
+                          color: tint,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Column(
@@ -356,7 +378,7 @@ class _MapCard extends StatelessWidget {
                           ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 120),
                             child: Text(
-                              bus.transport.pickupStopName ?? t('bus.home'),
+                              originName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -528,33 +550,41 @@ class _RouteCard extends StatelessWidget {
       );
     }
 
-    // Five milestones, each either behind, happening, or ahead — derived from
-    // the trip's own timestamps rather than stored as a stage.
+    // Four milestones, each either behind, happening, or ahead — derived from
+    // the trip's own timestamps rather than stored as a stage. The words
+    // follow the leg: the morning runs home → school, the afternoon runs
+    // school → home, and "Arrive at school" on the ride home would be a lie.
+    final toSchool = trip.leg != 'RETURN';
+    final school = Session.instance.me?.schoolName ?? t('driver.school');
+    final arrived = trip.alightedAt ?? trip.endedAt;
     final steps = <(String, String, DateTime?, int)>[
-      (t('bus.started'), t('driver.depot'), trip.startedAt, trip.startedAt != null ? 2 : 0),
       (
-        tn('bus.arrivedAt', bus.transport.pickupStopName ?? t('bus.home')),
-        bus.transport.pickupLandmark ?? '',
+        t('bus.started'),
+        toSchool ? t('driver.depot') : school,
+        trip.startedAt,
+        trip.startedAt != null ? 2 : 0,
+      ),
+      (
+        toSchool
+            ? tn('bus.arrivedAt', bus.transport.pickupStopName ?? t('bus.home'))
+            : t('bus.boarded'),
+        toSchool ? (bus.transport.pickupLandmark ?? '') : '',
         trip.boardedAt,
         trip.boardedAt != null ? 2 : (trip.startedAt != null ? 1 : 0),
       ),
       (
         t('bus.onTheWay'),
-        t('bus.headingToSchool'),
+        toSchool ? t('bus.headingToSchool') : t('bus.headingHome'),
         null,
-        trip.alightedAt != null ? 2 : (trip.boardedAt != null ? 1 : 0),
+        arrived != null ? 2 : (trip.boardedAt != null ? 1 : 0),
       ),
       (
-        t('bus.nextStop'),
-        trip.stopName ?? '',
-        null,
-        trip.alightedAt != null ? 2 : 0,
-      ),
-      (
-        t('bus.arriveAtSchool'),
-        bus.transport.dropoffStopName ?? '',
-        trip.alightedAt ?? trip.endedAt,
-        trip.endedAt != null ? 2 : 0,
+        toSchool
+            ? t('bus.arriveAtSchool')
+            : tn('bus.arrivedAt', bus.transport.dropoffStopName ?? t('bus.home')),
+        toSchool ? school : (bus.transport.dropoffLandmark ?? ''),
+        arrived,
+        arrived != null ? 2 : 0,
       ),
     ];
 
@@ -708,13 +738,17 @@ class _Step extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
+                          // Stop names go inside titles here, and "Arrived at
+                          // Zanko — st…" is not a place. Two lines before an
+                          // ellipsis is ever allowed.
                           title,
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.2,
+                            height: 1.15,
                             color: AppTheme.text,
                           ),
                         ),

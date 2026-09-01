@@ -110,8 +110,9 @@ void main() {
     for (final run in t.today) {
       expect(run.tripId, isNotEmpty);
       expect(['OUT', 'RETURN'], contains(run.leg));
-      // childLine is what the home card prints; it must never be empty.
-      expect(run.childLine, isNotEmpty);
+      // childLineKey feeds the home card's headline; it must always name a
+      // real translation.
+      expect(run.childLineKey, startsWith('bus.child.'));
     }
   });
 

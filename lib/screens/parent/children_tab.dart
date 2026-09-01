@@ -94,9 +94,9 @@ class _Snapshot {
     final back = transport.today.where((t) => t.leg == 'RETURN').firstOrNull;
     // The afternoon run is the live question after the morning one is done.
     if (back != null && (back.boardedAt != null || back.status == 'IN_PROGRESS')) {
-      return '${t('children.homeRun')} · ${back.childLine.toLowerCase()}';
+      return '${t('children.homeRun')} · ${t(back.childLineKey).toLowerCase()}';
     }
-    if (out != null) return '${t('children.morning')} · ${out.childLine.toLowerCase()}';
+    if (out != null) return '${t('children.morning')} · ${t(out.childLineKey).toLowerCase()}';
     return t('children.waitingForBus');
   }
 
