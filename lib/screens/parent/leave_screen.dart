@@ -304,8 +304,14 @@ class _RequestCard extends StatelessWidget {
   }
 
   Future<void> _open(BuildContext context) async {
-    // Only a request the office has not answered can be taken back.
-    if (item.status != 'PENDING') return;
+    // Leave is accepted the moment it is reported, so gating this on PENDING
+    // meant a family who mistyped a date could never take it back — the state
+    // they were waiting for had stopped happening. A day that has already
+    // finished stays put: the register for it is a record of what happened, not
+    // a plan. The server enforces the same two rules.
+    if (item.status != 'PENDING' && item.status != 'APPROVED') return;
+    final DateTime today = DateTime.now();
+    if (item.toDate.isBefore(DateTime(today.year, today.month, today.day))) return;
     final bool yes = await confirmDialog(
       context,
       icon: Icons.undo_rounded,

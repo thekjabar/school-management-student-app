@@ -613,7 +613,7 @@ const Map<String, String> _en = {
 
   // Leave
   'leave.title': 'Leave requests',
-  'leave.ask': 'Ask for leave',
+  'leave.ask': 'Report a day away',
   'leave.none': 'No leave has been asked for. Tap “Ask for leave” when you need a day.',
   'leave.withdraw': 'Withdraw this request',
   // The button, not the sentence. The dialog title above it has already said
@@ -621,7 +621,7 @@ const Map<String, String> _en = {
   // "Withdraw this r...".
   'leave.withdrawDo': 'Withdraw',
   'leave.withdrawn': 'Request withdrawn',
-  'leave.sent': 'Sent to the school office',
+  'leave.sent': 'The school has been told',
   'leave.for': 'Leave for {n}',
   'leave.why': 'Why',
   'leave.sick': 'Unwell',
@@ -635,7 +635,7 @@ const Map<String, String> _en = {
   'leave.to': 'To',
   'leave.reason': 'Reason',
   'leave.reasonHint': 'High temperature since last night, seeing the doctor this morning.',
-  'leave.reasonNeeded': 'Say briefly why — the office decides on this.',
+  'leave.reasonNeeded': 'Say briefly why, so the school knows.',
   'leave.confirmWithBiometrics': 'Confirm it is you before the school is told',
 // Student information
   'info.title': 'Student information',
@@ -772,9 +772,8 @@ const Map<String, String> _en = {
   'more.homeAddressSub': 'Set your address on the map',
   'grade.n': 'Grade {n}',
   'leave.notConfirmed': 'Not confirmed. Nothing has been sent.',
-  'leave.busNote':
-      'If the office approves this, the bus will not wait for your child on those days.',
-  'leave.send': 'Send to the office',
+  'leave.busNote': 'The bus will not wait for your child on those days.',
+  'leave.send': 'Tell the school',
 
   // More
   'more.yourChildren': 'Your children',
@@ -1800,12 +1799,12 @@ const Map<String, String> _ckb = {
   'fees.stillOwed': 'ماوە',
 
   'leave.title': 'داواکاری مۆڵەت',
-  'leave.ask': 'داوای مۆڵەت',
+  'leave.ask': 'ڕاگەیاندنی ڕۆژی نەهاتن',
   'leave.none': 'هیچ مۆڵەتێک داوا نەکراوە. کاتێک پێویستت بە ڕۆژێک بوو دەست بنێ.',
   'leave.withdraw': 'ئەم داواکارییە بگەڕێنەوە',
   'leave.withdrawDo': 'بگەڕێنەوە',
   'leave.withdrawn': 'داواکارییەکە گەڕێندرایەوە',
-  'leave.sent': 'نێردرا بۆ نووسینگەی قوتابخانە',
+  'leave.sent': 'قوتابخانە ئاگادار کرایەوە',
   'leave.for': 'مۆڵەت بۆ {n}',
   'leave.why': 'هۆکار',
   'leave.sick': 'نەخۆشە',
@@ -1819,7 +1818,7 @@ const Map<String, String> _ckb = {
   'leave.to': 'بۆ',
   'leave.reason': 'هۆکار',
   'leave.reasonHint': 'لە دوێنێ شەوەوە تایەکی بەرزی هەیە، ئەمڕۆ بەیانی دەچینە لای پزیشک.',
-  'leave.reasonNeeded': 'بە کورتی بڵێ بۆچی — نووسینگە لەسەر ئەمە بڕیار دەدات.',
+  'leave.reasonNeeded': 'بە کورتی بڵێ بۆچی، تا قوتابخانە بزانێت.',
   'leave.confirmWithBiometrics': 'پێش ئەوەی قوتابخانە ئاگادار بکرێتەوە، دڵنیای بکەرەوە کە خۆتی',
 // Student information
   'info.title': 'زانیاری قوتابی',
@@ -1956,8 +1955,8 @@ const Map<String, String> _ckb = {
   'more.homeAddressSub': 'ناونیشانەکەت لەسەر نەخشە دیاری بکە',
   'grade.n': 'قۆناغی {n}',
   'leave.notConfirmed': 'پشتڕاست نەکرایەوە. هیچ نەنێردرا.',
-  'leave.busNote': 'ئەگەر نووسینگە پەسەندی بکات، پاس لەو ڕۆژانەدا چاوەڕێی منداڵەکەت ناکات.',
-  'leave.send': 'بنێرە بۆ نووسینگە',
+  'leave.busNote': 'پاس لەو ڕۆژانەدا چاوەڕێی منداڵەکەت ناکات.',
+  'leave.send': 'قوتابخانە ئاگادار بکەرەوە',
 
   'more.yourChildren': 'منداڵەکانت',
   'more.moneyRequests': 'پارە و داواکاری',
@@ -2978,12 +2977,12 @@ const Map<String, String> _ar = {
   'fees.stillOwed': 'المتبقي',
 
   'leave.title': 'طلبات الإجازة',
-  'leave.ask': 'طلب إجازة',
+  'leave.ask': 'الإبلاغ عن يوم غياب',
   'leave.none': 'لم تُطلب أي إجازة. اضغط "طلب إجازة" عندما تحتاج يوماً.',
   'leave.withdraw': 'سحب هذا الطلب',
   'leave.withdrawDo': 'سحب',
   'leave.withdrawn': 'سُحب الطلب',
-  'leave.sent': 'أُرسل إلى مكتب المدرسة',
+  'leave.sent': 'تم إبلاغ المدرسة',
   'leave.for': 'إجازة لـ {n}',
   'leave.why': 'السبب',
   'leave.sick': 'مريض',
@@ -2997,7 +2996,7 @@ const Map<String, String> _ar = {
   'leave.to': 'إلى',
   'leave.reason': 'السبب',
   'leave.reasonHint': 'حرارة مرتفعة منذ الليلة الماضية، سنراجع الطبيب هذا الصباح.',
-  'leave.reasonNeeded': 'اذكر السبب باختصار — المكتب يقرر بناءً عليه.',
+  'leave.reasonNeeded': 'اذكر السبب باختصار ليعرف المدرسة.',
   'leave.confirmWithBiometrics': 'أكّد هويتك قبل إبلاغ المدرسة',
 // Student information
   'info.title': 'معلومات الطالب',
@@ -3134,8 +3133,8 @@ const Map<String, String> _ar = {
   'more.homeAddressSub': 'حدّد عنوانك على الخريطة',
   'grade.n': 'المرحلة {n}',
   'leave.notConfirmed': 'لم يتم التأكيد. لم يُرسل شيء.',
-  'leave.busNote': 'إذا وافق المكتب، لن تنتظر الحافلة طفلك في تلك الأيام.',
-  'leave.send': 'إرسال إلى المكتب',
+  'leave.busNote': 'لن تنتظر الحافلة طفلك في تلك الأيام.',
+  'leave.send': 'إبلاغ المدرسة',
 
   'more.yourChildren': 'أبناؤك',
   'more.moneyRequests': 'المال والطلبات',
