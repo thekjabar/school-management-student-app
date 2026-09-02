@@ -10,6 +10,18 @@ import 'package:flutter/material.dart';
 /// only sheet that got this right, because the shell opened it from its own
 /// context, so every sheet now goes the way that one does.
 ///
+/// Never taller than three quarters of the screen. A sheet that reaches the
+/// status bar has stopped being a sheet: the page it came from is completely
+/// hidden, so there is nothing left to show that this is a layer on top of
+/// something, and the only way back is a button somewhere inside it. Leaving a
+/// quarter of the page visible above it is what makes the scrim and the drag
+/// handle mean anything. Sheets whose content is taller scroll inside that
+/// height, which they already do.
+///
+/// Set here rather than per sheet because it was per sheet, and the numbers had
+/// already drifted to 0.92, 0.92 and 0.76 in three files.
+const double _maxSheetHeightFraction = 0.75;
+
 /// Sheets that need the keyboard pad themselves by `viewInsets.bottom`: at the
 /// root there is no Scaffold above the sheet to shrink for it.
 ///
@@ -30,6 +42,9 @@ Future<T?> showAppSheet<T>(
     backgroundColor: Colors.transparent,
     isDismissible: isDismissible,
     enableDrag: enableDrag,
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.of(context).size.height * _maxSheetHeightFraction,
+    ),
     builder: builder,
   );
 }

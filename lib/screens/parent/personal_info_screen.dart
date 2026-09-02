@@ -743,9 +743,6 @@ class _AskSheetState extends State<_AskSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: inset),
       child: Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.92,
-        ),
         decoration: BoxDecoration(
           color: AppTheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
