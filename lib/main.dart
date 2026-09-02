@@ -78,6 +78,16 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
   /// [_repaintEverything].
   bool? _painted;
 
+  /// And the language it was last painted in, for exactly the same reason.
+  ///
+  /// `t()` is a plain function call, not an InheritedWidget lookup, so a widget
+  /// that does not rebuild keeps whatever words it was built with. Rebuilding
+  /// from the root reaches most of the app, but not a subtree Flutter is
+  /// entitled to skip — which is why the settings page, the page the language
+  /// is changed ON, was the one page that stayed in the old language until it
+  /// was navigated away from and back.
+  Lang? _paintedLang;
+
   @override
   void initState() {
     super.initState();
@@ -161,10 +171,17 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
     // Marked dirty in place, once, after this frame — rather than by replacing
     // the tree, which unmounts the running app, replays the splash clip and
     // drops the person somewhere they were not.
-    if (_painted != null && _painted != AppTheme.dark) {
+    //
+    // The language is carried through the same door. It is not a colour, but it
+    // reaches the widgets the same way — a bare function call rather than a
+    // lookup Flutter tracks — so a subtree that does not rebuild keeps the old
+    // words just as it kept the old palette.
+    if ((_painted != null && _painted != AppTheme.dark) ||
+        (_paintedLang != null && _paintedLang != lang)) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _repaintEverything());
     }
     _painted = AppTheme.dark;
+    _paintedLang = lang;
 
     return MaterialApp(
       title: _title,
