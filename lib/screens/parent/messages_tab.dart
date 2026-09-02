@@ -407,7 +407,7 @@ class _MessageRow extends StatelessWidget {
     final days = midnight.difference(DateTime(at.year, at.month, at.day)).inDays;
     if (days <= 0) return hhmm(at);
     if (days == 1) return t('due.yesterday');
-    if (days < 7) return t('day.${at.weekday}').characters.take(3).toString();
+    if (days < 7) return t('day.${at.weekday}');
     return shortDate(at);
   }
 }

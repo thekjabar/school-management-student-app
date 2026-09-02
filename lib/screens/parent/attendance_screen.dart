@@ -287,7 +287,10 @@ class _Grid extends StatelessWidget {
     );
   }
 
-  String _weekdayShort(int weekday) => t('day.$weekday').characters.take(3).toString();
+  /// Seven of these share the width of a phone, so the whole word cannot fit.
+  /// The short phrase is written out per language rather than cut from the
+  /// long one — cutting is what turned Kurdish Friday into a non-word.
+  String _weekdayShort(int weekday) => t('dayShort.$weekday');
 }
 
 class _Arrow extends StatelessWidget {
@@ -514,7 +517,7 @@ class _DayRow extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  t('month.${item.date.month}').characters.take(3).toString(),
+                  t('monthShort.${item.date.month}'),
                   style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: colour),
                 ),
                 Text(
@@ -527,7 +530,7 @@ class _DayRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  t('day.${item.date.weekday}').characters.take(3).toString(),
+                  t('dayShort.${item.date.weekday}'),
                   style: TextStyle(fontSize: 9, color: colour),
                 ),
               ],

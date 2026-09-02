@@ -45,7 +45,12 @@ String hhmm(DateTime? at) {
 /// These were const English arrays, so every date in all three apps read
 /// "Thu 3 Sep 2026" on an otherwise Kurdish screen — including the ones a
 /// parent reads most, like a homework due date.
+///
+/// Whole words. The short pair is a separate set of phrases written out in each
+/// language, not these cut down: Kurdish and Arabic do not abbreviate by
+/// dropping letters, and doing it anyway turned هەینی into هەی.
 String _month(int m) => t('month.$m');
+String _monthShort(int m) => t('monthShort.$m');
 String _day(int weekday) => t('day.$weekday');
 
 /// "September 2026", for a calendar header.
@@ -65,7 +70,7 @@ List<String> weekdayInitials() => [
 
 String shortDate(DateTime? d) {
   if (d == null) return '—';
-  return '${d.day} ${_month(d.month)}';
+  return '${d.day} ${_monthShort(d.month)}';
 }
 
 String longDate(DateTime? d) {

@@ -389,10 +389,7 @@ class _MonthCard extends StatelessWidget {
                 Expanded(
                   child: Center(
                     child: Text(
-                      t('day.${(DateTime.sunday + i - 1) % 7 + 1}')
-                          .characters
-                          .take(3)
-                          .toString(),
+                      t('dayShort.${(DateTime.sunday + i - 1) % 7 + 1}'),
                       style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
                     ),
                   ),

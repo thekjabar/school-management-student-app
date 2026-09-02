@@ -294,9 +294,9 @@ class _DateBlock extends StatelessWidget {
           ),
           const SizedBox(height: 1),
           Text(
-            // Already an abbreviation in all three tables — the calendars and
-            // the due dates share it.
-            t('month.${date.month}').toUpperCase(),
+            // A chip the width of the day number under it, so the short
+            // phrase rather than the whole month name.
+            t('monthShort.${date.month}').toUpperCase(),
             maxLines: 1,
             style: TextStyle(
               fontSize: 9,

@@ -392,7 +392,7 @@ class _TrendCard extends StatelessWidget {
                           FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Text(
-                              t('month.${entry.key.month}').characters.take(3).toString(),
+                              t('monthShort.${entry.key.month}'),
                               style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted),
                             ),
                           ),
