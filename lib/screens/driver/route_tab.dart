@@ -250,7 +250,13 @@ class _StopRow extends StatelessWidget {
                     SizedBox(
                       width: 44,
                       child: Text(
-                        hhmm(stop.arrivedAt ?? stop.departedAt),
+                        // What happened, where it has; otherwise when the bus
+                        // is due, marked as a forecast. This column used to
+                        // show a dash for every stop still ahead, which is
+                        // most of them for most of the morning.
+                        stop.arrivedAt != null || stop.departedAt != null
+                            ? hhmm(stop.arrivedAt ?? stop.departedAt)
+                            : stopEtaText(stop),
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,

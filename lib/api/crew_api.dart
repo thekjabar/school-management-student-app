@@ -298,6 +298,10 @@ class PlannedStop {
     required this.students,
     required this.arrivedAt,
     required this.departedAt,
+    required this.etaAt,
+    required this.etaIsActual,
+    required this.dwellSeconds,
+    required this.driveSeconds,
   });
 
   final String stopId;
@@ -310,6 +314,24 @@ class PlannedStop {
   final List<RiderOnStop> students;
   final DateTime? arrivedAt;
   final DateTime? departedAt;
+
+  /// When the bus is expected here — or when it actually got here, once
+  /// [etaIsActual] is true. The server works it out from the drive between
+  /// stops and how long this stop's own children take to load, which is the
+  /// half the timetable does not cost.
+  final DateTime? etaAt;
+
+  /// [etaAt] is a record rather than a forecast: the bus has been here. The
+  /// difference matters on a screen — a time that already happened must not be
+  /// shown with a tilde in front of it, and a guess must not be shown with a
+  /// tick.
+  final bool etaIsActual;
+
+  /// How long this stop is expected to take, from the children on it.
+  final int dwellSeconds;
+
+  /// The drive from the stop before this one to this one.
+  final int driveSeconds;
 
   bool get done => departedAt != null;
   int get remaining => students.where((s) => !s.accountedFor).length;
@@ -327,6 +349,10 @@ class PlannedStop {
             .toList(),
         arrivedAt: j['arrivedAt'] == null ? null : DateTime.parse(j['arrivedAt'] as String).toLocal(),
         departedAt: j['departedAt'] == null ? null : DateTime.parse(j['departedAt'] as String).toLocal(),
+        etaAt: j['etaAt'] == null ? null : DateTime.parse(j['etaAt'] as String).toLocal(),
+        etaIsActual: (j['etaIsActual'] ?? false) as bool,
+        dwellSeconds: (j['dwellSeconds'] as num?)?.toInt() ?? 0,
+        driveSeconds: (j['driveSeconds'] as num?)?.toInt() ?? 0,
       );
 }
 
@@ -371,6 +397,89 @@ class Headcount {
       );
 }
 
+/// When the bus actually has to leave, and what today's children cost.
+///
+/// The timetable says depart 07:00, arrive 07:45, and it costed those 45
+/// minutes at half a minute per child. Five children waiting at one stop spend
+/// five times that, so a driver who leaves exactly on time still arrives late
+/// and is never told which of the two numbers was wrong. The server prices the
+/// run against today's roster instead; this is that answer.
+class TripTiming {
+  TripTiming({
+    required this.departByAt,
+    required this.mustArriveBy,
+    required this.scheduledDepartureAt,
+    required this.startedAt,
+    required this.driveSeconds,
+    required this.dwellSeconds,
+    required this.estimatedDurationSeconds,
+    required this.slackSeconds,
+    required this.secondsPerStudent,
+  });
+
+  /// The latest the bus can pull away and still reach the gate on time. Null
+  /// when there is no arrival time to work back from.
+  final DateTime? departByAt;
+
+  /// When the run is due at the other end.
+  final DateTime? mustArriveBy;
+
+  /// What the timetable says, which is not the same question.
+  final DateTime? scheduledDepartureAt;
+
+  /// Null until the wheels turn, and it is what says whether the leave-by
+  /// answer is still a decision or already history.
+  final DateTime? startedAt;
+
+  /// Driving, with nobody getting on or off.
+  final int driveSeconds;
+
+  /// Standing at stops, loading children — the part the timetable underrates.
+  final int dwellSeconds;
+
+  /// The two above, together.
+  final int estimatedDurationSeconds;
+
+  /// What the timetable has left over once the run is costed honestly.
+  ///
+  /// NEGATIVE means it does not allow enough time for today's children. That
+  /// is a fact about the timetable, not about the driver, and nothing the
+  /// driver can do about it — which is why the screen says so in those words.
+  final int? slackSeconds;
+
+  /// The loading time allowed per child.
+  final int secondsPerStudent;
+
+  /// There is a departure time to show at all. An older server sends none of
+  /// this block, and every field here comes back null or zero.
+  bool get hasDepartBy => departByAt != null;
+
+  /// The timetable is short for today's roster.
+  bool get tooTight => (slackSeconds ?? 0) < 0;
+
+  /// How many whole minutes short, rounded UP: a shortfall of 61 seconds is a
+  /// two-minute problem, not a one-minute one.
+  int get shortByMinutes => (-(slackSeconds ?? 0) / 60).ceil();
+
+  static DateTime? _at(dynamic v) => v == null ? null : DateTime.parse(v as String).toLocal();
+
+  factory TripTiming.fromJson(Map<String, dynamic> j) => TripTiming(
+        departByAt: _at(j['departByAt']),
+        mustArriveBy: _at(j['mustArriveBy']),
+        scheduledDepartureAt: _at(j['scheduledDepartureAt']),
+        startedAt: _at(j['startedAt']),
+        driveSeconds: (j['driveSeconds'] as num?)?.toInt() ?? 0,
+        dwellSeconds: (j['dwellSeconds'] as num?)?.toInt() ?? 0,
+        estimatedDurationSeconds: (j['estimatedDurationSeconds'] as num?)?.toInt() ?? 0,
+        // No default. Null means the server could not say, and zero means the
+        // run fits exactly — reading the first as the second would turn "we do
+        // not know" into "you have no slack", on the one field that decides
+        // whether a warning is shown.
+        slackSeconds: (j['slackSeconds'] as num?)?.toInt(),
+        secondsPerStudent: (j['secondsPerStudent'] as num?)?.toInt() ?? 0,
+      );
+}
+
 /// The plan for a run: the stops in the order they should be driven.
 class TripPlan {
   TripPlan({
@@ -378,6 +487,7 @@ class TripPlan {
     required this.orderingNote,
     required this.counts,
     required this.stops,
+    required this.timing,
   });
 
   /// "planned" — the office's order — or "nearest", recomputed from where the
@@ -387,6 +497,11 @@ class TripPlan {
   final Headcount counts;
   final List<PlannedStop> stops;
 
+  /// When to leave, and why. Never null: a server that does not send the block
+  /// yields an empty one, whose [TripTiming.hasDepartBy] is false and which
+  /// every screen already has to handle.
+  final TripTiming timing;
+
   factory TripPlan.fromJson(Map<String, dynamic> j) => TripPlan(
         ordering: (j['ordering'] ?? 'planned') as String,
         orderingNote: (j['orderingNote'] ?? '') as String,
@@ -394,6 +509,8 @@ class TripPlan {
         stops: ((j['stops'] as List?) ?? [])
             .map((e) => PlannedStop.fromJson(e as Map<String, dynamic>))
             .toList(),
+        timing: TripTiming.fromJson(
+            (j['timing'] as Map<String, dynamic>?) ?? const <String, dynamic>{}),
       );
 }
 

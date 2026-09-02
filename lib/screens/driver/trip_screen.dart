@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -215,6 +217,18 @@ class _TripScreenState extends State<TripScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 12),
+                      // Before the wheels turn, the only question left on this
+                      // screen is when to go — so it is the first thing on it.
+                      // Once the run has started it is history, and history at
+                      // the top of a working screen is in the way.
+                      if (data.plan.timing.hasDepartBy &&
+                          data.plan.timing.startedAt == null) ...[
+                        _LeaveByCard(
+                          timing: data.plan.timing,
+                          childrenOnRun: counts.expected,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       _HeadcountCard(counts: counts),
                       if (trip != null && trip.startedAt != null && trip.endedAt == null) ...[
                         const SizedBox(height: 12),
@@ -311,6 +325,164 @@ class _TripData {
   /// The campus gate. Null when the route has none marked, or when the pack
   /// could not be read.
   final String? terminalStopId;
+}
+
+/// When to leave, and why it is not the time printed on the timetable.
+///
+/// "Depart 07:00, arrive 07:45" was costed at half a minute a child. Five
+/// children at one stop spend five times that, so a driver who leaves exactly
+/// on time still arrives late and is never told which of the two numbers was
+/// wrong — and the answer he reaches for is to cut a stop short, which is the
+/// one thing nobody wants him to do. This card is the same sum done against
+/// today's roster: the time to go, how long until then, and where the minutes
+/// went.
+///
+/// Shown only before the run starts. Afterwards it is a question already
+/// answered, and the screen has forty children on it instead.
+class _LeaveByCard extends StatefulWidget {
+  const _LeaveByCard({required this.timing, required this.childrenOnRun});
+
+  final TripTiming timing;
+
+  /// The children the run is carrying today. The standing-at-stops half of the
+  /// estimate is theirs, and naming them is what makes the number checkable
+  /// rather than something the phone simply asserts.
+  final int childrenOnRun;
+
+  @override
+  State<_LeaveByCard> createState() => _LeaveByCardState();
+}
+
+class _LeaveByCardState extends State<_LeaveByCard> {
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    // Half a minute, not a whole one. The countdown reads in whole minutes, and
+    // a minute-long tick started at some arbitrary point inside a minute leaves
+    // the number up to 59 seconds stale — which on this card is the difference
+    // between "Leave now" and having already left late.
+    _tick = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    // A periodic timer holding a setState outlives the screen otherwise, and
+    // this screen is pushed and popped all morning.
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final timing = widget.timing;
+    final departBy = timing.departByAt!;
+    final secondsLeft = departBy.difference(DateTime.now()).inSeconds;
+
+    // Three states and only three: still time, go now, gone. The middle one is
+    // a window rather than an instant, because "Leave in 0 min" is not an
+    // instruction anybody can act on.
+    final late = secondsLeft <= -60;
+    final countdown = secondsLeft > 30
+        ? tn('driver.leaveIn', (secondsLeft / 60).round())
+        : late
+            ? tn('driver.shouldHaveLeft', (-secondsLeft / 60).floor())
+            : t('driver.leaveNow');
+
+    final accent = late ? AppTheme.rose : Role.driver.tint;
+
+    return Panel(
+      color: late ? AppTheme.roseSoft : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconChip(
+                icon: Icons.schedule_rounded,
+                color: accent,
+                background: late ? AppTheme.surface : Role.driver.wash,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      t('driver.leaveBy'),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                    // The one number this card exists for, at the size a driver
+                    // reads from the far side of a cab.
+                    Text(
+                      hhmm(departBy),
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -1,
+                        height: 1.2,
+                        color: late ? AppTheme.rose : AppTheme.text,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            countdown,
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: accent),
+          ),
+          const SizedBox(height: 4),
+          // The arithmetic, in words. A driver given only the answer has no way
+          // to tell a good one from a bad one, and the whole complaint about the
+          // old timetable was that its answer could not be checked.
+          Text(
+            tv('driver.leaveByMath', {
+              'drive': (timing.driveSeconds / 60).round(),
+              'dwell': (timing.dwellSeconds / 60).round(),
+              'n': widget.childrenOnRun,
+            }),
+            style: TextStyle(fontSize: 12.5, height: 1.5, color: AppTheme.textMuted),
+          ),
+          // Negative slack. Said as a fact about the timetable, because that is
+          // what it is: no amount of driving buys the minutes back, and a line
+          // that reads as an accusation is answered by skipping a stop.
+          if (timing.tooTight) ...[
+            const SizedBox(height: 12),
+            Divider(height: 1, color: AppTheme.border),
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.error_outline_rounded, size: 18, color: AppTheme.rose),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    tn('driver.timetableTight', timing.shortByMinutes),
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.45,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.rose,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 /// The count, in words.
@@ -721,6 +893,13 @@ class _StopCardState extends State<_StopCard> {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                           ),
+                          // When the bus is due here — or, once it has been,
+                          // when it got here. Same field, and the difference is
+                          // drawn rather than left to the reader.
+                          if (s.etaAt != null) ...[
+                            const SizedBox(height: 3),
+                            StopEta(stop: s),
+                          ],
                         ],
                       ),
                     ),
@@ -793,6 +972,62 @@ class _StopCardState extends State<_StopCard> {
     );
   }
 }
+
+/// A stop's arrival time, told apart from a guess about one.
+///
+/// The server sends both down the same field: etaAt is a forecast until the bus
+/// actually gets there, and the record of the arrival afterwards. Drawing them
+/// identically is how a driver comes to distrust both — so a forecast carries a
+/// clock and a tilde, and an arrival carries a tick and the word for what
+/// happened.
+class StopEta extends StatelessWidget {
+  const StopEta({super.key, required this.stop});
+
+  final PlannedStop stop;
+
+  @override
+  Widget build(BuildContext context) {
+    if (stop.etaAt == null) return const SizedBox.shrink();
+    final actual = stop.etaIsActual;
+    final colour = actual ? AppTheme.green : AppTheme.textMuted;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          actual ? Icons.check_circle_rounded : Icons.schedule_rounded,
+          size: 12,
+          color: colour,
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            stopEtaText(stop),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: colour),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The short form, for a column narrow enough that the mark beside it already
+/// says which of the two it is: "Arrived 07:14", or "~07:14".
+String stopEtaText(PlannedStop stop) => stop.etaAt == null
+    ? '—'
+    : stop.etaIsActual
+        ? tn('driver.arrivedAt', hhmm(stop.etaAt))
+        : tn('driver.etaShort', hhmm(stop.etaAt));
+
+/// The long form, for a line of running text with no mark on it: a bare tilde
+/// in the middle of a sentence is not a word anybody reads as "about".
+String stopEtaLine(PlannedStop stop) => stop.etaAt == null
+    ? '—'
+    : stop.etaIsActual
+        ? tn('driver.arrivedAt', hhmm(stop.etaAt))
+        : tn('driver.etaDue', hhmm(stop.etaAt));
 
 class _RiderRow extends StatelessWidget {
   const _RiderRow({

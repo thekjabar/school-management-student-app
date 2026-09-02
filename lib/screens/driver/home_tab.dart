@@ -683,6 +683,13 @@ class _NextStopCard extends StatelessWidget {
                                 style: TextStyle(fontSize: 11, color: AppTheme.textFaint),
                               ),
                             ],
+                            // When the bus is due at it. The card names the
+                            // stop the driver is heading for, and the time was
+                            // three taps away on the run screen.
+                            if (s.etaAt != null) ...[
+                              const SizedBox(height: 4),
+                              StopEta(stop: s),
+                            ],
                             if (s.metresAway != null) ...[
                               const SizedBox(height: 4),
                               Row(

@@ -10,6 +10,7 @@ import '../../ui/kit.dart';
 import '../../ui/sheets.dart';
 import 'handover_screen.dart';
 import 'home_tab.dart' show loadDutyTrip;
+import 'trip_screen.dart' show stopEtaLine;
 
 /// Every child on today's run, and where each one is.
 ///
@@ -477,7 +478,13 @@ class _RiderRow extends StatelessWidget {
                 Text(
                   entry.rider.boardedAt != null
                       ? tn('driver.onBoardSince', hhmm(entry.rider.boardedAt))
-                      : entry.stop.name,
+                      // The stop, and when the bus is due at it. Somebody
+                      // hunting one name out of forty is asking when THAT child
+                      // gets picked up, and the stop's name alone does not
+                      // answer it.
+                      : entry.stop.etaAt == null
+                          ? entry.stop.name
+                          : '${entry.stop.name} · ${stopEtaLine(entry.stop)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 11, color: AppTheme.textMuted),

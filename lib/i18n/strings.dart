@@ -487,6 +487,18 @@ const Map<String, String> _en = {
   'driver.notRecorded': '{name} was not recorded. Try again.',
   'driver.recordedAs': '{name} was recorded away from the expected stop. The office has been told.',
   'driver.onBoardSince': 'On board since {n}',
+
+  // ---- When to leave, and what today actually costs -------------------------
+  'driver.leaveBy': 'Leave by',
+  'driver.leaveIn': 'Leave in {n} min',
+  'driver.leaveNow': 'Leave now',
+  'driver.shouldHaveLeft': 'You should have left {n} min ago',
+  'driver.leaveByMath': '{drive} min driving + {dwell} min for {n} children',
+  'driver.timetableTight':
+      'The timetable does not allow enough time for today’s children — it is {n} min short.',
+  'driver.etaShort': '~{n}',
+  'driver.etaDue': 'Due ~{n}',
+  'driver.arrivedAt': 'Arrived {n}',
   // ---- The cabin sweep -----------------------------------------------------
   'driver.beforeYouLeave': 'Before you leave the bus',
   'driver.sweepWhy': 'A closed bus gets dangerously hot within minutes in summer.',
@@ -1858,6 +1870,17 @@ const Map<String, String> _ckb = {
   'driver.notRecorded': '{name} تۆمار نەکرا. دووبارە هەوڵ بدەرەوە.',
   'driver.recordedAs': '{name} لە دەرەوەی وێستگەی پێشبینیکراو تۆمارکرا. نووسینگە ئاگادارکرایەوە.',
   'driver.onBoardSince': 'لە پاسدایە لە {n}ەوە',
+
+  'driver.leaveBy': 'دواترین کاتی بەڕێکەوتن',
+  'driver.leaveIn': 'لە {n} خولەکدا بەڕێبکەوە',
+  'driver.leaveNow': 'ئێستا بەڕێبکەوە',
+  'driver.shouldHaveLeft': '{n} خولەک لە بەڕێکەوتن دواکەوتوویت',
+  'driver.leaveByMath': '{drive} خولەک لێخوڕین + {dwell} خولەک بۆ {n} منداڵ',
+  'driver.timetableTight':
+      'خشتەی کات کاتی پێویست بۆ منداڵەکانی ئەمڕۆ نادات — {n} خولەک کەمە.',
+  'driver.etaShort': '~{n}',
+  'driver.etaDue': 'چاوەڕوانکراو ~{n}',
+  'driver.arrivedAt': 'گەیشت {n}',
   // ---- The cabin sweep -----------------------------------------------------
   'driver.beforeYouLeave': 'پێش ئەوەی پاسەکە بەجێبهێڵیت',
   'driver.sweepWhy': 'پاسی داخراو لە هاویندا لە چەند خولەکێکدا بە شێوەیەکی مەترسیدار گەرم دەبێت.',
@@ -3210,6 +3233,17 @@ const Map<String, String> _ar = {
   'driver.notRecorded': '{name} لم يُسجّل. حاول مرة أخرى.',
   'driver.recordedAs': '{name} سُجّل بعيدًا عن الموقف المتوقع. تم إبلاغ المكتب.',
   'driver.onBoardSince': 'على متن الحافلة منذ {n}',
+
+  'driver.leaveBy': 'آخر موعد للانطلاق',
+  'driver.leaveIn': 'انطلق خلال {n} دقيقة',
+  'driver.leaveNow': 'انطلق الآن',
+  'driver.shouldHaveLeft': 'تأخرت عن الانطلاق {n} دقيقة',
+  'driver.leaveByMath': '{drive} دقيقة قيادة + {dwell} دقيقة لصعود {n} طفلاً',
+  'driver.timetableTight':
+      'جدول اليوم لا يمنح وقتاً كافياً لأطفال هذه الرحلة — ينقصه {n} دقيقة.',
+  'driver.etaShort': '~{n}',
+  'driver.etaDue': 'متوقع ~{n}',
+  'driver.arrivedAt': 'وصلت {n}',
   // ---- The cabin sweep -----------------------------------------------------
   'driver.beforeYouLeave': 'قبل أن تغادر الحافلة',
   'driver.sweepWhy': 'الحافلة المغلقة تصبح ساخنة بشكل خطير خلال دقائق في الصيف.',
