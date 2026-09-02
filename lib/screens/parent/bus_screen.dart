@@ -8,6 +8,7 @@ import 'package:flutter_map/flutter_map.dart';
 // ever pick up the wrong one by accident either.
 import 'package:latlong2/latlong.dart' hide Path;
 
+import '../../api/directions.dart';
 import '../../api/parent_api.dart';
 import '../../api/push.dart';
 import '../../api/session.dart';
@@ -337,19 +338,37 @@ class _MapCard extends StatelessWidget {
         children: [
           MapTiles.layer(),
 
-          // Straight, and dotted for that reason: it is how far the bus still
-          // has to come, not the road it will take. The platform sends no
-          // route geometry, and a solid line would be read as one.
+          // How far the bus still has to come — along the roads it will take
+          // when Mapbox can say, and dotted-straight while it cannot.
+          //
+          // Dotted was the honest form when there was no routing at all: a
+          // solid straight line reads as a road, and this one crossed blocks
+          // no bus can drive through. Now the road is drawn solid, because it
+          // IS the road, and only the fallback stays dotted.
+          //
+          // The bus coordinate is rounded to about a hundred metres before it
+          // is asked about, so a bus creeping up a street reuses one answer
+          // instead of spending a request and a parent's data on every tick.
           if (busAt != null && stopAt != null)
-            PolylineLayer(
-              polylines: [
-                Polyline(
-                  points: [busAt, stopAt],
-                  strokeWidth: 3,
-                  pattern: const StrokePattern.dotted(),
-                  color: tint.withValues(alpha: 0.55),
-                ),
-              ],
+            Builder(
+              builder: (_) {
+                final coarse = LatLng(
+                  (busAt.latitude * 1000).roundToDouble() / 1000,
+                  (busAt.longitude * 1000).roundToDouble() / 1000,
+                );
+                final road = Directions.cached([coarse, stopAt]);
+                if (road == null) unawaited(Directions.road([coarse, stopAt]));
+                return PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: road ?? [busAt, stopAt],
+                      strokeWidth: 3,
+                      pattern: road == null ? const StrokePattern.dotted() : const StrokePattern.solid(),
+                      color: tint.withValues(alpha: road == null ? 0.55 : 0.8),
+                    ),
+                  ],
+                );
+              },
             ),
 
           MarkerLayer(
