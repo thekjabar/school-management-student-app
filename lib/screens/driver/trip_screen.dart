@@ -136,6 +136,47 @@ class _TripScreenState extends State<TripScreen> {
     );
   }
 
+  /// Close the run, and do not let an unaccounted child pass as "Run ended".
+  ///
+  /// The server answers with the number of children it could not account for,
+  /// and its own comment on that field is "Anything but zero is an alarm, not a
+  /// note". The app used to discard it and report plain success — so the one
+  /// moment a driver could still walk back down the aisle passed with a green
+  /// tick.
+  Future<void> _endRun(CrewTrip trip) async {
+    setState(() => _busy = t('driver.runEnded'));
+    try {
+      final unaccounted = await CrewApi.instance.endTrip(trip.id);
+      _loaderKey.currentState?.reload();
+      if (!mounted) return;
+      if (unaccounted > 0) {
+        showNote(context, tn('driver.endedUnaccounted', unaccounted), bad: true);
+      } else {
+        showNote(context, t('driver.runEnded'));
+      }
+    } catch (e) {
+      if (mounted) showNote(context, errorText(e), bad: true);
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
+  /// The panic button.
+  ///
+  /// Confirmed once, because it is the loudest thing this platform does — an
+  /// INTERRUPTING, CRITICAL alert that puts a named human on the phone — and a
+  /// pocket press must not raise it. One tap to confirm, no typing, no reason
+  /// field: whatever is happening at the door, the driver has one hand and no
+  /// time, and the office can ask afterwards.
+  Future<void> _panic(CrewTrip trip) async {
+    final go = await showAppSheet<bool>(
+      context,
+      builder: (_) => const _PanicSheet(),
+    );
+    if (go != true || !mounted) return;
+    await _act(t('driver.sosSent'), () => CrewApi.instance.sos(trip.id));
+  }
+
   Future<void> _act(String label, Future<void> Function() action) async {
     setState(() => _busy = label);
     try {
@@ -175,6 +216,10 @@ class _TripScreenState extends State<TripScreen> {
                     children: [
                       const SizedBox(height: 12),
                       _HeadcountCard(counts: counts),
+                      if (trip != null && trip.startedAt != null && trip.endedAt == null) ...[
+                        const SizedBox(height: 12),
+                        _PanicButton(busy: _busy != null, onPressed: () => _panic(trip)),
+                      ],
                       if (trip != null) ...[
                         const SizedBox(height: 12),
                         _RunControls(
@@ -182,7 +227,7 @@ class _TripScreenState extends State<TripScreen> {
                           busy: _busy,
                           onStart: () => _startShift(trip),
                           onDepart: () => _act(t('driver.departed'), () => CrewApi.instance.depart(trip.id)),
-                          onEnd: () => _act(t('driver.runEnded'), () => CrewApi.instance.endTrip(trip.id)),
+                          onEnd: () => _endRun(trip),
                         ),
                       ],
                       SectionHead(t('driver.stops')),
@@ -2047,6 +2092,92 @@ class _ChildFoundSheet extends StatelessWidget {
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The panic button, on screen for as long as the bus is running.
+///
+/// There was none. A driver being threatened at the door had the same options
+/// as a driver with a flat tyre, which is to say a phone call to an office
+/// that may not answer. The server has taken an SOS all along and turns it
+/// into the loudest thing this platform can do.
+class _PanicButton extends StatelessWidget {
+  const _PanicButton({required this.busy, required this.onPressed});
+
+  final bool busy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: busy ? null : onPressed,
+          icon: Icon(Icons.emergency_share_rounded, size: 19, color: AppTheme.rose),
+          label: Text(
+            t('driver.sos'),
+            style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: AppTheme.rose),
+          ),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+            side: BorderSide(color: AppTheme.rose.withValues(alpha: 0.5)),
+            backgroundColor: AppTheme.roseSoft,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One tap between a pocket and a critical alert.
+class _PanicSheet extends StatelessWidget {
+  const _PanicSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 38,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: AppTheme.border,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          Text(
+            t('driver.sos'),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.rose),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            t('driver.sosWhat'),
+            style: TextStyle(fontSize: 13.5, height: 1.5, color: AppTheme.textMuted),
+          ),
+          const SizedBox(height: 16),
+          BigButton(
+            label: t('driver.sosSend'),
+            color: AppTheme.rose,
+            height: 54,
+            onPressed: () => Navigator.of(context).pop(true),
           ),
         ],
       ),

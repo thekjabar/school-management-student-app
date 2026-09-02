@@ -652,7 +652,17 @@ class CrewApi {
 
   Future<void> depart(String tripId) => _api.post('/crew/trips/$tripId/depart');
 
-  Future<void> endTrip(String tripId) => _api.post('/crew/trips/$tripId/end');
+  /// Close the run, and say how many children the server could not account for.
+  ///
+  /// The count was thrown away: this returned void, and the driver was told
+  /// "Run ended" whatever came back. The server's own comment on the field is
+  /// "Anything but zero is an alarm, not a note" — it is the number that says a
+  /// child boarded this bus and was never recorded getting off, at the exact
+  /// moment the driver is about to walk away from it.
+  Future<int> endTrip(String tripId) async {
+    final json = await _api.post('/crew/trips/$tripId/end') as Map<String, dynamic>;
+    return (json['unaccounted'] as num?)?.toInt() ?? 0;
+  }
 
   Future<void> arriveAtStop(String tripId, int sequence) =>
       _api.post('/crew/trips/$tripId/stops/$sequence/arrive');
@@ -755,6 +765,35 @@ class CrewApi {
       rewrittenTo: recorded != null && recorded != eventType ? recorded : null,
       alertRaised: mine['alertRaised'] == true,
     );
+  }
+
+  /// The panic button.
+  ///
+  /// There was none, anywhere in the app, though the server has taken it all
+  /// along: an SOS custody event raises an INTERRUPTING, CRITICAL alert titled
+  /// "The panic button was pressed on this bus" — the loudest thing this
+  /// platform can do. A driver being threatened at the door had the same
+  /// options as a driver with a flat tyre, which is to say a phone call.
+  ///
+  /// studentId is deliberately omitted: this is about the bus, not one child,
+  /// and the DTO makes it optional for exactly these types. The server dedupes
+  /// on the minute, so a driver pressing it three times in a panic raises one
+  /// alert rather than three.
+  Future<void> sos(String tripId) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _api.post('/crew/custody/events', {
+      'tripInstanceId': tripId,
+      'clientSentAt': now,
+      'events': [
+        {
+          'id': uuidV4(),
+          'type': 'SOS',
+          'deviceTime': now,
+          'captureMethod': 'MANUAL_WITH_REASON',
+          'manualReason': 'The crew pressed the panic button.',
+        },
+      ],
+    });
   }
 
   /// Confirm the cabin was walked to the back seat.
