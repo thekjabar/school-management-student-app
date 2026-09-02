@@ -1,3 +1,4 @@
+import '../i18n/strings.dart';
 import 'client.dart';
 
 /// One child on this guardian's account.
@@ -1026,24 +1027,41 @@ class LiveBus {
   bool get hasFix => visible && lat != null && lon != null;
 
   /// The reasons, in words a parent should read rather than an enum.
+  ///
+  /// These were hard-coded English on a screen that exists in three languages,
+  /// and — worse — half of them were names the server has never sent. It
+  /// answers window_not_open_yet, trip_ended, already_alighted, no_fix_yet,
+  /// no_bus_assigned, no_schedule, trip_cancelled and simulated_feed_withheld;
+  /// this switch was matching outside_window, trip_not_started,
+  /// already_handed_over and no_position_yet. Every one of those fell past the
+  /// cases to "The map is closed at the moment", which tells a parent nothing
+  /// about a child on a bus.
   String get reasonText {
     switch (reason) {
       case 'no_trip_today':
-        return 'No bus for this child today.';
-      case 'outside_window':
-        return 'The map opens twenty minutes before the bus is due.';
-      case 'trip_not_started':
-        return 'The bus has not set off yet.';
-      case 'already_handed_over':
-        return 'Already handed over — the map closes then.';
+        return t('reason.noTripToday');
+      case 'trip_ended':
+        return t('reason.tripEnded');
+      case 'trip_cancelled':
+        return t('reason.tripCancelled');
+      case 'window_not_open_yet':
+        return t('reason.windowNotOpen');
+      case 'already_alighted':
+        return t('reason.alreadyAlighted');
+      case 'no_bus_assigned':
+        return t('reason.noBusAssigned');
+      case 'no_schedule':
+        return t('reason.noSchedule');
+      case 'no_fix_yet':
+        return t('reason.noFixYet');
       case 'phone_not_verified':
-        return 'Your number is not verified. Ask the school office.';
+        return t('reason.phoneNotVerified');
       case 'location_not_permitted':
-        return 'The school has not granted location for this child.';
-      case 'no_position_yet':
-        return 'The bus has not reported a position yet.';
+        return t('reason.locationNotPermitted');
+      case 'simulated_feed_withheld':
+        return t('reason.simulatedWithheld');
       default:
-        return 'The map is closed at the moment.';
+        return t('reason.closed');
     }
   }
 

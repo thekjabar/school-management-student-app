@@ -263,6 +263,14 @@ class _StateCard extends StatelessWidget {
               : t('track.arrivedBody'),
         );
 
+      case 'DONE_FOR_TODAY':
+        return (
+          Icons.home_rounded,
+          AppTheme.green,
+          tv('track.doneForToday', {'name': name}),
+          t('track.doneForTodayBody'),
+        );
+
       case 'NOT_RIDING':
         return (
           Icons.home_outlined,
