@@ -247,6 +247,7 @@ class RiderOnStop {
     required this.requiresAssistance,
     required this.boardedAt,
     required this.alightedAt,
+    this.resolution,
   });
 
   final String studentId;
@@ -256,7 +257,22 @@ class RiderOnStop {
   final DateTime? boardedAt;
   final DateTime? alightedAt;
 
-  bool get accountedFor => boardedAt != null || alightedAt != null;
+  /// What the manifest says became of this child — NO_SHOW when the crew marked
+  /// them as not travelling.
+  final String? resolution;
+
+  /// Whether this child still needs something doing about them.
+  ///
+  /// NO_SHOW belongs here and was missing. It sets neither boardedAt nor
+  /// alightedAt, so a child the driver had just marked as not travelling looked
+  /// exactly like a child not yet picked up: the stop badge still said one was
+  /// owed, the stop never ticked, and the headcount went on counting them. The
+  /// tap appeared to do nothing at all, so drivers pressed it again.
+  bool get accountedFor =>
+      boardedAt != null || alightedAt != null || resolution == 'NO_SHOW';
+
+  /// Settled by NOT travelling, which reads differently from being on board.
+  bool get notTravelling => resolution == 'NO_SHOW';
 
   factory RiderOnStop.fromJson(Map<String, dynamic> j) => RiderOnStop(
         studentId: j['studentId'] as String,
@@ -265,6 +281,7 @@ class RiderOnStop {
         requiresAssistance: (j['requiresAssistance'] ?? false) as bool,
         boardedAt: j['boardedAt'] == null ? null : DateTime.parse(j['boardedAt'] as String).toLocal(),
         alightedAt: j['alightedAt'] == null ? null : DateTime.parse(j['alightedAt'] as String).toLocal(),
+        resolution: j['resolution'] as String?,
       );
 }
 
