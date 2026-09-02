@@ -217,7 +217,10 @@ class _Diary {
           subtitle: [l.teacher, l.room].whereType<String>().join('  •  '),
           at: day,
           startMinute: l.startMinute,
-          endMinute: (l.startMinute ?? 0) + 45,
+          // The end the school set. start+45 invented a length no timetable
+          // agreed to, and on an ordinary slot - where both are null because
+          // the times come from the bell schedule - it printed 00:45.
+          endMinute: l.endMinute,
           where: l.room,
           colour: parseHex(l.colorHex, AppTheme.violet),
         ));

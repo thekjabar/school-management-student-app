@@ -343,12 +343,26 @@ class _Table extends StatelessWidget {
     final rows = <Widget>[];
     for (var i = 0; i < lessons.length; i++) {
       final l = lessons[i];
-      final ends = (l.startMinute ?? 0) + 45;
+      /*
+       * The end the school set, not one made up from the start.
+       *
+       * This was `(l.startMinute ?? 0) + 45`, which invented a length no
+       * timetable had agreed to — and did something worse on an ordinary slot.
+       * startMinute and endMinute are only set when a slot DEVIATES from the
+       * school's period grid; a normal lesson has both null and takes its times
+       * from the bell schedule. So the row read "—" for the start and "00:45"
+       * for the end: nought minutes past midnight, plus forty-five.
+       *
+       * The server sends endMinute and it was never read. Where both are null
+       * there is no honest time to show, so the row shows none rather than a
+       * number that looks like one.
+       */
+      final ends = l.endMinute;
       rows.add(_LessonRow(lesson: l, endMinute: ends, first: i == 0, last: i == lessons.length - 1));
 
       if (i < lessons.length - 1) {
-        final nextStart = lessons[i + 1].startMinute ?? ends;
-        if (nextStart - ends >= 10) {
+        final nextStart = lessons[i + 1].startMinute;
+        if (ends != null && nextStart != null && nextStart - ends >= 10) {
           rows.add(_BreakRow(from: ends, to: nextStart));
         } else {
           rows.add(Divider(height: 1, color: AppTheme.border, indent: 86, endIndent: 14));
@@ -405,7 +419,9 @@ class _LessonRow extends StatelessWidget {
   });
 
   final Lesson lesson;
-  final int endMinute;
+  /// Null when the school has not set one - an ordinary slot takes its times
+  /// from the period grid, and inventing start+45 printed a time nobody agreed.
+  final int? endMinute;
   final bool first;
   final bool last;
 
@@ -433,7 +449,11 @@ class _LessonRow extends StatelessWidget {
                         color: AppTheme.text,
                       ),
                     ),
-                    Text('–', style: TextStyle(fontSize: 10, color: AppTheme.textFaint)),
+                    // No dash and no second time when the school has not set
+                    // an end: a lone '—' under the start reads as a fault.
+                    if (endMinute != null)
+                      Text('–', style: TextStyle(fontSize: 10, color: AppTheme.textFaint)),
+                    if (endMinute != null)
                     Text(
                       clock(endMinute),
                       style: TextStyle(

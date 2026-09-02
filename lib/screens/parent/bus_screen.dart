@@ -773,7 +773,21 @@ class _RouteCard extends StatelessWidget {
     // school → home, and "Arrive at school" on the ride home would be a lie.
     final toSchool = trip.leg != 'RETURN';
     final school = Session.instance.me?.schoolName ?? t('driver.school');
-    final arrived = trip.alightedAt ?? trip.endedAt;
+    /*
+     * Whether THIS CHILD arrived — not whether the bus finished its run.
+     *
+     * This was `trip.alightedAt ?? trip.endedAt`, and endedAt belongs to the
+     * BUS. A child recorded as a no-show has no alightedAt at all, so the
+     * moment the bus finished its round the timeline ticked "Arrive at school"
+     * green, with a time, for a child who was never picked up. The one screen a
+     * parent opens to ask "did my child get there" answered yes about a child
+     * standing at home.
+     *
+     * A no-show is a finished journey that did not happen, so the last two
+     * steps are neither pending nor complete: they are shown as not taken.
+     */
+    final noShow = trip.resolution == 'NO_SHOW';
+    final arrived = noShow ? null : (trip.alightedAt ?? trip.endedAt);
     final steps = <(String, String, DateTime?, int)>[
       (
         t('bus.started'),
@@ -793,15 +807,17 @@ class _RouteCard extends StatelessWidget {
         t('bus.onTheWay'),
         toSchool ? t('bus.headingToSchool') : t('bus.headingHome'),
         null,
-        arrived != null ? 2 : (trip.boardedAt != null ? 1 : 0),
+        noShow ? 3 : (arrived != null ? 2 : (trip.boardedAt != null ? 1 : 0)),
       ),
       (
-        toSchool
-            ? t('bus.arriveAtSchool')
-            : tn('bus.arrivedAt', bus.transport.dropoffStopName ?? t('bus.home')),
-        toSchool ? school : (bus.transport.dropoffLandmark ?? ''),
+        noShow
+            ? t('bus.child.noShow')
+            : toSchool
+                ? t('bus.arriveAtSchool')
+                : tn('bus.arrivedAt', bus.transport.dropoffStopName ?? t('bus.home')),
+        noShow ? t('bus.noShowNote') : (toSchool ? school : (bus.transport.dropoffLandmark ?? '')),
         arrived,
-        arrived != null ? 2 : 0,
+        noShow ? 3 : (arrived != null ? 2 : 0),
       ),
     ];
 
@@ -877,6 +893,9 @@ class _Step extends StatelessWidget {
   Widget build(BuildContext context) {
     final tint = Role.parent.tint;
     final (colour, chip) = switch (state) {
+      // 3: the journey is over and did not happen. Not green, because nothing
+      // was completed, and not grey-pending, because nothing is coming.
+      3 => (AppTheme.textMuted, t('bus.child.noShow')),
       2 => (AppTheme.green, t('bus.completed')),
       1 => (tint, t('bus.liveNow')),
       _ => (AppTheme.textFaint, t('bus.upcoming')),
