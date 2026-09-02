@@ -89,10 +89,35 @@ class MapTiles {
   ///
   /// 512px tiles at @2x: fewer requests than 256px for the same ground, and
   /// crisp on the phones these are actually read on.
+  /// True while tiles are failing to arrive.
+  ///
+  /// A tile that does not download leaves the map a plain grey rectangle —
+  /// which is exactly what a map with no token looks like, and what a map that
+  /// is still loading looks like, and what a bus that has not started looks
+  /// like. MapNotConfigured was written for one of those. This is the other:
+  /// the phone is on a bad connection, or Mapbox is unreachable, and the parent
+  /// deserves to be told that rather than left staring at grey.
+  ///
+  /// Global rather than per-screen because it describes the network, not the
+  /// screen, and every map in the app is drawn from the same host.
+  static final trouble = ValueNotifier<bool>(false);
+
   static TileLayer layer() => TileLayer(
         urlTemplate:
             'https://api.mapbox.com/styles/v1/$_style/tiles/512/{z}/{x}/{y}@2x'
             '?access_token=$token',
+        errorTileCallback: (_, _, _) {
+          // Set after the frame: this fires during the tile's own build, and
+          // notifying a listener mid-build is what makes Flutter throw.
+          WidgetsBinding.instance.addPostFrameCallback((_) => trouble.value = true);
+        },
+        tileBuilder: (context, tileWidget, tile) {
+          // One tile arriving is proof the connection came back.
+          if (tile.loadError == false && trouble.value) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => trouble.value = false);
+          }
+          return tileWidget;
+        },
         // The style is served at 512, so a tile covers one zoom level more
         // than the default. Without this every label renders half-size.
         tileDimension: 512,
@@ -110,6 +135,53 @@ class MapTiles {
   /// different free corner and already styles its own. What must not vary is
   /// the text — three screens spent a day claiming to be a map they were not.
   static const credit = '© Mapbox © OpenStreetMap';
+}
+
+/// Says so when the tiles will not come.
+///
+/// Stacked over the map rather than replacing it: the markers, the route and
+/// the stop names are all still worth reading with no tiles behind them, and
+/// throwing the whole map away because the background is missing would take
+/// more from the reader than it gives.
+class MapOffline extends StatelessWidget {
+  const MapOffline({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: MapTiles.trouble,
+      builder: (context, bad, _) {
+        if (!bad) return const SizedBox.shrink();
+        return Align(
+          alignment: AlignmentDirectional.topCenter,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppTheme.surface.withValues(alpha: 0.94),
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: AppTheme.dark
+                    ? null
+                    : const [BoxShadow(color: Color(0x14101828), blurRadius: 8, offset: Offset(0, 2))],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.cloud_off_rounded, size: 14, color: AppTheme.textMuted),
+                  const SizedBox(width: 6),
+                  Text(
+                    t('map.offline'),
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppTheme.textMuted),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 /// Drawn in place of a map when no token was built in.

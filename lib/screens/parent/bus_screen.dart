@@ -560,6 +560,11 @@ class _MapCard extends StatelessWidget {
                   ),
                 ),
 
+              // Says so when the tiles will not come, rather than leaving a
+              // grey rectangle that looks like every other reason a map is
+              // blank.
+              const MapOffline(),
+
               // Mapbox's licence requires the credit. It is not decoration and
               // it does not come off.
               if (drawn)
