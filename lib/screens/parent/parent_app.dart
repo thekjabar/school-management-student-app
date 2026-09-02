@@ -256,8 +256,24 @@ class _ParentAppState extends State<ParentApp> {
         // leave is the only action they initiate, so it is the only thing that
         // earns the raised button.
         centerIcon: Icons.add_rounded,
+        // Labelled, like the driver's. A bare plus in the middle of a bar of
+        // named tabs reads as decoration, and a parent who cannot guess what it
+        // does never finds the one thing this app lets them actually DO. The
+        // word is what makes it a button rather than an ornament.
+        centerLabel: t('nav.askLeave'),
         onCenter: () {
-          if (child == null) return;
+          if (child == null) {
+            // Was a silent return. A button that does nothing, says nothing and
+            // looks enabled is indistinguishable from a broken one — and this
+            // is the state on a cold start, before the children have loaded,
+            // which is exactly when somebody presses it.
+            showNote(
+              context,
+              _error ?? t('common.noChildren'),
+              bad: true,
+            );
+            return;
+          }
           Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => LeaveScreen(child: child)),
           );

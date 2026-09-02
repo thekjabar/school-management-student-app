@@ -221,6 +221,7 @@ const Map<String, String> _en = {
   'nav.more': 'More',
   'nav.account': 'Account',
   'nav.profile': 'Profile',
+  'nav.askLeave': 'Leave',
 
   // ---- The redesigned home screen ------------------------------------------
   'quick.bus': 'Bus tracking',
@@ -518,6 +519,18 @@ const Map<String, String> _en = {
   'driver.childFound': 'A child is still on the bus',
   'driver.childFoundWho': 'Say who, so the office can ring the family now.',
   'driver.childFoundFiled': 'Reported. The office has been told.',
+  // The three things the server can answer to a sweep. Only the first of them
+  // clears the run, so only the first of them is allowed to sound like good
+  // news — the app spent a long time saying "Sweep confirmed" over a refusal.
+  'driver.sweepLate':
+      'Your walk was recorded, but the deadline had already passed — it does not clear the alert, and the office has been told.',
+  'driver.sweepRubberStamped':
+      'That did not look like a real walk down the aisle, so this bus is still recorded as unswept. Walk to the back row and confirm again.',
+  'driver.sweepRubberStampWhy': 'Reason: {n}',
+  'driver.sweepNotCounted':
+      'Your walk was recorded, but it has not cleared this bus. The office has the record.',
+  'driver.sweepRecordedNotCleared':
+      'Your walk was recorded and the office has been told. It stays here because it came in after the deadline — only the office can close it now.',
   // ---- Papers --------------------------------------------------------------
   'driver.noPapers': 'Nothing is on file. The office holds licences, medicals and vetting checks — ask them to add yours, or the gate will stop you at check-in.',
   'driver.expires': 'Expires {n}',
@@ -1900,6 +1913,15 @@ const Map<String, String> _ckb = {
   'driver.childFound': 'منداڵێک هێشتا لە پاسەکەدایە',
   'driver.childFoundWho': 'بڵێ کێیە، تا نووسینگە ئێستا پەیوەندی بە خێزانەکەیەوە بکات.',
   'driver.childFoundFiled': 'ڕاپۆرت کرا. نووسینگە ئاگادارکرایەوە.',
+  'driver.sweepLate':
+      'پشکنینەکەت تۆمارکرا، بەڵام کاتەکە پێشتر تێپەڕیبوو — بۆیە ئاگادارییەکە لانابات، و نووسینگە ئاگادارکرایەوە.',
+  'driver.sweepRubberStamped':
+      'ئەمە وەک ڕۆیشتنێکی ڕاستەقینە بەناو ڕێڕەوی پاسەکەدا دەرنەکەوت، بۆیە ئەم پاسە هێشتا وەک پشکنین‌نەکراو تۆمارکراوە. بڕۆ بۆ ڕیزی دواوە و دووبارە پشتڕاست بکەرەوە.',
+  'driver.sweepRubberStampWhy': 'هۆکار: {n}',
+  'driver.sweepNotCounted':
+      'پشکنینەکەت تۆمارکرا، بەڵام ئەم پاسەی پاک نەکردەوە. تۆمارەکە لای نووسینگەیە.',
+  'driver.sweepRecordedNotCleared':
+      'پشکنینەکەت تۆمارکرا و نووسینگە ئاگادارکرایەوە. لێرە دەمێنێتەوە چونکە دوای کاتی دیاریکراو گەیشت — تەنها نووسینگە دەتوانێت ئێستا دایبخات.',
   // ---- Papers --------------------------------------------------------------
   'driver.noPapers': 'هیچ شتێک تۆمار نەکراوە. نووسینگە مۆڵەت و پشکنینەکان هەڵدەگرێت — داوایان لێبکە هی تۆ زیاد بکەن، ئەگەرنا لە دەروازە ڕێگرت لێدەکەن.',
   'driver.expires': 'بەسەردەچێت {n}',
@@ -2599,6 +2621,7 @@ const Map<String, String> _ckb = {
   'settings.version': 'وەشان',
   'settings.signedInAs': 'چوویتە ژوورەوە وەک',
   'nav.profile': 'پرۆفایل',
+  'nav.askLeave': 'مۆڵەت',
   'teacher.greetLine': 'با ئەمڕۆ ڕۆژێکی باش بێت!',
   'teacher.roleLabel': 'مامۆستا',
   'teacher.todayYouHave': 'ئەمڕۆ هەتە',
@@ -3263,6 +3286,15 @@ const Map<String, String> _ar = {
   'driver.childFound': 'لا يزال طفل في الحافلة',
   'driver.childFoundWho': 'حدّد من هو، ليتصل المكتب بالعائلة الآن.',
   'driver.childFoundFiled': 'تم الإبلاغ. أُبلغ المكتب.',
+  'driver.sweepLate':
+      'تم تسجيل فحصك، لكن الوقت المحدد كان قد انتهى — لذلك لا يُلغي التنبيه، وقد أُبلغ المكتب.',
+  'driver.sweepRubberStamped':
+      'لم يبدُ ذلك كمشي فعلي في ممر الحافلة، لذلك ما زالت هذه الحافلة مسجَّلة كغير مفحوصة. امشِ حتى الصف الخلفي وأكّد مرة أخرى.',
+  'driver.sweepRubberStampWhy': 'السبب: {n}',
+  'driver.sweepNotCounted':
+      'تم تسجيل فحصك، لكنه لم يُنهِ حالة هذه الحافلة. السجل لدى المكتب.',
+  'driver.sweepRecordedNotCleared':
+      'تم تسجيل فحصك وأُبلغ المكتب. يبقى هنا لأنه وصل بعد انتهاء الوقت المحدد — المكتب وحده من يمكنه إغلاقه الآن.',
   // ---- Papers --------------------------------------------------------------
   'driver.noPapers': 'لا يوجد شيء مسجّل. الإدارة تحتفظ بالرخص والفحوصات الطبية والتدقيقات — اطلب منهم إضافة أوراقك، وإلا أوقفك الحارس عند الدخول.',
   'driver.expires': 'تنتهي {n}',
@@ -3959,6 +3991,7 @@ const Map<String, String> _ar = {
   'settings.version': 'الإصدار',
   'settings.signedInAs': 'مسجّل الدخول باسم',
   'nav.profile': 'الملف الشخصي',
+  'nav.askLeave': 'إجازة',
   'teacher.greetLine': 'لنجعل اليوم يوماً رائعاً!',
   'teacher.roleLabel': 'مدرّس',
   'teacher.todayYouHave': 'لديك اليوم',

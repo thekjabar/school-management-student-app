@@ -613,6 +613,112 @@ class SweepState {
       );
 }
 
+/// What the server made of a sweep — which is not the same as whether the
+/// request succeeded.
+///
+/// `POST /crew/sweep/scan` answers 200 to a sweep it has REFUSED to count. A
+/// walk filed after the deadline, or one the platform grades as a rubber stamp,
+/// is recorded, raises an alert, and deliberately leaves the run unswept: that
+/// is the safeguard doing its job, and nothing on this side may work around it.
+///
+/// The app used to throw this whole answer away and show "Sweep confirmed" in
+/// green over a refusal, leaving the red card exactly where it was. Drivers
+/// read that as a broken button and pressed it again — ten recorded attempts on
+/// one run, every one of them answered with a green tick that was a lie.
+class SweepVerdict {
+  const SweepVerdict({
+    required this.genuine,
+    required this.withinDeadline,
+    required this.rubberStamped,
+    required this.rubberStampReasons,
+    required this.duplicate,
+    required this.alertsRaised,
+    this.deadlineSeconds,
+    this.secondsFromTripEnd,
+    this.confidenceScore,
+    this.unaccountedCount,
+  });
+
+  /// The only value that closes the run.
+  ///
+  /// The server's own definition: the outcome was CLEAR, it was not rubber
+  /// stamped, and it was inside the deadline. Only then does it clear
+  /// `TripInstance.status` and stamp `sweepConfirmedAt` — which is why a card
+  /// still sitting there after a green tick is the server disagreeing, not the
+  /// screen failing to reload.
+  final bool genuine;
+
+  /// Filed inside the window the run was given. Late is not refused — it is
+  /// recorded, it raises SWEEP_LATE, and it does not clear the bus.
+  final bool withinDeadline;
+
+  /// Recorded, but it did not look like somebody walking the aisle: too fast
+  /// for the minimum walk, no movement, the phone nowhere near the bus. Treated
+  /// as unswept, which is the whole point of grading it.
+  final bool rubberStamped;
+
+  /// Why, in the server's enum codes. Empty when it said only that it was one.
+  final List<String> rubberStampReasons;
+
+  /// Already on file — the same walk arriving twice after a dropped
+  /// connection, not a second walk.
+  final bool duplicate;
+
+  /// What the office was told, e.g. SWEEP_LATE. Non-empty means a human has
+  /// been handed this run.
+  final List<String> alertsRaised;
+
+  /// The window in seconds the run was given to be swept.
+  final int? deadlineSeconds;
+
+  /// How long after the run ended the walk was filed.
+  final int? secondsFromTripEnd;
+
+  /// The server's own confidence in the walk, 0–100.
+  final int? confidenceScore;
+
+  /// Children the reconciliation could not account for. Anything but zero is
+  /// an alarm, not a note.
+  final int? unaccountedCount;
+
+  /// Parse the answer without ever reading silence as a yes.
+  ///
+  /// A 200 with no body arrives here as null. That is not the server saying the
+  /// sweep counted, so it is not reported as one.
+  static SweepVerdict from(Object? json) => json is Map
+      ? SweepVerdict.fromJson(json.cast<String, dynamic>())
+      : const SweepVerdict(
+          genuine: false,
+          withinDeadline: true,
+          rubberStamped: false,
+          rubberStampReasons: [],
+          duplicate: false,
+          alertsRaised: [],
+        );
+
+  factory SweepVerdict.fromJson(Map<String, dynamic> j) => SweepVerdict(
+        // Absent reads as "not counted", never as counted. Only the server
+        // saying `genuine` outright earns the green note.
+        genuine: j['genuine'] == true,
+        // Absent here is the other way round: the server has said nothing about
+        // a deadline, and a missing answer must not be announced to the driver
+        // as a late one.
+        withinDeadline: (j['withinDeadline'] as bool?) ?? true,
+        rubberStamped: j['rubberStamped'] == true,
+        rubberStampReasons: [
+          for (final r in (j['rubberStampReasons'] as List?) ?? const []) '$r',
+        ],
+        duplicate: j['duplicate'] == true,
+        alertsRaised: [
+          for (final a in (j['alertsRaised'] as List?) ?? const []) '$a',
+        ],
+        deadlineSeconds: (j['deadlineSeconds'] as num?)?.toInt(),
+        secondsFromTripEnd: (j['secondsFromTripEnd'] as num?)?.toInt(),
+        confidenceScore: (j['confidenceScore'] as num?)?.toInt(),
+        unaccountedCount: ((j['reconciliation'] as Map?)?['unaccountedCount'] as num?)?.toInt(),
+      );
+}
+
 /// Everything the driver and attendant app asks the platform for.
 class CrewApi {
   CrewApi._();
@@ -937,15 +1043,22 @@ class CrewApi {
   /// it as weaker evidence than a tag scan precisely because it is. Claiming a
   /// scan the handset never performed would corrupt the one number a school
   /// would be judged on.
-  Future<void> confirmSweep(String tripId, {String outcome = 'CLEAR'}) async {
-    await _api.post('/crew/sweep/scan', {
+  /// The answer comes back, because the answer is sometimes no.
+  ///
+  /// This returned `Future<void>` and dropped the body on the floor, so a walk
+  /// the server had refused to count was reported to the driver as a success.
+  /// See [SweepVerdict].
+  Future<SweepVerdict> confirmSweep(String tripId, {String outcome = 'CLEAR'}) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    final json = await _api.post('/crew/sweep/scan', {
       'eventId': uuidV4(),
       'tripInstanceId': tripId,
       'method': 'MANUAL_ATTESTATION',
       'outcome': outcome,
-      'scannedAt': DateTime.now().toUtc().toIso8601String(),
-      'clientSentAt': DateTime.now().toUtc().toIso8601String(),
+      'scannedAt': now,
+      'clientSentAt': now,
     });
+    return SweepVerdict.from(json);
   }
 
   /// A child was still on the bus.
@@ -959,13 +1072,17 @@ class CrewApi {
   /// The child is named, because the server insists: "Say which child was found
   /// on board." That is the point — the record has to say who, so the office
   /// knows which family to ring before the parent does.
-  Future<void> sweepChildFound(
+  ///
+  /// Same endpoint, and the server grades this one too — so the verdict is
+  /// returned rather than discarded. CHILD_FOUND is never `genuine` (only CLEAR
+  /// can be), and it is not meant to be: finding a child does not close the run.
+  Future<SweepVerdict> sweepChildFound(
     String tripId, {
     required String studentId,
     String? notes,
   }) async {
     final now = DateTime.now().toUtc().toIso8601String();
-    await _api.post('/crew/sweep/scan', {
+    final json = await _api.post('/crew/sweep/scan', {
       'eventId': uuidV4(),
       'tripInstanceId': tripId,
       'method': 'MANUAL_ATTESTATION',
@@ -975,6 +1092,7 @@ class CrewApi {
       'scannedAt': now,
       'clientSentAt': now,
     });
+    return SweepVerdict.from(json);
   }
 
   Future<Map<String, dynamic>> me() async =>

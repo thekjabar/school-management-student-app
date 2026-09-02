@@ -179,12 +179,26 @@ class _TripScreenState extends State<TripScreen> {
     await _act(t('driver.sosSent'), () => CrewApi.instance.sos(trip.id));
   }
 
-  Future<void> _act(String label, Future<void> Function() action) async {
+  /// Run something, and say what the server said about it.
+  ///
+  /// [_act] shows its own busy label back as the note, which is right where the
+  /// only outcomes are "it worked" and "it threw". The sweep has a third: the
+  /// server takes the request, records the walk, and refuses to count it. A
+  /// fixed green label over that is the app contradicting the server on the one
+  /// control that exists to stop a child being left in a locked bus — so the
+  /// call that has an opinion gets to read it, via [note].
+  Future<void> _actWith<T>(
+    String label,
+    Future<T> Function() action,
+    ({String text, bool bad}) Function(T) note,
+  ) async {
     setState(() => _busy = label);
     try {
-      await action();
+      final result = await action();
       _loaderKey.currentState?.reload();
-      if (mounted) showNote(context, label);
+      if (!mounted) return;
+      final said = note(result);
+      showNote(context, said.text, bad: said.bad);
     } catch (e) {
       // Every failure, not just the ones the API answered. A dropped
       // connection threw straight past this and left the driver looking at a
@@ -193,6 +207,44 @@ class _TripScreenState extends State<TripScreen> {
     } finally {
       if (mounted) setState(() => _busy = null);
     }
+  }
+
+  /// The plain form: the label is both what the button is doing and what the
+  /// driver is told when it is done.
+  Future<void> _act(String label, Future<void> Function() action) => _actWith<bool>(
+        label,
+        () async {
+          await action();
+          return true;
+        },
+        (_) => (text: label, bad: false),
+      );
+
+  /// What to tell the driver about a sweep the server has already judged.
+  ///
+  /// Only `genuine` clears the run, and only `genuine` gets the green note.
+  /// The other answers are not failures of the app and must not be dressed up
+  /// as successes: the walk IS on file, an alert HAS been raised, and the bus
+  /// is still recorded as unswept. Rubber-stamped is reported ahead of late,
+  /// because "that did not look like a walk" is the graver thing to be told.
+  ({String text, bool bad}) _sweepNote(SweepVerdict verdict) {
+    if (verdict.genuine) return (text: t('driver.sweepConfirmed'), bad: false);
+
+    if (verdict.rubberStamped) {
+      final why = verdict.rubberStampReasons.map(humanise).join(', ');
+      return (
+        text: why.isEmpty
+            ? t('driver.sweepRubberStamped')
+            : '${t('driver.sweepRubberStamped')} ${tn('driver.sweepRubberStampWhy', why)}',
+        bad: true,
+      );
+    }
+
+    if (!verdict.withinDeadline) return (text: t('driver.sweepLate'), bad: true);
+
+    // Neither reason given, and still not counted. Saying so plainly beats
+    // guessing, and beats a green tick over a bus the server calls unswept.
+    return (text: t('driver.sweepNotCounted'), bad: true);
   }
 
   @override
@@ -291,9 +343,10 @@ class _TripScreenState extends State<TripScreen> {
                         stillOwed: trip?.status == 'SWEEP_PENDING' ||
                             trip?.status == 'SWEEP_OVERDUE',
                         busy: _busy != null,
-                        onConfirm: () => _act(
+                        onConfirm: () => _actWith(
                           t('driver.sweepConfirmed'),
                           () => CrewApi.instance.confirmSweep(widget.tripId),
+                          _sweepNote,
                         ),
                         onChildFound: () => _reportChildFound(data.plan),
                       ),
@@ -1330,6 +1383,22 @@ class _SweepCard extends StatelessWidget {
             '${t('driver.sweepHow')}${t('driver.sweepWhy')}',
             style: TextStyle(fontSize: 12.5, height: 1.5, color: AppTheme.textMuted),
           ),
+          // Late, and he has already pressed it. The server keeps this card up
+          // because a late walk does not clear the run — which from the driver's
+          // seat looks exactly like a button that does nothing, and that is how
+          // one run collected ten attempts. His walk did land; say so.
+          if (late && sweep.attemptsSoFar > 0) ...[
+            const SizedBox(height: 10),
+            Text(
+              t('driver.sweepRecordedNotCleared'),
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.5,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.rose,
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           BigButton(
             label: t('driver.walkedTheBus'),
