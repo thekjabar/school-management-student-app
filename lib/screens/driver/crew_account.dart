@@ -139,13 +139,51 @@ class _CredentialRow extends StatelessWidget {
     final expires = expiresRaw == null ? null : DateTime.parse(expiresRaw).toLocal();
     final days = expires?.difference(DateTime.now()).inDays;
 
-    final (Color colour, Color wash) = days == null
-        ? (AppTheme.textMuted, AppTheme.neutralSoft)
-        : days < 0
-            ? (AppTheme.rose, AppTheme.roseSoft)
-            : days < 30
-                ? (AppTheme.amber, AppTheme.amberSoft)
-                : (AppTheme.green, AppTheme.greenSoft);
+    /*
+     * The status the office set, which outranks the date on the paper.
+     *
+     * This row used to be coloured by the expiry date alone. A licence the
+     * office had SUSPENDED or REVOKED — pulled while still in date, which is
+     * exactly what happens after a safeguarding decision — drew green with a
+     * comfortable day count, and the one screen a driver checks before a run
+     * told him he was fine to drive. The status has been in the payload the
+     * whole time; nothing read it.
+     */
+    final status = credential['status'] as String?;
+    final stopped = status == 'SUSPENDED' ||
+        status == 'REVOKED' ||
+        status == 'REJECTED' ||
+        status == 'EXPIRED' ||
+        status == 'BLOCKING_SOON';
+    final warning = status == 'EXPIRING_SOON' || status == 'PENDING_VERIFICATION';
+
+    final (Color colour, Color wash) = stopped
+        ? (AppTheme.rose, AppTheme.roseSoft)
+        : warning
+            ? (AppTheme.amber, AppTheme.amberSoft)
+            : days == null
+                ? (AppTheme.textMuted, AppTheme.neutralSoft)
+                : days < 0
+                    ? (AppTheme.rose, AppTheme.roseSoft)
+                    : days < 30
+                        ? (AppTheme.amber, AppTheme.amberSoft)
+                        : (AppTheme.green, AppTheme.greenSoft);
+
+    /// What to put in the corner: the status when it is the thing that matters,
+    /// otherwise the days left, which is what it always showed.
+    final String? tag = switch (status) {
+      'SUSPENDED' => t('driver.credSuspended'),
+      'REVOKED' => t('driver.credRevoked'),
+      'REJECTED' => t('driver.credRejected'),
+      'PENDING_VERIFICATION' => t('driver.credPending'),
+      'BLOCKING_SOON' => t('driver.credBlocking'),
+      'EXPIRED' => t('driver.expired'),
+      _ => days == null
+          ? null
+          : days < 0
+              ? t('driver.expired')
+              : tn('driver.nDays', days),
+    };
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -172,12 +210,17 @@ class _CredentialRow extends StatelessWidget {
                     expires == null ? t('driver.noExpiry') : tn('driver.expires', longDate(expires)),
                     style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                   ),
+                  if (stopped && status != 'EXPIRED')
+                    Text(
+                      t('driver.credNotValid'),
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppTheme.rose),
+                    ),
                 ],
               ),
             ),
-            if (days != null)
+            if (tag != null)
               Tag(
-                days < 0 ? t('driver.expired') : tn('driver.nDays', days),
+                tag,
                 color: colour,
                 background: wash,
               ),

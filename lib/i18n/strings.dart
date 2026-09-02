@@ -488,10 +488,19 @@ const Map<String, String> _en = {
   'driver.sweepAfterRun': 'When the last child is off, walk the aisle and confirm the bus is empty here.',
   'driver.sweepOutstanding': 'This run has ended and the cabin sweep is not confirmed.',
   'driver.walkedTheBus': 'I have walked the bus — it is empty',
+  'driver.childFound': 'A child is still on the bus',
+  'driver.childFoundWho': 'Say who, so the office can ring the family now.',
+  'driver.childFoundFiled': 'Reported. The office has been told.',
   // ---- Papers --------------------------------------------------------------
   'driver.noPapers': 'Nothing is on file. The office holds licences, medicals and vetting checks — ask them to add yours, or the gate will stop you at check-in.',
   'driver.expires': 'Expires {n}',
   'driver.noExpiry': 'No expiry recorded',
+  'driver.credSuspended': 'Suspended',
+  'driver.credRevoked': 'Revoked',
+  'driver.credRejected': 'Rejected',
+  'driver.credPending': 'Not checked yet',
+  'driver.credBlocking': 'About to block',
+  'driver.credNotValid': 'The office has stopped this — you may not drive on it.',
   'driver.leaving': 'Your leaving process has started. The office will tell you when your access ends.',
 
 
@@ -1746,10 +1755,19 @@ const Map<String, String> _ckb = {
   'driver.sweepAfterRun': 'کاتێک دوایین منداڵ دابەزی، بەناو پاسەکەدا بڕۆ و لێرە پشتڕاست بکەرەوە کە بەتاڵە.',
   'driver.sweepOutstanding': 'ئەم گەشتە کۆتایی هاتووە و پشکنینی ناوەوە پشتڕاست نەکراوەتەوە.',
   'driver.walkedTheBus': 'بەناو پاسەکەدا ڕۆیشتووم — بەتاڵە',
+  'driver.childFound': 'منداڵێک هێشتا لە پاسەکەدایە',
+  'driver.childFoundWho': 'بڵێ کێیە، تا نووسینگە ئێستا پەیوەندی بە خێزانەکەیەوە بکات.',
+  'driver.childFoundFiled': 'ڕاپۆرت کرا. نووسینگە ئاگادارکرایەوە.',
   // ---- Papers --------------------------------------------------------------
   'driver.noPapers': 'هیچ شتێک تۆمار نەکراوە. نووسینگە مۆڵەت و پشکنینەکان هەڵدەگرێت — داوایان لێبکە هی تۆ زیاد بکەن، ئەگەرنا لە دەروازە ڕێگرت لێدەکەن.',
   'driver.expires': 'بەسەردەچێت {n}',
   'driver.noExpiry': 'بەرواری بەسەرچوون تۆمار نەکراوە',
+  'driver.credSuspended': 'ڕاگیراوە',
+  'driver.credRevoked': 'هەڵوەشێنراوەتەوە',
+  'driver.credRejected': 'ڕەتکراوەتەوە',
+  'driver.credPending': 'هێشتا نەپشکنراوە',
+  'driver.credBlocking': 'خەریکە ڕێگری دەکات',
+  'driver.credNotValid': 'نووسینگە ئەمەی ڕاگرتووە — ناتوانیت پێی لێبخوڕیت.',
   'driver.leaving': 'پرۆسەی جێهێشتنت دەستی پێکردووە. نووسینگە پێت دەڵێت کەی دەستڕاگەیشتنت کۆتایی دێت.',
 
 
@@ -2985,10 +3003,19 @@ const Map<String, String> _ar = {
   'driver.sweepAfterRun': 'عند نزول آخر طفل، امشِ في الممر وأكّد هنا أن الحافلة فارغة.',
   'driver.sweepOutstanding': 'انتهت هذه الرحلة ولم يُؤكَّد فحص الحافلة.',
   'driver.walkedTheBus': 'مشيت في الحافلة — إنها فارغة',
+  'driver.childFound': 'لا يزال طفل في الحافلة',
+  'driver.childFoundWho': 'حدّد من هو، ليتصل المكتب بالعائلة الآن.',
+  'driver.childFoundFiled': 'تم الإبلاغ. أُبلغ المكتب.',
   // ---- Papers --------------------------------------------------------------
   'driver.noPapers': 'لا يوجد شيء مسجّل. الإدارة تحتفظ بالرخص والفحوصات الطبية والتدقيقات — اطلب منهم إضافة أوراقك، وإلا أوقفك الحارس عند الدخول.',
   'driver.expires': 'تنتهي {n}',
   'driver.noExpiry': 'لا يوجد تاريخ انتهاء مسجّل',
+  'driver.credSuspended': 'موقوفة',
+  'driver.credRevoked': 'ملغاة',
+  'driver.credRejected': 'مرفوضة',
+  'driver.credPending': 'لم تُدقق بعد',
+  'driver.credBlocking': 'على وشك المنع',
+  'driver.credNotValid': 'أوقفها المكتب — لا يجوز القيادة بها.',
   'driver.leaving': 'بدأت إجراءات مغادرتك. ستخبرك الإدارة متى ينتهي وصولك.',
 
 

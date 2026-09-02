@@ -110,6 +110,32 @@ class _TripScreenState extends State<TripScreen> {
     );
   }
 
+  /// A child was still on the bus when the aisle was walked.
+  ///
+  /// The sweep could only ever be filed as CLEAR, so a driver who found a child
+  /// asleep on the back row had one button and it said the bus was empty. The
+  /// server has taken CHILD_FOUND all along and insists on a name with it —
+  /// which is the point: the office has to know WHICH child before the parent
+  /// rings. The list offered is this run's own roster.
+  Future<void> _reportChildFound(TripPlan plan) async {
+    final riders = [
+      for (final stop in plan.stops)
+        for (final r in stop.students) r,
+    ];
+    if (riders.isEmpty) return;
+
+    final chosen = await showAppSheet<RiderOnStop>(
+      context,
+      builder: (_) => _ChildFoundSheet(riders: riders),
+    );
+    if (chosen == null || !mounted) return;
+
+    await _act(
+      t('driver.childFoundFiled'),
+      () => CrewApi.instance.sweepChildFound(widget.tripId, studentId: chosen.studentId),
+    );
+  }
+
   Future<void> _act(String label, Future<void> Function() action) async {
     setState(() => _busy = label);
     try {
@@ -208,6 +234,7 @@ class _TripScreenState extends State<TripScreen> {
                           t('driver.sweepConfirmed'),
                           () => CrewApi.instance.confirmSweep(widget.tripId),
                         ),
+                        onChildFound: () => _reportChildFound(data.plan),
                       ),
                       const SizedBox(height: 20),
                     ],
@@ -864,7 +891,14 @@ class _SweepCard extends StatelessWidget {
     required this.busy,
     required this.onConfirm,
     required this.tripEnded,
+    required this.onChildFound,
   });
+
+  /// Opened when the aisle was NOT empty. Deliberately a plain link under the
+  /// big button rather than a second big button: the ordinary end to a sweep is
+  /// that the bus is empty, and a driver at the end of a run should not have to
+  /// choose between two equal-looking things to say so.
+  final VoidCallback onChildFound;
 
   final SweepState sweep;
   final bool busy;
@@ -1006,6 +1040,20 @@ class _SweepCard extends StatelessWidget {
             busy: busy,
             height: 54,
             onPressed: onConfirm,
+          ),
+          const SizedBox(height: 6),
+          Center(
+            child: TextButton(
+              onPressed: busy ? null : onChildFound,
+              child: Text(
+                t('driver.childFound'),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.rose,
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -1934,6 +1982,73 @@ class _SelfieButton extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Which child was found on the bus.
+///
+/// A plain list of this run's own roster. The server insists on a name with a
+/// CHILD_FOUND sweep — "Say which child was found on board" — and it is right
+/// to: the record has to say who, so the office knows which family to ring
+/// before the parent rings them.
+class _ChildFoundSheet extends StatelessWidget {
+  const _ChildFoundSheet({required this.riders});
+
+  final List<RiderOnStop> riders;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 38,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: AppTheme.border,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          Text(
+            t('driver.childFound'),
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.text),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            t('driver.childFoundWho'),
+            style: TextStyle(fontSize: 13, height: 1.45, color: AppTheme.textMuted),
+          ),
+          const SizedBox(height: 12),
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: riders.length,
+              itemBuilder: (context, i) {
+                final r = riders[i];
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    r.name,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5),
+                  ),
+                  onTap: () => Navigator.of(context).pop(r),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -775,6 +775,35 @@ class CrewApi {
     });
   }
 
+  /// A child was still on the bus.
+  ///
+  /// The sweep had exactly one button and it asserted CLEAR — the bus was
+  /// empty. A driver who walked to the back row and found a child asleep had
+  /// nothing to press that said so, and the only honest thing left to him was
+  /// to file the declaration that was untrue. The schema calls CHILD_FOUND
+  /// "the reason this entire feature exists".
+  ///
+  /// The child is named, because the server insists: "Say which child was found
+  /// on board." That is the point — the record has to say who, so the office
+  /// knows which family to ring before the parent does.
+  Future<void> sweepChildFound(
+    String tripId, {
+    required String studentId,
+    String? notes,
+  }) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _api.post('/crew/sweep/scan', {
+      'eventId': uuidV4(),
+      'tripInstanceId': tripId,
+      'method': 'MANUAL_ATTESTATION',
+      'outcome': 'CHILD_FOUND',
+      'childFoundStudentId': studentId,
+      'notes': ?notes,
+      'scannedAt': now,
+      'clientSentAt': now,
+    });
+  }
+
   Future<Map<String, dynamic>> me() async =>
       await _api.get('/crew/me') as Map<String, dynamic>;
 }
