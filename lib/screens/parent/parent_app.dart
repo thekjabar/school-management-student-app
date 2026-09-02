@@ -32,7 +32,20 @@ class ParentApp extends StatefulWidget {
 class _ParentAppState extends State<ParentApp> {
   /// One per destination, so each tab remembers where it was and the back
   /// gesture unwinds the tab rather than the app.
-  final _navKeys = List.generate(4, (_) => GlobalKey<NavigatorState>());
+  /// One navigator per tab, replaced wholesale when the child changes.
+  ///
+  /// A tab's content lives inside a Navigator, and Navigator generates its
+  /// FIRST route once — closing over the HomeTab widget alive at that moment.
+  /// Rebuilding the shell therefore repainted the header and nothing else: the
+  /// parent picked the other sibling, the name at the top changed, and Home and
+  /// Calendar went on showing the first child's bus, timetable, attendance and
+  /// marks underneath it. Meanwhile the centre button DID use the new child, so
+  /// a parent could file leave for the child whose data was not on the screen.
+  ///
+  /// Fresh keys force fresh navigators, which is also the right behaviour on
+  /// its own account: a homework detail pushed for one sibling should not stay
+  /// on screen after switching to the other.
+  List<GlobalKey<NavigatorState>> _navKeys = List.generate(4, (_) => GlobalKey<NavigatorState>());
 
   int _tab = 0;
   List<Child>? _children;
@@ -107,7 +120,23 @@ class _ParentAppState extends State<ParentApp> {
               ))
           .toList(),
     );
-    if (picked != null && mounted) setState(() => _selectedId = picked);
+    if (picked != null && mounted) _switchTo(picked);
+  }
+
+  /// Change which child every tab is about.
+  ///
+  /// Both ways in go through here - the header picker and the child rows on
+  /// the Profile tab - because the second one used to set the id alone and
+  /// leave the tabs showing the other sibling.
+  void _switchTo(String id) {
+    if (id == _selectedId) return;
+    setState(() {
+      _selectedId = id;
+      _navKeys = List.generate(4, (_) => GlobalKey<NavigatorState>());
+      // Back to the root of each tab. The pages pushed inside them belong to
+      // the child who was open a moment ago.
+      _tab = 0;
+    });
   }
 
   @override
@@ -203,7 +232,7 @@ class _ParentAppState extends State<ParentApp> {
                               navigatorKey: _navKeys[3],
                               child: ParentProfileTab(
                                 children: children,
-                                onOpenChild: (c) => setState(() => _selectedId = c.studentId),
+                                onOpenChild: (c) => _switchTo(c.studentId),
                               ),
                             ),
                           ],

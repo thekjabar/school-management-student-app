@@ -1292,16 +1292,34 @@ class ParentApi {
     required DateTime to,
     required String reason,
   }) async {
+    final why = reason.trim();
     await _api.post('/parent/leave-requests', {
       'studentId': studentId,
       'kind': kind,
       'fromDate': _dateOnly(from),
       'toDate': _dateOnly(to),
-      'reason': reason,
+      // Left out when blank, never sent empty. The sheet labels the reason
+      // optional and the DTO agrees - but it is @Length(2, 500) WHEN PRESENT,
+      // so an empty string was refused and a parent who simply had nothing to
+      // add could not report their child away at all.
+      'reason': ?(why.isEmpty ? null : why),
     });
   }
 
   Future<void> cancelLeave(String id) => _api.post('/parent/leave-requests/$id/cancel');
+
+  /// Say the notice has been read and understood.
+  ///
+  /// Some of these decide who may collect a child, which is why the server
+  /// takes the person from the token and offers no field to name somebody else.
+  /// The app had the button and never made the call: "Got it" closed the sheet
+  /// and nothing else, so a parent believed they had replied and the office's
+  /// list of who had not answered still had their name on it.
+  ///
+  /// Acknowledging twice is a success on the server, so a second tap after a
+  /// dropped connection is safe.
+  Future<void> acknowledgeAnnouncement(String id) =>
+      _api.post('/parent/announcements/$id/acknowledge', const <String, dynamic>{});
 
   // ---- Asking the office to correct your own details ----------------------
   //
@@ -1426,6 +1444,7 @@ class Announcement {
     required this.sentAt,
     required this.pinned,
     required this.requiresAcknowledgement,
+    this.acknowledgedAt,
     required this.authorName,
     required this.readAt,
   });
@@ -1438,6 +1457,12 @@ class Announcement {
   final DateTime? sentAt;
   final bool pinned;
   final bool requiresAcknowledgement;
+
+  /// When this parent said they had read it, if they have.
+  ///
+  /// The server has always sent it; nothing read it, so the Got it button had
+  /// no way to know whether it still had anything to do.
+  final DateTime? acknowledgedAt;
   final String authorName;
   final DateTime? readAt;
 
@@ -1450,6 +1475,9 @@ class Announcement {
         sentAt: j['sentAt'] == null ? null : DateTime.parse(j['sentAt'] as String).toLocal(),
         pinned: (j['pinned'] ?? false) as bool,
         requiresAcknowledgement: (j['requiresAcknowledgement'] ?? false) as bool,
+        acknowledgedAt: j['acknowledgedAt'] == null
+            ? null
+            : DateTime.parse(j['acknowledgedAt'] as String).toLocal(),
         authorName: (j['authorName'] ?? '') as String,
         readAt: j['readAt'] == null ? null : DateTime.parse(j['readAt'] as String).toLocal(),
       );

@@ -540,7 +540,25 @@ class _AnnouncementDialog extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
               child: Align(
                 alignment: AlignmentDirectional.centerEnd,
-                child: _GotIt(tint: tint, onTap: () => Navigator.of(context).pop()),
+                child: _GotIt(
+                  tint: tint,
+                  onTap: () async {
+                    // A notice that ASKS for an answer gets one. This used to
+                    // close the dialog and nothing else, so the parent believed
+                    // they had replied while the office list of who had not
+                    // answered still carried their name. A failure keeps the
+                    // dialog open rather than pretending.
+                    if (item.requiresAcknowledgement && item.acknowledgedAt == null) {
+                      try {
+                        await ParentApi.instance.acknowledgeAnnouncement(item.id);
+                      } catch (e) {
+                        if (context.mounted) showNote(context, errorText(e), bad: true);
+                        return;
+                      }
+                    }
+                    if (context.mounted) Navigator.of(context).pop(true);
+                  },
+                ),
               ),
             ),
           ],
