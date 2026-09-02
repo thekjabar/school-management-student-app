@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 
 import '../../api/crew_api.dart';
+import '../../api/directions.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/home_kit.dart';
@@ -103,10 +104,47 @@ class _RouteMapState extends State<RouteMap> {
   /// survives the reload that follows every arrive and depart.
   String? _touched;
 
+  /// The run drawn along the roads, once Mapbox has said where they go.
+  ///
+  /// Null until the first answer, and the straight line is drawn meanwhile —
+  /// the order of the stops is the thing the driver needs, and it should not
+  /// wait on a network round trip to appear.
+  List<LatLng>? _road;
+
+  /// The stops the shape in [_road] was fetched for, so a run whose stops
+  /// change — a skipped stop, a re-ordered route — asks again rather than
+  /// drawing the old shape through the new pins.
+  String? _roadFor;
+
   @override
   void dispose() {
     _map.dispose();
     super.dispose();
+  }
+
+  /// Ask for the driving line, once per distinct set of stops.
+  ///
+  /// Called from build because the stops arrive as a widget property and change
+  /// under it; guarded by [_roadFor] so a rebuild does not re-request. Failure
+  /// is silent by design — Directions hands back the straight line, which is
+  /// what was being drawn before any of this existed.
+  void _wantRoad(List<LatLng> points) {
+    final key = points
+        .map((p) => '${p.latitude.toStringAsFixed(5)},${p.longitude.toStringAsFixed(5)}')
+        .join(';');
+    if (_roadFor == key) return;
+    _roadFor = key;
+
+    final ready = Directions.cached(points);
+    if (ready != null) {
+      _road = ready;
+      return;
+    }
+    _road = null;
+    Directions.road(points).then((line) {
+      if (!mounted || _roadFor != key) return;
+      setState(() => _road = line);
+    });
   }
 
   @override
@@ -131,6 +169,7 @@ class _RouteMapState extends State<RouteMap> {
     }
 
     final points = [for (final p in pins) p.at];
+    _wantRoad(points);
 
     // Every stop at the same spot — one stop, or a route whose pins were all
     // typed the same. Fitting a camera to a zero-sized box divides by nothing,
@@ -333,15 +372,63 @@ class _RouteMapState extends State<RouteMap> {
 
   /// The line through the stops.
   ///
-  /// THIS IS THE ORDER, NOT THE ROAD. It joins stop 1 to stop 2 to stop 3 with
-  /// a straight line each time; the bus will follow streets that bend, and
-  /// where a stop in between has no position on file the line jumps straight
-  /// over it. Drawing the real road needs a routing service, and this product
-  /// does not have one — so nothing here pretends to be a route.
+  /// The line follows the roads, through Mapbox Directions, and falls back to
+  /// stop-to-stop when it cannot: offline, out of quota, or a stop pinned
+  /// somewhere no vehicle can reach. It used to be stop-to-stop always, which
+  /// drew the run through the Citadel and across blocks with no through road —
+  /// a picture of the ORDER presented as a picture of the route.
   ///
   /// The part already driven is green and the part still owed is the driver
   /// tint, which is the same reading as the stop list underneath.
   List<Polyline> _order(List<_Stop> pins) {
+    final width = widget.compact ? 3.5 : 5.0;
+    final casing = AppTheme.surface.withValues(alpha: 0.8);
+    final done = AppTheme.green.withValues(alpha: 0.75);
+    final owed = widget.tint.withValues(alpha: 0.9);
+
+    final road = _road;
+    if (road != null && road.length > 2) {
+      // The driving line, cut once at the last stop already visited so the part
+      // behind the bus reads the same here as it does in the list underneath.
+      //
+      // The cut is made at the point of the LINE nearest that stop rather than
+      // at the stop's own coordinate: a stop sits a few metres off the
+      // carriageway, and joining the two halves there would put a visible kink
+      // in the road.
+      final lastDone = pins.lastIndexWhere((p) => p.stop.done);
+      if (lastDone <= 0 || lastDone == pins.length - 1) {
+        return [
+          Polyline(
+            points: road,
+            strokeWidth: width,
+            color: lastDone == pins.length - 1 ? done : owed,
+            borderStrokeWidth: 2,
+            borderColor: casing,
+          ),
+        ];
+      }
+
+      final cut = Directions.nearestIndex(road, pins[lastDone].at);
+      return [
+        Polyline(
+          points: road.sublist(0, cut + 1),
+          strokeWidth: width,
+          color: done,
+          borderStrokeWidth: 2,
+          borderColor: casing,
+        ),
+        Polyline(
+          points: road.sublist(cut),
+          strokeWidth: width,
+          color: owed,
+          borderStrokeWidth: 2,
+          borderColor: casing,
+        ),
+      ];
+    }
+
+    // No road yet — the first paint, or Mapbox could not answer. Stop to stop,
+    // which is what this always drew.
     final out = <Polyline>[];
     for (var i = 0; i + 1 < pins.length; i++) {
       final a = pins[i];
@@ -349,14 +436,12 @@ class _RouteMapState extends State<RouteMap> {
       final behind = a.stop.done && b.stop.done;
       out.add(Polyline(
         points: [a.at, b.at],
-        strokeWidth: widget.compact ? 3.5 : 5,
-        color: behind
-            ? AppTheme.green.withValues(alpha: 0.75)
-            : widget.tint.withValues(alpha: 0.9),
+        strokeWidth: width,
+        color: behind ? done : owed,
         // A pale casing, so the line stays readable over a dark block of
         // buildings as well as over pale paper.
         borderStrokeWidth: 2,
-        borderColor: AppTheme.surface.withValues(alpha: 0.8),
+        borderColor: casing,
       ));
     }
     return out;
