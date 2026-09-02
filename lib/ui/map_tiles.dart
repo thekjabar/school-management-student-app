@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 
+import 'package:url_launcher/url_launcher.dart';
+
 import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
+import 'sheets.dart';
 
 /// The one place in this app that knows where map tiles come from.
 ///
@@ -126,15 +129,149 @@ class MapTiles {
         maxNativeZoom: 20,
       );
 
-  /// The credit line, which is not optional.
+  /// The credit line, which is not optional, and what it is owed to.
   ///
-  /// Mapbox's terms require both their name and OpenStreetMap's on the map:
-  /// Mapbox draws these tiles, and it draws them from OpenStreetMap's data.
+  /// Asked of Mapbox rather than assumed: the style light-v11 draws from the
+  /// source mapbox.mapbox-streets-v8, and that source's own metadata declares
   ///
-  /// It reads as one string rather than a widget because each screen has a
-  /// different free corner and already styles its own. What must not vary is
-  /// the text — three screens spent a day claiming to be a map they were not.
+  ///     © Mapbox © OpenStreetMap Improve this map
+  ///
+  /// OpenStreetMap is in there because the streets ARE OpenStreetMap's. Mapbox
+  /// is paid for rendering, hosting and delivery, not for the data underneath,
+  /// and OSM's licence — ODbL — makes the credit travel with the data wherever
+  /// it goes. Mapbox cannot waive it on OSM's behalf, so they pass it on.
+  ///
+  /// It used to sit on the map as a pill reading '© Mapbox © OpenStreetMap',
+  /// which was both intrusive and INCOMPLETE — the third element was missing.
+  /// It now lives behind the ⓘ, which Mapbox permits for a mobile app where
+  /// space is tight so long as it stays reachable. Off the map, and complete.
   static const credit = '© Mapbox © OpenStreetMap';
+  static const improve = 'Improve this map';
+
+  static const mapboxUrl = 'https://www.mapbox.com/about/maps/';
+  static const osmUrl = 'https://www.openstreetmap.org/copyright/';
+  static const improveUrl = 'https://www.mapbox.com/contribute/';
+}
+
+/// The ⓘ in the corner of every map, and the credit behind it.
+///
+/// A button rather than a line of text because the licence asks for the credit
+/// to be present and reachable, not for it to be painted across the picture.
+class MapAttribution extends StatelessWidget {
+  const MapAttribution({super.key, this.small = false});
+
+  /// Smaller still, for the map card on a home screen.
+  final bool small;
+
+  @override
+  Widget build(BuildContext context) {
+    final side = small ? 20.0 : 24.0;
+    return Semantics(
+      button: true,
+      label: t('map.credits'),
+      child: GestureDetector(
+        onTap: () => showAppSheet<void>(context, builder: (_) => const _CreditSheet()),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: side,
+          height: side,
+          decoration: BoxDecoration(
+            color: AppTheme.surface.withValues(alpha: 0.86),
+            shape: BoxShape.circle,
+            boxShadow: AppTheme.dark
+                ? null
+                : const [BoxShadow(color: Color(0x14101828), blurRadius: 6, offset: Offset(0, 2))],
+          ),
+          child: Icon(
+            Icons.info_outline_rounded,
+            size: small ? 12 : 14,
+            color: AppTheme.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CreditSheet extends StatelessWidget {
+  const _CreditSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 22),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 38,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: AppTheme.border,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          Text(
+            t('map.credits'),
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.text),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            t('map.creditsBody'),
+            style: TextStyle(fontSize: 13, height: 1.5, color: AppTheme.textMuted),
+          ),
+          const SizedBox(height: 14),
+          const _CreditLink(label: '© Mapbox', url: MapTiles.mapboxUrl),
+          const _CreditLink(label: '© OpenStreetMap', url: MapTiles.osmUrl),
+          _CreditLink(label: t('map.improve'), url: MapTiles.improveUrl),
+        ],
+      ),
+    );
+  }
+}
+
+class _CreditLink extends StatelessWidget {
+  const _CreditLink({required this.label, required this.url});
+
+  final String label;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () async {
+        // A credit that cannot be opened is still a credit; a crash is not.
+        try {
+          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        } catch (_) {
+          // No browser on the handset. Nothing useful to say, and nothing broken.
+        }
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 11),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppTheme.text),
+              ),
+            ),
+            Icon(Icons.open_in_new_rounded, size: 15, color: AppTheme.textFaint),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Says so when the tiles will not come.

@@ -565,23 +565,15 @@ class _MapCard extends StatelessWidget {
               // blank.
               const MapOffline(),
 
-              // Mapbox's licence requires the credit. It is not decoration and
-              // it does not come off.
+              // Mapbox's licence requires the credit, and it still carries it —
+              // behind the ⓘ, which is where Mapbox allows a mobile app to keep
+              // it. Off the picture, and complete: the pill that used to sit
+              // here named two of the three parties and left out the third.
               if (drawn)
                 PositionedDirectional(
                   end: 8,
                   bottom: 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface.withValues(alpha: 0.82),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    child: Text(
-                      MapTiles.credit,
-                      style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted),
-                    ),
-                  ),
+                  child: const MapAttribution(),
                 ),
             ],
           ),

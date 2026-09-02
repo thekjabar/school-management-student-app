@@ -766,22 +766,12 @@ class _Credit extends StatelessWidget {
 
   @override
   // The small one sits on the trailing side: on the home card the leading edge
-  // of the map is under a fade, and a credit nobody can read is not a credit.
+  // of the map is under a fade, and a credit nobody can reach is not a credit.
   Widget build(BuildContext context) => PositionedDirectional(
         start: small ? null : 8,
         end: small ? 5 : null,
         bottom: small ? 4 : 6,
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: small ? 4 : 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: AppTheme.surface.withValues(alpha: 0.82),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: Text(
-            MapTiles.credit,
-            style: TextStyle(fontSize: small ? 8 : 9.5, color: AppTheme.textMuted),
-          ),
-        ),
+        child: MapAttribution(small: small),
       );
 }
 
