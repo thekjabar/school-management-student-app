@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../i18n/strings.dart';
 import 'client.dart';
 import 'push.dart';
 
@@ -40,6 +41,7 @@ class Me {
     required this.phoneVerified,
     required this.memberships,
     required this.active,
+    this.locale,
   });
 
   final String id;
@@ -48,6 +50,12 @@ class Me {
   final bool phoneVerified;
   final List<Membership> memberships;
   final Membership active;
+
+  /// The language the SERVER will write this person's notifications in, as a
+  /// `Locale` name (CKB/KMR/AR/EN), or null on a payload from an older build.
+  /// Compared against the phone's own setting on start-up so a mismatch can be
+  /// corrected without a write on every launch.
+  final String? locale;
 
   String get role => active.role;
   String get schoolName => active.tenantName;
@@ -70,6 +78,7 @@ class Me {
       name: (person['name'] ?? '') as String,
       phone: (person['phoneE164'] ?? '') as String,
       phoneVerified: (person['phoneVerified'] ?? false) as bool,
+      locale: person['locale'] as String?,
       memberships: memberships,
       active: Membership(
         tenantId: active['tenantId'] as String,
@@ -178,6 +187,10 @@ class Session {
     // Also here, not only in signIn: a session restored from disk on a cold
     // start never passes through signIn, and would be subscribed to nothing.
     await Push.identify(_me!.id);
+    // Same reasoning for the language: a phone that was switched to English
+    // while signed in, or signed in long before this existed, would otherwise
+    // keep being sent Kurdish notifications. Writes nothing when they agree.
+    await syncLocale();
     return _me;
   }
 
@@ -197,6 +210,35 @@ class Session {
       // A payload written by an older build whose shape has since changed. Not
       // worth a crash on start-up — the server will supply a fresh one.
       return null;
+    }
+  }
+
+  /// Tell the server which language to write this person's notifications in.
+  ///
+  /// `X-Lang` on every request already decides the language of the ANSWERS, but
+  /// a push at 07:40 has no request to read a header from — the outbox renders
+  /// it from `Person.locale`. Nothing was ever writing that column, so a parent
+  /// who switched the app to English kept getting Kurdish bus messages.
+  ///
+  /// Safe to call when signed out: the server answers 401 and the caller
+  /// ignores it, because the language is on the phone regardless and
+  /// [syncLocale] runs again on the next sign-in.
+  Future<void> setLocale(Lang lang) async {
+    await _api.post('/auth/locale', {'locale': lang.serverCode});
+  }
+
+  /// Push the phone's language up if the account disagrees with it.
+  ///
+  /// Runs after sign-in. The phone is the authority: the choice was made on the
+  /// sign-in screen, in front of somebody who was reading it, and the column is
+  /// whatever the office happened to type when the family was enrolled.
+  Future<void> syncLocale() async {
+    if (_me?.locale == AppLocale.current.value.serverCode) return;
+    try {
+      await setLocale(AppLocale.current.value);
+    } on ApiException {
+      // Not worth failing a sign-in over. The next language tap, or the next
+      // sign-in, tries again.
     }
   }
 

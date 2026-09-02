@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -8,14 +10,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// second — the Region is bilingual and many families use it daily. English
 /// last, for staff and for anyone whose phone is set to it.
 enum Lang {
-  ckb('کوردی', 'ku', TextDirection.rtl),
-  ar('العربية', 'ar', TextDirection.rtl),
-  en('English', 'en', TextDirection.ltr);
+  ckb('کوردی', 'ku', 'CKB', TextDirection.rtl),
+  ar('العربية', 'ar', 'AR', TextDirection.rtl),
+  en('English', 'en', 'EN', TextDirection.ltr);
 
-  const Lang(this.label, this.code, this.direction);
+  const Lang(this.label, this.code, this.serverCode, this.direction);
 
   final String label;
+
+  /// The IETF tag, sent as `X-Lang` on every request and saved on the phone.
   final String code;
+
+  /// The name of the same language in the platform's `Locale` enum, which is
+  /// what `POST /auth/locale` stores and what every notification is rendered
+  /// from. Kept separate from [code] because the two vocabularies genuinely
+  /// differ — the tag for Sorani is `ku`, the column value is `CKB`.
+  final String serverCode;
+
   final TextDirection direction;
 
   static Lang fromCode(String? code) =>
@@ -92,10 +103,33 @@ class AppLocale {
     };
   }
 
+  /// Told about every change, so the account can be kept in step with the app.
+  ///
+  /// The language lives on the phone — it is chosen on the sign-in screen,
+  /// before there is an account to attach it to — but NOTIFICATIONS are written
+  /// from `Person.locale` on the server, because a push at 07:40 has no request
+  /// and no header to read. Without this hook the two drift apart on the very
+  /// first tap: the app turns English and the bus messages stay Kurdish.
+  ///
+  /// A callback rather than a direct call because this file is the bottom of
+  /// the stack — the API client imports it to put the language on every
+  /// request, so it cannot import the API client back. main() plugs the real
+  /// one in; tests leave it null.
+  static Future<void> Function(Lang lang)? onChanged;
+
   static Future<void> set(Lang lang) async {
+    if (current.value == lang) return;
     current.value = lang;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, lang.code);
+
+    // Deliberately not awaited, and its failure is swallowed. The choice is
+    // already saved on the phone; a dead network must not undo the tap that
+    // made it, and the next sign-in reconciles the account anyway.
+    final tell = onChanged;
+    if (tell != null) {
+      unawaited(tell(lang).catchError((Object _) {}));
+    }
   }
 }
 

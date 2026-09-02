@@ -47,6 +47,10 @@ Future<void> main() async {
   // app opens in English and redraws itself in Kurdish a moment later, which
   // looks like a fault.
   await AppLocale.restore();
+  // Every later change of language now also reaches the account, because that
+  // is what decides the language of the notifications. Registered here rather
+  // than inside the setting so that i18n stays at the bottom of the stack.
+  AppLocale.onChanged = Session.instance.setLocale;
   await AppThemeSetting.restore();
   // Started here, but deliberately not asked for permission here — see Push.
   // Failing to start push must not stop the app, so this never throws.
