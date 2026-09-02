@@ -274,6 +274,8 @@ class _TripScreenState extends State<TripScreen> {
                       _SweepCard(
                         sweep: data.sweep,
                         tripEnded: trip?.endedAt != null,
+                        stillOwed: trip?.status == 'SWEEP_PENDING' ||
+                            trip?.status == 'SWEEP_OVERDUE',
                         busy: _busy != null,
                         onConfirm: () => _act(
                           t('driver.sweepConfirmed'),
@@ -937,7 +939,21 @@ class _SweepCard extends StatelessWidget {
     required this.onConfirm,
     required this.tripEnded,
     required this.onChildFound,
+    required this.stillOwed,
   });
+
+  /// The server still wants a sweep for this run.
+  ///
+  /// Taken from the trip's own status — SWEEP_PENDING or SWEEP_OVERDUE — and it
+  /// is the authority, because `confirmedAt` on its own lies. A sweep filed
+  /// BEFORE the run ended does not satisfy the run: the server stamps a fresh
+  /// deadline at close and leaves the status pending. This screen showed both
+  /// answers at once — a red "this run has ended and the cabin sweep is not
+  /// confirmed" at the top, from the status, and a green "Cabin swept,
+  /// confirmed at 16:55" at the bottom, from confirmedAt, about a run that
+  /// ended eight hours after that. On the one control that exists to stop a
+  /// child being left in a locked bus, the reassuring half was the wrong one.
+  final bool stillOwed;
 
   /// Opened when the aisle was NOT empty. Deliberately a plain link under the
   /// big button rather than a second big button: the ordinary end to a sweep is
@@ -977,7 +993,8 @@ class _SweepCard extends StatelessWidget {
       );
     }
 
-    if (sweep.confirmedAt != null) {
+    // Confirmed, and the server agrees it counts.
+    if (sweep.confirmedAt != null && !stillOwed) {
       return Panel(
         color: AppTheme.greenSoft,
         child: Row(
