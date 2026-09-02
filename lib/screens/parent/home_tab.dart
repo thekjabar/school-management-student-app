@@ -46,12 +46,12 @@ class HomeTab extends StatelessWidget {
       tint: Role.parent.tint,
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
       load: () async {
-        // One pass, all at once. Six sequential round trips on a school
+        // One pass, all at once. Seven sequential round trips on a school
         // connection is the difference between a screen and a wait.
         final payload = await HomePayload.fetch(child.studentId);
         return _Home.from(payload);
       },
-      // The five blocks arrive in the order they are read, a step apart. It is
+      // The six blocks arrive in the order they are read, a step apart. It is
       // the page's own entrance and nothing more: it plays when the screen
       // appears — see the latch in motion.dart — not every time the Loader
       // refetches, or the screen would ripple at every poll.
@@ -197,8 +197,19 @@ class HomeTab extends StatelessWidget {
           ),
           const SizedBox(height: kCardGap),
 
+          // ---- What is coming ----------------------------------------------
+          //
+          // Straight under today's lessons, because "when is the maths exam" is
+          // asked in the same breath as "what has he got today" — and until the
+          // exams route was wired the app could not answer it anywhere.
+          Rise(
+            index: 3,
+            child: _ExamsCard(exams: home.exams, onSeeAll: () => onOpenTab(2)),
+          ),
+          const SizedBox(height: kCardGap),
+
           // ---- The child ---------------------------------------------------
-          Rise(index: 3, child: _ChildCard(child: child, home: home)),
+          Rise(index: 4, child: _ChildCard(child: child, home: home)),
           const SizedBox(height: kCardGap),
 
           // ---- Attendance, and what has happened ---------------------------
@@ -207,7 +218,7 @@ class HomeTab extends StatelessWidget {
           // "here is the summary" in one glance where two stacked full-width
           // ones read as two more sections to scroll past.
           Rise(
-            index: 4,
+            index: 5,
             child: IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -246,9 +257,10 @@ class _Home {
     required this.homework,
     required this.attitude,
     required this.announcements,
+    required this.exams,
   });
 
-  /// The same six answers, however they arrived — fetched here, or prefetched
+  /// The same seven answers, however they arrived — fetched here, or prefetched
   /// during the splash. The screen must not be able to tell the difference.
   factory _Home.from(HomePayload p) => _Home(
         transport: p.transport,
@@ -257,6 +269,7 @@ class _Home {
         homework: p.homework,
         attitude: p.attitude,
         announcements: p.announcements,
+        exams: p.exams,
       );
 
   final TransportInfo transport;
@@ -265,6 +278,7 @@ class _Home {
   final List<HomeworkItem> homework;
   final AttitudeSummary attitude;
   final List<Announcement> announcements;
+  final List<UpcomingExam> exams;
 
   /// Today's lessons, in the order they happen.
   List<Lesson> get today {
@@ -816,6 +830,188 @@ class _Tally extends StatelessWidget {
           style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: color),
         ),
       ],
+    );
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Exams ahead
+ * ------------------------------------------------------------------------- */
+
+/// The dates a family has to plan around.
+///
+/// Read-only, deliberately. There is no exam a guardian may open: the only
+/// detail route the school service has is permission-guarded and the guardian
+/// role carries no permissions at all, so a row that led anywhere would lead to
+/// a 403. Everything the school said about the exam is therefore ON the row.
+class _ExamsCard extends StatelessWidget {
+  const _ExamsCard({required this.exams, required this.onSeeAll});
+
+  final List<UpcomingExam> exams;
+
+  /// The calendar tab, which now carries every one of these on its own date.
+  /// The endpoint caps at fifty with no paging, so this is the only "more"
+  /// there is — and it goes to a screen that already exists.
+  final VoidCallback onSeeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // Cut again against LOCAL midnight. The server cuts at UTC midnight and
+    // Erbil is three hours ahead of it, so for the first three hours of the day
+    // yesterday's exam is still in the answer — and "yesterday" under a heading
+    // that says upcoming is worse than one row fewer.
+    final ahead = [
+      for (final e in exams)
+        if (!DateTime(e.date.year, e.date.month, e.date.day).isBefore(today)) e,
+    ];
+    final shown = ahead.take(3).toList();
+
+    return Card16(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionRow(
+            title: t('home.upcomingExams'),
+            actionLabel: shown.isEmpty ? null : t('home.viewAll'),
+            onAction: onSeeAll,
+          ),
+          // Empty is ORDINARY, not a failure. A child between classes has no
+          // class for an exam to hang on and the server answers with an empty
+          // list, so this stays quiet rather than showing something wrong.
+          if (shown.isEmpty)
+            _Quiet(text: t('home.noExams'))
+          else
+            for (var i = 0; i < shown.length; i++)
+              Padding(
+                padding: EdgeInsets.only(bottom: i == shown.length - 1 ? 0 : 10),
+                child: _ExamRow(
+                  exam: shown[i],
+                  days: DateTime(
+                    shown[i].date.year,
+                    shown[i].date.month,
+                    shown[i].date.day,
+                  ).difference(today).inDays,
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExamRow extends StatelessWidget {
+  const _ExamRow({required this.exam, required this.days});
+
+  final UpcomingExam exam;
+
+  /// Whole days from today. Never negative — the card filters those out.
+  final int days;
+
+  @override
+  Widget build(BuildContext context) {
+    // The subject's own colour, as the timetable and the calendar already use
+    // it, so a row is recognised before it is read.
+    final colour = parseHex(exam.colorHex, Role.parent.tint);
+    // Tomorrow is the one a family still has an evening to do something about.
+    final urgent = days <= 1;
+    final chip = urgent ? AppTheme.rose : Role.parent.tint;
+
+    final kindKey = exam.kindKey;
+    final under = [
+      if (exam.title != null) exam.subject,
+      if (kindKey != null) t(kindKey),
+    ].join('  •  ');
+
+    // One line, one flexible child: the day, then whatever else the school
+    // filled in. Any of the three can be missing and the line still reads.
+    final line = [
+      longDate(exam.date),
+      if (exam.startMinute != null) clock(exam.startMinute),
+      if (exam.room != null && exam.room!.isNotEmpty) '${t('tt.room')} ${exam.room}',
+      tn('exam.outOf', exam.maxScore.round()),
+    ].join('  •  ');
+
+    return Container(
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: AppTheme.canvas,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              IconChip(
+                icon: Icons.edit_calendar_rounded,
+                color: colour,
+                background: colour.withValues(alpha: AppTheme.dark ? 0.20 : 0.12),
+                size: 36,
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      // The server's title is nullable and there is no English
+                      // word to fall back on: the subject is what the school
+                      // would have called it anyway.
+                      exam.title ?? exam.subject,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                        color: AppTheme.text,
+                      ),
+                    ),
+                    if (under.isNotEmpty) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        under,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Tag(
+                days == 0
+                    ? t('exam.today')
+                    : days == 1
+                        ? t('exam.tomorrow')
+                        : tn('exam.inDays', days),
+                color: chip,
+                background: chip.withValues(alpha: AppTheme.dark ? 0.20 : 0.12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(Icons.calendar_today_rounded, size: 13, color: AppTheme.textFaint),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  line,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

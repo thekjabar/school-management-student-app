@@ -44,12 +44,14 @@ class _CalendarTabState extends State<CalendarTab> {
           ParentApi.instance.homework(widget.child.studentId),
           ParentApi.instance.results(widget.child.studentId),
           ParentApi.instance.announcements(),
+          ParentApi.instance.upcomingExams(widget.child.studentId),
         ]);
         return _Diary(
           week: r[0] as List<DayOfLessons>,
           homework: r[1] as List<HomeworkItem>,
-          exams: r[2] as List<ExamResultItem>,
+          results: r[2] as List<ExamResultItem>,
           notices: r[3] as List<Announcement>,
+          exams: r[4] as List<UpcomingExam>,
         );
       },
       builder: (context, diary) {
@@ -129,7 +131,14 @@ class _CalendarTabState extends State<CalendarTab> {
  * What is in the diary
  * ------------------------------------------------------------------------- */
 
-enum EventKind { lesson, assignment, exam, notice }
+/// What a dot on the grid can stand for.
+///
+/// [exam] is a date the school has SET and a family has to plan around;
+/// [result] is a mark published for an exam already sat. They shared a bucket
+/// until exams could be fetched at all, which meant a dot on the 14th could
+/// equally be "she sits maths" or "her maths mark is out", with nothing on the
+/// screen to tell a parent which.
+enum EventKind { lesson, assignment, exam, result, notice }
 
 class DiaryEvent {
   const DiaryEvent({
@@ -159,14 +168,18 @@ class DiaryEvent {
       switch (kind) {
         EventKind.lesson => AppTheme.violet,
         EventKind.assignment => AppTheme.blue,
-        EventKind.exam => AppTheme.amber,
+        // The one colour left over goes to the one entry a family has to act
+        // on. The marks keep the amber they have always had.
+        EventKind.exam => AppTheme.rose,
+        EventKind.result => AppTheme.amber,
         EventKind.notice => AppTheme.green,
       };
 
   IconData get icon => switch (kind) {
         EventKind.lesson => Icons.menu_book_rounded,
         EventKind.assignment => Icons.assignment_turned_in_outlined,
-        EventKind.exam => Icons.description_outlined,
+        EventKind.exam => Icons.edit_calendar_rounded,
+        EventKind.result => Icons.fact_check_outlined,
         EventKind.notice => Icons.campaign_outlined,
       };
 
@@ -174,6 +187,7 @@ class DiaryEvent {
         EventKind.lesson => t('cal.class'),
         EventKind.assignment => t('cal.assignment'),
         EventKind.exam => t('cal.exam'),
+        EventKind.result => t('cal.result'),
         EventKind.notice => t('cal.event'),
       };
 }
@@ -182,14 +196,21 @@ class _Diary {
   _Diary({
     required this.week,
     required this.homework,
-    required this.exams,
+    required this.results,
     required this.notices,
+    required this.exams,
   });
 
   final List<DayOfLessons> week;
   final List<HomeworkItem> homework;
-  final List<ExamResultItem> exams;
+
+  /// Marks the school has published — behind us.
+  final List<ExamResultItem> results;
   final List<Announcement> notices;
+
+  /// Exams the school has scheduled — ahead of us. A separate route, a separate
+  /// shape, and deliberately a separate list: see [EventKind].
+  final List<UpcomingExam> exams;
 
   static const _weekdays = {
     DateTime.monday: 'MONDAY',
@@ -237,12 +258,39 @@ class _Diary {
       ));
     }
 
+    // The server's "still to come" cut is UTC midnight and Erbil is three
+    // hours ahead of it, so for the first three hours of the day yesterday's
+    // exam is still in the answer. Nothing is filtered out here: an exam is
+    // drawn on its own date, which is where a reader goes looking for it, and
+    // yesterday's belongs on yesterday.
     for (final e in exams.where((e) => _same(e.date, day))) {
       events.add(DiaryEvent(
         kind: EventKind.exam,
-        title: e.examTitle,
-        subtitle: e.subject,
+        // Nullable on the server, and the translation overlay can only replace
+        // a title, never invent one. The subject is the truthful fallback.
+        title: e.title ?? e.subject,
+        subtitle: [
+          if (e.title != null) e.subject,
+          if (e.kindKey != null) t(e.kindKey!),
+          if (e.room != null && e.room!.isNotEmpty) '${t('tt.room')} ${e.room}',
+        ].join('  •  '),
         at: e.date,
+        startMinute: e.startMinute,
+        // Only when the school said both. start + a guess is a length no
+        // timetable agreed to.
+        endMinute: e.startMinute == null || e.durationMin == null
+            ? null
+            : e.startMinute! + e.durationMin!,
+        where: e.room,
+      ));
+    }
+
+    for (final r in results.where((r) => _same(r.date, day))) {
+      events.add(DiaryEvent(
+        kind: EventKind.result,
+        title: r.examTitle,
+        subtitle: r.subject,
+        at: r.date,
       ));
     }
 
@@ -269,7 +317,8 @@ class _Diary {
           switch (k) {
             EventKind.lesson => AppTheme.violet,
             EventKind.assignment => AppTheme.blue,
-            EventKind.exam => AppTheme.amber,
+            EventKind.exam => AppTheme.rose,
+            EventKind.result => AppTheme.amber,
             EventKind.notice => AppTheme.green,
           },
     ];
@@ -433,12 +482,18 @@ class _MonthCard extends StatelessWidget {
               color: AppTheme.canvas,
               borderRadius: BorderRadius.circular(11),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            // A Wrap, not a Row: five keys where there were four, and the
+            // longest word in the set is a different word in each language.
+            // A legend that overflows is worse than one on two lines.
+            child: Wrap(
+              alignment: WrapAlignment.spaceEvenly,
+              spacing: 10,
+              runSpacing: 6,
               children: [
                 _Key(colour: AppTheme.violet, label: t('cal.class')),
                 _Key(colour: AppTheme.blue, label: t('cal.assignment')),
-                _Key(colour: AppTheme.amber, label: t('cal.exam')),
+                _Key(colour: AppTheme.rose, label: t('cal.exam')),
+                _Key(colour: AppTheme.amber, label: t('cal.result')),
                 _Key(colour: AppTheme.green, label: t('cal.event')),
               ],
             ),
@@ -645,28 +700,36 @@ class _EventRow extends StatelessWidget {
   final DiaryEvent event;
   final Child child;
 
+  void _open(BuildContext context) {
+    final hw = event.homework;
+    if (hw != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => HomeworkDetail(item: hw, childName: child.name)),
+      );
+    } else if (event.kind == EventKind.lesson) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => TimetableScreen(child: child)),
+      );
+    } else if (event.kind == EventKind.assignment) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => AssignmentsScreen(child: child)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colour = event.tint;
 
+    // An exam, a mark and a notice lead nowhere. There is no exam a guardian
+    // may open — the only detail route is permission-guarded and the guardian
+    // role holds no permissions — so the row carries everything the school
+    // said, and does not offer a chevron it cannot honour.
+    final opens = event.kind == EventKind.lesson || event.kind == EventKind.assignment;
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () {
-        final hw = event.homework;
-        if (hw != null) {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => HomeworkDetail(item: hw, childName: child.name)),
-          );
-        } else if (event.kind == EventKind.lesson) {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => TimetableScreen(child: child)),
-          );
-        } else if (event.kind == EventKind.assignment) {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => AssignmentsScreen(child: child)),
-          );
-        }
-      },
+      onTap: opens ? () => _open(context) : null,
       child: Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: IntrinsicHeight(
@@ -674,7 +737,7 @@ class _EventRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // The coloured spine, which is what makes a day of six things
-              // read as four kinds at a glance.
+              // read as five kinds at a glance.
               Container(
                 width: 3.5,
                 decoration: BoxDecoration(
@@ -746,9 +809,10 @@ class _EventRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Center(child: StatusChip(event.label, color: colour)),
-              Center(
-                child: Icon(Icons.chevron_right_rounded, size: 18, color: AppTheme.textFaint),
-              ),
+              if (opens)
+                Center(
+                  child: Icon(Icons.chevron_right_rounded, size: 18, color: AppTheme.textFaint),
+                ),
             ],
           ),
         ),

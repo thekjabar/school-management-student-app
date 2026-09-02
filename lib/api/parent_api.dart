@@ -719,34 +719,474 @@ class ExamResultItem {
   }
 }
 
+/// One report card the school has published, as it appears in the list.
+///
+/// A DOCUMENT rather than a live view: the figures were frozen when the school
+/// generated it, and a correction arrives as a new [version] rather than as an
+/// edit to this one. Almost every figure on it is separately nullable, because
+/// a school prints what it prints — a card with a rank and no class size, or
+/// attendance and no GPA, is ordinary.
+class ReportCardSummary {
+  ReportCardSummary({
+    required this.id,
+    required this.version,
+    required this.termId,
+    required this.termName,
+    required this.wholeYear,
+    required this.academicYearName,
+    required this.className,
+    required this.subjectCount,
+    required this.overallScore,
+    required this.overallGrade,
+    required this.gpa,
+    required this.classRank,
+    required this.classSize,
+    required this.daysPresent,
+    required this.daysAbsent,
+    required this.daysLate,
+    required this.daysExcused,
+    required this.promoted,
+    required this.publishedAt,
+    required this.openedAt,
+    required this.hasPdf,
+  });
+
+  final String id;
+  final int version;
+
+  /// Null on the whole-year document. [wholeYear] says so outright.
+  final String? termId;
+  final String? termName;
+  final bool wholeYear;
+
+  final String academicYearName;
+
+  /// Nullable: a card need not name the class it was written for.
+  final String? className;
+  final int subjectCount;
+
+  final num? overallScore;
+
+  /// The word the school printed — 'B+', or a Kurdish word. Not translated,
+  /// not derived from [overallScore], and never rewritten here.
+  final String? overallGrade;
+  final num? gpa;
+  final int? classRank;
+  final int? classSize;
+  final int? daysPresent;
+  final int? daysAbsent;
+  final int? daysLate;
+  final int? daysExcused;
+
+  /// THREE states. null is 'the school printed no promotion decision', which
+  /// is not 'not promoted' and must never be shown as it.
+  final bool? promoted;
+
+  final DateTime publishedAt;
+
+  /// Null until this family first opens the card. It is the flag the office
+  /// checks before telephoning a family who says the report never arrived.
+  final DateTime? openedAt;
+
+  /// The school attached a rendered document. It is NOT a promise that anyone
+  /// can fetch it: there is no parent-facing route that serves a report-card
+  /// PDF, and the address on the detail can be null even when this is true.
+  final bool hasPdf;
+
+  factory ReportCardSummary.fromJson(Map<String, dynamic> j) {
+    final term = j['term'] as Map<String, dynamic>?;
+    final year = (j['academicYear'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
+    final klass = j['class'] as Map<String, dynamic>?;
+    return ReportCardSummary(
+      id: j['id'] as String,
+      version: (j['version'] as num?)?.toInt() ?? 1,
+      termId: term?['id'] as String?,
+      termName: term?['name'] as String?,
+      wholeYear: (j['wholeYear'] as bool?) ?? (term == null),
+      academicYearName: (year['name'] ?? '') as String,
+      className: klass?['name'] as String?,
+      subjectCount: (j['subjectCount'] as num?)?.toInt() ?? 0,
+      overallScore: j['overallScore'] as num?,
+      overallGrade: j['overallGrade'] as String?,
+      gpa: j['gpa'] as num?,
+      classRank: (j['classRank'] as num?)?.toInt(),
+      classSize: (j['classSize'] as num?)?.toInt(),
+      daysPresent: (j['daysPresent'] as num?)?.toInt(),
+      daysAbsent: (j['daysAbsent'] as num?)?.toInt(),
+      daysLate: (j['daysLate'] as num?)?.toInt(),
+      daysExcused: (j['daysExcused'] as num?)?.toInt(),
+      promoted: j['promoted'] as bool?,
+      publishedAt: DateTime.parse(j['publishedAt'] as String).toLocal(),
+      openedAt: j['openedAt'] == null
+          ? null
+          : DateTime.parse(j['openedAt'] as String).toLocal(),
+      hasPdf: (j['hasPdf'] ?? false) as bool,
+    );
+  }
+}
+
+/// One line of a report card: what the child got in one subject.
+class ReportCardLine {
+  ReportCardLine({
+    required this.id,
+    required this.subject,
+    required this.subjectId,
+    required this.colorHex,
+    required this.score,
+    required this.maxScore,
+    required this.percent,
+    required this.gradeLetter,
+    required this.gradePoint,
+    required this.isPass,
+    required this.classRank,
+    required this.teacherComment,
+  });
+
+  final String id;
+
+  /// Already in the reader's language, and on a card it is the label FROZEN
+  /// onto the line when the document was generated — which wins over the
+  /// subject's name today, so a subject renamed in March does not rewrite a
+  /// report a family printed in January. Never passed through t().
+  final String subject;
+  final String subjectId;
+  final String? colorHex;
+
+  /// null is 'no mark'; 0 is a mark of nothing. They are different answers.
+  final num? score;
+  final num maxScore;
+  final num? percent;
+  final String? gradeLetter;
+  final num? gradePoint;
+
+  /// THREE states, as on [ReportCardSummary.promoted].
+  final bool? isPass;
+  final int? classRank;
+  final String? teacherComment;
+
+  factory ReportCardLine.fromJson(Map<String, dynamic> j) => ReportCardLine(
+        id: j['id'] as String,
+        subject: _subjectOf(j),
+        subjectId: (j['subjectId'] ?? '') as String,
+        colorHex: _colorOf(j),
+        score: j['score'] as num?,
+        maxScore: (j['maxScore'] as num?) ?? 100,
+        percent: j['percent'] as num?,
+        gradeLetter: j['gradeLetter'] as String?,
+        gradePoint: j['gradePoint'] as num?,
+        isPass: j['isPass'] as bool?,
+        classRank: (j['classRank'] as num?)?.toInt(),
+        teacherComment: j['teacherComment'] as String?,
+      );
+}
+
+/// One report card with every subject line on it.
+///
+/// Not an upgraded [ReportCardSummary] — the two shapes are different answers.
+/// The list has a subject count and no lines; this has the lines, the two
+/// written comments, and an opened-at that is never null, because asking for
+/// this is what sets it.
+class ReportCardDetail {
+  ReportCardDetail({
+    required this.id,
+    required this.version,
+    required this.termId,
+    required this.termName,
+    required this.wholeYear,
+    required this.academicYearName,
+    required this.className,
+    required this.overallScore,
+    required this.overallGrade,
+    required this.gpa,
+    required this.classRank,
+    required this.classSize,
+    required this.daysPresent,
+    required this.daysAbsent,
+    required this.daysLate,
+    required this.daysExcused,
+    required this.promoted,
+    required this.homeroomComment,
+    required this.principalComment,
+    required this.publishedAt,
+    required this.openedAt,
+    required this.pdfUrl,
+    required this.lines,
+  });
+
+  final String id;
+  final int version;
+  final String? termId;
+  final String? termName;
+  final bool wholeYear;
+  final String academicYearName;
+  final String? className;
+  final num? overallScore;
+  final String? overallGrade;
+  final num? gpa;
+  final int? classRank;
+  final int? classSize;
+  final int? daysPresent;
+  final int? daysAbsent;
+  final int? daysLate;
+  final int? daysExcused;
+  final bool? promoted;
+
+  /// Written by the class teacher and by the principal, in whatever language
+  /// they typed. School text: shown verbatim.
+  final String? homeroomComment;
+  final String? principalComment;
+
+  final DateTime publishedAt;
+
+  /// Never null here: the server answers with the moment it stamped.
+  final DateTime openedAt;
+
+  /// The object-store address of the rendered document, when there is one.
+  /// Nothing in the app fetches it: no parent-facing route serves a report-card
+  /// PDF, and the asset's own schema says the document must not be publicly
+  /// fetchable. Carried so the shape matches the server, not so it can be
+  /// opened.
+  final String? pdfUrl;
+
+  final List<ReportCardLine> lines;
+
+  factory ReportCardDetail.fromJson(Map<String, dynamic> j) {
+    final term = j['term'] as Map<String, dynamic>?;
+    final year = (j['academicYear'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
+    final klass = j['class'] as Map<String, dynamic>?;
+    return ReportCardDetail(
+      id: j['id'] as String,
+      version: (j['version'] as num?)?.toInt() ?? 1,
+      termId: term?['id'] as String?,
+      termName: term?['name'] as String?,
+      wholeYear: (j['wholeYear'] as bool?) ?? (term == null),
+      academicYearName: (year['name'] ?? '') as String,
+      className: klass?['name'] as String?,
+      overallScore: j['overallScore'] as num?,
+      overallGrade: j['overallGrade'] as String?,
+      gpa: j['gpa'] as num?,
+      classRank: (j['classRank'] as num?)?.toInt(),
+      classSize: (j['classSize'] as num?)?.toInt(),
+      daysPresent: (j['daysPresent'] as num?)?.toInt(),
+      daysAbsent: (j['daysAbsent'] as num?)?.toInt(),
+      daysLate: (j['daysLate'] as num?)?.toInt(),
+      daysExcused: (j['daysExcused'] as num?)?.toInt(),
+      promoted: j['promoted'] as bool?,
+      homeroomComment: j['homeroomComment'] as String?,
+      principalComment: j['principalComment'] as String?,
+      publishedAt: DateTime.parse(j['publishedAt'] as String).toLocal(),
+      openedAt: DateTime.parse(j['openedAt'] as String).toLocal(),
+      pdfUrl: j['pdfUrl'] as String?,
+      lines: ((j['lines'] as List?) ?? [])
+          .map((e) => ReportCardLine.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+/// The grade the school released for one subject in one term.
+class TermSubjectGrade {
+  TermSubjectGrade({
+    required this.id,
+    required this.subject,
+    required this.subjectId,
+    required this.colorHex,
+    required this.score,
+    required this.maxScore,
+    required this.percent,
+    required this.gradeLetter,
+    required this.gradePoint,
+    required this.isPass,
+    required this.classRank,
+    required this.teacherComment,
+    required this.publishedAt,
+  });
+
+  final String id;
+
+  /// Translated by the server, in the language the request asked for.
+  final String subject;
+  final String subjectId;
+  final String? colorHex;
+  final num? score;
+  final num maxScore;
+  final num? percent;
+  final String? gradeLetter;
+  final num? gradePoint;
+  final bool? isPass;
+  final int? classRank;
+  final String? teacherComment;
+  final DateTime publishedAt;
+
+  factory TermSubjectGrade.fromJson(Map<String, dynamic> j) => TermSubjectGrade(
+        id: j['id'] as String,
+        subject: _subjectOf(j),
+        subjectId: (j['subjectId'] ?? '') as String,
+        colorHex: _colorOf(j),
+        score: j['score'] as num?,
+        maxScore: (j['maxScore'] as num?) ?? 100,
+        percent: j['percent'] as num?,
+        gradeLetter: j['gradeLetter'] as String?,
+        gradePoint: j['gradePoint'] as num?,
+        isPass: j['isPass'] as bool?,
+        classRank: (j['classRank'] as num?)?.toInt(),
+        teacherComment: j['teacherComment'] as String?,
+        publishedAt: DateTime.parse(j['publishedAt'] as String).toLocal(),
+      );
+}
+
+/// One term of released grades, grouped by the server.
+///
+/// The grouping is not the app's: 'her second term' is the unit a family
+/// thinks in, and forty subject rows across three terms is a list nobody
+/// reads. The counts and the average come with it, so nothing here has to be
+/// worked out from the subjects — and must not be. Subjects appear as the
+/// school releases them, so four of nine is a correct answer and the five that
+/// are absent are not failures.
+class TermGradeGroup {
+  TermGradeGroup({
+    required this.termId,
+    required this.termName,
+    required this.sequence,
+    required this.startsOn,
+    required this.endsOn,
+    required this.academicYearName,
+    required this.className,
+    required this.subjectCount,
+    required this.subjectsPassed,
+    required this.subjectsFailed,
+    required this.averagePercent,
+    required this.subjects,
+  });
+
+  final String termId;
+  final String termName;
+  final int sequence;
+
+  /// Plain calendar days, kept in UTC on purpose. These are date columns and
+  /// arrive as UTC midnight; moving them to the phone's zone would slide the
+  /// first and last day of a term across a date boundary west of Greenwich.
+  final DateTime startsOn;
+  final DateTime endsOn;
+
+  final String academicYearName;
+  final String className;
+  final int subjectCount;
+
+  /// Passed plus failed need NOT be [subjectCount]: a subject the school left
+  /// unjudged is in neither.
+  final int subjectsPassed;
+  final int subjectsFailed;
+
+  /// The school's own mean of the released percentages. Null when no subject
+  /// in the term carries one.
+  final num? averagePercent;
+
+  final List<TermSubjectGrade> subjects;
+
+  factory TermGradeGroup.fromJson(Map<String, dynamic> j) {
+    final term = (j['term'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
+    final year = (j['academicYear'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
+    final klass = (j['class'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
+    return TermGradeGroup(
+      termId: (term['id'] ?? '') as String,
+      termName: (term['name'] ?? '') as String,
+      sequence: (term['sequence'] as num?)?.toInt() ?? 0,
+      startsOn: DateTime.parse(term['startsOn'] as String),
+      endsOn: DateTime.parse(term['endsOn'] as String),
+      academicYearName: (year['name'] ?? '') as String,
+      className: (klass['name'] ?? '') as String,
+      subjectCount: (j['subjectCount'] as num?)?.toInt() ?? 0,
+      subjectsPassed: (j['subjectsPassed'] as num?)?.toInt() ?? 0,
+      subjectsFailed: (j['subjectsFailed'] as num?)?.toInt() ?? 0,
+      averagePercent: j['averagePercent'] as num?,
+      subjects: ((j['subjects'] as List?) ?? [])
+          .map((e) => TermSubjectGrade.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+/// One exam the school has already put in the diary for the child's class.
+///
+/// The opposite end of [ExamResultItem]: this is a date still to come, that is
+/// a mark already published for one already sat. The two arrive from different
+/// routes and mean different things to a family, and nothing here merges them.
+///
+/// It belongs to the CLASS rather than to the child, so every subject the class
+/// is scheduled to sit comes back — including any this child does not.
 class UpcomingExam {
   UpcomingExam({
     required this.id,
+    required this.kind,
     required this.title,
     required this.subject,
     required this.colorHex,
     required this.date,
     required this.startMinute,
+    required this.durationMin,
     required this.room,
+    required this.maxScore,
   });
 
   final String id;
-  final String title;
+
+  /// QUIZ, MONTHLY, MIDTERM, FINAL, NATIONAL, PRACTICAL, ORAL or MAKEUP.
+  final String kind;
+
+  /// Genuinely absent on plenty of rows: the column is nullable and the
+  /// translation overlay can only REPLACE a title, never invent one.
+  ///
+  /// It used to be defaulted to the English word 'Test', which put an
+  /// untranslated string on a Kurdish screen every time a teacher scheduled an
+  /// exam without naming it. A screen falls back to [subject] instead, which is
+  /// what the school would have called it anyway.
+  final String? title;
+
+  /// Flat and already in the reader's language on this route.
   final String subject;
   final String? colorHex;
+
+  /// The day of the exam. The server sends a plain date at UTC midnight, so
+  /// only the day part means anything.
   final DateTime date;
+
   final int? startMinute;
+  final int? durationMin;
   final String? room;
+  final num maxScore;
+
+  /// The kind of exam as an i18n key, so the screen says it in the parent's
+  /// language rather than in the API's vocabulary.
+  ///
+  /// Null for a kind this build has no word for. A ninth kind added to the
+  /// server later must not reach a phone as a raw MAKEUP-shaped enum; the row
+  /// simply says less.
+  String? get kindKey => _kinds.contains(kind) ? 'exam.kind.$kind' : null;
+
+  static const _kinds = {
+    'QUIZ',
+    'MONTHLY',
+    'MIDTERM',
+    'FINAL',
+    'NATIONAL',
+    'PRACTICAL',
+    'ORAL',
+    'MAKEUP',
+  };
 
   factory UpcomingExam.fromJson(Map<String, dynamic> j) {
     return UpcomingExam(
       id: j['id'] as String,
-      title: (j['title'] ?? 'Test') as String,
+      kind: (j['kind'] ?? '') as String,
+      title: j['title'] as String?,
       subject: _subjectOf(j),
       colorHex: _colorOf(j),
       date: DateTime.parse(j['date'] as String).toLocal(),
       startMinute: (j['startMinute'] as num?)?.toInt(),
+      durationMin: (j['durationMin'] as num?)?.toInt(),
       room: j['room'] as String?,
+      maxScore: (j['maxScore'] as num?) ?? 100,
     );
   }
 }
@@ -1221,6 +1661,16 @@ class ParentApi {
     return Paged.from<HomeworkItem>(json, HomeworkItem.fromJson).rows;
   }
 
+  /// The exams already scheduled for the child's class, soonest first.
+  ///
+  /// No query string, because the endpoint declares none: no page size, no date
+  /// window, no way to ask for a fifty-first row. Whatever the school has put in
+  /// the diary arrives capped at fifty, and there is no "show more" a screen
+  /// could honestly offer.
+  ///
+  /// Draft exams never appear, and a cancelled one stops appearing rather than
+  /// arriving flagged — so an exam a family saw yesterday can simply be gone,
+  /// with nothing for the app to hang an explanation on.
   Future<List<UpcomingExam>> upcomingExams(String studentId) async {
     final json = await _api.get('/parent/children/$studentId/exams');
     if (json is List) {
@@ -1235,6 +1685,61 @@ class ParentApi {
       return json.map((e) => ExamResultItem.fromJson(e as Map<String, dynamic>)).toList();
     }
     return Paged.from<ExamResultItem>(json, ExamResultItem.fromJson).rows;
+  }
+
+  /// The report cards the school has actually published for this child.
+  ///
+  /// Published ones only. A card the office is withholding, one that a newer
+  /// version has replaced, and one that was never generated all arrive the same
+  /// way — absent — so nothing above this may say the school produced none.
+  ///
+  /// No paging: the server takes forty and reads no page parameter. Forty
+  /// published cards is most of a childhood.
+  Future<List<ReportCardSummary>> reportCards(String studentId) async {
+    final json = await _api.get('/parent/children/$studentId/report-cards');
+    return (json as List)
+        .map((e) => ReportCardSummary.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// One card, with every subject line on it.
+  ///
+  /// Calling this IS the receipt. The server stamps the moment the family first
+  /// opened the card as a side effect of answering, once and never again, and
+  /// there is no acknowledgement to send afterwards. So it is called when a
+  /// parent opens a card and at no other time: filling a list from it, or
+  /// fetching a card ahead of a tap, would sign for a report nobody read.
+  ///
+  /// Retrying is safe — the stamp is written only while it is still empty, so a
+  /// second read cannot move the date the office quotes back to a family.
+  ///
+  /// 404 'That report card is not available.' answers every reason at once: no
+  /// such card, another child's, withheld, superseded, unpublished. The caller
+  /// must not guess which.
+  Future<ReportCardDetail> reportCard(String studentId, String id) async {
+    final json = await _api.get('/parent/children/$studentId/report-cards/$id')
+        as Map<String, dynamic>;
+    return ReportCardDetail.fromJson(json);
+  }
+
+  /// The term grades the school has released, grouped by term.
+  ///
+  /// The row the school stands behind: it survives a re-mark and carries the
+  /// weighting that produced it, which is what makes it worth showing instead
+  /// of an average of exam marks worked out on the phone.
+  ///
+  /// [termId] filters server-side. It is worth knowing that a term id the
+  /// server does not recognise is not an error there — it answers with an empty
+  /// list — and that nothing in the API lists a family's terms, so a screen
+  /// offering a term picker has to build it from the terms in an unfiltered
+  /// answer. An empty string is dropped rather than sent, since the server
+  /// would read it as no filter at all.
+  Future<List<TermGradeGroup>> termGrades(String studentId, {String? termId}) async {
+    final filter = (termId == null || termId.isEmpty) ? '' : '?termId=$termId';
+    final json = await _api.get('/parent/children/$studentId/term-grades$filter');
+    return (json as List)
+        .map((e) => TermGradeGroup.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
 /// What the school has published about this child's conduct.
@@ -1429,6 +1934,140 @@ class ParentApi {
     return FeeSummary.fromJson(json);
   }
 
+  /// What this school will accept as a payment notice, and where to send the
+  /// money. Asked BEFORE any form is drawn, because a school that has switched
+  /// self-declaration off should be shown its own bank details and a telephone
+  /// number, not a send button.
+  ///
+  /// Null means this platform does not answer the parent money routes at all.
+  /// The gateway forwards `/parent/fees` to the money service by name and
+  /// sends everything else under `/parent/` to the students service, which has
+  /// no such handler and answers 404 — so `/parent/payments`, `/parent/receipts`
+  /// and `/parent/invoices` are unreachable until three lines are added to it.
+  /// Rather than let a parent meet three tabs of dead controls, the screen asks
+  /// this one question first and draws only what the platform in front of it
+  /// can actually answer. The day the gateway learns those paths, the rest of
+  /// the screen appears without an app release.
+  Future<PaymentOptions?> paymentOptions() async {
+    try {
+      final json = await _api.get('/parent/payments/options') as Map<String, dynamic>;
+      return PaymentOptions.fromJson(json);
+    } on ApiException catch (e) {
+      // Only a 404 means "nothing here". A 403, a 502 or a timeout is a real
+      // answer about a route that exists, and belongs on screen as one.
+      if (e.status == 404) return null;
+      rethrow;
+    }
+  }
+
+  /// Every payment recorded against this household — the ones the office
+  /// entered as well as the ones the family declared.
+  ///
+  /// Deliberately unfiltered. The route understands only `pending` and
+  /// `confirmed`; any other value is ignored and the whole list comes back
+  /// anyway, so a "Rejected" filter sent to the server would look as though it
+  /// had worked and quietly show everything. Whatever the screen narrows, it
+  /// narrows here on the phone.
+  ///
+  /// Fifty is the server's ceiling, not a preference: asking for a hundred
+  /// silently yields fifty, so the count is asked for honestly and the screen
+  /// says when there is more than it is showing.
+  Future<Paged<DeclaredPayment>> payments({int pageSize = 50}) async {
+    final json = await _api.get('/parent/payments?pageSize=$pageSize');
+    return Paged.from<DeclaredPayment>(json, DeclaredPayment.fromJson);
+  }
+
+  /// The family's own receipts.
+  ///
+  /// Cancelled ones are left out by the server, which is what makes every row
+  /// here openable. The stubs hanging off a payment are not filtered that way,
+  /// so those are checked one by one instead.
+  Future<Paged<PaymentReceipt>> receipts({int pageSize = 50}) async {
+    final json = await _api.get('/parent/receipts?pageSize=$pageSize');
+    return Paged.from<PaymentReceipt>(json, PaymentReceipt.fromJson);
+  }
+
+  /// A link to the receipt as the office would print it.
+  ///
+  /// The first open renders the PDF and stores it, so it can be slow; the link
+  /// it answers with lives ten minutes, so it is fetched on every open and
+  /// never kept.
+  Future<StoredDocument> receiptPdf(String receiptId) async {
+    final json = await _api.get('/parent/receipts/$receiptId/pdf') as Map<String, dynamic>;
+    return StoredDocument.fromJson(json);
+  }
+
+  /// The same for a bill. A draft has never been issued and has no PDF, so the
+  /// screen does not offer this on one.
+  Future<StoredDocument> invoicePdf(String invoiceId) async {
+    final json = await _api.get('/parent/invoices/$invoiceId/pdf') as Map<String, dynamic>;
+    return StoredDocument.fromJson(json);
+  }
+
+  /// Tell the school a payment has been made.
+  ///
+  /// A notice, not a payment. It lands awaiting confirmation and moves no
+  /// balance until somebody at the office says so — which is the whole point:
+  /// an unverified screenshot must not settle a bill, and a family that cannot
+  /// see what it has already told the school pays twice.
+  ///
+  /// Exactly one of [invoiceId] and [studentId] is sent, and one of them always
+  /// is. A guardian whose children are in two households — after a separation,
+  /// or a remarriage — is refused outright when neither is named, because the
+  /// office cannot tell which household the money is for either. Sending both
+  /// risks the server's "that bill belongs to a different household".
+  ///
+  /// [idempotencyKey] is made once when the form opens rather than once per
+  /// tap: that is what turns a second tap on a bad connection into a replay
+  /// instead of a second claim the office has to unpick. A 409 means two
+  /// identical claims raced each other past the server's own replay lookup —
+  /// the same good outcome through a different door, so it is not an error.
+  Future<void> declarePayment({
+    required int amountIqd,
+    required String method,
+    required String idempotencyKey,
+    String? invoiceId,
+    String? studentId,
+    DateTime? paidAt,
+    String? reference,
+    String? notes,
+  }) async {
+    final ref = reference?.trim() ?? '';
+    final note = notes?.trim() ?? '';
+    try {
+      await _api.post('/parent/payments', {
+        'amountIqd': amountIqd,
+        'method': method,
+        'idempotencyKey': idempotencyKey,
+        // An empty string fails every one of these validators, so a field the
+        // parent did not fill in is left out of the body rather than sent
+        // blank. The server has its own defaults for all of them.
+        if (invoiceId != null && invoiceId.isNotEmpty) 'invoiceId': invoiceId,
+        if (studentId != null && studentId.isNotEmpty) 'studentId': studentId,
+        if (paidAt != null) 'paidAt': paidAt.toUtc().toIso8601String(),
+        if (ref.isNotEmpty) 'reference': ref,
+        // Two characters is the server's floor for a note; one is refused.
+        if (note.length >= 2) 'notes': note,
+      });
+    } on ApiException catch (e) {
+      if (e.status == 409) return;
+      rethrow;
+    }
+  }
+
+  /// Take a declared payment back.
+  ///
+  /// Offered only while the payment is still awaiting confirmation: once the
+  /// office has dealt with it the server refuses, and a control that cannot
+  /// succeed should not be on screen.
+  ///
+  /// No reason is sent. The route takes an optional one of three characters or
+  /// more, and a confirmation dialog is not a place to type; the office sees
+  /// who withdrew it either way.
+  Future<void> withdrawPayment(String paymentId) async {
+    await _api.post('/parent/payments/$paymentId/withdraw');
+  }
+
   String _dateOnly(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 }
@@ -1569,6 +2208,237 @@ class FeeSummary {
       );
 }
 
+
+
+/// A person's name as the money service sends it, or null when there is none.
+String? _twoPartName(Map<String, dynamic>? j) {
+  if (j == null) return null;
+  final name = '${j['nameGiven'] ?? ''} ${j['nameFamily'] ?? ''}'.trim();
+  return name.isEmpty ? null : name;
+}
+
+/// What this school will take, and how it wants to be told about it.
+class PaymentOptions {
+  PaymentOptions({
+    required this.allowSelfDeclare,
+    required this.requireProofForTransfer,
+    required this.methods,
+    required this.currencyCode,
+    required this.instructions,
+  });
+
+  /// Whether this school takes payment notices through the app at all. Off, and
+  /// there is no form — only [instructions].
+  final bool allowSelfDeclare;
+
+  /// Whether a bank transfer must carry a photograph of the slip.
+  ///
+  /// There is no parent upload route anywhere on the platform, so while this is
+  /// true a bank transfer declared from a phone is refused every time and the
+  /// form does not offer it. Kept as a field rather than buried in the screen
+  /// because this is the flag that turns it back on the day an upload route
+  /// exists.
+  final bool requireProofForTransfer;
+
+  /// The methods the server will accept. Read from here rather than written out
+  /// in the app: CARD is a real payment method in the schema and is deliberately
+  /// not one a parent may claim, and that list is the server's to change.
+  final List<String> methods;
+
+  final String currencyCode;
+
+  /// The school's own words — which bank, which account, who to ring.
+  final String? instructions;
+
+  /// The methods a parent can actually get accepted from this app today.
+  List<String> get usableMethods => [
+        for (final m in methods)
+          if (!(m == 'BANK_TRANSFER' && requireProofForTransfer)) m,
+      ];
+
+  factory PaymentOptions.fromJson(Map<String, dynamic> j) {
+    final written = (j['paymentInstructions'] as String?)?.trim() ?? '';
+    return PaymentOptions(
+      allowSelfDeclare: (j['allowParentSelfDeclare'] ?? false) as bool,
+      // The server's own default, repeated here so a field missing from an
+      // older deployment errs towards refusing the transfer form rather than
+      // towards showing one that always fails.
+      requireProofForTransfer: (j['requireProofForTransfer'] ?? true) as bool,
+      methods: ((j['methods'] as List?) ?? const []).map((e) => '$e').toList(),
+      currencyCode: (j['currencyCode'] ?? 'IQD') as String,
+      instructions: written.isEmpty ? null : written,
+    );
+  }
+}
+
+/// A receipt, in the two shapes the platform sends it.
+///
+/// The list route sends the whole thing — serial, amount, method, the bill and
+/// the child it names — and never sends a cancelled one. The stub hanging off a
+/// payment carries only enough to open it, plus the one field the list cannot
+/// have: [voidedAt]. A cancelled receipt has no PDF to open, so the control is
+/// drawn from [open] rather than from an id being present.
+class PaymentReceipt {
+  PaymentReceipt({
+    required this.id,
+    required this.serial,
+    required this.amountIqd,
+    required this.currencyCode,
+    required this.method,
+    required this.issuedAt,
+    required this.voidedAt,
+    required this.invoiceSerial,
+    required this.studentName,
+  });
+
+  final String id;
+  final String serial;
+  final int amountIqd;
+  final String currencyCode;
+  final String method;
+  final DateTime? issuedAt;
+  final DateTime? voidedAt;
+  final String? invoiceSerial;
+  final String? studentName;
+
+  bool get open => voidedAt == null;
+
+  factory PaymentReceipt.fromJson(Map<String, dynamic> j) => PaymentReceipt(
+        id: j['id'] as String,
+        serial: (j['serial'] ?? '') as String,
+        amountIqd: (j['amountIqd'] as num?)?.toInt() ?? 0,
+        currencyCode: (j['currencyCode'] ?? 'IQD') as String,
+        method: (j['method'] ?? '') as String,
+        issuedAt: DateTime.tryParse((j['issuedAt'] ?? '') as String)?.toLocal(),
+        voidedAt: DateTime.tryParse((j['voidedAt'] ?? '') as String)?.toLocal(),
+        invoiceSerial: (j['invoice'] as Map<String, dynamic>?)?['serial'] as String?,
+        studentName: _twoPartName(j['student'] as Map<String, dynamic>?),
+      );
+}
+
+/// One payment against this household, and what the office made of it.
+class DeclaredPayment {
+  DeclaredPayment({
+    required this.id,
+    required this.amountIqd,
+    required this.currencyCode,
+    required this.method,
+    required this.status,
+    required this.paidAt,
+    required this.receivedAt,
+    required this.createdAt,
+    required this.reference,
+    required this.rejectedReason,
+    required this.invoiceId,
+    required this.invoiceSerial,
+    required this.studentName,
+    required this.receipts,
+  });
+
+  final String id;
+  final int amountIqd;
+  final String currencyCode;
+  final String method;
+
+  /// PENDING_CONFIRMATION, CONFIRMED, REJECTED, REVERSED, FAILED or WITHDRAWN.
+  final String status;
+
+  final DateTime? paidAt;
+  final DateTime? receivedAt;
+  final DateTime createdAt;
+  final String? reference;
+  final String? rejectedReason;
+  final String? invoiceId;
+  final String? invoiceSerial;
+  final String? studentName;
+  final List<PaymentReceipt> receipts;
+
+  bool get awaiting => status == 'PENDING_CONFIRMATION';
+  bool get confirmed => status == 'CONFIRMED';
+
+  /// What the withdraw route writes in front of the family's own reason.
+  static const _withdrawnMark = 'Withdrawn by the family';
+
+  /// The family took this back themselves.
+  ///
+  /// The schema has a WITHDRAWN state and the withdraw route does not use it —
+  /// it writes REJECTED with this marker on the reason. Printing the raw status
+  /// would tell a parent the school had refused a payment they cancelled
+  /// themselves, so the marker, not the status, is what the screen branches on.
+  bool get withdrawnByFamily =>
+      status == 'REJECTED' && (rejectedReason ?? '').startsWith(_withdrawnMark);
+
+  /// Why it was refused, in the office's words — with the withdraw marker taken
+  /// off, because the screen already says who cancelled it.
+  String? get refusal {
+    final reason = rejectedReason?.trim() ?? '';
+    if (reason.isEmpty) return null;
+    if (!withdrawnByFamily) return reason;
+    var rest = reason.substring(_withdrawnMark.length).trim();
+    if (rest.startsWith(':')) rest = rest.substring(1).trim();
+    return rest.isEmpty ? null : rest;
+  }
+
+  /// When the money moved, as far as anybody knows.
+  ///
+  /// Both of the server's dates are nullable and an office-entered row often
+  /// carries neither, so this falls back to when the row was written rather
+  /// than printing a dash where a date belongs.
+  DateTime get when => paidAt ?? receivedAt ?? createdAt;
+
+  /// The receipt worth offering, if there is one.
+  ///
+  /// Cancelled ones are skipped: the PDF route refuses them, and nothing that
+  /// is not yet confirmed has a receipt at all.
+  PaymentReceipt? get receipt {
+    for (final r in receipts) {
+      if (r.open) return r;
+    }
+    return null;
+  }
+
+  factory DeclaredPayment.fromJson(Map<String, dynamic> j) {
+    final invoice = j['invoice'] as Map<String, dynamic>?;
+    return DeclaredPayment(
+      id: j['id'] as String,
+      amountIqd: (j['amountIqd'] as num?)?.toInt() ?? 0,
+      currencyCode: (j['currencyCode'] ?? 'IQD') as String,
+      method: (j['method'] ?? '') as String,
+      status: (j['status'] ?? '') as String,
+      paidAt: DateTime.tryParse((j['paidAt'] ?? '') as String)?.toLocal(),
+      receivedAt: DateTime.tryParse((j['receivedAt'] ?? '') as String)?.toLocal(),
+      createdAt: DateTime.tryParse((j['createdAt'] ?? '') as String)?.toLocal() ?? DateTime.now(),
+      reference: j['reference'] as String?,
+      rejectedReason: j['rejectedReason'] as String?,
+      invoiceId: invoice?['id'] as String?,
+      invoiceSerial: invoice?['serial'] as String?,
+      studentName: _twoPartName(j['student'] as Map<String, dynamic>?),
+      receipts: ((j['receipts'] as List?) ?? const [])
+          .map((e) => PaymentReceipt.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+/// A PDF the platform rendered and stored, and a link to it that dies in ten
+/// minutes.
+class StoredDocument {
+  StoredDocument({required this.url, required this.filename, required this.latinOnly});
+
+  final String url;
+  final String filename;
+
+  /// True when this deployment has no Arabic-capable font, so a Kurdish or
+  /// Arabic document has come out in Latin letters. Worth saying out loud
+  /// rather than letting a parent think the school printed it wrong.
+  final bool latinOnly;
+
+  factory StoredDocument.fromJson(Map<String, dynamic> j) => StoredDocument(
+        url: (j['url'] ?? '') as String,
+        filename: (j['filename'] ?? '') as String,
+        latinOnly: (j['latinOnly'] ?? false) as bool,
+      );
+}
 
 /* ---------------------------------------------------------------------------
  * Subject naming

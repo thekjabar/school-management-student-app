@@ -146,7 +146,7 @@ class BootState {
   final bool offline;
 }
 
-/// The six calls the parent home screen opens with.
+/// The seven calls the parent home screen opens with.
 ///
 /// Gathered here as well as on the screen so that the splash can do them early.
 /// The screen owns the shape; this owns only the timing.
@@ -159,6 +159,7 @@ class HomePayload {
     required this.homework,
     required this.attitude,
     required this.announcements,
+    required this.exams,
   });
 
   final String studentId;
@@ -169,7 +170,14 @@ class HomePayload {
   final AttitudeSummary attitude;
   final List<Announcement> announcements;
 
-  /// One pass, all at once. Six sequential round trips on a school connection
+  /// The exams already in the diary for this child's class.
+  ///
+  /// One call per child and no way to batch: there is no all-children exams
+  /// route, so switching child on the home screen fetches these again with
+  /// everything else.
+  final List<UpcomingExam> exams;
+
+  /// One pass, all at once. Seven sequential round trips on a school connection
   /// is the difference between a screen and a wait.
   static Future<HomePayload> fetch(String studentId) async {
     final api = ParentApi.instance;
@@ -180,6 +188,7 @@ class HomePayload {
       api.homework(studentId),
       api.attitude(studentId),
       api.announcements(),
+      api.upcomingExams(studentId),
     ]);
     return HomePayload(
       studentId: studentId,
@@ -189,6 +198,7 @@ class HomePayload {
       homework: r[3] as List<HomeworkItem>,
       attitude: r[4] as AttitudeSummary,
       announcements: r[5] as List<Announcement>,
+      exams: r[6] as List<UpcomingExam>,
     );
   }
 }

@@ -90,8 +90,12 @@ void main() {
   test('upcoming exams parse', () async {
     final rows = await ParentApi.instance.upcomingExams(child.studentId);
     for (final e in rows) {
-      expect(e.title, isNotEmpty);
+      // NOT the title. Exam.title is nullable on the server and plenty of rows
+      // arrive without one; the screens fall back to the subject, so that is
+      // the field that has to be there.
       expect(e.subject, isNotEmpty);
+      expect(e.maxScore, greaterThan(0));
+      expect(e.kind, isNotEmpty);
     }
   });
 
