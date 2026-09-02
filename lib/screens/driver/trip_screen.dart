@@ -524,7 +524,7 @@ class _StopCardState extends State<_StopCard> {
   Future<void> _mark(RiderOnStop rider, String eventType, String label) async {
     setState(() => _busyStudent = rider.studentId);
     try {
-      await CrewApi.instance.recordCustody(
+      final verdict = await CrewApi.instance.recordCustody(
         tripId: widget.tripId,
         studentId: rider.studentId,
         eventType: eventType,
@@ -540,9 +540,25 @@ class _StopCardState extends State<_StopCard> {
         ),
       );
       widget.onChanged();
-      // The label, not humanise(EVENT_TYPE): that spelled the server's enum
-      // out in English on a Kurdish screen.
-      if (mounted) showNote(context, '${rider.name.split(' ').first} — $label');
+      if (!mounted) return;
+      // What the SERVER did, not what was asked of it.
+      //
+      // The batch endpoint answers 200 even when the event inside it was
+      // refused, and this used to read that as done: a refused boarding
+      // reached the driver as a green "Ahmad — On board" while the ledger held
+      // nothing, and he drove off believing the child was recorded.
+      final first = rider.name.split(' ').first;
+      if (!verdict.accepted) {
+        showNote(context, verdict.reason ?? tv('driver.notRecorded', {'name': first}), bad: true);
+      } else if (verdict.rewrittenTo != null) {
+        // Accepted, but stored as something else — a drop-off away from the
+        // expected stop becomes WRONG_STOP, and the office has been told.
+        showNote(context, tv('driver.recordedAs', {'name': first}), bad: true);
+      } else {
+        // The label, not humanise(EVENT_TYPE): that spelled the server's enum
+        // out in English on a Kurdish screen.
+        showNote(context, '$first — $label');
+      }
     } catch (e) {
       if (mounted) showNote(context, errorText(e), bad: true);
     } finally {

@@ -469,6 +469,8 @@ const Map<String, String> _en = {
   'driver.handedOver': 'Handed over',
   'driver.movingOn': 'Moving on',
   'driver.notRiding': 'Not riding today',
+  'driver.notRecorded': '{name} was not recorded. Try again.',
+  'driver.recordedAs': '{name} was recorded away from the expected stop. The office has been told.',
   'driver.onBoardSince': 'On board since {n}',
   // ---- The cabin sweep -----------------------------------------------------
   'driver.beforeYouLeave': 'Before you leave the bus',
@@ -1725,6 +1727,8 @@ const Map<String, String> _ckb = {
   'driver.handedOver': 'ڕادەستکرا',
   'driver.movingOn': 'بەردەوامە',
   'driver.notRiding': 'ئەمڕۆ سواری نابێت',
+  'driver.notRecorded': '{name} تۆمار نەکرا. دووبارە هەوڵ بدەرەوە.',
+  'driver.recordedAs': '{name} لە دەرەوەی وێستگەی پێشبینیکراو تۆمارکرا. نووسینگە ئاگادارکرایەوە.',
   'driver.onBoardSince': 'لە پاسدایە لە {n}ەوە',
   // ---- The cabin sweep -----------------------------------------------------
   'driver.beforeYouLeave': 'پێش ئەوەی پاسەکە بەجێبهێڵیت',
@@ -2962,6 +2966,8 @@ const Map<String, String> _ar = {
   'driver.handedOver': 'تم التسليم',
   'driver.movingOn': 'مستمرة',
   'driver.notRiding': 'لا يركب اليوم',
+  'driver.notRecorded': '{name} لم يُسجّل. حاول مرة أخرى.',
+  'driver.recordedAs': '{name} سُجّل بعيدًا عن الموقف المتوقع. تم إبلاغ المكتب.',
   'driver.onBoardSince': 'على متن الحافلة منذ {n}',
   // ---- The cabin sweep -----------------------------------------------------
   'driver.beforeYouLeave': 'قبل أن تغادر الحافلة',

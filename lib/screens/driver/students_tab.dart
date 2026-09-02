@@ -45,18 +45,45 @@ class _DriverStudentsState extends State<DriverStudents> {
   /// This list is where a driver looks for one name out of forty. It used to be
   /// read-only, so finding the name meant remembering which stop it was under
   /// and going to look for it again on the run screen.
-  Future<void> _record(String tripId, _Rider entry, String eventType, String label) async {
+  Future<void> _record(
+    String tripId,
+    _Rider entry,
+    String eventType,
+    String label, {
+    required String leg,
+    required String? terminalStopId,
+  }) async {
     setState(() => _busyStudent = entry.rider.studentId);
     try {
-      await CrewApi.instance.recordCustody(
+      final verdict = await CrewApi.instance.recordCustody(
         tripId: tripId,
         studentId: entry.rider.studentId,
         eventType: eventType,
-        stopId: entry.stop.stopId,
+        // Which stop this happened AT, which is not always the child's own.
+        //
+        // This sent entry.stop.stopId for everything. In the morning the child
+        // gets off at the SCHOOL, so the server — which expects the gate for an
+        // OUT-leg alighting — read the home stop as the wrong one, rewrote the
+        // event to WRONG_STOP and raised a CRITICAL safeguarding alert. Per
+        // child. Every morning. The run screen already worked this out with
+        // custodyStopId; this list was the one place that did not, and it is
+        // the list a driver uses to find one name out of forty.
+        stopId: custodyStopId(
+          leg: leg,
+          eventType: eventType,
+          riderStopId: entry.stop.stopId,
+          terminalStopId: terminalStopId,
+        ),
       );
       _loaderKey.currentState?.reload();
-      if (mounted) {
-        showNote(context, '${entry.rider.name.split(' ').first} — $label');
+      if (!mounted) return;
+      final first = entry.rider.name.split(' ').first;
+      if (!verdict.accepted) {
+        showNote(context, verdict.reason ?? tv('driver.notRecorded', {'name': first}), bad: true);
+      } else if (verdict.rewrittenTo != null) {
+        showNote(context, tv('driver.recordedAs', {'name': first}), bad: true);
+      } else {
+        showNote(context, '$first — $label');
       }
     } catch (e) {
       if (mounted) showNote(context, errorText(e), bad: true);
@@ -100,7 +127,12 @@ class _DriverStudentsState extends State<DriverStudents> {
         HandoverOutcome.nobodyAtStop => t('handover.nobodyTitle'),
       };
 
-  Future<void> _openActions(String tripId, _Rider entry, String leg) async {
+  Future<void> _openActions(
+    String tripId,
+    _Rider entry,
+    String leg,
+    String? terminalStopId,
+  ) async {
     final choice = await showAppSheet<_Mark>(
       context,
       builder: (_) => _MarkSheet(entry: entry, leg: leg),
@@ -108,15 +140,18 @@ class _DriverStudentsState extends State<DriverStudents> {
     if (choice == null || !mounted) return;
     switch (choice) {
       case _Mark.boarded:
-        await _record(tripId, entry, 'BOARDED', t('driver.onBoard'));
+        await _record(tripId, entry, 'BOARDED', t('driver.onBoard'),
+            leg: leg, terminalStopId: terminalStopId);
       case _Mark.dropped:
         // Only ever the morning leg. Coming home, a child does not simply get
         // off — they are given to somebody.
-        await _record(tripId, entry, 'ALIGHTED', t('driver.atSchool'));
+        await _record(tripId, entry, 'ALIGHTED', t('driver.atSchool'),
+            leg: leg, terminalStopId: terminalStopId);
       case _Mark.handover:
         await _openHandover(tripId, entry);
       case _Mark.noShow:
-        await _record(tripId, entry, 'NO_SHOW', t('driver.notRiding'));
+        await _record(tripId, entry, 'NO_SHOW', t('driver.notRiding'),
+            leg: leg, terminalStopId: terminalStopId);
     }
   }
 
@@ -130,8 +165,13 @@ class _DriverStudentsState extends State<DriverStudents> {
         final trip = await loadDutyTrip();
         if (trip == null) return _Roster(trip: null, riders: const []);
         final plan = await CrewApi.instance.plan(trip.id);
+        // The gate comes from the trip pack, not the plan. Fetched alongside so
+        // a morning drop-off can be recorded at the school rather than at the
+        // child's own stop — which the server reads as the wrong stop.
+        final gate = await CrewApi.instance.terminalStopId(trip.id);
         return _Roster(
           trip: trip,
+          terminalStopId: gate,
           riders: [
             for (final stop in plan.stops)
               for (final r in stop.students) _Rider(stop: stop, rider: r),
@@ -272,6 +312,7 @@ class _DriverStudentsState extends State<DriverStudents> {
                                   roster.trip!.id,
                                   shown[i],
                                   roster.trip!.leg,
+                                  roster.terminalStopId,
                                 ),
                       ),
                     ],
@@ -288,10 +329,14 @@ class _DriverStudentsState extends State<DriverStudents> {
 enum _Filter { all, waiting, onBoard, done }
 
 class _Roster {
-  _Roster({required this.trip, required this.riders});
+  _Roster({required this.trip, required this.riders, this.terminalStopId});
 
   final CrewTrip? trip;
   final List<_Rider> riders;
+
+  /// The campus gate. Needed to record WHERE a custody event happened: in the
+  /// morning a child gets off here, not at the stop their row is drawn under.
+  final String? terminalStopId;
 }
 
 class _Rider {

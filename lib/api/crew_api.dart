@@ -104,6 +104,39 @@ String? custodyStopId({
   return atOwnStop ? riderStopId : terminalStopId;
 }
 
+/// The verdict on one custody event, as the server gave it.
+///
+/// The batch endpoint answers 200 even when the events inside it were refused,
+/// so "the request worked" and "the child is recorded" are different questions.
+/// This is the second one.
+class CustodyVerdict {
+  const CustodyVerdict({
+    required this.accepted,
+    this.duplicate = false,
+    this.reason,
+    this.rewrittenTo,
+    this.alertRaised = false,
+  });
+
+  /// Whether the ledger now holds this event.
+  final bool accepted;
+
+  /// Accepted, but it was already there — a retry after a dropped connection.
+  /// Nothing is wrong and the driver need not be told twice.
+  final bool duplicate;
+
+  /// Why it was refused, in the server's own words, when it was.
+  final String? reason;
+
+  /// Set when the server wrote something OTHER than what was asked for —
+  /// a drop-off away from the expected stop is stored as WRONG_STOP. The
+  /// driver has to know, because it means the office has been told.
+  final String? rewrittenTo;
+
+  /// Whether recording it raised an alert somebody will act on.
+  final bool alertRaised;
+}
+
 /// A run the crew is on today.
 class CrewTrip {
   CrewTrip({
@@ -653,7 +686,22 @@ class CrewApi {
   /// day comes: the server grades a lat/lon with no [gpsAccuracyM] as a clean
   /// GPS fix and lets it raise a CRITICAL alert, so a coarse network fix sent
   /// without its accuracy is worse than no fix at all.
-  Future<void> recordCustody({
+  /// What the server did with one custody event.
+  ///
+  /// See [CustodyVerdict].
+  ///
+  /// The batch endpoint answers 200 whatever happens to the events inside it —
+  /// it has to, because a batch can hold twenty and half of them can be
+  /// duplicates from a retry. The verdict per event is in `results`, and this
+  /// method used to throw it away and return void. A rejected event therefore
+  /// reached the driver as a green "Ahmad — On board" while the ledger held
+  /// nothing at all, and he drove off believing a child was recorded.
+  ///
+  /// [rewrittenTo] is set when the server accepted the event but recorded it as
+  /// something else — a drop-off at the wrong stop becomes WRONG_STOP — which
+  /// the driver has to be told about, because it means an alert has gone to the
+  /// office with his name on it.
+  Future<CustodyVerdict> recordCustody({
     required String tripId,
     required String studentId,
     required String eventType,
@@ -664,12 +712,13 @@ class CrewApi {
     int? positionAgeMs,
   }) async {
     final now = DateTime.now().toUtc().toIso8601String();
-    await _api.post('/crew/custody/events', {
+    final id = uuidV4();
+    final json = await _api.post('/crew/custody/events', {
       'tripInstanceId': tripId,
       'clientSentAt': now,
       'events': [
         {
-          'id': uuidV4(),
+          'id': id,
           'type': eventType,
           'studentId': studentId,
           'deviceTime': now,
@@ -686,7 +735,26 @@ class CrewApi {
           'positionAgeMs': ?positionAgeMs,
         },
       ],
-    });
+    }) as Map<String, dynamic>;
+
+    final results = (json['results'] as List?) ?? const [];
+    final mine = results.cast<Map<String, dynamic>>().where((r) => r['id'] == id).firstOrNull;
+    // No row for this id at all: nothing was written, and saying so is better
+    // than a green tick over an empty ledger.
+    if (mine == null) return const CustodyVerdict(accepted: false);
+
+    final outcome = (mine['outcome'] ?? '') as String;
+    if (outcome == 'REJECTED') {
+      return CustodyVerdict(accepted: false, reason: mine['reason'] as String?);
+    }
+
+    final recorded = mine['recordedType'] as String?;
+    return CustodyVerdict(
+      accepted: true,
+      duplicate: outcome == 'DUPLICATE',
+      rewrittenTo: recorded != null && recorded != eventType ? recorded : null,
+      alertRaised: mine['alertRaised'] == true,
+    );
   }
 
   /// Confirm the cabin was walked to the back seat.
