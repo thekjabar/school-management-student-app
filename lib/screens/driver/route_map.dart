@@ -7,7 +7,9 @@ import 'package:latlong2/latlong.dart' hide Path;
 import '../../api/crew_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
+import '../../ui/home_kit.dart';
 import '../../ui/map_tiles.dart';
+import '../../ui/screen_kit.dart';
 
 /// Whether a stop carries a position this app is allowed to draw.
 ///
@@ -59,6 +61,7 @@ class RouteMap extends StatefulWidget {
     required this.leg,
     this.terminalStopId,
     this.compact = false,
+    this.fullScreen = false,
   });
 
   /// The stops in the order they are driven — the order the plan returned,
@@ -82,6 +85,12 @@ class RouteMap extends StatefulWidget {
   /// The small map beside the run's name on the home card: no interaction, no
   /// callout, smaller markers.
   final bool compact;
+
+  /// Filling a screen of its own, pushed from the corner button of the card
+  /// map. There is no page underneath to scroll, so one finger pans it, and
+  /// the corner button fits the whole run back on screen instead of opening
+  /// another copy.
+  final bool fullScreen;
 
   @override
   State<RouteMap> createState() => _RouteMapState();
@@ -164,9 +173,11 @@ class _RouteMapState extends State<RouteMap> {
         interactionOptions: InteractionOptions(
           flags: widget.compact
               ? InteractiveFlag.none
-              : InteractiveFlag.pinchZoom |
-                  InteractiveFlag.pinchMove |
-                  InteractiveFlag.doubleTapZoom,
+              : widget.fullScreen
+                  ? InteractiveFlag.all & ~InteractiveFlag.rotate
+                  : InteractiveFlag.pinchZoom |
+                      InteractiveFlag.pinchMove |
+                      InteractiveFlag.doubleTapZoom,
         ),
       ),
       children: [
@@ -215,15 +226,33 @@ class _RouteMapState extends State<RouteMap> {
             child: _Callout(pin: _shown(pins), tint: widget.tint, leg: widget.leg),
           ),
         ),
+        // In the card this opens the run full screen; full screen, where the
+        // map already fills the window, it puts the whole run back in view.
+        // The card used to carry the re-fit here too, and with the run already
+        // fitted — which it is, from the first frame — the button did nothing
+        // visible, which reads as broken.
         PositionedDirectional(
           end: 10,
           top: 10,
           child: Semantics(
             button: true,
-            label: t('driver.map.showWholeRun'),
+            label: t(widget.fullScreen ? 'driver.map.showWholeRun' : 'driver.map.fullScreen'),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () {
+                if (!widget.fullScreen) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => RouteMapScreen(
+                        stops: widget.stops,
+                        tint: widget.tint,
+                        leg: widget.leg,
+                        terminalStopId: widget.terminalStopId,
+                      ),
+                    ),
+                  );
+                  return;
+                }
                 setState(() => _touched = null);
                 if (spread) {
                   _map.fitCamera(_fit(points));
@@ -248,7 +277,11 @@ class _RouteMapState extends State<RouteMap> {
                     ),
                   ],
                 ),
-                child: Icon(Icons.zoom_out_map_rounded, size: 21, color: widget.tint),
+                child: Icon(
+                  widget.fullScreen ? Icons.zoom_out_map_rounded : Icons.open_in_full_rounded,
+                  size: 21,
+                  color: widget.tint,
+                ),
               ),
             ),
           ),
@@ -264,7 +297,9 @@ class _RouteMapState extends State<RouteMap> {
         coordinates: points,
         padding: widget.compact
             ? const EdgeInsets.all(26)
-            : const EdgeInsets.fromLTRB(46, 74, 46, 46),
+            : widget.fullScreen
+                ? const EdgeInsets.fromLTRB(54, 96, 54, 70)
+                : const EdgeInsets.fromLTRB(46, 74, 46, 46),
         // Close enough to read the street, never so close that two stops on the
         // same road land on top of each other.
         maxZoom: 16.5,
@@ -337,6 +372,64 @@ class _RouteMapState extends State<RouteMap> {
       if (p.next) return p;
     }
     return null;
+  }
+}
+
+/// The run on a map that fills the screen.
+///
+/// Pushed from the corner button of the card map on the run and route
+/// screens. Same stops, same pins, same tint; the difference is room — the
+/// card is 230 pixels high and a run across half of Erbil is a cluster of
+/// numbers in it — and one-finger panning, which the card cannot allow
+/// because it sits in a scrolling page.
+///
+/// The stops are the list the caller had when the button was pressed. The
+/// screen underneath reloads after every arrive and depart, and the driver is
+/// back on it for those, so a snapshot is the right thing here.
+class RouteMapScreen extends StatelessWidget {
+  const RouteMapScreen({
+    super.key,
+    required this.stops,
+    required this.tint,
+    required this.leg,
+    this.terminalStopId,
+  });
+
+  final List<PlannedStop> stops;
+  final Color tint;
+  final String leg;
+  final String? terminalStopId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.canvas,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            ScreenHeader(title: t('driver.map.title')),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 0),
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppTheme.radius),
+                  ),
+                  child: RouteMap(
+                    stops: stops,
+                    tint: tint,
+                    leg: leg,
+                    terminalStopId: terminalStopId,
+                    fullScreen: true,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

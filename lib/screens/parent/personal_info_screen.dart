@@ -10,6 +10,7 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/settings_widgets.dart';
+import '../../ui/sheets.dart';
 import 'home_address_screen.dart';
 
 /// The guardian's own details, and the honest truth about which of them they
@@ -183,10 +184,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                             color: tint,
                             title: t('more.changePassword'),
                             subtitle: t('more.changePasswordSub'),
-                            onTap: () => showModalBottomSheet<void>(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
+                            onTap: () => showAppSheet<void>(
+                              context,
                               builder: (_) => ChangePasswordSheet(tint: tint),
                             ),
                           ),
@@ -246,10 +245,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
   Future<void> _ask() async {
-    final sent = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+    final sent = await showAppSheet<bool>(
+      context,
       builder: (_) => _AskSheet(heldName: Session.instance.me?.name ?? ''),
     );
     if (sent != true) return;

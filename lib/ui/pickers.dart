@@ -4,6 +4,7 @@ import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
 import 'format.dart';
 import 'kit.dart';
+import 'sheets.dart';
 
 /// Choosing a date, and choosing from a list.
 ///
@@ -29,10 +30,8 @@ Future<DateTime?> pickDate(
   required Color tint,
   String? title,
 }) {
-  return showModalBottomSheet<DateTime>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
+  return showAppSheet<DateTime>(
+    context,
     builder: (_) => _DateSheet(
       initial: initial,
       first: first,
@@ -55,10 +54,8 @@ Future<T?> pickOne<T>(
   T? selected,
   String? title,
 }) {
-  return showModalBottomSheet<T>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
+  return showAppSheet<T>(
+    context,
     builder: (_) => _OptionSheet<T>(
       options: options,
       selected: selected,

@@ -10,6 +10,7 @@ import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
 import '../ui/async.dart';
 import '../ui/kit.dart';
+import '../ui/sheets.dart';
 
 /// One screen: the language, the picture, and the form.
 ///
@@ -149,10 +150,8 @@ class _LoginScreenState extends State<LoginScreen> {
   /// password wrong has almost always typed their phone right, and asking for
   /// it again two centimetres below where they just typed it reads as an app
   /// that was not paying attention.
-  Future<void> _forgot() => showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
+  Future<void> _forgot() => showAppSheet<void>(
+        context,
         builder: (_) => _ForgotSheet(tint: widget.role.tint, phone: _phone.text),
       );
 

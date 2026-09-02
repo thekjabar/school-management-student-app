@@ -10,6 +10,7 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
+import '../../ui/sheets.dart';
 
 /// Giving a child to an adult, and the two things that happen when you cannot.
 ///
@@ -435,10 +436,8 @@ class _HandoverScreenState extends State<HandoverScreen> {
   }
 
   Future<void> _confirm(_Door door, {_Allowed? adult, _OneTime? oneTime}) async {
-    final done = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+    final done = await showAppSheet<bool>(
+      context,
       builder: (_) => _ConfirmHandover(
         tripId: widget.tripId,
         studentId: widget.studentId,

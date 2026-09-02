@@ -6,6 +6,7 @@ import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/kit.dart';
 import '../../ui/settings_widgets.dart';
+import '../../ui/sheets.dart';
 import '../login_screen.dart' show LanguagePicker;
 import 'teacher_account.dart';
 
@@ -137,10 +138,8 @@ class TeacherDrawer extends StatelessWidget {
                           subtitle: t('more.changePasswordSub'),
                           onTap: () {
                             Navigator.of(context).pop();
-                            showModalBottomSheet<void>(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
+                            showAppSheet<void>(
+                              context,
                               builder: (_) => ChangePasswordSheet(tint: Role.teacher.tint),
                             );
                           },

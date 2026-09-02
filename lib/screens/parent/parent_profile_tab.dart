@@ -12,6 +12,7 @@ import '../../ui/kit.dart';
 import 'student_info_screen.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/settings_widgets.dart';
+import '../../ui/sheets.dart';
 import 'children_tab.dart';
 import 'fees_screen.dart';
 import 'help_screen.dart';
@@ -448,10 +449,8 @@ class _Settings extends StatelessWidget {
             icon: Icons.shield_outlined,
             title: t('profile.security'),
             sub: t('profile.securitySub'),
-            onTap: () => showModalBottomSheet<void>(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
+            onTap: () => showAppSheet<void>(
+              context,
               builder: (_) => ChangePasswordSheet(tint: tint),
             ),
           ),

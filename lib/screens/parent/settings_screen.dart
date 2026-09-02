@@ -6,6 +6,7 @@ import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/kit.dart';
 import '../../ui/settings_widgets.dart';
+import '../../ui/sheets.dart';
 import '../login_screen.dart' show LanguagePicker;
 
 /// Appearance, language, notifications, password.
@@ -99,10 +100,8 @@ class SettingsScreen extends StatelessWidget {
               title: t('more.changePassword'),
               subtitle: t('more.changePasswordSub'),
               last: true,
-              onTap: () => showModalBottomSheet<void>(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
+              onTap: () => showAppSheet<void>(
+                context,
                 builder: (_) => ChangePasswordSheet(tint: tint),
               ),
             ),

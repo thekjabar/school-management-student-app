@@ -10,6 +10,7 @@ import '../../ui/format.dart';
 import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
 import '../../ui/screen_kit.dart';
+import '../../ui/sheets.dart';
 import 'teacher_kit.dart';
 
 /// Exams, and the mark sheet behind each one.
@@ -81,10 +82,8 @@ class _ExamsTabState extends State<ExamsTab> {
   }
 
   Future<void> _create() async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+    final saved = await showAppSheet<bool>(
+      context,
       builder: (_) => const _NewExamSheet(),
     );
     if (saved == true) {

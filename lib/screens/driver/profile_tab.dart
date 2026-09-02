@@ -7,6 +7,7 @@ import '../../theme/app_theme.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/settings_widgets.dart';
+import '../../ui/sheets.dart';
 import '../login_screen.dart' show LanguagePicker;
 import 'crew_account.dart';
 
@@ -110,10 +111,8 @@ class DriverProfile extends StatelessWidget {
                 color: AppTheme.textMuted,
                 title: t('more.changePassword'),
                 subtitle: t('more.changePasswordSub'),
-                onTap: () => showModalBottomSheet<void>(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
+                onTap: () => showAppSheet<void>(
+                  context,
                   builder: (_) => ChangePasswordSheet(tint: tint),
                 ),
               ),

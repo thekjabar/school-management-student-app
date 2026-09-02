@@ -9,6 +9,7 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
+import '../../ui/sheets.dart';
 
 /// What a family says about the person driving their child.
 ///
@@ -85,10 +86,8 @@ class _DriverFeedbackScreenState extends State<DriverFeedbackScreen> {
   }
 
   Future<void> _compose() async {
-    final sent = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+    final sent = await showAppSheet<bool>(
+      context,
       builder: (_) => _ComposeSheet(child: widget.child),
     );
     if (sent == true && mounted) {

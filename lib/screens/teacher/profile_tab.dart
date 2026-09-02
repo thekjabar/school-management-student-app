@@ -9,6 +9,7 @@ import '../../ui/async.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/settings_widgets.dart';
+import '../../ui/sheets.dart';
 import '../login_screen.dart' show LanguagePicker;
 
 /// The teacher's own tab.
@@ -137,10 +138,8 @@ class TeacherProfileTab extends StatelessWidget {
                   color: AppTheme.textMuted,
                   title: t('more.changePassword'),
                   subtitle: t('more.changePasswordSub'),
-                  onTap: () => showModalBottomSheet<void>(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
+                  onTap: () => showAppSheet<void>(
+                    context,
                     builder: (_) => ChangePasswordSheet(tint: tint),
                   ),
                 ),

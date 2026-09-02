@@ -11,6 +11,7 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
 import '../../ui/screen_kit.dart';
+import '../../ui/sheets.dart';
 
 /// Every day off the family has asked the office for.
 ///
@@ -133,10 +134,8 @@ class _LeaveScreenState extends State<LeaveScreen> {
   }
 
   Future<void> _ask() async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+    final saved = await showAppSheet<bool>(
+      context,
       builder: (_) => _AskSheet(child: widget.child),
     );
     if (saved == true) {

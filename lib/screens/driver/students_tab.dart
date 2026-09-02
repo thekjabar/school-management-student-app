@@ -7,6 +7,7 @@ import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
+import '../../ui/sheets.dart';
 import 'handover_screen.dart';
 import 'home_tab.dart' show loadDutyTrip;
 
@@ -100,9 +101,8 @@ class _DriverStudentsState extends State<DriverStudents> {
       };
 
   Future<void> _openActions(String tripId, _Rider entry, String leg) async {
-    final choice = await showModalBottomSheet<_Mark>(
-      context: context,
-      backgroundColor: Colors.transparent,
+    final choice = await showAppSheet<_Mark>(
+      context,
       builder: (_) => _MarkSheet(entry: entry, leg: leg),
     );
     if (choice == null || !mounted) return;

@@ -9,6 +9,7 @@ import '../../ui/format.dart';
 import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
 import '../../ui/screen_kit.dart';
+import '../../ui/sheets.dart';
 
 /// Work set, and the form for setting more.
 ///
@@ -92,10 +93,8 @@ class _HomeworkTabState extends State<HomeworkTab> {
   }
 
   Future<void> _set() async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+    final saved = await showAppSheet<bool>(
+      context,
       builder: (_) => const _SetSheet(),
     );
     if (saved == true) {

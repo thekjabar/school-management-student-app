@@ -9,6 +9,7 @@ import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
+import '../../ui/sheets.dart';
 import 'route_map.dart';
 
 /// One run, from the driver's seat.
@@ -98,10 +99,8 @@ class _TripScreenState extends State<TripScreen> {
   /// so the sheet comes first and the call only happens if the driver actually
   /// filed it.
   Future<void> _startShift(CrewTrip trip) async {
-    final check = await showModalBottomSheet<PreTripCheck>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+    final check = await showAppSheet<PreTripCheck>(
+      context,
       builder: (_) => const _PreTripSheet(),
     );
     if (check == null || !mounted) return;

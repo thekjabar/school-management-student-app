@@ -2,6 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart';
+// latlong2 exports a generic Path<T> for geodesic paths, which shadows
+// dart:ui's Path. Nothing here paints one any more, but nothing here should
+// ever pick up the wrong one by accident either.
+import 'package:latlong2/latlong.dart' hide Path;
 
 import '../../api/parent_api.dart';
 import '../../api/push.dart';
@@ -12,7 +17,9 @@ import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
+import '../../ui/map_tiles.dart';
 import '../../ui/screen_kit.dart';
+import 'track_screen.dart';
 
 /// Where the bus is, and when it gets there.
 ///
@@ -30,23 +37,33 @@ class BusScreen extends StatefulWidget {
 
 class _BusScreenState extends State<BusScreen> {
   final _loaderKey = GlobalKey<LoaderState<_Bus>>();
+  final _map = MapController();
   Timer? _tick;
   bool _dismissedAlerts = false;
+
+  /// The arrangement's stops, fetched once. They do not move between polls,
+  /// and a lookup that fails must not take the bus down with it.
+  AssignedStops? _stops;
 
   @override
   void initState() {
     super.initState();
     // A live position that does not move is not live. Half a minute is often
     // enough to see the bus turn into the street.
+    //
+    // Quiet, because an ordinary reload drops the screen to a spinner for the
+    // length of the request — and now that there is a real map on it, that is
+    // a map that blinks out and fetches its tiles again twice a minute.
     _tick = Timer.periodic(
       const Duration(seconds: 30),
-      (_) => _loaderKey.currentState?.reload(),
+      (_) => _loaderKey.currentState?.reload(quiet: true),
     );
   }
 
   @override
   void dispose() {
     _tick?.cancel();
+    _map.dispose();
     super.dispose();
   }
 
@@ -74,9 +91,10 @@ class _BusScreenState extends State<BusScreen> {
                 tint: tint,
                 padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20),
                 load: () async {
-                  final r = await Future.wait([
+                  final r = await Future.wait<Object?>([
                     ParentApi.instance.transport(widget.child.studentId),
                     ParentApi.instance.live(),
+                    _assignedStops(),
                   ]);
                   final buses = r[1] as List<LiveBus>;
                   return _Bus(
@@ -84,6 +102,7 @@ class _BusScreenState extends State<BusScreen> {
                     live: buses
                         .where((b) => b.studentId == widget.child.studentId)
                         .firstOrNull,
+                    stops: r[2] as AssignedStops?,
                   );
                 },
                 builder: (context, bus) {
@@ -101,11 +120,12 @@ class _BusScreenState extends State<BusScreen> {
                   }
 
                   final trip = bus.run;
+                  WidgetsBinding.instance.addPostFrameCallback((_) => _frame(bus));
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _MapCard(bus: bus),
+                      _MapCard(bus: bus, controller: _map, onOpen: _openTrack),
                       const SizedBox(height: kCardGap),
                       _RouteCard(bus: bus),
                       const SizedBox(height: kCardGap),
@@ -133,6 +153,60 @@ class _BusScreenState extends State<BusScreen> {
     );
   }
 
+  /// Where the arrangement puts this child's stops.
+  ///
+  /// For the days the live feed has nothing to say — a weekend, a holiday, an
+  /// account the school has not granted location to — the map can still show
+  /// where the bus collects her. /parent/home is what the home-address screen
+  /// already reads: the family's own arrangement, and never a position.
+  Future<AssignedStops?> _assignedStops() async {
+    if (_stops != null) return _stops;
+    try {
+      final home = await ParentApi.instance.homeLocation();
+      _stops = home.children
+          .where((c) => c.studentId == widget.child.studentId)
+          .firstOrNull;
+    } catch (_) {
+      // Then the map draws what the live feed gives it, which may be nothing.
+      // That is said on the card; an error page here would hide the driver's
+      // number behind a lookup the parent never asked for.
+    }
+    return _stops;
+  }
+
+  /// Put everything known on screen.
+  ///
+  /// Every time, not once: nobody can pan this map, so there is no view of
+  /// theirs to preserve, and a bus that drives out of the frame between two
+  /// polls is a bus that has vanished.
+  void _frame(_Bus bus) {
+    // The same test the card makes before it builds a map at all. The
+    // controller is only attached while one exists.
+    if (!MapTiles.configured) return;
+    final points = bus.mapPoints;
+    if (points.isEmpty) return;
+
+    if (points.length == 1) {
+      _map.move(points.first, 15.5);
+      return;
+    }
+    _map.fitCamera(
+      CameraFit.coordinates(
+        coordinates: points,
+        // Room for the callouts drawn over the map, and enough that a marker
+        // never sits against the frame's edge where it reads as off-screen.
+        padding: const EdgeInsets.fromLTRB(44, 76, 44, 66),
+        maxZoom: 16,
+      ),
+    );
+  }
+
+  void _openTrack() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => TrackScreen(child: widget.child)),
+    );
+  }
+
   Future<void> _enableAlerts() async {
     final ok = await Push.askPermission();
     if (!mounted) return;
@@ -142,10 +216,13 @@ class _BusScreenState extends State<BusScreen> {
 }
 
 class _Bus {
-  _Bus({required this.transport, required this.live});
+  _Bus({required this.transport, required this.live, required this.stops});
 
   final TransportInfo transport;
   final LiveBus? live;
+
+  /// The arrangement's stops, when the home lookup answered.
+  final AssignedStops? stops;
 
   /// The run this screen is about: the afternoon one once it is under way, the
   /// morning one until then.
@@ -160,31 +237,147 @@ class _Bus {
   }
 
   bool get moving => run?.status == 'IN_PROGRESS';
+
+  /// Which way this run goes. The morning leg is home → school, the afternoon
+  /// school → home; no run at all reads as the morning one.
+  bool get toSchool => run == null || run!.leg != 'RETURN';
+
+  /// The bus, where the live feed has a position it is allowed to show.
+  LatLng? get busAt {
+    final l = live;
+    return l != null && l.hasFix ? LatLng(l.lat!, l.lon!) : null;
+  }
+
+  /// The child's stop for this run: the pickup going out, the drop-off coming
+  /// home. The live feed's placement first, since that is the stop on the trip
+  /// the feed is actually about; the arrangement's when the feed has none.
+  LatLng? get stopAt {
+    final l = live;
+    if (l != null && l.stopLat != null && l.stopLon != null) {
+      return LatLng(l.stopLat!, l.stopLon!);
+    }
+    final s = toSchool ? stops?.pickup : stops?.dropoff;
+    if (s != null && s.lat != null && s.lon != null) return LatLng(s.lat!, s.lon!);
+    return null;
+  }
+
+  /// Everything the map has to show.
+  ///
+  /// The school is not among them. No parent endpoint returns a campus
+  /// position, and a pin placed by guess is a wrong answer drawn confidently.
+  List<LatLng> get mapPoints => [?busAt, ?stopAt];
 }
 
 /* ---------------------------------------------------------------------------
- * The map that is not a map
+ * The map
  * ------------------------------------------------------------------------- */
 
+/// A real map, framed for the parent.
+///
+/// It used to be a drawing: a dashed curve between a house and a school, with
+/// the bus dot placed by the trip's status. A parent read it as where their
+/// child was. This is Mapbox, the same tiles as the full tracking screen, with
+/// only what the platform actually knows about drawn on it — the bus when it is
+/// reporting and may be shown, the child's stop when the office has placed it,
+/// and a dotted line between the two that is a distance, not a route.
+///
+/// It cannot be panned. It sits in the page's scrolling list, where a drag
+/// would fight the scroll, and the framing is done for the parent on every
+/// poll. Anyone who wants to look around taps it and gets the full screen.
 class _MapCard extends StatelessWidget {
-  const _MapCard({required this.bus});
+  const _MapCard({
+    required this.bus,
+    required this.controller,
+    required this.onOpen,
+  });
 
   final _Bus bus;
+  final MapController controller;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
     final tint = Role.parent.tint;
-    final eta = bus.live?.etaMinutes;
+    final live = bus.live;
+    final eta = live?.etaMinutes;
     final trip = bus.run;
-    // Where this run is headed. The two corner callouts are origin and
-    // destination, and they trade places between the morning and the
-    // afternoon leg.
-    final toSchool = trip == null || trip.leg != 'RETURN';
+    final busAt = bus.busAt;
+    final stopAt = bus.stopAt;
+    final points = bus.mapPoints;
+    final drawn = points.isNotEmpty && MapTiles.configured;
+
+    // Where this run is headed. Origin and destination trade places between
+    // the morning and the afternoon leg.
+    final toSchool = bus.toSchool;
     final school = Session.instance.me?.schoolName ?? t('driver.school');
     final originName =
         toSchool ? (bus.transport.pickupStopName ?? t('bus.home')) : school;
     final destName =
         toSchool ? school : (bus.transport.dropoffStopName ?? t('bus.home'));
+
+    final Widget ground;
+    if (points.isEmpty) {
+      ground = const _NothingToMap();
+    } else if (!MapTiles.configured) {
+      ground = MapNotConfigured(tint: tint);
+    } else {
+      ground = FlutterMap(
+        mapController: controller,
+        options: MapOptions(
+          initialCenter: points.first,
+          initialZoom: 15,
+          minZoom: 4,
+          maxZoom: 18,
+          interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+          // A tap anywhere on the map is a request for the big one. Only when
+          // there is a live row to open it on; without one the full screen
+          // says "no bus", which is a door that opens onto a wall.
+          onTap: live == null ? null : (_, _) => onOpen(),
+        ),
+        children: [
+          MapTiles.layer(),
+
+          // Straight, and dotted for that reason: it is how far the bus still
+          // has to come, not the road it will take. The platform sends no
+          // route geometry, and a solid line would be read as one.
+          if (busAt != null && stopAt != null)
+            PolylineLayer(
+              polylines: [
+                Polyline(
+                  points: [busAt, stopAt],
+                  strokeWidth: 3,
+                  pattern: const StrokePattern.dotted(),
+                  color: tint.withValues(alpha: 0.55),
+                ),
+              ],
+            ),
+
+          MarkerLayer(
+            markers: [
+              if (stopAt != null)
+                Marker(
+                  point: stopAt,
+                  width: 30,
+                  height: 30,
+                  child: _StopPin(colour: tint),
+                ),
+              if (busAt != null)
+                Marker(
+                  point: busAt,
+                  width: 34,
+                  height: 34,
+                  child: _BusPin(
+                    // Green only when she is actually on it, as on the full
+                    // tracking screen. A bus that is not carrying her is a
+                    // bus, and it is drawn as one.
+                    colour: live!.onBoard ? AppTheme.green : AppTheme.textMuted,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      );
+    }
 
     return Card16(
       padding: EdgeInsets.zero,
@@ -194,226 +387,269 @@ class _MapCard extends StatelessWidget {
           height: 200,
           child: Stack(
             children: [
-              // The route drawn, not mapped. There is no tile provider in this
-              // app; a decorative street map would be a picture of somewhere
-              // else, and a parent would read it as where their child is.
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _RoutePainter(
-                    progress: bus.moving ? 0.55 : (trip?.endedAt != null ? 1 : 0.08),
-                    tint: tint,
-                    track: AppTheme.border,
-                    ground: tint.withValues(alpha: AppTheme.dark ? 0.08 : 0.05),
-                  ),
-                ),
-              ),
+              Positioned.fill(child: ground),
 
               PositionedDirectional(
                 start: 10,
                 top: 10,
                 child: _Callout(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: bus.moving ? AppTheme.green : AppTheme.textFaint,
-                              shape: BoxShape.circle,
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: bus.moving ? AppTheme.green : AppTheme.textFaint,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 7),
+                              Text(
+                                bus.moving ? t('bus.onTheWay') : t('bus.noRunTitle'),
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.3,
+                                  color: bus.moving ? AppTheme.green : AppTheme.textMuted,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 7),
-                          Text(
-                            bus.moving ? t('bus.onTheWay') : t('bus.noRunTitle'),
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.3,
-                              color: bus.moving ? AppTheme.green : AppTheme.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.sensors_rounded, size: 13, color: AppTheme.textMuted),
-                          const SizedBox(width: 5),
-                          Text(
-                            bus.live?.visible == true ? t('bus.live') : t('bus.notLive'),
-                            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(Icons.sensors_rounded, size: 13, color: AppTheme.textMuted),
+                              const SizedBox(width: 5),
+                              Text(
+                                live?.visible == true ? t('bus.live') : t('bus.notLive'),
+                                style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                       if (eta != null) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              '$eta',
-                              style: TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -1,
-                                height: 1,
-                                color: tint,
-                              ),
-                            ),
-                            const SizedBox(width: 3),
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 2),
-                              child: Text(
-                                t('bus.min'),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: tint,
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '$eta',
+                                  style: TextStyle(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -1,
+                                    height: 1,
+                                    color: tint,
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(width: 3),
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 2),
+                                  child: Text(
+                                    t('bus.min'),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: tint,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              t('bus.estimatedArrival'),
+                              style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted),
                             ),
                           ],
                         ),
-                        Text(
-                          t('bus.estimatedArrival'),
-                          style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
-                        ),
                       ],
-                      if (trip?.scheduledDepartureAt != null)
-                        Text(
-                          hhmm(trip!.scheduledDepartureAt),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.text,
-                          ),
-                        ),
                     ],
                   ),
                 ),
               ),
 
-              PositionedDirectional(
-                end: 10,
-                top: 10,
-                child: _Callout(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                        child: Icon(
-                          toSchool
-                              ? Icons.account_balance_rounded
-                              : Icons.home_rounded,
-                          size: 16,
-                          color: tint,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 120),
-                            child: Text(
-                              destName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.text,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            '${t('bus.eta')} ${hhmm(trip?.scheduledDepartureAt)}',
-                            style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
+              // Origin to destination, by leg: home → school in the morning,
+              // school → home in the afternoon.
               PositionedDirectional(
                 start: 10,
                 bottom: 10,
                 child: _Callout(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                        child: Icon(
-                          toSchool
-                              ? Icons.home_rounded
-                              : Icons.account_balance_rounded,
-                          size: 16,
-                          color: tint,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 120),
-                            child: Text(
-                              originName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.text,
-                              ),
-                            ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 250),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: _Place(
+                            icon: toSchool ? Icons.home_rounded : Icons.account_balance_rounded,
+                            name: originName,
+                            time: hhmm(trip?.startedAt ?? trip?.scheduledDepartureAt),
+                            tint: tint,
                           ),
-                          Text(
-                            hhmm(trip?.startedAt ?? trip?.scheduledDepartureAt),
-                            style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Icon(Icons.arrow_forward_rounded, size: 14, color: AppTheme.textFaint),
+                        ),
+                        Flexible(
+                          child: _Place(
+                            icon: toSchool ? Icons.account_balance_rounded : Icons.home_rounded,
+                            name: destName,
+                            time: null,
+                            tint: tint,
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
 
-              PositionedDirectional(
-                end: 12,
-                bottom: 12,
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    shape: BoxShape.circle,
-                    boxShadow: const [
-                      BoxShadow(color: Color(0x1A101828), blurRadius: 10, offset: Offset(0, 3)),
-                    ],
+              if (drawn && live != null)
+                PositionedDirectional(
+                  end: 10,
+                  top: 10,
+                  child: Tooltip(
+                    message: t('track.title'),
+                    child: GestureDetector(
+                      onTap: onOpen,
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface,
+                          shape: BoxShape.circle,
+                          boxShadow: const [
+                            BoxShadow(color: Color(0x1A101828), blurRadius: 10, offset: Offset(0, 3)),
+                          ],
+                        ),
+                        child: Icon(Icons.open_in_full_rounded, size: 17, color: tint),
+                      ),
+                    ),
                   ),
-                  child: Icon(Icons.my_location_rounded, size: 19, color: tint),
                 ),
+
+              // Mapbox's licence requires the credit. It is not decoration and
+              // it does not come off.
+              if (drawn)
+                PositionedDirectional(
+                  end: 8,
+                  bottom: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface.withValues(alpha: 0.82),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text(
+                      MapTiles.credit,
+                      style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One end of the run: an icon, the place, and when the bus left it.
+class _Place extends StatelessWidget {
+  const _Place({
+    required this.icon,
+    required this.name,
+    required this.time,
+    required this.tint,
+  });
+
+  final IconData icon;
+  final String name;
+  final String? time;
+  final Color tint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 14, color: tint),
+        ),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.text,
+                ),
+              ),
+              if (time != null)
+                Text(
+                  time!,
+                  style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Drawn where the map would be when there is nothing to put on one.
+///
+/// Said in words rather than shown as an empty map of somewhere, which a parent
+/// would read as "the bus is there".
+class _NothingToMap extends StatelessWidget {
+  const _NothingToMap();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: AppTheme.neutralSoft,
+      child: Center(
+        child: Padding(
+          // Clear of the callouts in the top and bottom corners.
+          padding: const EdgeInsets.fromLTRB(24, 64, 24, 58),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.location_off_outlined, size: 20, color: AppTheme.textFaint),
+              const SizedBox(height: 6),
+              Text(
+                t('track.noMap'),
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, height: 1.35, color: AppTheme.textMuted),
               ),
             ],
           ),
@@ -433,7 +669,7 @@ class _Callout extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: AppTheme.surface.withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(13),
         boxShadow: const [
           BoxShadow(color: Color(0x14101828), blurRadius: 12, offset: Offset(0, 4)),
@@ -444,85 +680,50 @@ class _Callout extends StatelessWidget {
   }
 }
 
-class _RoutePainter extends CustomPainter {
-  _RoutePainter({
-    required this.progress,
-    required this.tint,
-    required this.track,
-    required this.ground,
-  });
+class _BusPin extends StatelessWidget {
+  const _BusPin({required this.colour});
 
-  final double progress;
-  final Color tint;
-  final Color track;
-  final Color ground;
+  final Color colour;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = ground);
-
-    final path = Path()
-      ..moveTo(size.width * 0.14, size.height * 0.88)
-      ..cubicTo(
-        size.width * 0.30, size.height * 0.80,
-        size.width * 0.34, size.height * 0.62,
-        size.width * 0.52, size.height * 0.56,
-      )
-      ..cubicTo(
-        size.width * 0.70, size.height * 0.50,
-        size.width * 0.72, size.height * 0.26,
-        size.width * 0.86, size.height * 0.22,
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: colour,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: const Icon(Icons.directions_bus_rounded, size: 17, color: Colors.white),
       );
+}
 
-    canvas.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 5
-        ..strokeCap = StrokeCap.round
-        ..color = track,
-    );
+class _StopPin extends StatelessWidget {
+  const _StopPin({required this.colour});
 
-    final metric = path.computeMetrics().first;
-    final done = metric.extractPath(0, metric.length * progress.clamp(0, 1));
-    canvas.drawPath(
-      done,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 5
-        ..strokeCap = StrokeCap.round
-        ..color = tint,
-    );
-
-    // The two ends, then the bus where the driven part stops.
-    for (final at in [0.0, 1.0]) {
-      final p = metric.getTangentForOffset(metric.length * at)!.position;
-      canvas.drawCircle(p, 7, Paint()..color = tint);
-      canvas.drawCircle(
-        p,
-        7,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3
-          ..color = Colors.white,
-      );
-    }
-
-    final head = metric.getTangentForOffset(metric.length * progress.clamp(0, 1))!.position;
-    canvas.drawCircle(head, 20, Paint()..color = tint.withValues(alpha: 0.18));
-    canvas.drawCircle(head, 13, Paint()..color = tint);
-    canvas.drawCircle(
-      head,
-      13,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..color = Colors.white,
-    );
-  }
+  final Color colour;
 
   @override
-  bool shouldRepaint(_RoutePainter old) => old.progress != progress || old.tint != tint;
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          shape: BoxShape.circle,
+          border: Border.all(color: colour, width: 3),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Icon(Icons.person_pin_circle_outlined, size: 15, color: colour),
+      );
 }
 
 /* ---------------------------------------------------------------------------
