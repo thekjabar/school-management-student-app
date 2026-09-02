@@ -483,6 +483,7 @@ const Map<String, String> _en = {
   'driver.aboutMinutes': 'about {n} min',
   'driver.sweepDeadlinePassed': 'The deadline has passed. The office has been told.',
   'driver.sweepNotRequired': 'No cabin sweep is required for this run.',
+  'driver.sweepAfterRun': 'When the last child is off, walk the aisle and confirm the bus is empty here.',
   'driver.sweepOutstanding': 'This run has ended and the cabin sweep is not confirmed.',
   'driver.walkedTheBus': 'I have walked the bus — it is empty',
   // ---- Papers --------------------------------------------------------------
@@ -1738,6 +1739,7 @@ const Map<String, String> _ckb = {
   'driver.aboutMinutes': 'نزیکەی {n} خولەک',
   'driver.sweepDeadlinePassed': 'کاتەکە تێپەڕی. نووسینگە ئاگادارکرایەوە.',
   'driver.sweepNotRequired': 'ئەم گەشتە پێویستی بە پشکنینی ناوەوە نییە.',
+  'driver.sweepAfterRun': 'کاتێک دوایین منداڵ دابەزی، بەناو پاسەکەدا بڕۆ و لێرە پشتڕاست بکەرەوە کە بەتاڵە.',
   'driver.sweepOutstanding': 'ئەم گەشتە کۆتایی هاتووە و پشکنینی ناوەوە پشتڕاست نەکراوەتەوە.',
   'driver.walkedTheBus': 'بەناو پاسەکەدا ڕۆیشتووم — بەتاڵە',
   // ---- Papers --------------------------------------------------------------
@@ -2974,6 +2976,7 @@ const Map<String, String> _ar = {
   'driver.aboutMinutes': 'نحو {n} دقيقة',
   'driver.sweepDeadlinePassed': 'انتهى الوقت المحدد. تم إبلاغ الإدارة.',
   'driver.sweepNotRequired': 'هذه الرحلة لا تتطلب فحص الحافلة.',
+  'driver.sweepAfterRun': 'عند نزول آخر طفل، امشِ في الممر وأكّد هنا أن الحافلة فارغة.',
   'driver.sweepOutstanding': 'انتهت هذه الرحلة ولم يُؤكَّد فحص الحافلة.',
   'driver.walkedTheBus': 'مشيت في الحافلة — إنها فارغة',
   // ---- Papers --------------------------------------------------------------

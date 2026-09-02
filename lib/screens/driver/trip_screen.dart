@@ -202,6 +202,7 @@ class _TripScreenState extends State<TripScreen> {
                       SectionHead(t('driver.beforeYouLeave')),
                       _SweepCard(
                         sweep: data.sweep,
+                        tripEnded: trip?.endedAt != null,
                         busy: _busy != null,
                         onConfirm: () => _act(
                           t('driver.sweepConfirmed'),
@@ -842,11 +843,33 @@ class _Mini extends StatelessWidget {
 
 /// The last thing before the bus is locked.
 class _SweepCard extends StatelessWidget {
-  const _SweepCard({required this.sweep, required this.busy, required this.onConfirm});
+  const _SweepCard({
+    required this.sweep,
+    required this.busy,
+    required this.onConfirm,
+    required this.tripEnded,
+  });
 
   final SweepState sweep;
   final bool busy;
   final VoidCallback onConfirm;
+
+  /// Whether the run has actually finished.
+  ///
+  /// The sweep is the walk down the aisle AFTER the last child is off, and both
+  /// halves of this card were wrong without it. The server only computes a
+  /// deadline once the trip has ended, so secondsRemaining is null all morning
+  /// — and `?? 0` read that as "the deadline has passed", painting the panel
+  /// red and announcing that the office had been told, from 07:00, every day,
+  /// on the one panel of this screen that has to be believed.
+  ///
+  /// Worse, the button under it was live too, and the server takes it: nothing
+  /// on either side checks that the run is over. A driver clearing that false
+  /// red at 07:00, with forty children about to board, filed the empty-bus
+  /// declaration for the day — after which the card turns green for good and
+  /// the aisle is never walked. The control that exists to stop a child being
+  /// left in a locked bus could be satisfied before the bus had moved.
+  final bool tripEnded;
 
   @override
   Widget build(BuildContext context) {
@@ -887,8 +910,34 @@ class _SweepCard extends StatelessWidget {
       );
     }
 
-    final seconds = sweep.secondsRemaining ?? 0;
-    final late = seconds <= 0;
+    // Not yet: the run is still going, so say what the sweep is for and leave
+    // it at that. No countdown, no red, and no button to press by mistake.
+    if (!tripEnded) {
+      return Panel(
+        child: Row(
+          children: [
+            IconChip(
+              icon: Icons.event_seat_rounded,
+              color: AppTheme.textMuted,
+              background: AppTheme.neutralSoft,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                t('driver.sweepAfterRun'),
+                style: TextStyle(fontSize: 13, height: 1.45, color: AppTheme.textMuted),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Only once the run is over is there a deadline at all, so only then can it
+    // have passed. A null here now means the server has not sent one yet, which
+    // is not the same as late.
+    final seconds = sweep.secondsRemaining;
+    final late = seconds != null && seconds <= 0;
 
     return Panel(
       color: late ? AppTheme.roseSoft : AppTheme.amberSoft,
@@ -915,7 +964,7 @@ class _SweepCard extends StatelessWidget {
                     Text(
                       late
                           ? t('driver.sweepDeadlinePassed')
-                          : '${tn('driver.sweepDueBy', hhmm(sweep.deadlineAt))} — ${tn('driver.aboutMinutes', (seconds / 60).ceil())}',
+                          : '${tn('driver.sweepDueBy', hhmm(sweep.deadlineAt))} — ${tn('driver.aboutMinutes', ((seconds ?? 0) / 60).ceil())}',
                       style: TextStyle(
                         fontSize: 12.5,
                         color: late ? AppTheme.rose : AppTheme.textMuted,
