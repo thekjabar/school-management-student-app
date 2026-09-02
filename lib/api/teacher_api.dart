@@ -361,12 +361,21 @@ class TeacherApi {
   }
 
   /// The register for a day, with whatever has already been marked on it.
+  ///
+  /// [q] asks the server for only the children whose name or code contains
+  /// it; the matching is done there, in the same folded form the search
+  /// columns use, so a name typed in Kurdish finds a child stored in Latin.
   Future<({bool alreadyTaken, List<RegisterMark> marks})> register(
     String classId, {
     String? date,
+    String? q,
   }) async {
+    final query = <String, String>{
+      'date': ?date,
+      if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
+    };
     final json = await _api.get(
-      '/teacher/classes/$classId/attendance${date != null ? '?date=$date' : ''}',
+      '/teacher/classes/$classId/attendance${query.isEmpty ? '' : '?${Uri(queryParameters: query).query}'}',
     ) as Map<String, dynamic>;
     return (
       alreadyTaken: (json['alreadyTaken'] ?? false) as bool,

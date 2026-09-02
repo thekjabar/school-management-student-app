@@ -321,6 +321,8 @@ const Map<String, String> _en = {
   'teacher.noLessons': 'No lessons are timetabled for you.',
   'teacher.nothingToday': 'Nothing timetabled today.',
   'teacher.noRoster': 'Nobody is on this class roster.',
+  'teacher.searchRegister': 'Search by name or code',
+  'teacher.registerNoMatch': 'No child on this register matches that.',
   'teacher.noTerm': 'No term is open. The school office sets these.',
   // ---- The register --------------------------------------------------------
   'teacher.takeRegister': 'Take the register',
@@ -1534,6 +1536,8 @@ const Map<String, String> _ckb = {
   'teacher.noLessons': 'هیچ وانەیەکت بۆ دیاری نەکراوە.',
   'teacher.nothingToday': 'ئەمڕۆ هیچ وانەیەک نییە.',
   'teacher.noRoster': 'هیچ کەسێک لەم پۆلەدا نییە.',
+  'teacher.searchRegister': 'بە ناو یان کۆد بگەڕێ',
+  'teacher.registerNoMatch': 'هیچ منداڵێک لەم لیستەدا لەگەڵ ئەوە ناگونجێت.',
   'teacher.noTerm': 'هیچ وەرزێک کراوە نییە. نووسینگەی قوتابخانە ئەمانە دیاری دەکات.',
   // ---- The register --------------------------------------------------------
   'teacher.takeRegister': 'تۆمارکردنی ئامادەبوون',
@@ -2730,6 +2734,8 @@ const Map<String, String> _ar = {
   'teacher.noLessons': 'لا توجد حصص مجدولة لك.',
   'teacher.nothingToday': 'لا توجد حصص اليوم.',
   'teacher.noRoster': 'لا يوجد أحد في قائمة هذا الصف.',
+  'teacher.searchRegister': 'ابحث بالاسم أو الرمز',
+  'teacher.registerNoMatch': 'لا يوجد طالب في هذا السجل يطابق ذلك.',
   'teacher.noTerm': 'لا يوجد فصل دراسي مفتوح. الإدارة تحدد ذلك.',
   // ---- The register --------------------------------------------------------
   'teacher.takeRegister': 'تسجيل الحضور',

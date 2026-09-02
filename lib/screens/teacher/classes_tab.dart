@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api/client.dart';
@@ -159,6 +161,70 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _dirty = false;
   bool _saving = false;
 
+  final _search = TextEditingController();
+  String _query = '';
+  Timer? _debounce;
+  bool _searching = false;
+
+  /// The children the server said match the search, or null when there is
+  /// no search. Only ids come back into use: the rows drawn are still the
+  /// ones in [_marks], so a mark put against a child before the teacher
+  /// searched is still there when the search is cleared. Re-fetching the
+  /// rows themselves would wipe every unsaved mark on each keystroke.
+  Set<String>? _matching;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _onQuery(String value) {
+    _debounce?.cancel();
+    final q = value.trim();
+    if (q.isEmpty) {
+      setState(() {
+        _query = '';
+        _matching = null;
+        _searching = false;
+      });
+      return;
+    }
+    setState(() => _query = value);
+    // A pause, not a keystroke: a teacher typing a name sends one request for
+    // the name, not one for every letter of it.
+    _debounce = Timer(const Duration(milliseconds: 350), () => _runSearch(q));
+  }
+
+  Future<void> _runSearch(String q) async {
+    setState(() => _searching = true);
+    try {
+      final data = await TeacherApi.instance.register(
+        widget.slot.classId,
+        date: _dateString,
+        q: q,
+      );
+      // Typed past this one while it was in flight; the newer search answers.
+      if (!mounted || _query.trim() != q) return;
+      setState(() => _matching = data.marks.map((m) => m.studentId).toSet());
+    } on ApiException catch (e) {
+      if (mounted) showNote(context, e.message, bad: true);
+    } finally {
+      if (mounted && _query.trim() == q) setState(() => _searching = false);
+    }
+  }
+
+  void _clearSearch() {
+    _debounce?.cancel();
+    _search.clear();
+    setState(() {
+      _query = '';
+      _matching = null;
+      _searching = false;
+    });
+  }
+
   /// Whether the amber note has been waved away.
   ///
   /// Dismissed for the sitting rather than for the day: it is a reminder, not a
@@ -208,6 +274,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _date = picked;
       _dirty = false;
     });
+    _clearSearch();
     _loaderKey.currentState?.reload();
   }
 
@@ -244,6 +311,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
               date: _date,
               onPickDate: _pickDate,
             ),
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(kGutter, 0, kGutter, 10),
+              child: TextField(
+                controller: _search,
+                textInputAction: TextInputAction.search,
+                onChanged: _onQuery,
+                style: TextStyle(fontSize: 14, color: AppTheme.text),
+                decoration: InputDecoration(
+                  hintText: t('teacher.searchRegister'),
+                  prefixIcon: Icon(Icons.search_rounded, size: 19, color: AppTheme.textFaint),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 42, minHeight: 42),
+                  suffixIcon: _searching
+                      ? Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Role.teacher.tint,
+                            ),
+                          ),
+                        )
+                      : _query.isEmpty
+                          ? null
+                          : GestureDetector(
+                              onTap: _clearSearch,
+                              child: Icon(
+                                Icons.cancel_rounded,
+                                size: 17,
+                                color: AppTheme.textFaint,
+                              ),
+                            ),
+                  suffixIconConstraints: const BoxConstraints(minWidth: 42, minHeight: 42),
+                ),
+              ),
+            ),
             Expanded(
               // The height of the region is measured here so the body can fill
               // it exactly and scroll its own children lazily. Fifty is an
@@ -273,7 +377,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                   isEmpty: (d) => d.marks.isEmpty,
                   empty: t('teacher.noRoster'),
-                  builder: (context, data) => SizedBox(
+                  builder: (context, data) {
+                    final matching = _matching;
+                    final shown = matching == null
+                        ? data.marks
+                        : [for (final m in data.marks) if (matching.contains(m.studentId)) m];
+                    return SizedBox(
                     height: box.maxHeight,
                     child: RefreshIndicator(
                       color: Role.teacher.tint,
@@ -323,15 +432,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ],
                             ),
                           ),
+                          if (shown.isEmpty)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(12, 18, 12, 8),
+                                child: Text(
+                                  t('teacher.registerNoMatch'),
+                                  style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                                ),
+                              ),
+                            ),
                           SliverList.builder(
-                            itemCount: data.marks.length,
+                            itemCount: shown.length,
                             itemBuilder: (context, i) {
-                              final mark = data.marks[i];
+                              final mark = shown[i];
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: kCardGap),
                                 child: _MarkRow(
                                   mark: mark,
-                                  position: i + 1,
+                                  // Where the child sits in the whole register,
+                                  // not in the search results: the number next
+                                  // to a name must not change when the teacher
+                                  // types.
+                                  position: data.marks.indexOf(mark) + 1,
                                   onChanged: (status) => setState(() {
                                     mark.status = status;
                                     if (status != 'LATE') mark.minutesLate = null;
@@ -345,7 +468,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ],
                       ),
                     ),
-                  ),
+                  );
+                  },
                 ),
               ),
             ),
@@ -693,7 +817,9 @@ class _MarkRow extends StatelessWidget {
           const SizedBox(width: 9),
           // The name gives up its width first: the four marks are what the
           // screen is for, and a long name that pushed them past the edge would
-          // leave a child unmarkable.
+          // leave a child unmarkable. It wraps rather than truncates — a
+          // Kurdish name is three words and the third is the one that tells
+          // two cousins apart, so "Shadan Ja…" is not a name, it is a guess.
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -701,7 +827,8 @@ class _MarkRow extends StatelessWidget {
               children: [
                 Text(
                   mark.name,
-                  maxLines: 1,
+                  maxLines: 3,
+                  softWrap: true,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
