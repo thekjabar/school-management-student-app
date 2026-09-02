@@ -363,8 +363,9 @@ class TeacherApi {
   /// The register for a day, with whatever has already been marked on it.
   ///
   /// [q] asks the server for only the children whose name or code contains
-  /// it; the matching is done there, in the same folded form the search
-  /// columns use, so a name typed in Kurdish finds a child stored in Latin.
+  /// it; the matching is done there, on the folded form the search columns
+  /// use, so case and letter variants do not matter. It does not transliterate:
+  /// a name stored in Latin is found by typing it in Latin.
   Future<({bool alreadyTaken, List<RegisterMark> marks})> register(
     String classId, {
     String? date,
