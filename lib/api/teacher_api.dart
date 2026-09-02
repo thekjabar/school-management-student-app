@@ -276,7 +276,7 @@ class MarkRow {
     required this.score,
     required this.wasAbsent,
     required this.publishedAt,
-  });
+  }) : _openedWith = (score, wasAbsent);
 
   final String studentId;
   final String name;
@@ -285,6 +285,17 @@ class MarkRow {
   num? score;
   bool wasAbsent;
   final DateTime? publishedAt;
+
+  /// What this row said when the screen opened it.
+  ///
+  /// score and wasAbsent are edited in place, so without this there is no way
+  /// to tell a mark the teacher CLEARED from one they never touched — and that
+  /// distinction is the whole difference between "leave this student alone" and
+  /// "take the old mark off".
+  final (num?, bool) _openedWith;
+
+  /// Whether the teacher changed this row.
+  bool get changed => score != _openedWith.$1 || wasAbsent != _openedWith.$2;
 
   factory MarkRow.fromJson(Map<String, dynamic> j) => MarkRow(
         studentId: (j['studentId'] ?? '') as String,
@@ -483,13 +494,26 @@ class TeacherApi {
     return rows.isEmpty ? null : rows.first['id'] as String?;
   }
 
+  /// Save the marks the teacher actually changed.
+  ///
+  /// The filter used to be `score != null || wasAbsent`, which silently dropped
+  /// the one case that matters most: a mark the teacher had just CLEARED, or a
+  /// student they had just un-flagged as absent. Neither reached the server, so
+  /// it kept the old value while the screen said "Marks saved" — a correction
+  /// that looked made and was not, on the numbers a family is sent.
+  ///
+  /// Only changed rows go, so a save cannot quietly wipe the marks of students
+  /// nobody touched. `score` is OMITTED rather than sent null when a mark is
+  /// cleared, because that is how the server clears one: an absent `score`
+  /// writes null, which is exactly what "no mark" means.
   Future<void> saveMarks(String examId, List<MarkRow> rows) async {
+    final changed = rows.where((r) => r.changed).toList();
+    if (changed.isEmpty) return;
     await _api.post('/teacher/exams/$examId/marks', {
-      'marks': rows
-          .where((r) => r.score != null || r.wasAbsent)
+      'marks': changed
           .map((r) => {
                 'studentId': r.studentId,
-                if (!r.wasAbsent) 'score': r.score,
+                if (!r.wasAbsent && r.score != null) 'score': r.score,
                 'wasAbsent': r.wasAbsent,
               })
           .toList(),
