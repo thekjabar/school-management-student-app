@@ -131,6 +131,14 @@ for role in "${ROLES[@]}"; do
   if [ "${lib:-0}" -gt 0 ]; then
     tmp=$(mktemp)
     unzip -p "$OUT/$name.apk" lib/arm64-v8a/libapp.so > "$tmp"
+    # The Dart title, which is spaced — NOT $name, which is the hyphenated
+    # FILE name. Confusing the two made this check reject a perfectly good
+    # parent build on its first run.
+    case "$role" in
+      parent)  wantTitle="KSP Parent"  ;;
+      teacher) wantTitle="KSP Teacher" ;;
+      driver)  wantTitle="KSP Driver"  ;;
+    esac
     wrong=""
     for other in parent teacher driver; do
       [ "$other" = "$role" ] && continue
@@ -141,7 +149,7 @@ for role in "${ROLES[@]}"; do
       esac
       if grep -aq "$otherName" "$tmp"; then wrong="$wrong $otherName"; fi
     done
-    if ! grep -aq "$name" "$tmp" || [ -n "$wrong" ]; then
+    if ! grep -aq "$wantTitle" "$tmp" || [ -n "$wrong" ]; then
       rm -f "$tmp"
       echo
       echo "FAILED: $name.apk is not the $role app."
