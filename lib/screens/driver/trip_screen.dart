@@ -1175,7 +1175,9 @@ class _StopCardState extends State<_StopCard> {
               // roster stays exactly where it is — the driver still has to see
               // who is expected — but the reason the ticks beside it will not
               // move is said once, in the place he is looking when he tries.
-              if (!widget.running && widget.started)
+              if (!widget.running &&
+                  widget.started &&
+                  s.students.any((r) => r.boardedAt != null && r.alightedAt == null))
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: Row(
@@ -1242,11 +1244,13 @@ class _StopCardState extends State<_StopCard> {
                         label: t('driver.arrived'),
                         color: Role.driver.tint,
                         busy: _busyStop,
-                        onPressed: () => _stopAction(
-                          () => CrewApi.instance
-                              .arriveAtStop(widget.tripId, s.plannedSequence),
-                          t('driver.arrived'),
-                        ),
+                        onPressed: widget.running
+                            ? () => _stopAction(
+                                  () => CrewApi.instance
+                                      .arriveAtStop(widget.tripId, s.plannedSequence),
+                                  t('driver.arrived'),
+                                )
+                            : null,
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -1255,11 +1259,13 @@ class _StopCardState extends State<_StopCard> {
                         label: t('driver.movingOn'),
                         color: AppTheme.blue,
                         busy: _busyStop,
-                        onPressed: () => _stopAction(
-                          () => CrewApi.instance
-                              .leaveStop(widget.tripId, s.plannedSequence),
-                          t('driver.movingOn'),
-                        ),
+                        onPressed: widget.running
+                            ? () => _stopAction(
+                                  () => CrewApi.instance
+                                      .leaveStop(widget.tripId, s.plannedSequence),
+                                  t('driver.movingOn'),
+                                )
+                            : null,
                       ),
                     ),
                   ],
