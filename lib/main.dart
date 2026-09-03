@@ -26,7 +26,27 @@ import 'theme/app_theme.dart';
 /// — so one codebase produces three apps. Each Android flavour also carries its
 /// own applicationId, so a teacher whose own child rides the bus can have both
 /// the teacher app and the parent app on one phone.
-const String kRole = String.fromEnvironment('APP_ROLE', defaultValue: 'parent');
+///
+/// There is deliberately NO default.
+///
+/// The Android flavour and this define are separate inputs to the build, and
+/// nothing makes them agree. A build run as `flutter build apk --flavor driver`
+/// without the define produced an APK with the driver's applicationId, the
+/// driver's name and the driver's icon, running the PARENT app — because the
+/// default was 'parent'. It shipped. The driver installed it, signed in, and
+/// was told his account was for the web console: a DRIVER membership does not
+/// pass the parent app's gate, and the gate was right.
+///
+/// A default made that failure invisible for exactly one of the three roles and
+/// silent for the other two. Without one, a build missing the define is broken
+/// for all three, loudly, on the first screen — before it reaches anybody.
+/// tool/build_apks.sh always passes it; nothing else should be building these.
+const String kRole = String.fromEnvironment('APP_ROLE');
+
+/// The three apps this codebase builds.
+const List<String> kRoles = ['parent', 'teacher', 'driver'];
+
+bool get _roleIsValid => kRoles.contains(kRole);
 
 Role get _role => switch (kRole) {
       'teacher' => Role.teacher,
@@ -291,6 +311,11 @@ class _GateState extends State<_Gate> {
 
   @override
   Widget build(BuildContext context) {
+    // Before anything else, and before any account is involved: this build does
+    // not know which of the three apps it is. Everything past here would be a
+    // guess, and the guess is what shipped the parent app inside KSP Driver.
+    if (!_roleIsValid) return const _BrokenBuild();
+
     if (!_ready) {
       // Deliberately bare of CONTENT — the wordmark and spinner that used to
       // live here read as a second splash screen the moment the clip lifted,
@@ -358,6 +383,63 @@ class _GateState extends State<_Gate> {
     }
     // The active membership may not be listed separately on some accounts.
     return wanted.contains(_me!.role) ? _me!.active : null;
+  }
+}
+
+/// The build itself is wrong, and no account can fix it.
+///
+/// Deliberately in English only and deliberately ugly. It is not a message for
+/// a driver or a parent — if one ever sees it, the APK should never have been
+/// handed out, and it says so in the words the person who built it needs. The
+/// alternative is what happened before: a build that looks perfect, installs
+/// under the right name, and quietly runs the wrong app.
+class _BrokenBuild extends StatelessWidget {
+  const _BrokenBuild();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFF7F1D1D),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.build_circle_outlined, size: 44, color: Colors.white),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'This build is broken',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'APP_ROLE was not set, so this APK does not know whether it is '
+                    'the parent, teacher or driver app.\n\n'
+                    'Do not hand this file to anybody. Build with '
+                    'tool/build_apks.sh, which passes the define.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 13,
+                      height: 1.6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

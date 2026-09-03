@@ -113,6 +113,47 @@ for role in "${ROLES[@]}"; do
     fi
     echo "splash verified: $got bytes"
   fi
+
+  # Prove the APK is actually THIS role's app.
+  #
+  # --flavor and --dart-define are separate inputs and nothing makes them
+  # agree. Building without the define once produced KSP-Driver.apk with the
+  # right applicationId, the right label and the right icon, running the PARENT
+  # app, because kRole defaulted. Nothing about the file gave it away: the
+  # package name was right, the label was right, and the driver only found out
+  # when he signed in and was told his account was for the web console.
+  #
+  # kRole is a const, so `switch (kRole)` folds at compile time and only the
+  # winning branch's title survives in the snapshot. That makes the title a
+  # direct read of what APP_ROLE actually was — unlike the label, which the
+  # Android flavour sets whatever the Dart side believes.
+  lib=$(unzip -p "$OUT/$name.apk" lib/arm64-v8a/libapp.so 2>/dev/null | wc -c)
+  if [ "${lib:-0}" -gt 0 ]; then
+    tmp=$(mktemp)
+    unzip -p "$OUT/$name.apk" lib/arm64-v8a/libapp.so > "$tmp"
+    wrong=""
+    for other in parent teacher driver; do
+      [ "$other" = "$role" ] && continue
+      case "$other" in
+        parent)  otherName="KSP Parent"  ;;
+        teacher) otherName="KSP Teacher" ;;
+        driver)  otherName="KSP Driver"  ;;
+      esac
+      if grep -aq "$otherName" "$tmp"; then wrong="$wrong $otherName"; fi
+    done
+    if ! grep -aq "$name" "$tmp" || [ -n "$wrong" ]; then
+      rm -f "$tmp"
+      echo
+      echo "FAILED: $name.apk is not the $role app."
+      echo "  APP_ROLE did not reach the Dart side, so the binary is somebody"
+      echo "  else's app wearing this role's package name, label and icon."
+      [ -n "$wrong" ] && echo "  found instead:$wrong"
+      exit 1
+    fi
+    rm -f "$tmp"
+    echo "role verified: binary is the $role app"
+  fi
+
   echo "→ $OUT/$name.apk  ($(du -h "$OUT/$name.apk" | cut -f1))"
 done
 
