@@ -591,6 +591,9 @@ class SweepState {
     required this.secondsRemaining,
     required this.attemptsSoFar,
     required this.tagFitted,
+    required this.lastAlightingAt,
+    required this.minSecondsAfterLastAlighting,
+    required this.confirmableFrom,
   });
 
   final bool required_;
@@ -599,6 +602,47 @@ class SweepState {
   final int? secondsRemaining;
   final int attemptsSoFar;
   final bool tagFitted;
+
+  /// When the last child stepped off. Null until somebody has.
+  final DateTime? lastAlightingAt;
+
+  /// The floor, in seconds, the server puts under a believable walk. Null when
+  /// the server has not said — an older build of the platform, not a run
+  /// without a floor.
+  final int? minSecondsAfterLastAlighting;
+
+  /// The instant a sweep filed for this run starts being counted.
+  ///
+  /// Sent as an absolute server time on purpose. Anything filed before it is
+  /// graded a rubber stamp: recorded, alerted on, and deliberately NOT clearing
+  /// the bus, because nobody walks to the back row in twenty seconds. Null when
+  /// nobody has got off yet, which is not a wait — it is no last child to
+  /// measure from.
+  final DateTime? confirmableFrom;
+
+  /// How long the driver still has to wait, in seconds. Zero once the wait is
+  /// over.
+  ///
+  /// Measured against [confirmableFrom] rather than re-derived from
+  /// [minSecondsAfterLastAlighting] and a local stopwatch: the server grades
+  /// the walk against its own clock, so counting down to its own instant is the
+  /// only way the number on the phone means what the button will do. A run
+  /// where nobody alighted has no [confirmableFrom] and is therefore not
+  /// blocked at all.
+  int get secondsUntilConfirmable {
+    final from = confirmableFrom;
+    if (from == null) return 0;
+    final left = from.difference(DateTime.now());
+    if (left <= Duration.zero) return 0;
+    // Rounded up, not truncated. `inSeconds` throws the fraction away, which
+    // would open the button up to a second before the server's own instant —
+    // and a walk filed a fraction early is refused exactly as silently as one
+    // filed twenty seconds early. Better a second late than a second refused.
+    return (left.inMilliseconds / 1000).ceil();
+  }
+
+  /// The walk would be counted if it were filed now.
+  bool get confirmable => secondsUntilConfirmable <= 0;
 
   factory SweepState.fromJson(Map<String, dynamic> j) => SweepState(
         required_: (j['sweepRequired'] ?? true) as bool,
@@ -610,6 +654,14 @@ class SweepState {
         secondsRemaining: (j['secondsRemaining'] as num?)?.toInt(),
         attemptsSoFar: (j['attemptsSoFar'] as num?)?.toInt() ?? 0,
         tagFitted: (j['tagFitted'] ?? false) as bool,
+        lastAlightingAt: j['lastAlightingAt'] == null
+            ? null
+            : DateTime.parse(j['lastAlightingAt'] as String).toLocal(),
+        minSecondsAfterLastAlighting:
+            (j['minSecondsAfterLastAlighting'] as num?)?.toInt(),
+        confirmableFrom: j['confirmableFrom'] == null
+            ? null
+            : DateTime.parse(j['confirmableFrom'] as String).toLocal(),
       );
 }
 

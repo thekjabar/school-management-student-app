@@ -14,6 +14,47 @@ import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
 import 'route_map.dart';
 
+/* ---------------------------------------------------------------------------
+ * The server's words, turned into the driver's
+ * ------------------------------------------------------------------------- */
+
+/// What the server said, and what the driver needed to hear instead.
+///
+/// The API writes its refusals for the record: "This trip has not been started,
+/// so nothing can be recorded against it yet." Every word of that is true, and
+/// none of it tells a man standing in an aisle which button to press. He read
+/// it, learned nothing, and tapped the same tick again.
+///
+/// Each entry is a fragment of a sentence the server actually sends, matched
+/// case-insensitively anywhere in the message, against the key of an
+/// instruction he can act on. Add to the list as more of them turn up — being a
+/// list is the whole point.
+///
+/// The server answers in the language the app asked in, so these fragments only
+/// match while that language is English. That is not a hole: an unrecognised
+/// message falls through untouched, which is exactly what reaches the driver
+/// today, and nothing is ever swallowed.
+const List<(String, String)> _serverSays = [
+  // No shift opened, or a shift opened and the bus never departed. Both come
+  // down to the same instruction: the orange button at the top of the screen.
+  ('not been started', 'driver.mustSetOff'),
+  ('is not running', 'driver.mustSetOff'),
+  // The walk-around the platform will not open a shift without.
+  ('pre-trip check', 'driver.mustCheckBus'),
+];
+
+/// The instruction behind a server message, or the message itself.
+String _driverWords(String message) {
+  final lower = message.toLowerCase();
+  for (final (fragment, key) in _serverSays) {
+    if (lower.contains(fragment)) return t(key);
+  }
+  return message;
+}
+
+/// The same, for a failure that was thrown rather than answered.
+String _driverError(Object? e) => _driverWords(errorText(e));
+
 /// One run, from the driver's seat.
 ///
 /// The whole screen is one question repeated: WHO IS STILL NOT ACCOUNTED FOR.
@@ -157,7 +198,7 @@ class _TripScreenState extends State<TripScreen> {
         showNote(context, t('driver.runEnded'));
       }
     } catch (e) {
-      if (mounted) showNote(context, errorText(e), bad: true);
+      if (mounted) showNote(context, _driverError(e), bad: true);
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -203,7 +244,7 @@ class _TripScreenState extends State<TripScreen> {
       // Every failure, not just the ones the API answered. A dropped
       // connection threw straight past this and left the driver looking at a
       // button that had apparently done nothing.
-      if (mounted) showNote(context, errorText(e), bad: true);
+      if (mounted) showNote(context, _driverError(e), bad: true);
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -265,14 +306,39 @@ class _TripScreenState extends State<TripScreen> {
                   final counts = data.plan.counts;
                   final trip = data.trip;
 
+                  // The wheels have turned and the run is not over — the one
+                  // condition every control that records a child depends on.
+                  // Worked out once, here, so the panic button and the tick
+                  // buttons on forty rider rows cannot reach different answers.
+                  final running =
+                      trip != null && trip.startedAt != null && trip.endedAt == null;
+
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 12),
+                      // FIRST on the screen, above everything.
+                      //
+                      // It used to be the third card down. A driver opened the
+                      // run, saw forty children with tick buttons beside them,
+                      // tapped one, and was told by the server that the trip
+                      // had not been started — while the orange Set off button
+                      // that would have started it sat below the fold. The next
+                      // thing to do is now the first thing he sees, and it says
+                      // in words what that thing is.
+                      if (trip != null) ...[
+                        _RunControls(
+                          trip: trip,
+                          busy: _busy,
+                          onStart: () => _startShift(trip),
+                          onDepart: () => _act(t('driver.departed'), () => CrewApi.instance.depart(trip.id)),
+                          onEnd: () => _endRun(trip),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       // Before the wheels turn, the only question left on this
-                      // screen is when to go — so it is the first thing on it.
-                      // Once the run has started it is history, and history at
-                      // the top of a working screen is in the way.
+                      // screen is when to go. Once the run has started it is
+                      // history, and history on a working screen is in the way.
                       if (data.plan.timing.hasDepartBy &&
                           data.plan.timing.startedAt == null) ...[
                         _LeaveByCard(
@@ -282,19 +348,9 @@ class _TripScreenState extends State<TripScreen> {
                         const SizedBox(height: 12),
                       ],
                       _HeadcountCard(counts: counts),
-                      if (trip != null && trip.startedAt != null && trip.endedAt == null) ...[
+                      if (trip != null && running) ...[
                         const SizedBox(height: 12),
                         _PanicButton(busy: _busy != null, onPressed: () => _panic(trip)),
-                      ],
-                      if (trip != null) ...[
-                        const SizedBox(height: 12),
-                        _RunControls(
-                          trip: trip,
-                          busy: _busy,
-                          onStart: () => _startShift(trip),
-                          onDepart: () => _act(t('driver.departed'), () => CrewApi.instance.depart(trip.id)),
-                          onEnd: () => _endRun(trip),
-                        ),
                       ],
                       SectionHead(t('driver.stops')),
                       _OrderToggle(
@@ -333,6 +389,10 @@ class _TripScreenState extends State<TripScreen> {
                           tripId: widget.tripId,
                           leg: trip?.leg ?? 'OUT',
                           terminalStopId: data.terminalStopId,
+                          // Whether the ticks on this card can do anything at
+                          // all. The server refuses every custody event until
+                          // the bus has set off.
+                          running: running,
                           onChanged: () => _loaderKey.currentState?.reload(),
                         ),
                       ),
@@ -626,31 +686,58 @@ class _RunControls extends StatelessWidget {
     // start, depart and end together invites the wrong one to be pressed on a
     // moving bus.
     //
+    // The same switch also picks the sentence printed above that button and the
+    // driver's position in the run. One switch, not three: a screen whose words
+    // and whose button can disagree is worse than a screen with no words on it.
+    //
     // Every arm names a real TripStatus. ARRIVED, SWEEP_PENDING and
     // SWEEP_OVERDUE all used to fall through to "This run has finished" — so a
     // bus standing at the gate with children still on it offered nothing at
     // all, and a run whose cabin sweep was overdue said it was done.
-    final (String label, VoidCallback? action) = switch (trip.status) {
-      'PLANNED' || 'ROSTERED' => (t('driver.startShift'), onStart),
+    final (String label, VoidCallback? action, String? how, int? step) =
+        switch (trip.status) {
+      'PLANNED' || 'ROSTERED' => (t('driver.startShift'), onStart, t('driver.step.check'), 1),
       // The walk-around failed, or the office stopped the bus. A second check
       // is the way back: a PASS clears the gate and returns the run to
       // BOARDING. The reason is shown above the button rather than on it.
-      'BLOCKED' => (t('driver.startShift'), onStart),
-      'BOARDING' => (t('driver.setOff'), onDepart),
-      // Still carrying children — at the gate or between stops. Ending is what
-      // starts the sweep clock, and the server allows it right up until the
-      // trip is closed.
-      'IN_PROGRESS' || 'ARRIVED' => (t('driver.endRun'), onEnd),
+      'BLOCKED' => (t('driver.startShift'), onStart, t('driver.step.check'), 1),
+      'BOARDING' => (t('driver.setOff'), onDepart, t('driver.step.setOff'), 2),
+      // Still carrying children — between stops, then standing at the gate.
+      // Same button both times, because ending is what starts the sweep clock
+      // and the server allows it right up until the trip is closed; different
+      // sentence, because "tick each child as they get off" and "you are at the
+      // last stop" are not the same instruction.
+      'IN_PROGRESS' => (t('driver.endRun'), onEnd, t('driver.step.atStops'), 3),
+      'ARRIVED' => (t('driver.endRun'), onEnd, t('driver.step.endRun'), 4),
       // Ended. The sweep card below is the only thing left to do, and it is the
       // one thing nobody may be told is optional.
-      'SWEEP_PENDING' || 'SWEEP_OVERDUE' => (t('driver.sweepOutstanding'), null),
-      'CANCELLED' || 'VOID' || 'ABANDONED' => (t('driver.runCalledOff'), null),
-      _ => (t('driver.runFinished'), null),
+      'SWEEP_PENDING' || 'SWEEP_OVERDUE' =>
+        (t('driver.sweepOutstanding'), null, t('driver.step.sweep'), 5),
+      // Called off. There is no step in a run that is not happening, and
+      // "Step 1 of 5" over a cancelled run would be the app inviting him to
+      // start it.
+      'CANCELLED' || 'VOID' || 'ABANDONED' => (t('driver.runCalledOff'), null, null, null),
+      _ => (t('driver.runFinished'), null, t('driver.step.done'), 5),
     };
 
     // Nothing left to do AND nothing left owed.
     final settled = trip.status == 'COMPLETED';
     final blocked = trip.status == 'BLOCKED';
+
+    // Something is still owed and there is no button here for it — the cabin
+    // sweep, or a run the office stopped. The driver's own orange would read as
+    // "carry on", so those wear red.
+    final owing = action == null && !settled;
+    final accent = settled
+        ? AppTheme.textMuted
+        : owing
+            ? AppTheme.rose
+            : Role.driver.tint;
+    final wash = settled
+        ? AppTheme.neutralSoft
+        : owing
+            ? AppTheme.roseSoft
+            : Role.driver.wash;
 
     return Panel(
       child: Column(
@@ -709,6 +796,51 @@ class _RunControls extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+          ],
+          // What to do RIGHT NOW, in words, directly above the control that
+          // does it.
+          //
+          // The button alone was not an instruction. "Set off" is obvious to
+          // whoever wrote it and means nothing to a driver who has never been
+          // shown the order of the five things this screen wants from him — so
+          // the sentence says the thing to do, and the step number tells him
+          // where in the run he is standing. Both come from the switch that
+          // chose the button, so neither can drift away from it.
+          if (how != null) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(13, 11, 13, 13),
+              decoration: BoxDecoration(
+                color: wash,
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (step != null) ...[
+                    Text(
+                      tn('driver.stepOf', step),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                        color: accent,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                  ],
+                  Text(
+                    how,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.45,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 12),
           ],
@@ -798,6 +930,7 @@ class _StopCard extends StatefulWidget {
     required this.tripId,
     required this.leg,
     required this.terminalStopId,
+    required this.running,
     required this.onChanged,
   });
 
@@ -808,6 +941,16 @@ class _StopCard extends StatefulWidget {
   /// The campus gate, where the morning's drop-offs and the afternoon's
   /// boardings actually happen.
   final String? terminalStopId;
+
+  /// The bus has set off and the run is not over.
+  ///
+  /// The server records nothing against a trip that has not started, and the
+  /// tick buttons on every rider row did not know it: they were live from the
+  /// moment the screen opened, so the first tap of the morning always failed —
+  /// with a sentence about trips and states, at the one moment the driver was
+  /// least equipped to read one. Dead buttons and one line of explanation are
+  /// the honest version of a rule the server was going to enforce anyway.
+  final bool running;
 
   final VoidCallback onChanged;
 
@@ -848,7 +991,14 @@ class _StopCardState extends State<_StopCard> {
       // nothing, and he drove off believing the child was recorded.
       final first = rider.name.split(' ').first;
       if (!verdict.accepted) {
-        showNote(context, verdict.reason ?? tv('driver.notRecorded', {'name': first}), bad: true);
+        // The refusal reaches the driver as an instruction wherever it is one
+        // the app recognises, and verbatim wherever it is not.
+        final reason = verdict.reason;
+        showNote(
+          context,
+          reason == null ? tv('driver.notRecorded', {'name': first}) : _driverWords(reason),
+          bad: true,
+        );
       } else if (verdict.rewrittenTo != null) {
         // Accepted, but stored as something else — a drop-off away from the
         // expected stop becomes WRONG_STOP, and the office has been told.
@@ -859,7 +1009,7 @@ class _StopCardState extends State<_StopCard> {
         showNote(context, '$first — $label');
       }
     } catch (e) {
-      if (mounted) showNote(context, errorText(e), bad: true);
+      if (mounted) showNote(context, _driverError(e), bad: true);
     } finally {
       if (mounted) setState(() => _busyStudent = null);
     }
@@ -874,7 +1024,7 @@ class _StopCardState extends State<_StopCard> {
       widget.onChanged();
       if (mounted) showNote(context, label);
     } catch (e) {
-      if (mounted) showNote(context, errorText(e), bad: true);
+      if (mounted) showNote(context, _driverError(e), bad: true);
     } finally {
       if (mounted) setState(() => _busyStop = false);
     }
@@ -972,10 +1122,36 @@ class _StopCardState extends State<_StopCard> {
             ),
             if (_open) ...[
               Divider(height: 1, color: AppTheme.border),
+              // ONE line for the whole stop, not one under every child. The
+              // roster stays exactly where it is — the driver still has to see
+              // who is expected — but the reason the ticks beside it will not
+              // move is said once, in the place he is looking when he tries.
+              if (!widget.running)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 16, color: AppTheme.textMuted),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          t('driver.tickAfterSetOff'),
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            height: 1.45,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ...s.students.map((r) => _RiderRow(
                     rider: r,
                     leg: widget.leg,
                     busy: _busyStudent == r.studentId,
+                    enabled: widget.running,
                     // The note names the state the child is now in, in the
                     // reader's language.
                     onBoard: () => _mark(r, 'BOARDED', t('driver.onBoard')),
@@ -1087,6 +1263,7 @@ class _RiderRow extends StatelessWidget {
     required this.rider,
     required this.leg,
     required this.busy,
+    required this.enabled,
     required this.onBoard,
     required this.onOff,
     required this.onNoShow,
@@ -1095,6 +1272,11 @@ class _RiderRow extends StatelessWidget {
   final RiderOnStop rider;
   final String leg;
   final bool busy;
+
+  /// Whether a tap on this row can actually record anything. False until the
+  /// bus has set off, and the buttons are drawn plainly dead rather than left
+  /// live to fail.
+  final bool enabled;
   final VoidCallback onBoard;
   final VoidCallback onOff;
   final VoidCallback onNoShow;
@@ -1175,10 +1357,20 @@ class _RiderRow extends StatelessWidget {
                 _Mini(
                   icon: onBus ? Icons.logout_rounded : Icons.login_rounded,
                   colour: onBus ? AppTheme.green : Role.driver.tint,
-                  onTap: onBus ? onOff : onBoard,
+                  // Null, not a call that will be refused. The stop card says
+                  // once, above this row, what has to happen first.
+                  onTap: !enabled
+                      ? null
+                      : onBus
+                          ? onOff
+                          : onBoard,
                 ),
                 const SizedBox(width: 6),
-                _Mini(icon: Icons.close_rounded, colour: AppTheme.rose, onTap: onNoShow),
+                _Mini(
+                  icon: Icons.close_rounded,
+                  colour: AppTheme.rose,
+                  onTap: enabled ? onNoShow : null,
+                ),
               ],
             ),
         ],
@@ -1193,15 +1385,23 @@ class _RiderRow extends StatelessWidget {
 /// often wearing gloves, while the child is still in front of them — the 36 dp
 /// square they used to be is under every guideline there is and was missed
 /// often enough to be marked on the wrong row.
+///
+/// A null [onTap] draws the button plainly dead — grey, and flat against the
+/// row. Before the bus sets off the server will refuse the record anyway, and a
+/// coloured button that takes the tap and then fails teaches the driver that
+/// the app is broken rather than that he has missed a step.
 class _Mini extends StatelessWidget {
   const _Mini({required this.icon, required this.colour, required this.onTap});
 
   final IconData icon;
   final Color colour;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final off = onTap == null;
+    final tone = off ? AppTheme.textFaint : colour;
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -1210,17 +1410,28 @@ class _Mini extends StatelessWidget {
         height: 46,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: colour.withValues(alpha: 0.10),
+          color: tone.withValues(alpha: off ? 0.07 : 0.10),
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Icon(icon, size: 21, color: colour),
+        child: Icon(icon, size: 21, color: tone),
       ),
     );
   }
 }
 
 /// The last thing before the bus is locked.
-class _SweepCard extends StatelessWidget {
+///
+/// The confirm button is held shut for the first seconds after the last child
+/// steps off. That rule lives on the server — a walk filed inside the window is
+/// graded a rubber stamp, recorded, alerted on, and pointedly does NOT clear the
+/// bus — but until now it was invisible here: the driver tapped, the request
+/// came back 200, the red card stayed exactly where it was, and the only lesson
+/// available to him was to tap it again. On the one control that exists to stop
+/// a child being left asleep in a locked bus, "press it harder" is the worst
+/// habit the app could teach. So the wait is shown instead of enforced in
+/// silence: the button is plainly disabled, a countdown says when it opens, and
+/// one line says why it is shut.
+class _SweepCard extends StatefulWidget {
   const _SweepCard({
     required this.sweep,
     required this.busy,
@@ -1271,7 +1482,64 @@ class _SweepCard extends StatelessWidget {
   final bool tripEnded;
 
   @override
+  State<_SweepCard> createState() => _SweepCardState();
+}
+
+class _SweepCardState extends State<_SweepCard> {
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTicking();
+  }
+
+  /// A reload hands the card a fresh [SweepState], and with it a new instant to
+  /// count down to — so the ticker is re-armed rather than left pointing at the
+  /// old one.
+  @override
+  void didUpdateWidget(covariant _SweepCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sweep.confirmableFrom != widget.sweep.confirmableFrom) {
+      _startTicking();
+    }
+  }
+
+  /// One tick a second while the wait runs, and none once it is over.
+  ///
+  /// A second, not thirty: the number on screen is in seconds, and the whole
+  /// point of showing it is that the driver can watch it reach zero. The timer
+  /// stops itself on the tick that opens the button, so a card sitting on the
+  /// screen all afternoon is not rebuilding once a second for nothing — and the
+  /// button enables itself on that same tick, with no refresh asked of anybody.
+  void _startTicking() {
+    _tick?.cancel();
+    _tick = null;
+    if (widget.sweep.confirmable) return;
+    _tick = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      setState(() {});
+      if (widget.sweep.confirmable) {
+        timer.cancel();
+        _tick = null;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    // A periodic timer holding a setState outlives the screen otherwise, and
+    // this screen is pushed and popped all morning.
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final sweep = widget.sweep;
+    final stillOwed = widget.stillOwed;
+    final busy = widget.busy;
+
     if (!sweep.required_) {
       return Panel(
         child: Text(
@@ -1312,7 +1580,7 @@ class _SweepCard extends StatelessWidget {
 
     // Not yet: the run is still going, so say what the sweep is for and leave
     // it at that. No countdown, no red, and no button to press by mistake.
-    if (!tripEnded) {
+    if (!widget.tripEnded) {
       return Panel(
         child: Row(
           children: [
@@ -1338,6 +1606,13 @@ class _SweepCard extends StatelessWidget {
     // is not the same as late.
     final seconds = sweep.secondsRemaining;
     final late = seconds != null && seconds <= 0;
+
+    // The other clock on this card, and the one that runs the opposite way: not
+    // how long is left to file the walk, but how long until a filed walk will be
+    // believed. Ticked once a second by [_startTicking] so it reaches zero on
+    // its own.
+    final waitSeconds = sweep.secondsUntilConfirmable;
+    final waiting = waitSeconds > 0;
 
     return Panel(
       color: late ? AppTheme.roseSoft : AppTheme.amberSoft,
@@ -1399,18 +1674,64 @@ class _SweepCard extends StatelessWidget {
               ),
             ),
           ],
+          // The wait, said out loud. Two lines and no jargon: when the button
+          // opens, and why it is shut — because the check IS the walk, and the
+          // bus cannot be signed off faster than it can be walked. A driver who
+          // is told this once does not need to be told about the rule again; a
+          // driver who is told nothing learns to press the button twice.
+          if (waiting) ...[
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.hourglass_bottom_rounded, size: 18, color: AppTheme.textMuted),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tn('driver.sweepWaitCountdown', waitSeconds),
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        t('driver.sweepWaitWhy'),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.45,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 14),
           BigButton(
             label: t('driver.walkedTheBus'),
             color: late ? AppTheme.rose : AppTheme.amber,
             busy: busy,
             height: 54,
-            onPressed: onConfirm,
+            // Shut until the walk could plausibly have happened. A null here is
+            // a button that visibly cannot be pressed, which is the whole
+            // difference from the old behaviour: the tap used to be taken, sent,
+            // answered 200, and thrown away by the server as a rubber stamp
+            // without a word of it reaching the driver.
+            onPressed: waiting ? null : widget.onConfirm,
           ),
           const SizedBox(height: 6),
           Center(
             child: TextButton(
-              onPressed: busy ? null : onChildFound,
+              // Never gated. A child found on the back row is the emergency the
+              // whole sweep exists to catch, and it must never wait on a timer.
+              onPressed: busy ? null : widget.onChildFound,
               child: Text(
                 t('driver.childFound'),
                 style: TextStyle(

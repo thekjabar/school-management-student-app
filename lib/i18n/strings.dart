@@ -489,6 +489,25 @@ const Map<String, String> _en = {
   'driver.recordedAs': '{name} was recorded away from the expected stop. The office has been told.',
   'driver.onBoardSince': 'On board since {n}',
 
+  // ---- What to do right now ------------------------------------------------
+  // The run in five steps, in the order a driver does them, printed above the
+  // one button that is live at that moment. "BOARDING" is a state; "press Set
+  // off when you are ready to drive" is an instruction, and only one of the two
+  // is any use to a man who has never been shown this screen before.
+  'driver.stepOf': 'Step {n} of 5',
+  'driver.step.check': 'Press the button below and fill in the bus check. You cannot set off until it is done.',
+  'driver.step.setOff': 'The bus check is done. Press Set off when you are ready to drive.',
+  'driver.step.atStops': 'At each stop press Arrived, tick each child on or off, then press Moving on.',
+  'driver.step.endRun': 'You are at the last stop. Once every child is off, press End the run.',
+  'driver.step.sweep': 'Walk to the back row and look under every seat. Then confirm it at the bottom of this screen.',
+  'driver.step.done': 'This run is finished. There is nothing left to do.',
+  // Said once on the stop card, never once per child.
+  'driver.tickAfterSetOff': 'Press Set off at the top of this screen first — then you can tick each child here.',
+  // The server's refusals, as instructions. The sentences these stand in for
+  // are listed in _serverSays, in trip_screen.dart.
+  'driver.mustSetOff': 'The bus has not set off yet. Press Set off at the top of the screen first.',
+  'driver.mustCheckBus': 'Fill in the bus check first. Press Start my shift at the top of the screen.',
+
   // ---- When to leave, and what today actually costs -------------------------
   'driver.leaveBy': 'Leave by',
   'driver.leaveIn': 'Leave in {n} min',
@@ -516,6 +535,12 @@ const Map<String, String> _en = {
   'driver.sweepAfterRun': 'When the last child is off, walk the aisle and confirm the bus is empty here.',
   'driver.sweepOutstanding': 'This run has ended and the cabin sweep is not confirmed.',
   'driver.walkedTheBus': 'I have walked the bus — it is empty',
+  // The wait after the last child steps off. The server refuses to count a walk
+  // filed inside it, and said nothing about why — so the driver pressed again.
+  // These two lines are the rule, in a driver's words and with no rule in them.
+  'driver.sweepWaitCountdown': 'You can confirm in {n}s',
+  'driver.sweepWaitWhy':
+      'The check is a walk to the back row. The bus cannot be signed off faster than it can be walked.',
   'driver.childFound': 'A child is still on the bus',
   'driver.childFoundWho': 'Say who, so the office can ring the family now.',
   'driver.childFoundFiled': 'Reported. The office has been told.',
@@ -1884,6 +1909,18 @@ const Map<String, String> _ckb = {
   'driver.recordedAs': '{name} لە دەرەوەی وێستگەی پێشبینیکراو تۆمارکرا. نووسینگە ئاگادارکرایەوە.',
   'driver.onBoardSince': 'لە پاسدایە لە {n}ەوە',
 
+  // ---- What to do right now ------------------------------------------------
+  'driver.stepOf': 'هەنگاوی {n} لە 5',
+  'driver.step.check': 'دوگمەی خوارەوە دابگرە و پشکنینی پاسەکە پڕ بکەرەوە. تا ئەوە تەواو نەبێت ناتوانیت بەڕێبکەویت.',
+  'driver.step.setOff': 'پشکنینی پاسەکە تەواو بوو. کاتێک ئامادەی لێخوڕینیت، «بەڕێکەوتن» دابگرە.',
+  'driver.step.atStops': 'لە هەر وێستگەیەکدا «گەیشت» دابگرە، سواربوون یان دابەزینی هەر منداڵێک نیشان بکە، پاشان «بەردەوامە» دابگرە.',
+  'driver.step.endRun': 'لە دوایین وێستگەدایت. کاتێک هەموو منداڵەکان دابەزین، «کۆتاییهێنان بە گەشت» دابگرە.',
+  'driver.step.sweep': 'بڕۆ بۆ ڕیزی دواوە و ژێر هەموو کورسییەک سەیر بکە. پاشان لە خوارەوەی ئەم لاپەڕەیە پشتڕاستی بکەرەوە.',
+  'driver.step.done': 'ئەم گەشتە تەواو بووە. هیچ کارێکی تر نەماوە.',
+  'driver.tickAfterSetOff': 'سەرەتا لە سەرەوەی ئەم لاپەڕەیە «بەڕێکەوتن» دابگرە — پاشان لێرە دەتوانیت هەر منداڵێک نیشان بکەیت.',
+  'driver.mustSetOff': 'پاسەکە هێشتا بەڕێنەکەوتووە. سەرەتا لە سەرەوەی لاپەڕەکە «بەڕێکەوتن» دابگرە.',
+  'driver.mustCheckBus': 'سەرەتا پشکنینی پاسەکە پڕ بکەرەوە. لە سەرەوەی لاپەڕەکە «دەستپێکردنی نۆرەکەم» دابگرە.',
+
   'driver.leaveBy': 'دواترین کاتی بەڕێکەوتن',
   'driver.leaveIn': 'لە {n} خولەکدا بەڕێبکەوە',
   'driver.leaveNow': 'ئێستا بەڕێبکەوە',
@@ -1910,6 +1947,9 @@ const Map<String, String> _ckb = {
   'driver.sweepAfterRun': 'کاتێک دوایین منداڵ دابەزی، بەناو پاسەکەدا بڕۆ و لێرە پشتڕاست بکەرەوە کە بەتاڵە.',
   'driver.sweepOutstanding': 'ئەم گەشتە کۆتایی هاتووە و پشکنینی ناوەوە پشتڕاست نەکراوەتەوە.',
   'driver.walkedTheBus': 'بەناو پاسەکەدا ڕۆیشتووم — بەتاڵە',
+  'driver.sweepWaitCountdown': 'دوای {n} چرکە دەتوانیت پشتڕاست بکەیتەوە',
+  'driver.sweepWaitWhy':
+      'پشکنین واتە ڕۆیشتن بۆ ڕیزی دواوە. پاسەکە ناتوانرێت خێراتر پشتڕاست بکرێتەوە لەو کاتەی بۆ ڕۆیشتنی پێویستە.',
   'driver.childFound': 'منداڵێک هێشتا لە پاسەکەدایە',
   'driver.childFoundWho': 'بڵێ کێیە، تا نووسینگە ئێستا پەیوەندی بە خێزانەکەیەوە بکات.',
   'driver.childFoundFiled': 'ڕاپۆرت کرا. نووسینگە ئاگادارکرایەوە.',
@@ -3257,6 +3297,18 @@ const Map<String, String> _ar = {
   'driver.recordedAs': '{name} سُجّل بعيدًا عن الموقف المتوقع. تم إبلاغ المكتب.',
   'driver.onBoardSince': 'على متن الحافلة منذ {n}',
 
+  // ---- What to do right now ------------------------------------------------
+  'driver.stepOf': 'الخطوة {n} من 5',
+  'driver.step.check': 'اضغط الزر أدناه واملأ فحص الحافلة. لا يمكنك الانطلاق قبل إتمامه.',
+  'driver.step.setOff': 'اكتمل فحص الحافلة. اضغط «الانطلاق» عندما تكون مستعداً للقيادة.',
+  'driver.step.atStops': 'عند كل محطة اضغط «وصلت»، وسجّل صعود أو نزول كل طفل، ثم اضغط «مستمرة».',
+  'driver.step.endRun': 'أنت في المحطة الأخيرة. بعد نزول كل الأطفال، اضغط «إنهاء الرحلة».',
+  'driver.step.sweep': 'امشِ إلى الصف الخلفي وانظر تحت كل مقعد. ثم أكّد ذلك في أسفل هذه الشاشة.',
+  'driver.step.done': 'انتهت هذه الرحلة. لم يبقَ شيء لتفعله.',
+  'driver.tickAfterSetOff': 'اضغط «الانطلاق» في أعلى هذه الشاشة أولاً — بعدها يمكنك تسجيل كل طفل هنا.',
+  'driver.mustSetOff': 'لم تنطلق الحافلة بعد. اضغط «الانطلاق» في أعلى الشاشة أولاً.',
+  'driver.mustCheckBus': 'املأ فحص الحافلة أولاً. اضغط «بدء الدوام» في أعلى الشاشة.',
+
   'driver.leaveBy': 'آخر موعد للانطلاق',
   'driver.leaveIn': 'انطلق خلال {n} دقيقة',
   'driver.leaveNow': 'انطلق الآن',
@@ -3283,6 +3335,9 @@ const Map<String, String> _ar = {
   'driver.sweepAfterRun': 'عند نزول آخر طفل، امشِ في الممر وأكّد هنا أن الحافلة فارغة.',
   'driver.sweepOutstanding': 'انتهت هذه الرحلة ولم يُؤكَّد فحص الحافلة.',
   'driver.walkedTheBus': 'مشيت في الحافلة — إنها فارغة',
+  'driver.sweepWaitCountdown': 'يمكنك التأكيد بعد {n} ثانية',
+  'driver.sweepWaitWhy':
+      'الفحص يعني المشي إلى الصف الخلفي. ولا يمكن اعتماد الحافلة أسرع من الوقت اللازم للمشي فيها.',
   'driver.childFound': 'لا يزال طفل في الحافلة',
   'driver.childFoundWho': 'حدّد من هو، ليتصل المكتب بالعائلة الآن.',
   'driver.childFoundFiled': 'تم الإبلاغ. أُبلغ المكتب.',
