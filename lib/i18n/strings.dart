@@ -508,6 +508,26 @@ const Map<String, String> _en = {
   'driver.stillAboardHow': 'If you end the run now, the record will say they never got off, and the office will be told. Go back and tap the green button beside each child first.',
   'driver.goBackAndDrop': 'Go back and record them off',
   'driver.endAnyway': 'End the run anyway',
+  // ---- Emptying the bus in one go ------------------------------------------
+  // Twenty-nine green buttons is not something anybody does at a school gate
+  // with a queue of buses behind him, and what he does instead is end the run
+  // with twenty-nine children still on the register as on board. One button,
+  // one request, and an answer that says what the server actually recorded.
+  'driver.recordAllOffOut': 'Record all {n} off at the school',
+  'driver.recordAllOffReturn': 'Record all {n} as handed over',
+  'driver.recordAllOffTitleOut': 'Who got off at the school?',
+  'driver.recordAllOffTitleReturn': 'Who has been handed over?',
+  'driver.recordAllOffHow':
+      'Every child still on the bus is ticked. Untick anyone who did NOT get off, then press the button once.',
+  'driver.recordTickedOff': 'Record {n} off',
+  'driver.recordNobody': 'Nobody is ticked',
+  'driver.recordingAllOff': 'Recording them off…',
+  'driver.allOffRecorded': '{n} children recorded off the bus.',
+  'driver.someOffRefused':
+      '{ok} recorded off, {bad} refused. Tap the green button beside each of those children.',
+  'driver.someOffRefusedWhy': '{ok} recorded off, {bad} refused — {why}',
+  'driver.allOffButAway':
+      '{ok} recorded off. {away} were recorded away from the expected stop, and the office has been told.',
   // The server's refusals, as instructions. The sentences these stand in for
   // are listed in _serverSays, in trip_screen.dart.
   'driver.mustSetOff': 'The bus has not set off yet. Press Set off at the top of the screen first.',
@@ -1928,6 +1948,21 @@ const Map<String, String> _ckb = {
   'driver.stillAboardHow': 'ئەگەر ئێستا گەشتەکە کۆتایی پێبهێنیت، تۆمارەکە دەڵێت هەرگیز دانەبەزیون، و نووسینگە ئاگادار دەکرێتەوە. بگەڕێوە و سەرەتا دوگمە سەوزەکەی تەنیشت هەر منداڵێک دابگرە.',
   'driver.goBackAndDrop': 'بگەڕێوە و دابەزینیان تۆمار بکە',
   'driver.endAnyway': 'بە هەر حاڵ گەشتەکە کۆتایی پێبهێنە',
+  'driver.recordAllOffOut': 'دابەزینی هەموو {n} منداڵ لە قوتابخانە تۆمار بکە',
+  'driver.recordAllOffReturn': 'ڕادەستکردنی هەموو {n} منداڵ تۆمار بکە',
+  'driver.recordAllOffTitleOut': 'کێ لە قوتابخانە دابەزی؟',
+  'driver.recordAllOffTitleReturn': 'کێ ڕادەستکرا؟',
+  'driver.recordAllOffHow':
+      'هەموو ئەو منداڵانەی هێشتا لەناو پاسەکەدان دیاریکراون. ئەوەی دانەبەزیوە دیاریکردنەکەی لابەرە، پاشان یەک جار دوگمەکە دابگرە.',
+  'driver.recordTickedOff': 'دابەزینی {n} منداڵ تۆمار بکە',
+  'driver.recordNobody': 'هیچ منداڵێک دیارینەکراوە',
+  'driver.recordingAllOff': 'دابەزینیان تۆمار دەکرێت…',
+  'driver.allOffRecorded': 'دابەزینی {n} منداڵ لە پاسەکە تۆمارکرا.',
+  'driver.someOffRefused':
+      'دابەزینی {ok} تۆمارکرا، {bad} ڕەتکرانەوە. دوگمە سەوزەکەی تەنیشت هەر یەکێک لەوان دابگرە.',
+  'driver.someOffRefusedWhy': 'دابەزینی {ok} تۆمارکرا، {bad} ڕەتکرانەوە — {why}',
+  'driver.allOffButAway':
+      'دابەزینی {ok} تۆمارکرا. {away} لە دەرەوەی وێستگەی پێشبینیکراو تۆمارکران، و نووسینگە ئاگادارکرایەوە.',
   'driver.mustSetOff': 'پاسەکە هێشتا بەڕێنەکەوتووە. سەرەتا لە سەرەوەی لاپەڕەکە «بەڕێکەوتن» دابگرە.',
   'driver.mustCheckBus': 'سەرەتا پشکنینی پاسەکە پڕ بکەرەوە. لە سەرەوەی لاپەڕەکە «دەستپێکردنی نۆرەکەم» دابگرە.',
 
@@ -3321,6 +3356,21 @@ const Map<String, String> _ar = {
   'driver.stillAboardHow': 'إذا أنهيت الرحلة الآن، سيقول السجل إنهم لم ينزلوا أبداً، وسيتم إبلاغ الإدارة. ارجع واضغط الزر الأخضر بجانب كل طفل أولاً.',
   'driver.goBackAndDrop': 'ارجع وسجّل نزولهم',
   'driver.endAnyway': 'إنهاء الرحلة على أي حال',
+  'driver.recordAllOffOut': 'سجّل نزول جميع الأطفال الـ {n} في المدرسة',
+  'driver.recordAllOffReturn': 'سجّل تسليم جميع الأطفال الـ {n}',
+  'driver.recordAllOffTitleOut': 'من نزل في المدرسة؟',
+  'driver.recordAllOffTitleReturn': 'من تم تسليمه؟',
+  'driver.recordAllOffHow':
+      'كل طفل ما زال داخل الحافلة محدّد. أزل التحديد عن أي طفل لم ينزل، ثم اضغط الزر مرة واحدة.',
+  'driver.recordTickedOff': 'سجّل نزول {n}',
+  'driver.recordNobody': 'لم يتم تحديد أحد',
+  'driver.recordingAllOff': 'جارٍ تسجيل نزولهم…',
+  'driver.allOffRecorded': 'تم تسجيل نزول {n} من الحافلة.',
+  'driver.someOffRefused':
+      'تم تسجيل نزول {ok}، ورُفض {bad}. اضغط الزر الأخضر بجانب كل واحد منهم.',
+  'driver.someOffRefusedWhy': 'تم تسجيل نزول {ok}، ورُفض {bad} — {why}',
+  'driver.allOffButAway':
+      'تم تسجيل نزول {ok}. سُجّل {away} بعيدًا عن الموقف المتوقع، وتم إبلاغ المكتب.',
   'driver.mustSetOff': 'لم تنطلق الحافلة بعد. اضغط «الانطلاق» في أعلى الشاشة أولاً.',
   'driver.mustCheckBus': 'املأ فحص الحافلة أولاً. اضغط «بدء الدوام» في أعلى الشاشة.',
 

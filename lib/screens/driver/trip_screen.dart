@@ -55,6 +55,33 @@ String _driverWords(String message) {
 /// The same, for a failure that was thrown rather than answered.
 String _driverError(Object? e) => _driverWords(errorText(e));
 
+/// A child still recorded as on the bus, and the stop they belong to.
+///
+/// The stop travels with the child rather than being looked up later, because
+/// [custodyStopId] needs it PER CHILD: on the OUT leg an alighting resolves to
+/// the campus gate and on the RETURN leg to the child's own stop. A batch that
+/// gets this wrong does not get it wrong once — it raises one CRITICAL
+/// safeguarding alert per child, all at the same second.
+class _Aboard {
+  const _Aboard({required this.rider, required this.stopId, required this.stopName});
+
+  final RiderOnStop rider;
+  final String stopId;
+  final String stopName;
+}
+
+/// Everyone the register still has on the bus, in stop order.
+///
+/// The same test the rider row draws its blue "On board since" from — boarded,
+/// and not yet set down — so the button's count and the rows underneath it can
+/// never disagree.
+List<_Aboard> _stillAboard(TripPlan plan) => [
+      for (final stop in plan.stops)
+        for (final rider in stop.students)
+          if (rider.boardedAt != null && rider.alightedAt == null)
+            _Aboard(rider: rider, stopId: stop.stopId, stopName: stop.name),
+    ];
+
 /// One run, from the driver's seat.
 ///
 /// The whole screen is one question repeated: WHO IS STILL NOT ACCOUNTED FOR.
@@ -222,6 +249,105 @@ class _TripScreenState extends State<TripScreen> {
     }
   }
 
+  /// Record everyone still on the bus off, in ONE request.
+  ///
+  /// At the gate the driver has twenty-nine children going down the steps at
+  /// once and a queue of buses behind him. Twenty-nine taps on twenty-nine
+  /// green buttons is not a thing he will do, and what he does instead is end
+  /// the run — which is exactly how a run was closed today with twenty-nine
+  /// children still on the register as on board.
+  ///
+  /// The sheet ticks everybody, because the ordinary case at the school gate is
+  /// that the bus empties. Unticking is for the child who stayed on, and it is
+  /// one tap rather than twenty-eight.
+  ///
+  /// Each child's stopId is worked out separately with [custodyStopId] against
+  /// that child's OWN stop, so the morning's drop-offs all resolve to the gate
+  /// and none of them arrives at the server looking like a child put down at
+  /// their home street.
+  Future<void> _recordAllOff(_TripData data) async {
+    final leg = data.trip?.leg ?? 'OUT';
+    final aboard = _stillAboard(data.plan);
+    if (aboard.isEmpty) return;
+
+    final picked = await showAppSheet<List<_Aboard>>(
+      context,
+      builder: (_) => _RecordAllOffSheet(aboard: aboard, leg: leg),
+    );
+    if (picked == null || picked.isEmpty || !mounted) return;
+
+    // The same split the single green button makes: at the school the child
+    // gets off, on the way home the child is handed to somebody.
+    final eventType = leg == 'OUT' ? 'ALIGHTED' : 'HANDOVER';
+
+    setState(() => _busy = t('driver.recordingAllOff'));
+    try {
+      final outcomes = await CrewApi.instance.recordCustodyBatch(
+        tripId: widget.tripId,
+        entries: [
+          for (final a in picked)
+            CustodyEntry(
+              studentId: a.rider.studentId,
+              eventType: eventType,
+              stopId: custodyStopId(
+                leg: leg,
+                eventType: eventType,
+                riderStopId: a.stopId,
+                terminalStopId: data.terminalStopId,
+              ),
+            ),
+        ],
+      );
+      _loaderKey.currentState?.reload();
+      if (!mounted) return;
+      final said = _batchNote(outcomes);
+      showNote(context, said.text, bad: said.bad);
+    } catch (e) {
+      if (mounted) showNote(context, _driverError(e), bad: true);
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
+  /// What the SERVER did with the busload, child by child.
+  ///
+  /// A 200 back from the batch means the request was read, not that twenty-nine
+  /// children were recorded — the events inside it are judged one at a time and
+  /// any of them can be refused. Reporting a blanket "all done" over that would
+  /// be the same failure as the old single-tap green tick, multiplied by
+  /// twenty-nine, so the count that is said out loud is the count the server
+  /// accepted and the refusals are named with the server's own reason.
+  ({String text, bool bad}) _batchNote(List<CustodyOutcome> outcomes) {
+    final refused = outcomes.where((o) => !o.verdict.accepted).toList();
+    final ok = outcomes.length - refused.length;
+
+    if (refused.isNotEmpty) {
+      // One reason, not twenty-nine. They are nearly always the same sentence,
+      // and a snack bar holding a list of them is a snack bar nobody reads.
+      final why = refused.map((o) => o.verdict.reason).whereType<String>().firstOrNull;
+      return (
+        text: why == null
+            ? tv('driver.someOffRefused', {'ok': ok, 'bad': refused.length})
+            : tv('driver.someOffRefusedWhy', {
+                'ok': ok,
+                'bad': refused.length,
+                'why': _driverWords(why),
+              }),
+        bad: true,
+      );
+    }
+
+    // Accepted, but stored as something other than what was asked — a drop-off
+    // away from the expected stop becomes WRONG_STOP, and the office has been
+    // told with the driver's name on it. That is not a green note.
+    final away = outcomes.where((o) => o.verdict.rewrittenTo != null).length;
+    if (away > 0) {
+      return (text: tv('driver.allOffButAway', {'ok': ok, 'away': away}), bad: true);
+    }
+
+    return (text: tn('driver.allOffRecorded', ok), bad: false);
+  }
+
 /// The panic button.
   ///
   /// Confirmed once, because it is the loudest thing this platform does — an
@@ -348,6 +474,11 @@ class _TripScreenState extends State<TripScreen> {
                   // on the back row both land there. The screen now matches it.
                   final started = trip != null && trip.startedAt != null;
 
+                  // Everyone the register still has on the bus. Worked out once
+                  // so the button's count, the sheet's list and what is actually
+                  // sent are the same three things.
+                  final aboard = _stillAboard(data.plan);
+
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -383,6 +514,25 @@ class _TripScreenState extends State<TripScreen> {
                         const SizedBox(height: 12),
                       ],
                       _HeadcountCard(counts: counts),
+                      // Directly under the number it acts on.
+                      //
+                      // The headcount says twenty-nine are still on the bus and
+                      // the only way to clear them used to be twenty-nine taps
+                      // spread over however many stop cards they belong to,
+                      // each behind a collapsed header. Nobody does that at a
+                      // school gate. This is the same twenty-nine records in
+                      // one request, and it is on the screen for as long as
+                      // anybody is still aboard — including after the run has
+                      // ended, which is when it is needed most.
+                      if (started && aboard.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _RecordAllOffButton(
+                          count: aboard.length,
+                          leg: trip.leg,
+                          busy: _busy != null,
+                          onPressed: () => _recordAllOff(data),
+                        ),
+                      ],
                       if (trip != null && running) ...[
                         const SizedBox(height: 12),
                         _PanicButton(busy: _busy != null, onPressed: () => _panic(trip)),
@@ -2855,6 +3005,181 @@ class _PanicButton extends StatelessWidget {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// One tap for the whole bus.
+///
+/// Green, because green is the colour of the button beside each child that does
+/// the same thing one at a time, and the words the driver has been taught say
+/// "the green button". It says the number out loud — twenty-nine is the fact
+/// that makes it worth pressing — and it names the place, because "off at the
+/// school" and "handed over" are two different afternoons.
+class _RecordAllOffButton extends StatelessWidget {
+  const _RecordAllOffButton({
+    required this.count,
+    required this.leg,
+    required this.busy,
+    required this.onPressed,
+  });
+
+  final int count;
+  final String leg;
+  final bool busy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: SizedBox(
+        width: double.infinity,
+        child: FilledButton.icon(
+          onPressed: busy ? null : onPressed,
+          icon: const Icon(Icons.logout_rounded, size: 20),
+          label: Text(
+            tn(
+              leg == 'OUT' ? 'driver.recordAllOffOut' : 'driver.recordAllOffReturn',
+              count,
+            ),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
+          ),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(52),
+            backgroundColor: AppTheme.green,
+            disabledBackgroundColor: AppTheme.green.withValues(alpha: 0.5),
+            foregroundColor: Colors.white,
+            disabledForegroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Who actually got off.
+///
+/// Everybody is ticked when it opens, because at a school gate the bus empties
+/// — that is the ordinary case, and the ordinary case must not cost twenty-nine
+/// taps. The exception is the child who stayed on, and unticking them is one
+/// tap rather than twenty-eight.
+///
+/// The stop each child belongs to is printed under their name. It is the only
+/// thing on the list that tells two children with the same first name apart,
+/// and on the return leg it is what the driver is looking at when he decides
+/// whether that child has been handed over yet.
+class _RecordAllOffSheet extends StatefulWidget {
+  const _RecordAllOffSheet({required this.aboard, required this.leg});
+
+  final List<_Aboard> aboard;
+  final String leg;
+
+  @override
+  State<_RecordAllOffSheet> createState() => _RecordAllOffSheetState();
+}
+
+class _RecordAllOffSheetState extends State<_RecordAllOffSheet> {
+  late final Set<String> _ticked = {
+    for (final a in widget.aboard) a.rider.studentId,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final picked = [
+      for (final a in widget.aboard)
+        if (_ticked.contains(a.rider.studentId)) a,
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 38,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: AppTheme.border,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          Text(
+            widget.leg == 'OUT'
+                ? t('driver.recordAllOffTitleOut')
+                : t('driver.recordAllOffTitleReturn'),
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.text),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            t('driver.recordAllOffHow'),
+            style: TextStyle(fontSize: 13, height: 1.45, color: AppTheme.textMuted),
+          ),
+          const SizedBox(height: 6),
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: widget.aboard.length,
+              itemBuilder: (context, i) {
+                final a = widget.aboard[i];
+                final on = _ticked.contains(a.rider.studentId);
+                return CheckboxListTile(
+                  value: on,
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                  activeColor: AppTheme.green,
+                  title: Text(
+                    a.rider.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5),
+                  ),
+                  subtitle: Text(
+                    [
+                      a.stopName,
+                      if (a.rider.boardedAt != null)
+                        tn('driver.onBoardSince', hhmm(a.rider.boardedAt)),
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                  ),
+                  onChanged: (v) => setState(() {
+                    if (v == true) {
+                      _ticked.add(a.rider.studentId);
+                    } else {
+                      _ticked.remove(a.rider.studentId);
+                    }
+                  }),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 10),
+          // ONE button, and it says how many children it is about to record.
+          // A driver who has just unticked two needs to see the number fall to
+          // twenty-seven before he presses it, not afterwards.
+          BigButton(
+            label: picked.isEmpty
+                ? t('driver.recordNobody')
+                : tn('driver.recordTickedOff', picked.length),
+            color: AppTheme.green,
+            height: 54,
+            onPressed: picked.isEmpty ? null : () => Navigator.of(context).pop(picked),
+          ),
+        ],
       ),
     );
   }

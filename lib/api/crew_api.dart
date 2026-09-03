@@ -137,6 +137,47 @@ class CustodyVerdict {
   final bool alertRaised;
 }
 
+/// The most custody events the server will take in one request.
+///
+/// MAX_BATCH_EVENTS in custody.service.ts, enforced by @ArrayMaxSize on the DTO
+/// — a longer array is refused before a single row is written, so the app
+/// splits rather than finding out. It is not a reason to fall back to one
+/// request per child: a bus of twenty-nine is one request, and a bus of three
+/// hundred is two.
+const int kMaxCustodyBatchEvents = 200;
+
+/// One child, and the event to record against them, inside a batch.
+class CustodyEntry {
+  const CustodyEntry({
+    required this.studentId,
+    required this.eventType,
+    this.stopId,
+  });
+
+  final String studentId;
+  final String eventType;
+
+  /// The stop the BUS is standing at, worked out per child with
+  /// [custodyStopId] — NOT the stop the child belongs to. On the OUT leg every
+  /// alighting in a batch resolves to the campus gate; sending the child's own
+  /// stop is what makes the server rewrite the row to WRONG_STOP and raise a
+  /// CRITICAL safeguarding alert, and in a batch it does it once per child.
+  final String? stopId;
+}
+
+/// What the server did with one child's event in a batch.
+///
+/// The batch answers 200 whatever happened to the events inside it, so the
+/// caller needs to know which children are actually on the ledger and which
+/// were refused. [studentId] is carried alongside the verdict because the
+/// answer comes back keyed on the event uuid, which no screen knows about.
+class CustodyOutcome {
+  const CustodyOutcome({required this.studentId, required this.verdict});
+
+  final String studentId;
+  final CustodyVerdict verdict;
+}
+
 /// A run the crew is on today.
 class CrewTrip {
   CrewTrip({
@@ -1058,6 +1099,143 @@ class CrewApi {
       alertRaised: mine['alertRaised'] == true,
     );
   }
+
+  /// Record a whole busload off in ONE request.
+  ///
+  /// At the school gate the driver has twenty-nine children going down the
+  /// steps at once and a queue of buses behind him. Twenty-nine taps on
+  /// twenty-nine green buttons is not something he will do, and the thing he
+  /// does instead is end the run — which is how a run was closed with
+  /// twenty-nine children still on the register as on board, the worst state
+  /// this system has.
+  ///
+  /// This is ONE POST, not a loop. The endpoint has always taken an array; a
+  /// request per child on a school car park's signal is twenty-nine chances to
+  /// fail, twenty-nine trip recomputations on the server, and no way to tell
+  /// the driver what happened overall. Anything longer than
+  /// [kMaxCustodyBatchEvents] is split into as few requests as will hold it.
+  ///
+  /// Each entry carries its OWN [CustodyEntry.stopId], because the answer is
+  /// per child: work it out with [custodyStopId] against that child's stop and
+  /// the trip's terminal stop before calling.
+  ///
+  /// The answer is per child too. A 200 does not mean twenty-nine children were
+  /// recorded — it means the request was read — so this returns one
+  /// [CustodyVerdict] per entry and the screen reports what actually happened.
+  Future<List<CustodyOutcome>> recordCustodyBatch({
+    required String tripId,
+    required List<CustodyEntry> entries,
+  }) async {
+    final out = <CustodyOutcome>[];
+    for (var from = 0; from < entries.length; from += kMaxCustodyBatchEvents) {
+      final chunk = entries.sublist(
+        from,
+        min(from + kMaxCustodyBatchEvents, entries.length),
+      );
+      try {
+        out.addAll(await _sendCustodyBatch(tripId, chunk));
+      } catch (e) {
+        // Nothing has reached the ledger yet, so the caller can show the
+        // server's own refusal as an instruction, exactly as one tap does.
+        if (out.isEmpty) rethrow;
+        // Some children ARE recorded. Throwing here would drop that on the
+        // floor and tell the driver the whole thing failed — the precise lie
+        // this method exists to stop — so the rest come back as refused, with
+        // the failure as their reason.
+        out.addAll([
+          for (final entry in chunk)
+            CustodyOutcome(
+              studentId: entry.studentId,
+              verdict: CustodyVerdict(accepted: false, reason: _failureText(e)),
+            ),
+        ]);
+      }
+    }
+    return out;
+  }
+
+  /// One request, holding at most [kMaxCustodyBatchEvents] events.
+  ///
+  /// The per-event shape is [recordCustody]'s, field for field. The uuids are
+  /// minted here, before the send, and kept: they are both what makes a retry
+  /// over a dropped connection free and the only thing the answer is keyed on —
+  /// `results` comes back per event id, in no promised order, so the ids are
+  /// what put each verdict back beside the right child.
+  Future<List<CustodyOutcome>> _sendCustodyBatch(
+    String tripId,
+    List<CustodyEntry> chunk,
+  ) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    final ids = [for (final _ in chunk) uuidV4()];
+
+    final json = await _api.post('/crew/custody/events', {
+      'tripInstanceId': tripId,
+      'clientSentAt': now,
+      'events': [
+        for (var i = 0; i < chunk.length; i++)
+          {
+            'id': ids[i],
+            'type': chunk[i].eventType,
+            'studentId': chunk[i].studentId,
+            'deviceTime': now,
+            'stopId': ?chunk[i].stopId,
+            // Same as a single tap: no scanner in this build, so every event
+            // is a deliberate act by a named person with a reason on it. The
+            // reason says it was a whole busload, because months later that is
+            // the difference between a driver who watched each child off and a
+            // driver who emptied the bus at the gate.
+            'captureMethod': 'MANUAL_WITH_REASON',
+            'manualReason': 'Marked off together by the crew as the bus emptied.',
+          },
+      ],
+    }) as Map<String, dynamic>;
+
+    final results =
+        ((json['results'] as List?) ?? const []).cast<Map<String, dynamic>>();
+    final byId = <String, Map<String, dynamic>>{
+      for (final r in results)
+        if (r['id'] is String) r['id'] as String: r,
+    };
+
+    return [
+      for (var i = 0; i < chunk.length; i++)
+        CustodyOutcome(
+          studentId: chunk[i].studentId,
+          verdict: _verdictFrom(byId[ids[i]], chunk[i].eventType),
+        ),
+    ];
+  }
+
+  /// One row of `results`, read the way [recordCustody] reads its own.
+  ///
+  /// A null row means the server answered without mentioning this event at
+  /// all: nothing was written, and saying so beats a green tick over an empty
+  /// ledger.
+  static CustodyVerdict _verdictFrom(Map<String, dynamic>? row, String asked) {
+    if (row == null) return const CustodyVerdict(accepted: false);
+
+    final outcome = (row['outcome'] ?? '') as String;
+    if (outcome == 'REJECTED') {
+      return CustodyVerdict(accepted: false, reason: row['reason'] as String?);
+    }
+
+    final recorded = row['recordedType'] as String?;
+    return CustodyVerdict(
+      accepted: true,
+      duplicate: outcome == 'DUPLICATE',
+      rewrittenTo: recorded != null && recorded != asked ? recorded : null,
+      alertRaised: row['alertRaised'] == true,
+    );
+  }
+
+  /// A thrown failure, in words a driver can act on.
+  ///
+  /// OfflineException is checked first because it IS an ApiException.
+  static String _failureText(Object e) => e is OfflineException
+      ? t('common.offline')
+      : e is ApiException
+          ? e.message
+          : t('common.loadFailed');
 
   /// The panic button.
   ///
