@@ -503,6 +503,11 @@ const Map<String, String> _en = {
   'driver.step.done': 'This run is finished. There is nothing left to do.',
   // Said once on the stop card, never once per child.
   'driver.tickAfterSetOff': 'Press Set off at the top of this screen first — then you can tick each child here.',
+  'driver.dropAfterEnd': 'This run has ended, but children are still marked on the bus. Tap the green button beside each one to record them off.',
+  'driver.stillAboardWarning': '{n} children are still on the bus.',
+  'driver.stillAboardHow': 'If you end the run now, the record will say they never got off, and the office will be told. Go back and tap the green button beside each child first.',
+  'driver.goBackAndDrop': 'Go back and record them off',
+  'driver.endAnyway': 'End the run anyway',
   // The server's refusals, as instructions. The sentences these stand in for
   // are listed in _serverSays, in trip_screen.dart.
   'driver.mustSetOff': 'The bus has not set off yet. Press Set off at the top of the screen first.',
@@ -1918,6 +1923,11 @@ const Map<String, String> _ckb = {
   'driver.step.sweep': 'بڕۆ بۆ ڕیزی دواوە و ژێر هەموو کورسییەک سەیر بکە. پاشان لە خوارەوەی ئەم لاپەڕەیە پشتڕاستی بکەرەوە.',
   'driver.step.done': 'ئەم گەشتە تەواو بووە. هیچ کارێکی تر نەماوە.',
   'driver.tickAfterSetOff': 'سەرەتا لە سەرەوەی ئەم لاپەڕەیە «بەڕێکەوتن» دابگرە — پاشان لێرە دەتوانیت هەر منداڵێک نیشان بکەیت.',
+  'driver.dropAfterEnd': 'ئەم گەشتە کۆتایی هات، بەڵام هێشتا منداڵ هەن وەک سواری پاس تۆمارکراون. دوگمە سەوزەکەی تەنیشت هەر یەکێکیان دابگرە بۆ تۆمارکردنی دابەزینیان.',
+  'driver.stillAboardWarning': '{n} منداڵ هێشتا لەناو پاسەکەدان.',
+  'driver.stillAboardHow': 'ئەگەر ئێستا گەشتەکە کۆتایی پێبهێنیت، تۆمارەکە دەڵێت هەرگیز دانەبەزیون، و نووسینگە ئاگادار دەکرێتەوە. بگەڕێوە و سەرەتا دوگمە سەوزەکەی تەنیشت هەر منداڵێک دابگرە.',
+  'driver.goBackAndDrop': 'بگەڕێوە و دابەزینیان تۆمار بکە',
+  'driver.endAnyway': 'بە هەر حاڵ گەشتەکە کۆتایی پێبهێنە',
   'driver.mustSetOff': 'پاسەکە هێشتا بەڕێنەکەوتووە. سەرەتا لە سەرەوەی لاپەڕەکە «بەڕێکەوتن» دابگرە.',
   'driver.mustCheckBus': 'سەرەتا پشکنینی پاسەکە پڕ بکەرەوە. لە سەرەوەی لاپەڕەکە «دەستپێکردنی نۆرەکەم» دابگرە.',
 
@@ -3306,6 +3316,11 @@ const Map<String, String> _ar = {
   'driver.step.sweep': 'امشِ إلى الصف الخلفي وانظر تحت كل مقعد. ثم أكّد ذلك في أسفل هذه الشاشة.',
   'driver.step.done': 'انتهت هذه الرحلة. لم يبقَ شيء لتفعله.',
   'driver.tickAfterSetOff': 'اضغط «الانطلاق» في أعلى هذه الشاشة أولاً — بعدها يمكنك تسجيل كل طفل هنا.',
+  'driver.dropAfterEnd': 'انتهت هذه الرحلة، لكن ما زال هناك أطفال مسجّلون داخل الحافلة. اضغط الزر الأخضر بجانب كل طفل لتسجيل نزوله.',
+  'driver.stillAboardWarning': 'ما زال {n} أطفال داخل الحافلة.',
+  'driver.stillAboardHow': 'إذا أنهيت الرحلة الآن، سيقول السجل إنهم لم ينزلوا أبداً، وسيتم إبلاغ الإدارة. ارجع واضغط الزر الأخضر بجانب كل طفل أولاً.',
+  'driver.goBackAndDrop': 'ارجع وسجّل نزولهم',
+  'driver.endAnyway': 'إنهاء الرحلة على أي حال',
   'driver.mustSetOff': 'لم تنطلق الحافلة بعد. اضغط «الانطلاق» في أعلى الشاشة أولاً.',
   'driver.mustCheckBus': 'املأ فحص الحافلة أولاً. اضغط «بدء الدوام» في أعلى الشاشة.',
 

@@ -186,7 +186,25 @@ class _TripScreenState extends State<TripScreen> {
   /// note". The app used to discard it and report plain success — so the one
   /// moment a driver could still walk back down the aisle passed with a green
   /// tick.
-  Future<void> _endRun(CrewTrip trip) async {
+  /// Close the run.
+  ///
+  /// Asks first when children are still marked aboard, because ending is the
+  /// moment that decision becomes expensive. A run was ended today with
+  /// twenty-nine children still on the register as on board: the count was
+  /// sitting on the screen the whole time, and the only thing said about it was
+  /// a red line AFTER the fact, when the bus had already been closed.
+  ///
+  /// One tap to confirm, no typing. A driver ending a run with children still
+  /// aboard is sometimes right — the office may want the record to say exactly
+  /// that — so this warns and gets out of the way rather than refusing.
+  Future<void> _endRun(CrewTrip trip, int stillOnBoard) async {
+    if (stillOnBoard > 0) {
+      final go = await showAppSheet<bool>(
+        context,
+        builder: (_) => _EndWithChildrenSheet(count: stillOnBoard),
+      );
+      if (go != true || !mounted) return;
+    }
     setState(() => _busy = t('driver.runEnded'));
     try {
       final unaccounted = await CrewApi.instance.endTrip(trip.id);
@@ -204,7 +222,7 @@ class _TripScreenState extends State<TripScreen> {
     }
   }
 
-  /// The panic button.
+/// The panic button.
   ///
   /// Confirmed once, because it is the loudest thing this platform does — an
   /// INTERRUPTING, CRITICAL alert that puts a named human on the phone — and a
@@ -312,6 +330,23 @@ class _TripScreenState extends State<TripScreen> {
                   // buttons on forty rider rows cannot reach different answers.
                   final running =
                       trip != null && trip.startedAt != null && trip.endedAt == null;
+                  // Setting a child DOWN is not the same question as picking one
+                  // up, and gating both on `running` was wrong in the one case
+                  // that matters most.
+                  //
+                  // A run ended with children still marked on board is the worst
+                  // state the system has: twenty-nine of them, on the record, on
+                  // a bus that has finished. The way out is to mark each one off
+                  // — and that is exactly what the disabled buttons refused to
+                  // do, because ending the run had already flipped `running` to
+                  // false. The driver was shown the problem and locked out of
+                  // the fix.
+                  //
+                  // The server never had this restriction: a custody event is
+                  // refused before a run STARTS and accepted after it ends, on
+                  // purpose, because the cabin sweep and the child found asleep
+                  // on the back row both land there. The screen now matches it.
+                  final started = trip != null && trip.startedAt != null;
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -332,7 +367,7 @@ class _TripScreenState extends State<TripScreen> {
                           busy: _busy,
                           onStart: () => _startShift(trip),
                           onDepart: () => _act(t('driver.departed'), () => CrewApi.instance.depart(trip.id)),
-                          onEnd: () => _endRun(trip),
+                          onEnd: () => _endRun(trip, counts.stillOnBoard),
                         ),
                         const SizedBox(height: 12),
                       ],
@@ -393,6 +428,7 @@ class _TripScreenState extends State<TripScreen> {
                           // all. The server refuses every custody event until
                           // the bus has set off.
                           running: running,
+                          started: started,
                           onChanged: () => _loaderKey.currentState?.reload(),
                         ),
                       ),
@@ -931,6 +967,7 @@ class _StopCard extends StatefulWidget {
     required this.leg,
     required this.terminalStopId,
     required this.running,
+    required this.started,
     required this.onChanged,
   });
 
@@ -951,6 +988,18 @@ class _StopCard extends StatefulWidget {
   /// least equipped to read one. Dead buttons and one line of explanation are
   /// the honest version of a rule the server was going to enforce anyway.
   final bool running;
+
+  /// The run has started at all — even if it has since ended.
+  ///
+  /// Setting a child DOWN is a different question from picking one up, and
+  /// gating both on [running] was wrong in the case that matters most: a run
+  /// ended with children still marked on board. The way out of that state is
+  /// to mark each of them off, and that is precisely what the disabled buttons
+  /// refused to do. The server never had the restriction — it refuses an event
+  /// before a run STARTS and accepts one after it ends, deliberately, because
+  /// the cabin sweep and the child found asleep on the back row both land
+  /// there. This makes the screen agree with it.
+  final bool started;
 
   final VoidCallback onChanged;
 
@@ -1126,7 +1175,28 @@ class _StopCardState extends State<_StopCard> {
               // roster stays exactly where it is — the driver still has to see
               // who is expected — but the reason the ticks beside it will not
               // move is said once, in the place he is looking when he tries.
-              if (!widget.running)
+              if (!widget.running && widget.started)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 16, color: AppTheme.amber),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          t('driver.dropAfterEnd'),
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            height: 1.45,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (!widget.running)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: Row(
@@ -1151,7 +1221,8 @@ class _StopCardState extends State<_StopCard> {
                     rider: r,
                     leg: widget.leg,
                     busy: _busyStudent == r.studentId,
-                    enabled: widget.running,
+                    canPickUp: widget.running,
+                    canSetDown: widget.started,
                     // The note names the state the child is now in, in the
                     // reader's language.
                     onBoard: () => _mark(r, 'BOARDED', t('driver.onBoard')),
@@ -1263,7 +1334,8 @@ class _RiderRow extends StatelessWidget {
     required this.rider,
     required this.leg,
     required this.busy,
-    required this.enabled,
+    required this.canPickUp,
+    required this.canSetDown,
     required this.onBoard,
     required this.onOff,
     required this.onNoShow,
@@ -1276,7 +1348,10 @@ class _RiderRow extends StatelessWidget {
   /// Whether a tap on this row can actually record anything. False until the
   /// bus has set off, and the buttons are drawn plainly dead rather than left
   /// live to fail.
-  final bool enabled;
+  /// Boarding and no-show need a run that is under way.
+  final bool canPickUp;
+  /// Setting down only needs a run that started. See the note in TripScreen.
+  final bool canSetDown;
   final VoidCallback onBoard;
   final VoidCallback onOff;
   final VoidCallback onNoShow;
@@ -1359,17 +1434,18 @@ class _RiderRow extends StatelessWidget {
                   colour: onBus ? AppTheme.green : Role.driver.tint,
                   // Null, not a call that will be refused. The stop card says
                   // once, above this row, what has to happen first.
-                  onTap: !enabled
-                      ? null
-                      : onBus
-                          ? onOff
-                          : onBoard,
+                  //
+                  // A child already on the bus can always be set down; only
+                  // picking one up waits for the run to be under way.
+                  onTap: onBus
+                      ? (canSetDown ? onOff : null)
+                      : (canPickUp ? onBoard : null),
                 ),
                 const SizedBox(width: 6),
                 _Mini(
                   icon: Icons.close_rounded,
                   colour: AppTheme.rose,
-                  onTap: enabled ? onNoShow : null,
+                  onTap: canPickUp ? onNoShow : null,
                 ),
               ],
             ),
@@ -2779,6 +2855,71 @@ class _PanicButton extends StatelessWidget {
 }
 
 /// One tap between a pocket and a critical alert.
+/// Ending a run with children still marked on board.
+///
+/// The count is the whole message. It is stated once, large, in the driver's
+/// own language, with the consequence spelled out — the office is told, and
+/// those children stay on the record as having never got off.
+class _EndWithChildrenSheet extends StatelessWidget {
+  const _EndWithChildrenSheet({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 38,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: AppTheme.border,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          Text(
+            tn('driver.stillAboardWarning', count),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.rose),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            t('driver.stillAboardHow'),
+            style: TextStyle(fontSize: 13.5, height: 1.5, color: AppTheme.textMuted),
+          ),
+          const SizedBox(height: 16),
+          // The safe way out is the one that looks like the button, and it is
+          // listed first. Ending anyway stays available and stays red.
+          BigButton(
+            label: t('driver.goBackAndDrop'),
+            color: Role.driver.tint,
+            height: 54,
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+          const SizedBox(height: 10),
+          BigButton(
+            label: t('driver.endAnyway'),
+            color: AppTheme.rose,
+            height: 54,
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
 class _PanicSheet extends StatelessWidget {
   const _PanicSheet();
 
