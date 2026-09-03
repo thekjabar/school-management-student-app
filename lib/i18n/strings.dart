@@ -885,6 +885,8 @@ const Map<String, String> _en = {
   'quick.driverFeedback': 'Driver',
   'quick.liveVideo': 'Live video',
   'quick.liveVideoSoon': 'Not ready yet. No bus has a camera fitted, so there is nothing to watch.',
+  'quick.liveClassVideo': 'Live classroom',
+  'quick.liveClassVideoSoon': 'Not ready yet. No classroom has a camera fitted, so there is nothing to watch.',
 // Where the child is
   'track.title': 'Where is my child',
   'track.onBoard': '{name} is on the bus',
@@ -2297,6 +2299,8 @@ const Map<String, String> _ckb = {
   'quick.driverFeedback': 'شۆفێر',
   'quick.liveVideo': 'ڤیدیۆی ڕاستەوخۆ',
   'quick.liveVideoSoon': 'هێشتا ئامادە نییە. هیچ پاسێک کامێرای لەسەر نییە، بۆیە هیچ شتێک نییە بۆ سەیرکردن.',
+  'quick.liveClassVideo': 'ڤیدیۆی ڕاستەوخۆی پۆل',
+  'quick.liveClassVideoSoon': 'هێشتا ئامادە نییە. هیچ پۆلێک کامێرای لەسەر نییە، بۆیە هیچ شتێک نییە بۆ سەیرکردن.',
 // Where the child is
   'track.title': 'منداڵەکەم لەکوێیە',
   'track.onBoard': '{name} لەناو پاسەکەدایە',
@@ -3703,6 +3707,8 @@ const Map<String, String> _ar = {
   'quick.driverFeedback': 'السائق',
   'quick.liveVideo': 'بث مباشر',
   'quick.liveVideoSoon': 'غير جاهز بعد. لا توجد كاميرا في أي حافلة، فلا شيء لمشاهدته.',
+  'quick.liveClassVideo': 'بث مباشر للصف',
+  'quick.liveClassVideoSoon': 'غير جاهز بعد. لا توجد كاميرا في أي صف، فلا شيء لمشاهدته.',
 // Where the child is
   'track.title': 'أين طفلي',
   'track.onBoard': '{name} في الحافلة',

@@ -86,6 +86,17 @@ class HomeTab extends StatelessWidget {
                   enabled: false,
                   note: t('quick.liveVideoSoon'),
                 ),
+                // Beside the bus camera, not instead of it: two different
+                // rooms, two different pieces of hardware, two different
+                // installs. Off for the same honest reason — no classroom has
+                // a camera fitted yet — rather than a date nobody can promise.
+                QuickAction(
+                  icon: Icons.cast_for_education_outlined,
+                  label: t('quick.liveClassVideo'),
+                  color: AppTheme.blue,
+                  enabled: false,
+                  note: t('quick.liveClassVideoSoon'),
+                ),
                 QuickAction(
                   icon: Icons.my_location_rounded,
                   label: t('quick.track'),
