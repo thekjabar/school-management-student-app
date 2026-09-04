@@ -1229,10 +1229,36 @@ class _StopCardState extends State<_StopCard> {
     }
   }
 
+  /// Pass this stop without stopping. The reason is what tells a family
+  /// standing at it apart from one the driver simply forgot, so it is
+  /// collected before anything is sent — never a bare confirmation.
+  Future<void> _skipStop() async {
+    final reason = await showAppSheet<String>(
+      context,
+      builder: (_) => const _SkipStopSheet(),
+    );
+    if (reason == null || _busyStop) return;
+    setState(() => _busyStop = true);
+    try {
+      await CrewApi.instance.skipStop(widget.tripId, widget.stop.plannedSequence, reason);
+      widget.onChanged();
+      if (mounted) showNote(context, t('driver.skipped'));
+    } catch (e) {
+      if (mounted) showNote(context, _driverError(e), bad: true);
+    } finally {
+      if (mounted) setState(() => _busyStop = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = widget.stop;
     final remaining = s.remaining;
+    // The server refuses a skip the moment `actualArrivalAt` is set — the
+    // same instant Arrived stops being the button that matters. Once the
+    // stop is already done (departed, or already skipped) there is nothing
+    // left here to skip either.
+    final canSkip = !s.done && s.arrivedAt == null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1252,23 +1278,32 @@ class _StopCardState extends State<_StopCard> {
                       height: 34,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: s.done
-                            ? AppTheme.greenSoft
-                            : remaining == 0
+                        color: s.skipped
+                            ? AppTheme.amberSoft
+                            : s.done
                                 ? AppTheme.greenSoft
-                                : Role.driver.wash,
+                                : remaining == 0
+                                    ? AppTheme.greenSoft
+                                    : Role.driver.wash,
                         borderRadius: BorderRadius.circular(11),
                       ),
-                      child: s.done || remaining == 0
-                          ? Icon(Icons.check_rounded, size: 18, color: AppTheme.green)
-                          : Text(
-                              '${s.plannedSequence}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 14,
-                                color: Role.driver.tint,
-                              ),
-                            ),
+                      // A skipped stop gets its own mark rather than the tick
+                      // every other finished stop gets — the whole reason this
+                      // is recorded is that "passed without stopping" and
+                      // "everyone accounted for" must not read the same on this
+                      // screen, any more than they do on the map beside it.
+                      child: s.skipped
+                          ? Icon(Icons.skip_next_rounded, size: 18, color: AppTheme.amber)
+                          : s.done || remaining == 0
+                              ? Icon(Icons.check_rounded, size: 18, color: AppTheme.green)
+                              : Text(
+                                  '${s.plannedSequence}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                    color: Role.driver.tint,
+                                  ),
+                                ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1295,6 +1330,18 @@ class _StopCardState extends State<_StopCard> {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                           ),
+                          // Only set when a driver skipped this stop on
+                          // purpose — a stop skipped because nobody on it was
+                          // riding today carries no reason, and needs none.
+                          if (s.skippedReason != null) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              s.skippedReason!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 12, color: AppTheme.amber),
+                            ),
+                          ],
                           // When the bus is due here — or, once it has been,
                           // when it got here. Same field, and the difference is
                           // drawn rather than left to the reader.
@@ -1306,9 +1353,21 @@ class _StopCardState extends State<_StopCard> {
                       ),
                     ),
                     Tag(
-                      remaining == 0 ? t('driver.done') : tn('driver.nLeft', remaining),
-                      color: remaining == 0 ? AppTheme.green : AppTheme.amber,
-                      background: remaining == 0 ? AppTheme.greenSoft : AppTheme.amberSoft,
+                      s.skipped
+                          ? t('driver.skipped')
+                          : remaining == 0
+                              ? t('driver.done')
+                              : tn('driver.nLeft', remaining),
+                      color: s.skipped
+                          ? AppTheme.amber
+                          : remaining == 0
+                              ? AppTheme.green
+                              : AppTheme.amber,
+                      background: s.skipped
+                          ? AppTheme.amberSoft
+                          : remaining == 0
+                              ? AppTheme.greenSoft
+                              : AppTheme.amberSoft,
                     ),
                     const SizedBox(width: 6),
                     Icon(
@@ -1386,7 +1445,7 @@ class _StopCardState extends State<_StopCard> {
                     onNoShow: () => _mark(r, 'NO_SHOW', t('driver.notRiding')),
                   )),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+                padding: EdgeInsets.fromLTRB(16, 8, 16, canSkip ? 4 : 14),
                 child: Row(
                   children: [
                     Expanded(
@@ -1421,7 +1480,138 @@ class _StopCardState extends State<_StopCard> {
                   ],
                 ),
               ),
+              // An alternative to Arrived, not a step after it — the server
+              // refuses this the moment a stop has an arrival recorded, so it
+              // has nothing left to offer once the bus has actually pulled up.
+              if (canSkip)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 40,
+                    child: TextButton.icon(
+                      onPressed: widget.running && !_busyStop ? _skipStop : null,
+                      icon: Icon(Icons.skip_next_rounded, size: 18, color: AppTheme.textMuted),
+                      label: Text(
+                        t('driver.skipStop'),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Why the bus is passing this stop without stopping at it.
+///
+/// `SkipStopDto` on the server requires 3–300 characters and nothing else, so
+/// this is the one thing the sheet actually collects. There is no cancel
+/// button beside the field the way `_PanicSheet` has none beside its
+/// confirm — dragging the sheet down does that, and the confirm button stays
+/// the only button, disabled rather than duplicated by a second one.
+class _SkipStopSheet extends StatefulWidget {
+  const _SkipStopSheet();
+
+  @override
+  State<_SkipStopSheet> createState() => _SkipStopSheetState();
+}
+
+class _SkipStopSheetState extends State<_SkipStopSheet> {
+  final TextEditingController _reason = TextEditingController();
+  String _text = '';
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmed = _text.trim();
+    final valid = trimmed.length >= 3;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 38,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: AppTheme.border,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            Text(
+              t('driver.skipStopTitle'),
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.text),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              t('driver.skipStopWhy'),
+              style: TextStyle(fontSize: 13, height: 1.45, color: AppTheme.textMuted),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _reason,
+              autofocus: true,
+              maxLines: 2,
+              maxLength: 300,
+              style: const TextStyle(fontSize: 13.5),
+              onChanged: (v) => setState(() => _text = v),
+              decoration: InputDecoration(
+                labelText: t('driver.skipReasonLabel'),
+                filled: true,
+                fillColor: AppTheme.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppTheme.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppTheme.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Role.driver.tint),
+                ),
+              ),
+            ),
+            if (_text.isNotEmpty && !valid) ...[
+              const SizedBox(height: 6),
+              Text(
+                t('driver.skipReasonTooShort'),
+                style: TextStyle(fontSize: 11.5, color: AppTheme.rose),
+              ),
+            ],
+            const SizedBox(height: 14),
+            BigButton(
+              label: t('driver.skipConfirm'),
+              color: AppTheme.rose,
+              height: 54,
+              onPressed: valid ? () => Navigator.of(context).pop(trimmed) : null,
+            ),
           ],
         ),
       ),

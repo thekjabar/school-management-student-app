@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show ValueNotifier;
+
 import '../i18n/strings.dart';
 import 'client.dart';
 
@@ -339,6 +341,8 @@ class PlannedStop {
     required this.students,
     required this.arrivedAt,
     required this.departedAt,
+    required this.skipped,
+    this.skippedReason,
     required this.etaAt,
     required this.etaIsActual,
     required this.dwellSeconds,
@@ -355,6 +359,15 @@ class PlannedStop {
   final List<RiderOnStop> students;
   final DateTime? arrivedAt;
   final DateTime? departedAt;
+
+  /// Passed without stopping — either the driver skipped it with a reason, or
+  /// nobody was assigned here today at all. The server does not tell the two
+  /// apart in this field (see `skipped` in crew-routing.controller.ts's
+  /// `buildStops`), so neither does this screen.
+  final bool skipped;
+  /// Why, when the driver skipped it on purpose. Null for a stop skipped only
+  /// because nobody on it was riding today.
+  final String? skippedReason;
 
   /// When the bus is expected here — or when it actually got here, once
   /// [etaIsActual] is true. The server works it out from the drive between
@@ -374,7 +387,8 @@ class PlannedStop {
   /// The drive from the stop before this one to this one.
   final int driveSeconds;
 
-  bool get done => departedAt != null;
+  /// Passed, one way or another — actually departed, or skipped over.
+  bool get done => departedAt != null || skipped;
   int get remaining => students.where((s) => !s.accountedFor).length;
 
   factory PlannedStop.fromJson(Map<String, dynamic> j) => PlannedStop(
@@ -390,6 +404,8 @@ class PlannedStop {
             .toList(),
         arrivedAt: j['arrivedAt'] == null ? null : DateTime.parse(j['arrivedAt'] as String).toLocal(),
         departedAt: j['departedAt'] == null ? null : DateTime.parse(j['departedAt'] as String).toLocal(),
+        skipped: (j['skipped'] ?? false) as bool,
+        skippedReason: j['skippedReason'] as String?,
         etaAt: j['etaAt'] == null ? null : DateTime.parse(j['etaAt'] as String).toLocal(),
         etaIsActual: (j['etaIsActual'] ?? false) as bool,
         dwellSeconds: (j['dwellSeconds'] as num?)?.toInt() ?? 0,
@@ -812,6 +828,81 @@ class SweepVerdict {
       );
 }
 
+/// A notice the school aimed at drivers or attendants — the whole school, a
+/// route, a campus, or crew by name.
+///
+/// A fresh model rather than a reuse of the parent or teacher one:
+/// CrewAnnouncementsController resolves a DIFFERENT audience — the routes and
+/// campuses this person has actually been rostered on, not the classes a
+/// teacher teaches — and the fields it sends back are its own, even though
+/// most of them read the same. The controller's own doc comment is blunt
+/// about why it exists at all: `Announcement.audienceRoles` has accepted
+/// DRIVER and ATTENDANT since the first migration, and nothing in the app
+/// ever had a screen that could read one.
+class CrewAnnouncement {
+  CrewAnnouncement({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.category,
+    required this.priority,
+    required this.sentAt,
+    required this.pinned,
+    required this.requiresAcknowledgement,
+    this.acknowledgedAt,
+    required this.authorName,
+    required this.readAt,
+    required this.attachmentCount,
+  });
+
+  final String id;
+  final String title;
+  final String body;
+  final String category;
+  final String priority;
+  final DateTime? sentAt;
+  final bool pinned;
+
+  /// "I have read this and I understand it" is asked for, not just read —
+  /// e.g. a changed release procedure or a road closed to buses.
+  final bool requiresAcknowledgement;
+
+  /// When this crew member said they had, if they have.
+  final DateTime? acknowledgedAt;
+  final String authorName;
+  final DateTime? readAt;
+
+  /// Files on the notice — a scanned circular, a revised stop map. Counted
+  /// rather than fetched: neither the parent nor the teacher screen this was
+  /// modelled on opens attachments either, so a count is shown and nothing is
+  /// promised that this build cannot open.
+  final int attachmentCount;
+
+  /// Answered, but not necessarily settled — [requiresAcknowledgement] can
+  /// still be owed.
+  bool get isRead => readAt != null;
+
+  /// Nothing left to do with this notice.
+  bool get settled => isRead && (!requiresAcknowledgement || acknowledgedAt != null);
+
+  factory CrewAnnouncement.fromJson(Map<String, dynamic> j) => CrewAnnouncement(
+        id: j['id'] as String,
+        title: (j['title'] ?? '') as String,
+        body: (j['body'] ?? '') as String,
+        category: (j['category'] ?? 'ANNOUNCEMENT') as String,
+        priority: (j['priority'] ?? 'NORMAL') as String,
+        sentAt: j['sentAt'] == null ? null : DateTime.parse(j['sentAt'] as String).toLocal(),
+        pinned: (j['pinned'] ?? false) as bool,
+        requiresAcknowledgement: (j['requiresAcknowledgement'] ?? false) as bool,
+        acknowledgedAt: j['acknowledgedAt'] == null
+            ? null
+            : DateTime.parse(j['acknowledgedAt'] as String).toLocal(),
+        authorName: (j['authorName'] ?? '') as String,
+        readAt: j['readAt'] == null ? null : DateTime.parse(j['readAt'] as String).toLocal(),
+        attachmentCount: (j['attachmentCount'] as num?)?.toInt() ?? 0,
+      );
+}
+
 /// Everything the driver and attendant app asks the platform for.
 class CrewApi {
   CrewApi._();
@@ -1002,6 +1093,18 @@ class CrewApi {
 
   Future<void> leaveStop(String tripId, int sequence) =>
       _api.post('/crew/trips/$tripId/stops/$sequence/depart');
+
+  /// Pass a stop without stopping, with a reason.
+  ///
+  /// `SkipStopDto` on the server takes [reason] as 3–300 characters and
+  /// nothing else. Recorded rather than left silent: a stop skipped because
+  /// nobody was waiting looks identical on a map to a stop the driver forgot,
+  /// and the family standing there deserves the difference to be written
+  /// down. The server refuses this once the stop already has an arrival
+  /// recorded — a skip is an alternative to Arrived, not something that
+  /// follows it.
+  Future<void> skipStop(String tripId, int sequence, String reason) =>
+      _api.post('/crew/trips/$tripId/stops/$sequence/skip', {'reason': reason});
 
   /// Record that a child got on or off.
   ///
@@ -1327,4 +1430,44 @@ class CrewApi {
 
   Future<Map<String, dynamic>> me() async =>
       await _api.get('/crew/me') as Map<String, dynamic>;
+
+  /// How many notices this crew member has not opened yet.
+  ///
+  /// Seeded by every fetch of [announcements] and moved by the screen itself
+  /// as notices are read, the same way TeacherApi keeps its own dot live.
+  /// Anything drawing a badge for it should listen to this rather than count
+  /// rows a second time.
+  final ValueNotifier<int> unreadAnnouncements = ValueNotifier<int>(0);
+
+  /// What the office has told drivers and attendants.
+  ///
+  /// Resolved server-side against the routes and campuses this person has
+  /// actually been rostered on — see the audience note on
+  /// CrewAnnouncementsController — so the client asks for nothing more
+  /// specific than a page size.
+  Future<List<CrewAnnouncement>> announcements() async {
+    final json = await _api.get('/crew/announcements?pageSize=50');
+    final rows = Paged.from<CrewAnnouncement>(json, CrewAnnouncement.fromJson).rows;
+    unreadAnnouncements.value = rows.where((a) => a.readAt == null).length;
+    return rows;
+  }
+
+  /// This crew member opened one notice. Idempotent — a second call is a
+  /// success, not an error.
+  Future<void> markAnnouncementRead(String id) =>
+      _api.post('/crew/announcements/$id/read');
+
+  /// Everything this crew member can see, marked read in one sweep. Returns
+  /// how many rows the server actually stamped, which covers more than the
+  /// one page on screen.
+  Future<int> markAllAnnouncementsRead() async {
+    final json = await _api.post('/crew/announcements/read-all');
+    return ((json as Map<String, dynamic>?)?['marked'] as num?)?.toInt() ?? 0;
+  }
+
+  /// "I have read this and I understand it" — offered only on a notice the
+  /// office marked as requiring it, e.g. a changed release procedure or a road
+  /// closed to buses. Twice is a success, same as the server.
+  Future<void> acknowledgeAnnouncement(String id) =>
+      _api.post('/crew/announcements/$id/acknowledge', const <String, dynamic>{});
 }

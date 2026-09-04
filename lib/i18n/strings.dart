@@ -488,6 +488,28 @@ const Map<String, String> _en = {
   'driver.notRecorded': '{name} was not recorded. Try again.',
   'driver.recordedAs': '{name} was recorded away from the expected stop. The office has been told.',
   'driver.onBoardSince': 'On board since {n}',
+  // ---- Passed without stopping ---------------------------------------------
+  // A stop skipped because nobody was waiting looks identical on a map to one
+  // the driver forgot, unless the difference is written down — which is what
+  // the required reason on this sheet is for.
+  'driver.skipStop': 'Skip stop',
+  'driver.skipped': 'Skipped',
+  'driver.skipStopTitle': 'Skip this stop?',
+  'driver.skipStopWhy':
+      'Say why the bus is passing without stopping — so this reads as a stop nobody was waiting at, not one you forgot.',
+  'driver.skipReasonLabel': 'Reason',
+  'driver.skipReasonTooShort': 'Say a little more — at least 3 characters.',
+  'driver.skipConfirm': 'Skip this stop',
+
+  // ---- Notices from the school --------------------------------------------
+  // CrewAnnouncementsController existed long before any screen here called
+  // it: drivers and attendants could be aimed at directly, and had nowhere to
+  // read it.
+  'driver.announcements': 'Notices',
+  'driver.noAnnouncements': 'The school has not sent anything yet.',
+  'driver.ackNeeded': 'Needs your acknowledgement',
+  'driver.mustAcknowledge':
+      'This one asks to be acknowledged — press Got it once you have read and understood it.',
 
   // ---- What to do right now ------------------------------------------------
   // The run in five steps, in the order a driver does them, printed above the
@@ -1455,6 +1477,8 @@ const Map<String, String> _en = {
   'bus.arriveAtSchool': 'Arrive at school',
   'bus.child.arrivedSchool': 'Arrived at school',
   'bus.child.droppedOff': 'Dropped off',
+  'bus.handedTo': 'Handed to {name}',
+  'bus.handedToWithRelation': 'Handed to {name} ({relation})',
   'bus.child.onBus': 'On the bus',
   'bus.child.noShow': 'Did not board',
   'bus.noShowNote': 'The school recorded that your child did not travel.',
@@ -1935,6 +1959,19 @@ const Map<String, String> _ckb = {
   'driver.notRecorded': '{name} تۆمار نەکرا. دووبارە هەوڵ بدەرەوە.',
   'driver.recordedAs': '{name} لە دەرەوەی وێستگەی پێشبینیکراو تۆمارکرا. نووسینگە ئاگادارکرایەوە.',
   'driver.onBoardSince': 'لە پاسدایە لە {n}ەوە',
+  'driver.skipStop': 'وێستگە بپەڕێنە',
+  'driver.skipped': 'پەڕێنرا',
+  'driver.skipStopTitle': 'ئەم وێستگەیە بپەڕێنیت؟',
+  'driver.skipStopWhy':
+      'بڵێ بۆچی پاسەکە بەبێ وەستان تێدەپەڕێت — تاکو ئەمە وەک وێستگەیەک بخوێنرێتەوە کە کەس چاوەڕێی نەبووە، نەک وەک یەکێک لەبیرت چووبێت.',
+  'driver.skipReasonLabel': 'هۆکار',
+  'driver.skipReasonTooShort': 'کەمێک زیاتر بنووسە — لانیکەم ٣ پیت.',
+  'driver.skipConfirm': 'ئەم وێستگەیە بپەڕێنە',
+  'driver.announcements': 'ئاگادارکردنەوەکان',
+  'driver.noAnnouncements': 'قوتابخانە هێشتا هیچی نەناردووە.',
+  'driver.ackNeeded': 'پێویستی بە پەسەندکردنی تۆیە',
+  'driver.mustAcknowledge':
+      'ئەمە داوای پەسەندکردن دەکات — کاتێک خوێندتەوە و تێگەیشتیت، «تێگەیشتم» دابگرە.',
 
   // ---- What to do right now ------------------------------------------------
   'driver.stepOf': 'هەنگاوی {n} لە 5',
@@ -2868,6 +2905,8 @@ const Map<String, String> _ckb = {
   'bus.arriveAtSchool': 'گەیشتن بە قوتابخانە',
   'bus.child.arrivedSchool': 'گەیشتە قوتابخانە',
   'bus.child.droppedOff': 'لە وێستگە دابەزی',
+  'bus.handedTo': 'بە {name} دراوە',
+  'bus.handedToWithRelation': 'بە {name} ({relation}) دراوە',
   'bus.child.onBus': 'لەناو پاسدایە',
   'bus.child.noShow': 'سواری پاس نەبوو',
   'bus.noShowNote': 'قوتابخانە تۆماری کرد کە منداڵەکەت گەشتی نەکرد.',
@@ -3345,6 +3384,18 @@ const Map<String, String> _ar = {
   'driver.notRecorded': '{name} لم يُسجّل. حاول مرة أخرى.',
   'driver.recordedAs': '{name} سُجّل بعيدًا عن الموقف المتوقع. تم إبلاغ المكتب.',
   'driver.onBoardSince': 'على متن الحافلة منذ {n}',
+  'driver.skipStop': 'تخطي الموقف',
+  'driver.skipped': 'تم التخطي',
+  'driver.skipStopTitle': 'تخطي هذا الموقف؟',
+  'driver.skipStopWhy':
+      'اذكر السبب — ليُقرأ هذا كموقف لم ينتظر عنده أحد، لا كموقف نسيته.',
+  'driver.skipReasonLabel': 'السبب',
+  'driver.skipReasonTooShort': 'اكتب أكثر قليلاً — 3 أحرف على الأقل.',
+  'driver.skipConfirm': 'تخطي هذا الموقف',
+  'driver.announcements': 'الإشعارات',
+  'driver.noAnnouncements': 'لم ترسل المدرسة شيئاً بعد.',
+  'driver.ackNeeded': 'يحتاج إلى إقرارك',
+  'driver.mustAcknowledge': 'يطلب هذا إقراراً — اضغط فهمت بعد أن تقرأه وتفهمه.',
 
   // ---- What to do right now ------------------------------------------------
   'driver.stepOf': 'الخطوة {n} من 5',
@@ -4275,6 +4326,8 @@ const Map<String, String> _ar = {
   'bus.arriveAtSchool': 'الوصول إلى المدرسة',
   'bus.child.arrivedSchool': 'وصل إلى المدرسة',
   'bus.child.droppedOff': 'نزل في المحطة',
+  'bus.handedTo': 'تم تسليمه إلى {name}',
+  'bus.handedToWithRelation': 'تم تسليمه إلى {name} ({relation})',
   'bus.child.onBus': 'في الحافلة',
   'bus.child.noShow': 'لم يركب الحافلة',
   'bus.noShowNote': 'سجّلت المدرسة أن طفلك لم يسافر.',

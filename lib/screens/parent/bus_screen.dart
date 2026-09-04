@@ -788,6 +788,18 @@ class _RouteCard extends StatelessWidget {
      */
     final noShow = trip.resolution == 'NO_SHOW';
     final arrived = noShow ? null : (trip.alightedAt ?? trip.endedAt);
+
+    // Who actually took her at the door, once she has actually arrived. Never
+    // shown for a run still under way — [arrived] is null until then — and
+    // never invented: it is exactly what the office recorded, or nothing.
+    final collectorName = trip.collectorName;
+    final relationship = trip.collectorRelationship;
+    final handedToLine = (arrived != null && collectorName != null && collectorName.isNotEmpty)
+        ? ((relationship != null && relationship.isNotEmpty)
+            ? tv('bus.handedToWithRelation', {'name': collectorName, 'relation': relationship})
+            : tv('bus.handedTo', {'name': collectorName}))
+        : null;
+
     final steps = <(String, String, DateTime?, int)>[
       (
         t('bus.started'),
@@ -815,7 +827,9 @@ class _RouteCard extends StatelessWidget {
             : toSchool
                 ? t('bus.arriveAtSchool')
                 : tn('bus.arrivedAt', bus.transport.dropoffStopName ?? t('bus.home')),
-        noShow ? t('bus.noShowNote') : (toSchool ? school : (bus.transport.dropoffLandmark ?? '')),
+        noShow
+            ? t('bus.noShowNote')
+            : handedToLine ?? (toSchool ? school : (bus.transport.dropoffLandmark ?? '')),
         arrived,
         noShow ? 3 : (arrived != null ? 2 : 0),
       ),

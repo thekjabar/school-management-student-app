@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/crew_api.dart';
 import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
@@ -7,6 +8,7 @@ import '../../ui/async.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/nav_glyphs.dart';
+import 'announcements_screen.dart';
 import 'home_tab.dart';
 import 'profile_tab.dart';
 import 'route_tab.dart';
@@ -39,6 +41,27 @@ class _DriverAppState extends State<DriverApp> {
   /// stack two copies of the run on top of each other.
   bool _finding = false;
 
+  /// The dot on the header's notices button. Loaded quietly and failing
+  /// quietly, the same as the teacher shell's own bell: a number on a button
+  /// is not worth an error state on the screen behind it.
+  int _unread = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _countUnread();
+  }
+
+  Future<void> _countUnread() async {
+    try {
+      final rows = await CrewApi.instance.announcements();
+      if (!mounted) return;
+      setState(() => _unread = rows.where((a) => a.readAt == null).length);
+    } catch (_) {
+      // Leave it at nought.
+    }
+  }
+
   List<NavItem> get _nav => [
         NavItem(Icons.home_rounded, Icons.home_outlined, t('nav.home'), glyph: NavGlyph.home),
         NavItem(Icons.map_rounded, Icons.map_outlined, t('driver.route'), glyph: NavGlyph.route),
@@ -70,6 +93,8 @@ class _DriverAppState extends State<DriverApp> {
               greeting: greeting,
               name: me?.name ?? '',
               school: me?.schoolName ?? '',
+              notificationCount: _unread,
+              onBell: _openAnnouncements,
             ),
             Expanded(
               child: IndexedStack(
@@ -122,23 +147,48 @@ class _DriverAppState extends State<DriverApp> {
       if (mounted) setState(() => _finding = false);
     }
   }
+
+  /// The school's notices for drivers and attendants — a screen that did not
+  /// exist until now (see CrewAnnouncementsController's own doc comment).
+  ///
+  /// A fifth tab, or a menu, would be the obvious place; this shell is
+  /// deliberately four destinations and one action, and the doc comment above
+  /// explains why nothing sits behind a drawer here. So this button, not a
+  /// new destination, is what makes the list reachable — the same shape the
+  /// teacher shell already uses for its own bell.
+  Future<void> _openAnnouncements() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const DriverAnnouncements()),
+    );
+    // The count moves by reading notices on that screen, not by anything this
+    // one is told directly — it is a pushed screen, not a tab kept alive
+    // underneath, so the badge is only right again once it is asked afresh.
+    if (mounted) _countUnread();
+  }
 }
 
 /// The driver's header.
 ///
-/// No menu button — there is no drawer to open — and no bell either: nothing in
-/// this app keeps a list of notifications, and the one that was here jumped to
-/// the Route tab, which is not what a bell promises.
+/// No drawer-menu button — there is nothing behind a drawer on this shell —
+/// but there is now a notices button where the doc comment below used to say
+/// there could never usefully be one. That was true of the bell that jumped
+/// to the Route tab and showed nothing a route needed; it stopped being true
+/// the day CrewAnnouncementsController shipped a real list for this screen to
+/// open.
 class _DriverHeader extends StatelessWidget {
   const _DriverHeader({
     required this.greeting,
     required this.name,
     required this.school,
+    required this.notificationCount,
+    required this.onBell,
   });
 
   final String greeting;
   final String name;
   final String school;
+  final int notificationCount;
+  final VoidCallback onBell;
 
   @override
   Widget build(BuildContext context) {
@@ -216,6 +266,12 @@ class _DriverHeader extends StatelessWidget {
                 ],
               ],
             ),
+          ),
+          const SizedBox(width: 8),
+          SquareButton(
+            icon: Icons.campaign_outlined,
+            onTap: onBell,
+            badge: notificationCount,
           ),
         ],
       ),

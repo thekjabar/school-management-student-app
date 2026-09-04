@@ -1295,6 +1295,9 @@ class TripToday {
     required this.resolution,
     required this.boardedAt,
     required this.alightedAt,
+    required this.collectorName,
+    required this.collectorRelationship,
+    required this.collectorPhotoUrl,
   });
 
   final String tripId;
@@ -1312,6 +1315,20 @@ class TripToday {
   final String? resolution;
   final DateTime? boardedAt;
   final DateTime? alightedAt;
+
+  /// Who actually took her at the door. Null until an alighting or hand-over
+  /// event is actually on the ledger for this run — never guessed at while
+  /// she is still riding.
+  final String? collectorName;
+
+  /// How that adult relates to her, in the office's own words — set only
+  /// when [collectorName] came from an authorised collector on file, not from
+  /// a guardian on the account or a one-time code.
+  final String? collectorRelationship;
+
+  /// A photograph of that adult, when the office holds one. Not yet shown
+  /// anywhere in this app.
+  final String? collectorPhotoUrl;
 
   static DateTime? _at(dynamic v) => v == null ? null : DateTime.parse(v as String).toLocal();
 
@@ -1331,6 +1348,9 @@ class TripToday {
         resolution: j['resolution'] as String?,
         boardedAt: _at(j['boardedAt']),
         alightedAt: _at(j['alightedAt']),
+        collectorName: j['collectorName'] as String?,
+        collectorRelationship: j['collectorRelationship'] as String?,
+        collectorPhotoUrl: j['collectorPhotoUrl'] as String?,
       );
 
   /// What actually happened to this child on this run — as an i18n key, so
