@@ -110,6 +110,27 @@ class _TripScreenState extends State<TripScreen> {
   bool _nearestFirst = false;
   String? _busy;
 
+  /// What the driver has typed into the child search.
+  ///
+  /// A run can carry forty children over eight stops, and finding one by
+  /// scrolling means opening cards until the right name appears. Folded to
+  /// lower case once here rather than on every row of every rebuild.
+  final TextEditingController _search = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  /// Whether this child answers the search. Name or seat number, because the
+  /// seat is what is written on the paper list the office hands out.
+  static bool _matches(RiderOnStop r, String q) =>
+      q.isEmpty ||
+      r.name.toLowerCase().contains(q) ||
+      (r.seatNumber ?? '').toLowerCase().contains(q);
+
   Future<List<CrewTrip>> _dutyList() {
     final day = widget.serviceDate;
     if (day == null) return CrewApi.instance.today();
@@ -568,8 +589,44 @@ class _TripScreenState extends State<TripScreen> {
                       ),
                       RouteMapNote(stops: data.plan.stops),
                       const SizedBox(height: 14),
-                      ...data.plan.stops.map(
+                      _ChildSearch(
+                        controller: _search,
+                        onChanged: (v) =>
+                            setState(() => _query = v.trim().toLowerCase()),
+                      ),
+                      if (_query.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Builder(builder: (_) {
+                          final hits = data.plan.stops
+                              .expand((s) => s.students)
+                              .where((r) => _matches(r, _query))
+                              .length;
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 4, bottom: 6),
+                            child: Text(
+                              hits == 0
+                                  ? t('driver.searchNone')
+                                  : tn('driver.searchHits', '$hits'),
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: hits == 0 ? AppTheme.textMuted : Role.driver.tint,
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                      const SizedBox(height: 6),
+                      // While a search is running the list shows only the stops
+                      // that hold a match, so the answer is not three closed
+                      // cards below the fold.
+                      ...data.plan.stops
+                          .where((s) =>
+                              _query.isEmpty ||
+                              s.students.any((r) => _matches(r, _query)))
+                          .map(
                         (s) => _StopCard(
+                          query: _query,
                           stop: s,
                           tripId: widget.tripId,
                           leg: trip?.leg ?? 'OUT',
@@ -1132,11 +1189,16 @@ class _StopCard extends StatefulWidget {
     required this.running,
     required this.started,
     required this.onChanged,
+    this.query = '',
   });
 
   final PlannedStop stop;
   final String tripId;
   final String leg;
+
+  /// The child search, already folded to lower case. Empty means no search is
+  /// running and the card behaves exactly as it always did.
+  final String query;
 
   /// The campus gate, where the morning's drop-offs and the afternoon's
   /// boardings actually happen.
@@ -1183,6 +1245,69 @@ class _StopCardState extends State<_StopCard> {
   bool _open = false;
   String? _busyStudent;
   bool _busyStop = false;
+
+  /// Redraws the hold countdown once a second, and only while one is running.
+  Timer? _hold;
+
+  /// How long the bus should stand at this stop before it may move on.
+  ///
+  /// Taken from the stop's own planned dwell, which the server already works
+  /// out from the children booked onto it (25 seconds each, trip-timing.ts), so
+  /// a stop with eight children holds longer than one with a single child
+  /// without a second number having to be invented and kept in step. Clamped:
+  /// twenty seconds is the least that is worth calling a stop, and ninety is as
+  /// long as it is fair to hold a bus that is ready to go.
+  int get _holdSeconds => widget.stop.dwellSeconds.clamp(20, 90);
+
+  /// Seconds still to run, or zero. Negative never leaks out.
+  int get _holdLeft {
+    final at = widget.stop.arrivedAt;
+    if (at == null || widget.stop.departedAt != null) return 0;
+    // Capped at the full hold as well as floored at zero. The arrival is the
+    // SERVER's clock and this is the handset's: a phone running a few minutes
+    // slow would otherwise compute a negative elapsed time and hold the bus for
+    // longer than the rule ever intended.
+    final left = _holdSeconds - DateTime.now().difference(at).inSeconds;
+    if (left <= 0) return 0;
+    return left > _holdSeconds ? _holdSeconds : left;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _syncHold();
+  }
+
+  @override
+  void didUpdateWidget(covariant _StopCard old) {
+    super.didUpdateWidget(old);
+    _syncHold();
+  }
+
+  @override
+  void dispose() {
+    _hold?.cancel();
+    super.dispose();
+  }
+
+  /// Runs the ticker exactly while there is something to count down, so a
+  /// screen full of finished stops is not rebuilding itself every second.
+  void _syncHold() {
+    final wanted = _holdLeft > 0;
+    if (wanted && _hold == null) {
+      _hold = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted) return;
+        setState(() {});
+        if (_holdLeft <= 0) {
+          _hold?.cancel();
+          _hold = null;
+        }
+      });
+    } else if (!wanted && _hold != null) {
+      _hold!.cancel();
+      _hold = null;
+    }
+  }
 
   Future<void> _mark(RiderOnStop rider, String eventType, String label) async {
     setState(() => _busyStudent = rider.studentId);
@@ -1281,6 +1406,13 @@ class _StopCardState extends State<_StopCard> {
     // stop is already done (departed, or already skipped) there is nothing
     // left here to skip either.
     final canSkip = !s.done && s.arrivedAt == null;
+    // The bus has pulled up and has not stood here long enough yet.
+    final holdLeft = _holdLeft;
+    final holding = holdLeft > 0;
+    // A card holding a search hit opens itself. Closing every card again the
+    // moment the search is cleared would lose the driver's place, so this is
+    // read alongside the tapped state rather than written into it.
+    final open = _open || widget.query.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1393,14 +1525,14 @@ class _StopCardState extends State<_StopCard> {
                     ),
                     const SizedBox(width: 6),
                     Icon(
-                      _open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                      open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
                       color: AppTheme.textFaint,
                     ),
                   ],
                 ),
               ),
             ),
-            if (_open) ...[
+            if (open) ...[
               Divider(height: 1, color: AppTheme.border),
               // ONE line for the whole stop, not one under every child. The
               // roster stays exactly where it is — the driver still has to see
@@ -1457,21 +1589,27 @@ class _StopCardState extends State<_StopCard> {
               // whole list had to be scrolled past to say the bus had stopped.
               // "Moving on" stays at the bottom, where it belongs — that one IS
               // the step after the children.
-              Padding(
-                padding: EdgeInsets.fromLTRB(16, 12, 16, canSkip ? 2 : 4),
-                child: BigButton(
-                  label: t('driver.arrived'),
-                  color: Role.driver.tint,
-                  busy: _busyStop,
-                  onPressed: widget.running
-                      ? () => _stopAction(
-                            () => CrewApi.instance
-                                .arriveAtStop(widget.tripId, s.plannedSequence),
-                            t('driver.arrived'),
-                          )
-                      : null,
+              // Gone the moment the arrival is recorded. It used to sit there
+              // afterwards looking like the next thing to press, so a driver
+              // who had already arrived pressed it again and got a refusal from
+              // the server for a step he had done correctly the first time.
+              // The green "Arrived HH:MM" in the header above is the receipt.
+              if (s.arrivedAt == null)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, canSkip ? 2 : 4),
+                  child: BigButton(
+                    label: t('driver.arrived'),
+                    color: Role.driver.tint,
+                    busy: _busyStop,
+                    onPressed: widget.running
+                        ? () => _stopAction(
+                              () => CrewApi.instance
+                                  .arriveAtStop(widget.tripId, s.plannedSequence),
+                              t('driver.arrived'),
+                            )
+                        : null,
+                  ),
                 ),
-              ),
               // An alternative to Arrived, not a step after it — the server
               // refuses this the moment a stop has an arrival recorded, so it
               // has nothing left to offer once the bus has actually pulled up.
@@ -1497,7 +1635,9 @@ class _StopCardState extends State<_StopCard> {
                     ),
                   ),
                 ),
-              ...s.students.map((r) => _RiderRow(
+              ...s.students
+                  .where((r) => _TripScreenState._matches(r, widget.query))
+                  .map((r) => _RiderRow(
                     rider: r,
                     leg: widget.leg,
                     schoolReached: widget.schoolReached,
@@ -1523,17 +1663,47 @@ class _StopCardState extends State<_StopCard> {
                   )),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-                child: BigButton(
-                  label: t('driver.movingOn'),
-                  color: AppTheme.blue,
-                  busy: _busyStop,
-                  onPressed: widget.running
-                      ? () => _stopAction(
-                            () => CrewApi.instance
-                                .leaveStop(widget.tripId, s.plannedSequence),
-                            t('driver.movingOn'),
-                          )
-                      : null,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    BigButton(
+                      // The clock is on the button itself. A disabled button
+                      // with the reason somewhere else is the same dead button
+                      // this screen has been taught not to draw.
+                      label: holding
+                          ? '${t('driver.movingOn')} · ${holdLeft ~/ 60}:${(holdLeft % 60).toString().padLeft(2, '0')}'
+                          : t('driver.movingOn'),
+                      color: AppTheme.blue,
+                      busy: _busyStop,
+                      onPressed: widget.running && !holding
+                          ? () => _stopAction(
+                                () => CrewApi.instance
+                                    .leaveStop(widget.tripId, s.plannedSequence),
+                                t('driver.movingOn'),
+                              )
+                          : null,
+                    ),
+                    if (holding) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.timer_outlined, size: 16, color: AppTheme.textMuted),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: Text(
+                              t('driver.holdAtStop'),
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                height: 1.45,
+                                color: AppTheme.textMuted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
@@ -2739,6 +2909,72 @@ class _PreTripSheetState extends State<_PreTripSheet> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Find one child on a run that carries forty.
+///
+/// Deliberately plain: a single field, the same 14 radius as every other panel
+/// on the screen, and a clear button that appears only when there is something
+/// to clear. It filters rather than navigates — the stops that hold a match
+/// stay exactly where they are in the run order, opened, with the other
+/// children hidden — so the driver never loses track of where the bus is in
+/// the route while looking somebody up.
+class _ChildSearch extends StatelessWidget {
+  const _ChildSearch({required this.controller, required this.onChanged});
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Panel(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      child: Row(
+        children: [
+          Icon(Icons.search_rounded, size: 20, color: AppTheme.textMuted),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              textInputAction: TextInputAction.search,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              decoration: InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                hintText: t('driver.searchChild'),
+                hintStyle: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppTheme.textFaint,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+          // Only when there is something to undo. A permanent cross on an empty
+          // field is one more thing to read on a screen used at arm's length.
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (context, value, child) => value.text.isEmpty
+                ? const SizedBox(width: 4)
+                : GestureDetector(
+                    onTap: () {
+                      controller.clear();
+                      onChanged('');
+                      FocusScope.of(context).unfocus();
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                      child: Icon(Icons.close_rounded, size: 19, color: AppTheme.textMuted),
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }
