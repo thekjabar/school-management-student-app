@@ -574,6 +574,13 @@ class _TripScreenState extends State<TripScreen> {
                           tripId: widget.tripId,
                           leg: trip?.leg ?? 'OUT',
                           terminalStopId: data.terminalStopId,
+                          // "At school" is a claim about a place, and the only
+                          // evidence for it is the bus having arrived at the
+                          // gate. Without this the row said "At school" for a
+                          // child set down at stop 4 of 8.
+                          schoolReached: data.plan.stops.any(
+                            (p) => p.stopId == data.terminalStopId && p.arrivedAt != null,
+                          ),
                           // Whether the ticks on this card can do anything at
                           // all. The server refuses every custody event until
                           // the bus has set off.
@@ -1116,6 +1123,7 @@ class _StopCard extends StatefulWidget {
     required this.tripId,
     required this.leg,
     required this.terminalStopId,
+    required this.schoolReached,
     required this.running,
     required this.started,
     required this.onChanged,
@@ -1128,6 +1136,15 @@ class _StopCard extends StatefulWidget {
   /// The campus gate, where the morning's drop-offs and the afternoon's
   /// boardings actually happen.
   final String? terminalStopId;
+
+  /// The bus has actually arrived at that gate.
+  ///
+  /// A morning alighting is the app SAYING the child reached school, and until
+  /// this existed it said so from the leg alone — so tapping a child off at
+  /// stop 4 of 8 drew "At school" beside their name and sent their family the
+  /// same claim. The server now refuses to make that claim without this
+  /// evidence; the screen must not make it either.
+  final bool schoolReached;
 
   /// The bus has set off and the run is not over.
   ///
@@ -1431,6 +1448,7 @@ class _StopCardState extends State<_StopCard> {
               ...s.students.map((r) => _RiderRow(
                     rider: r,
                     leg: widget.leg,
+                    schoolReached: widget.schoolReached,
                     busy: _busyStudent == r.studentId,
                     canPickUp: widget.running,
                     canSetDown: widget.started,
@@ -1440,7 +1458,14 @@ class _StopCardState extends State<_StopCard> {
                     onOff: () => _mark(
                       r,
                       widget.leg == 'OUT' ? 'ALIGHTED' : 'HANDOVER',
-                      widget.leg == 'OUT' ? t('driver.atSchool') : t('driver.handedOver'),
+                      // The reason is written into the ledger, so it has to
+                      // name what actually happened rather than what the leg
+                      // usually means.
+                      widget.leg == 'OUT'
+                          ? (widget.schoolReached
+                              ? t('driver.atSchool')
+                              : t('driver.setDownEarly'))
+                          : t('driver.handedOver'),
                     ),
                     onNoShow: () => _mark(r, 'NO_SHOW', t('driver.notRiding')),
                   )),
@@ -1679,6 +1704,7 @@ class _RiderRow extends StatelessWidget {
   const _RiderRow({
     required this.rider,
     required this.leg,
+    required this.schoolReached,
     required this.busy,
     required this.canPickUp,
     required this.canSetDown,
@@ -1689,6 +1715,10 @@ class _RiderRow extends StatelessWidget {
 
   final RiderOnStop rider;
   final String leg;
+
+  /// The bus has reached the campus gate, so a morning set-down may honestly be
+  /// called "at school". See the note on _StopCard.
+  final bool schoolReached;
   final bool busy;
 
   /// Whether a tap on this row can actually record anything. False until the
@@ -1759,8 +1789,11 @@ class _RiderRow extends StatelessWidget {
                 ),
                 if (off)
                   Text(
-                    '${leg == 'OUT' ? t('driver.atSchool') : t('driver.handedOver')} ${hhmm(rider.alightedAt)}',
-                    style: TextStyle(fontSize: 11, color: AppTheme.green),
+                    '${leg == 'OUT' ? (schoolReached ? t('driver.atSchool') : t('driver.setDownEarly')) : t('driver.handedOver')} ${hhmm(rider.alightedAt)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: leg == 'OUT' && !schoolReached ? AppTheme.amber : AppTheme.green,
+                    ),
                   )
                 else if (onBus)
                   Text(
