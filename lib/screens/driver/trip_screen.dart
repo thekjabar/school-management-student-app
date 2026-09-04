@@ -578,9 +578,14 @@ class _TripScreenState extends State<TripScreen> {
                           // evidence for it is the bus having arrived at the
                           // gate. Without this the row said "At school" for a
                           // child set down at stop 4 of 8.
-                          schoolReached: data.plan.stops.any(
-                            (p) => p.stopId == data.terminalStopId && p.arrivedAt != null,
-                          ),
+                          //
+                          // Taken from the server, which judges it on
+                          // StopAssignment.isTerminal — the same field the
+                          // custody guard uses — rather than matching the gate
+                          // here on Stop.isCampusGate, which is set on no stop
+                          // in this database and would have made the screen
+                          // call every correct drop-off an early set-down.
+                          schoolReached: data.plan.terminalArrivedAt != null,
                           // Whether the ticks on this card can do anything at
                           // all. The server refuses every custody event until
                           // the bus has set off.

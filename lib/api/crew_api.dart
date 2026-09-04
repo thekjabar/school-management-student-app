@@ -545,6 +545,7 @@ class TripPlan {
     required this.counts,
     required this.stops,
     required this.timing,
+    this.terminalArrivedAt,
   });
 
   /// "planned" — the office's order — or "nearest", recomputed from where the
@@ -559,6 +560,14 @@ class TripPlan {
   /// every screen already has to handle.
   final TripTiming timing;
 
+  /// When the bus reached the campus gate, straight from the server.
+  ///
+  /// The one piece of evidence that a morning set-down really was a school
+  /// arrival. Null while the bus is still on its way — and null from an older
+  /// server, which is why every reader must treat null as "cannot say" rather
+  /// than as proof of anything.
+  final DateTime? terminalArrivedAt;
+
   factory TripPlan.fromJson(Map<String, dynamic> j) => TripPlan(
         ordering: (j['ordering'] ?? 'planned') as String,
         orderingNote: (j['orderingNote'] ?? '') as String,
@@ -568,6 +577,10 @@ class TripPlan {
             .toList(),
         timing: TripTiming.fromJson(
             (j['timing'] as Map<String, dynamic>?) ?? const <String, dynamic>{}),
+        terminalArrivedAt: (j['trip'] as Map<String, dynamic>?)?['terminalArrivedAt'] == null
+            ? null
+            : DateTime.parse((j['trip'] as Map<String, dynamic>)['terminalArrivedAt'] as String)
+                .toLocal(),
       );
 }
 
