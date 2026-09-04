@@ -1450,6 +1450,53 @@ class _StopCardState extends State<_StopCard> {
                     ],
                   ),
                 ),
+              // Arriving comes BEFORE the roster because it happens before the
+              // roster: the bus pulls up, and only then is there anyone to tick
+              // on or off. Sitting under six children it was the last thing the
+              // driver could reach and the first thing he had to do, so the
+              // whole list had to be scrolled past to say the bus had stopped.
+              // "Moving on" stays at the bottom, where it belongs — that one IS
+              // the step after the children.
+              Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, canSkip ? 2 : 4),
+                child: BigButton(
+                  label: t('driver.arrived'),
+                  color: Role.driver.tint,
+                  busy: _busyStop,
+                  onPressed: widget.running
+                      ? () => _stopAction(
+                            () => CrewApi.instance
+                                .arriveAtStop(widget.tripId, s.plannedSequence),
+                            t('driver.arrived'),
+                          )
+                      : null,
+                ),
+              ),
+              // An alternative to Arrived, not a step after it — the server
+              // refuses this the moment a stop has an arrival recorded, so it
+              // has nothing left to offer once the bus has actually pulled up.
+              // It therefore sits WITH Arrived rather than at the far end of
+              // the card, where it read as something to do after moving on.
+              if (canSkip)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 2),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 40,
+                    child: TextButton.icon(
+                      onPressed: widget.running && !_busyStop ? _skipStop : null,
+                      icon: Icon(Icons.skip_next_rounded, size: 18, color: AppTheme.textMuted),
+                      label: Text(
+                        t('driver.skipStop'),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ...s.students.map((r) => _RiderRow(
                     rider: r,
                     leg: widget.leg,
@@ -1475,64 +1522,20 @@ class _StopCardState extends State<_StopCard> {
                     onNoShow: () => _mark(r, 'NO_SHOW', t('driver.notRiding')),
                   )),
               Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, canSkip ? 4 : 14),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: BigButton(
-                        label: t('driver.arrived'),
-                        color: Role.driver.tint,
-                        busy: _busyStop,
-                        onPressed: widget.running
-                            ? () => _stopAction(
-                                  () => CrewApi.instance
-                                      .arriveAtStop(widget.tripId, s.plannedSequence),
-                                  t('driver.arrived'),
-                                )
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: BigButton(
-                        label: t('driver.movingOn'),
-                        color: AppTheme.blue,
-                        busy: _busyStop,
-                        onPressed: widget.running
-                            ? () => _stopAction(
-                                  () => CrewApi.instance
-                                      .leaveStop(widget.tripId, s.plannedSequence),
-                                  t('driver.movingOn'),
-                                )
-                            : null,
-                      ),
-                    ),
-                  ],
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+                child: BigButton(
+                  label: t('driver.movingOn'),
+                  color: AppTheme.blue,
+                  busy: _busyStop,
+                  onPressed: widget.running
+                      ? () => _stopAction(
+                            () => CrewApi.instance
+                                .leaveStop(widget.tripId, s.plannedSequence),
+                            t('driver.movingOn'),
+                          )
+                      : null,
                 ),
               ),
-              // An alternative to Arrived, not a step after it — the server
-              // refuses this the moment a stop has an arrival recorded, so it
-              // has nothing left to offer once the bus has actually pulled up.
-              if (canSkip)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 40,
-                    child: TextButton.icon(
-                      onPressed: widget.running && !_busyStop ? _skipStop : null,
-                      icon: Icon(Icons.skip_next_rounded, size: 18, color: AppTheme.textMuted),
-                      label: Text(
-                        t('driver.skipStop'),
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textMuted,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ],
         ),
@@ -1742,6 +1745,13 @@ class _RiderRow extends StatelessWidget {
     final onBus = rider.boardedAt != null && rider.alightedAt == null;
     final off = rider.alightedAt != null;
 
+    // Marked as not travelling. The row had no branch for it: no line under the
+    // name, the same neutral seat chip as a child not yet picked up, and both
+    // buttons still sitting there. So a driver who tapped the cross saw a row
+    // that had not moved and tapped it again — the count went down, the row
+    // said nothing.
+    final notRiding = !off && !onBus && rider.notTravelling;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Row(
@@ -1755,7 +1765,9 @@ class _RiderRow extends StatelessWidget {
                   ? AppTheme.greenSoft
                   : onBus
                       ? AppTheme.blueSoft
-                      : AppTheme.neutralSoft,
+                      : notRiding
+                          ? AppTheme.roseSoft
+                          : AppTheme.neutralSoft,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -1767,7 +1779,9 @@ class _RiderRow extends StatelessWidget {
                     ? AppTheme.green
                     : onBus
                         ? AppTheme.blue
-                        : AppTheme.textMuted,
+                        : notRiding
+                            ? AppTheme.rose
+                            : AppTheme.textMuted,
               ),
             ),
           ),
@@ -1804,6 +1818,15 @@ class _RiderRow extends StatelessWidget {
                   Text(
                     tn('driver.onBoardSince', hhmm(rider.boardedAt)),
                     style: TextStyle(fontSize: 11, color: AppTheme.blue),
+                  )
+                else if (notRiding)
+                  Text(
+                    t('driver.notRiding'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.rose,
+                    ),
                   ),
               ],
             ),
@@ -1825,12 +1848,18 @@ class _RiderRow extends StatelessWidget {
                       ? (canSetDown ? onOff : null)
                       : (canPickUp ? onBoard : null),
                 ),
-                const SizedBox(width: 6),
-                _Mini(
-                  icon: Icons.close_rounded,
-                  colour: AppTheme.rose,
-                  onTap: canPickUp ? onNoShow : null,
-                ),
+                // Nothing left to say no to once the answer is already no. The
+                // boarding button above stays, so a child who turns up after
+                // all can still be picked up rather than the driver being stuck
+                // with a mark he made a second too early.
+                if (!notRiding) ...[
+                  const SizedBox(width: 6),
+                  _Mini(
+                    icon: Icons.close_rounded,
+                    colour: AppTheme.rose,
+                    onTap: canPickUp ? onNoShow : null,
+                  ),
+                ],
               ],
             ),
         ],
@@ -2289,6 +2318,23 @@ class _PreTripSheetState extends State<_PreTripSheet> {
   final TextEditingController _notes = TextEditingController();
   bool _unsafe = false;
 
+  /// The driver has pressed File at least once and been refused.
+  ///
+  /// Until they have, an unanswered line is simply one they have not reached
+  /// yet and is drawn plainly. Afterwards it is the reason the check will not
+  /// go, and says so on the line itself.
+  bool _tried = false;
+
+  /// A handle on every line, so the first unanswered one can be scrolled to.
+  /// A message naming a line is no use if the line is off the screen.
+  final Map<String, GlobalKey> _itemKeys = {
+    for (final item in _preTripItems) item.$1: GlobalKey(),
+  };
+
+  /// The lines still with no answer, in the order they are asked.
+  List<(String, String)> get _missing =>
+      _preTripItems.where((i) => !_answers.containsKey(i.$1)).toList();
+
   /// The crew member's own photograph, which ShiftStartDto requires.
   ///
   /// The id of a real file on the platform: taken on this handset a moment ago,
@@ -2431,8 +2477,6 @@ class _PreTripSheetState extends State<_PreTripSheet> {
     }
   }
 
-  bool get _answered => _answers.length == _preTripItems.length;
-
   /// FAIL and NOT_COMPLETED both stop the bus, and the server enforces that
   /// rather than warning about it. So the driver saying outright that this bus
   /// must not carry children outranks everything else on the form.
@@ -2461,8 +2505,23 @@ class _PreTripSheetState extends State<_PreTripSheet> {
       showNote(context, t('driver.pretrip.selfieRequired'), bad: true);
       return;
     }
-    if (!_answered) {
-      showNote(context, t('driver.pretrip.answerAll'), bad: true);
+    final missing = _missing;
+    if (missing.isNotEmpty) {
+      // showNote puts a SnackBar in the Scaffold, and this sheet is a modal
+      // route ABOVE it: every warning this button gave was drawn behind the
+      // sheet and never seen, so pressing File appeared to do nothing at all.
+      // The answer is on the sheet — a line naming what is left, and a jump to
+      // the first one.
+      setState(() => _tried = true);
+      final ctx = _itemKeys[missing.first.$1]?.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOut,
+          alignment: 0.15,
+        );
+      }
       return;
     }
 
@@ -2562,8 +2621,12 @@ class _PreTripSheetState extends State<_PreTripSheet> {
                     const SizedBox(height: 14),
                     ..._preTripItems.map(
                       (item) => _PreTripRow(
+                        key: _itemKeys[item.$1],
                         label: t(item.$2),
                         answer: _answers[item.$1],
+                        // Flagged only after a refused attempt: a line the
+                        // driver simply has not got to yet is not a mistake.
+                        flagged: _tried && !_answers.containsKey(item.$1),
                         onAnswer: (a) => setState(() => _answers[item.$1] = a),
                       ),
                     ),
@@ -2638,6 +2701,31 @@ class _PreTripSheetState extends State<_PreTripSheet> {
                       ),
                       const SizedBox(height: 8),
                     ],
+                    // What is actually left, named. Shown only once the driver
+                    // has been refused, so the sheet does not open scolding
+                    // them for eight lines they have not reached yet.
+                    if (_tried && _missing.isNotEmpty) ...[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.error_outline_rounded, size: 16, color: AppTheme.rose),
+                          const SizedBox(width: 7),
+                          Flexible(
+                            child: Text(
+                              '${tn('driver.pretrip.stillToAnswer', '${_missing.length}')} '
+                              '${_missing.map((i) => t(i.$2)).join(' · ')}',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                height: 1.4,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.rose,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     BigButton(
                       label: t('driver.pretrip.file'),
                       color: _outcome == kInspectionPass ? tint : AppTheme.amber,
@@ -2664,13 +2752,20 @@ class _PreTripSheetState extends State<_PreTripSheet> {
 /// makes the whole record worthless.
 class _PreTripRow extends StatelessWidget {
   const _PreTripRow({
+    super.key,
     required this.label,
     required this.answer,
+    required this.flagged,
     required this.onAnswer,
   });
 
   final String label;
   final String? answer;
+
+  /// This line is why the check would not file. Drawn on the line itself,
+  /// because a message at the bottom of a sheet eight lines long does not tell
+  /// a driver standing at a bus WHICH line to go back to.
+  final bool flagged;
   final ValueChanged<String> onAnswer;
 
   @override
@@ -2679,13 +2774,36 @@ class _PreTripRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: Panel(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        color: flagged ? AppTheme.roseSoft : null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (flagged) ...[
+                  Icon(Icons.error_outline_rounded, size: 16, color: AppTheme.rose),
+                  const SizedBox(width: 7),
+                ],
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: flagged ? AppTheme.rose : AppTheme.text,
+                    ),
+                  ),
+                ),
+              ],
             ),
+            if (flagged) ...[
+              const SizedBox(height: 3),
+              Text(
+                t('driver.pretrip.notAnswered'),
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppTheme.rose),
+              ),
+            ],
             const SizedBox(height: 10),
             Row(
               children: [
