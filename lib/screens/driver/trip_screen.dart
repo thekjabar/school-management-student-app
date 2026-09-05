@@ -1020,6 +1020,20 @@ class _RunControls extends StatelessWidget {
       _ => (t('driver.runFinished'), null, t('driver.step.done'), 5),
     };
 
+    // The same state as a word short enough to sit in a pill. Kept apart from
+    // the sentence above it: one answers "what do I press", this answers "what
+    // is this run doing", and they are different lengths for a reason.
+    final statusWord = switch (trip.status) {
+      'PLANNED' || 'ROSTERED' => t('driver.statusNotStarted'),
+      'BLOCKED' => t('driver.statusStopped'),
+      'BOARDING' => t('driver.boarding'),
+      'IN_PROGRESS' => t('driver.onRoute'),
+      'ARRIVED' => t('driver.atSchool'),
+      'SWEEP_PENDING' || 'SWEEP_OVERDUE' => t('driver.sweepDue'),
+      'CANCELLED' || 'VOID' || 'ABANDONED' => t('driver.statusCalledOff'),
+      _ => t('driver.statusFinished'),
+    };
+
     // Nothing left to do AND nothing left owed.
     final settled = trip.status == 'COMPLETED';
     final blocked = trip.status == 'BLOCKED';
@@ -1055,45 +1069,65 @@ class _RunControls extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Capped at one line each. Whatever sits beside them, the
+                    // bus is never spelled downwards a letter at a time again.
                     Text(
                       '${trip.vehicleLabel ?? t('driver.bus')}${trip.plate != null ? ' · ${trip.plate}' : ''}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
                     ),
                     Text(
                       '${tn('driver.dueOut', hhmm(trip.scheduledDepartureAt))}'
                       '${trip.startedAt != null ? ' · ${tn('driver.departedAt', hhmm(trip.startedAt))}' : ''}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
                   ],
                 ),
               ),
-              // Where the run stands, as a word, beside the bus it describes.
-              // The status was only ever implied by which button happened to be
-              // showing, which is a poor way to answer "is this thing running".
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: wash,
-                  borderRadius: BorderRadius.circular(999),
+              // Where the run stands, as a WORD.
+              //
+              // Not `label` — that is a whole sentence for some states ("This
+              // run has ended and the cabin sweep is not confirmed"), and an
+              // unbounded sentence in this Row squeezed the bus name beside it
+              // down to one letter per line. A pill gets a word, and is held to
+              // a third of the row even so.
+              const SizedBox(width: 8),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width * 0.34,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
-                        color: accent,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: wash,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          statusWord,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            color: accent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
