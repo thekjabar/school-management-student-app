@@ -224,6 +224,32 @@ class _RouteMapState extends State<RouteMap> {
       children: [
         MapTiles.layer(),
         PolylineLayer(polylines: _order(pins)),
+        // The bit of the journey the driver is actually on: from where the bus
+        // is now to the stop it is heading for.
+        //
+        // The route line only ever joined stop to stop, so the leg being driven
+        // at this moment — the only one that is not yet history or not yet
+        // relevant — was the one segment missing from the map. Dashed, because
+        // it is the bus's own position over open ground rather than a planned
+        // road, and nothing should read it as the route the office authored.
+        ValueListenableBuilder<Position?>(
+          valueListenable: BusLocation.instance.here,
+          builder: (context, me, _) {
+            if (me == null) return const SizedBox.shrink();
+            final next = pins.where((p) => p.stop.departedAt == null).firstOrNull;
+            if (next == null) return const SizedBox.shrink();
+            return PolylineLayer(
+              polylines: [
+                Polyline(
+                  points: [LatLng(me.latitude, me.longitude), next.at],
+                  strokeWidth: widget.compact ? 2.5 : 3.5,
+                  color: AppTheme.blue.withValues(alpha: 0.75),
+                  pattern: StrokePattern.dashed(segments: const [7, 6]),
+                ),
+              ],
+            );
+          },
+        ),
         MarkerLayer(
           markers: [
             for (final p in pins)
