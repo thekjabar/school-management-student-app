@@ -273,13 +273,43 @@ class _RouteMapState extends State<RouteMap> {
           valueListenable: BusLocation.instance.here,
           builder: (context, me, _) {
             if (me == null) return const SizedBox.shrink();
-            return MarkerLayer(
-              markers: [
-                Marker(
-                  point: LatLng(me.latitude, me.longitude),
-                  width: 26,
-                  height: 26,
-                  child: const _MeDot(),
+            final at = LatLng(me.latitude, me.longitude);
+            final coarse =
+                me.accuracy.isFinite && me.accuracy > kCoarseAccuracyM;
+            return Stack(
+              children: [
+                // How sure the phone is, drawn to the same scale as the map.
+                //
+                // A cell-tower fix arrives with two kilometres of uncertainty
+                // and the map used to draw it as a dot the size of a doorway —
+                // a confident answer to a question the phone had not answered.
+                // The circle is the honest shape of it: at a good GPS fix it is
+                // barely larger than the dot, and at 2 km it visibly covers half
+                // the city, which is exactly what it means.
+                if (me.accuracy.isFinite && me.accuracy > 25)
+                  CircleLayer(
+                    circles: [
+                      CircleMarker(
+                        point: at,
+                        radius: me.accuracy,
+                        useRadiusInMeter: true,
+                        color: (coarse ? AppTheme.amber : AppTheme.blue)
+                            .withValues(alpha: 0.10),
+                        borderColor: (coarse ? AppTheme.amber : AppTheme.blue)
+                            .withValues(alpha: 0.35),
+                        borderStrokeWidth: 1,
+                      ),
+                    ],
+                  ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: at,
+                      width: 26,
+                      height: 26,
+                      child: _MeDot(coarse: coarse),
+                    ),
+                  ],
                 ),
               ],
             );
@@ -965,7 +995,11 @@ class _LiveLegState extends State<_LiveLeg> {
 /// driver should not have to learn a new one from us. Deliberately smaller
 /// than a stop pin — it moves, and the stops are what the run is about.
 class _MeDot extends StatelessWidget {
-  const _MeDot();
+  const _MeDot({this.coarse = false});
+
+  /// The fix is a kilometre-scale guess. Amber rather than blue, so the dot
+  /// itself says it is not to be trusted to a street.
+  final bool coarse;
 
   @override
   Widget build(BuildContext context) {
@@ -974,7 +1008,7 @@ class _MeDot extends StatelessWidget {
         width: 18,
         height: 18,
         decoration: BoxDecoration(
-          color: AppTheme.blue,
+          color: coarse ? AppTheme.amber : AppTheme.blue,
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white, width: 3),
           boxShadow: [

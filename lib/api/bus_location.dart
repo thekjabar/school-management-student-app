@@ -28,7 +28,27 @@ enum BusLocationState {
   /// Refused permanently, or location is switched off on the handset. Only the
   /// system settings can change this, so the app must not pretend otherwise.
   blocked,
+
+  /// Fixes are arriving, and they are useless.
+  ///
+  /// Android 12 and later let a person grant "Approximate" instead of
+  /// "Precise", and a phone with GPS off or set to battery-saving does the same
+  /// thing by another route: it answers from cell towers. What comes back is a
+  /// coordinate accurate to a kilometre or two, repeated identically for hours
+  /// with a speed of zero.
+  ///
+  /// Every fix this handset sent tonight looked like that — 2000 m accuracy,
+  /// the same seven decimal places from 18:52 to 22:21 — and the map drew it as
+  /// a confident dot on a street the driver was nowhere near. A position that
+  /// cannot tell one district from the next is not a bus position, and saying
+  /// so is the only honest thing to do with it.
+  coarse,
 }
+
+/// Beyond this, a fix cannot tell one stop from another and must not be drawn
+/// as though it can. A school stop is tens of metres across; a hundred and
+/// fifty is already generous for deciding which one a bus is standing at.
+const double kCoarseAccuracyM = 150;
 
 /// Where the bus is, and telling the platform about it.
 ///
@@ -169,7 +189,15 @@ class BusLocation {
 
   void _take(Position p) {
     here.value = p;
-    if (state.value == BusLocationState.waiting) {
+    // Said out loud rather than drawn as certainty. A coarse fix still goes up
+    // — the server records accuracyM and weighs it, and a bus with a bad sky
+    // view is better tracked roughly than not at all — but the driver is told
+    // his phone is guessing, because he is the only one who can fix it.
+    final coarse = p.accuracy.isFinite && p.accuracy > kCoarseAccuracyM;
+    if (coarse) {
+      state.value = BusLocationState.coarse;
+    } else if (state.value == BusLocationState.waiting ||
+        state.value == BusLocationState.coarse) {
       state.value = BusLocationState.live;
     }
     if (_pending.length >= _maxPending) _pending.removeAt(0);

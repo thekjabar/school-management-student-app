@@ -2675,9 +2675,11 @@ class _LocationNotice extends StatelessWidget {
       valueListenable: BusLocation.instance.state,
       builder: (context, state, _) {
         if (state != BusLocationState.denied &&
-            state != BusLocationState.blocked) {
+            state != BusLocationState.blocked &&
+            state != BusLocationState.coarse) {
           return const SizedBox.shrink();
         }
+        final coarse = state == BusLocationState.coarse;
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Panel(
@@ -2685,14 +2687,20 @@ class _LocationNotice extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.location_off_rounded, size: 18, color: AppTheme.amber),
+                Icon(
+                  coarse ? Icons.gps_not_fixed_rounded : Icons.location_off_rounded,
+                  size: 18,
+                  color: AppTheme.amber,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        t('driver.locationOffTitle'),
+                        coarse
+                            ? t('driver.locationCoarseTitle')
+                            : t('driver.locationOffTitle'),
                         style: TextStyle(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w800,
@@ -2701,7 +2709,9 @@ class _LocationNotice extends StatelessWidget {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        t('driver.locationOffWhy'),
+                        coarse
+                            ? t('driver.locationCoarseWhy')
+                            : t('driver.locationOffWhy'),
                         style: TextStyle(
                           fontSize: 12.5,
                           height: 1.45,
@@ -2717,7 +2727,9 @@ class _LocationNotice extends StatelessWidget {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           child: Text(
-                            t('driver.locationOffFix'),
+                            coarse
+                                ? t('driver.locationCoarseFix')
+                                : t('driver.locationOffFix'),
                             style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w800,
