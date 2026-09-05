@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' show MapboxOptions;
 
 import 'api/boot.dart';
 import 'api/client.dart';
 import 'api/push.dart';
 import 'i18n/delegates.dart';
 import 'ui/async.dart';
+import 'ui/map_tiles.dart';
 import 'i18n/strings.dart';
 import 'api/session.dart';
 import 'screens/driver/driver_app.dart';
@@ -63,6 +65,16 @@ String get _title => switch (kRole) {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(AppTheme.systemOverlay);
+  // The map engine is told its token once, here, before any map is built.
+  //
+  // The raster map this replaced carried the token in every tile URL, so there
+  // was nothing to set up: a map either had a URL or drew nothing. The GL
+  // engine authenticates itself instead, and with no token it does not fail —
+  // it loads an empty style and renders a white rectangle, with no error on the
+  // widget, in the log, or anywhere else. Which is exactly what it did.
+  if (MapTiles.configured) {
+    MapboxOptions.setAccessToken(MapTiles.token);
+  }
   // Read before the first frame. Restoring the language afterwards means the
   // app opens in English and redraws itself in Kurdish a moment later, which
   // looks like a fault.
