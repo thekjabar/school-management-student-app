@@ -370,6 +370,56 @@ class _RouteMapState extends State<RouteMap> {
             ),
           ),
         ),
+        // Centre on the bus.
+        //
+        // Under the fit-the-run button, because they are the two halves of the
+        // same question — where is the run, and where am I in it — and a driver
+        // who has panned away needs the second one as often as the first. Shown
+        // only in the full-screen map, and only once there is a real fix: a
+        // locate button that answers with nothing is worse than no button.
+        if (widget.fullScreen)
+          ValueListenableBuilder<Position?>(
+            valueListenable: BusLocation.instance.here,
+            builder: (context, me, _) {
+              if (me == null) return const SizedBox.shrink();
+              return PositionedDirectional(
+                end: 10,
+                top: 64,
+                child: Semantics(
+                  button: true,
+                  label: t('driver.map.centreOnMe'),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      setState(() => _touched = null);
+                      _map.move(LatLng(me.latitude, me.longitude), 16.5);
+                    },
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface.withValues(alpha: 0.94),
+                        borderRadius: BorderRadius.circular(13),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: AppTheme.dark ? 0.4 : 0.12),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.my_location_rounded,
+                        size: 21,
+                        color: AppTheme.blue,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
         const _Credit(),
       ],
     );
