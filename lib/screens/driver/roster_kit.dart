@@ -180,7 +180,7 @@ class RosterFilters extends StatelessWidget {
             label: t('driver.filterAll'),
             count: riders.length,
             on: value == RosterFilter.all,
-            colour: AppTheme.text,
+            colour: Role.driver.tint,
             onTap: () => onChanged(RosterFilter.all),
           ),
           RosterChip(
@@ -224,9 +224,14 @@ class WordButton extends StatelessWidget {
     required this.label,
     required this.colour,
     required this.onTap,
+    this.icon,
   });
 
   final String label;
+
+  /// A glyph beside the word. The word carries the meaning; the icon is what
+  /// the eye finds first when it comes back from the road.
+  final IconData? icon;
   final Color colour;
   final VoidCallback? onTap;
 
@@ -245,14 +250,26 @@ class WordButton extends StatelessWidget {
           color: tone.withValues(alpha: dead ? 0.07 : 0.12),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Text(
-          label,
-          maxLines: 1,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w800,
-            color: tone,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: tone),
+              const SizedBox(width: 6),
+            ],
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: tone,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

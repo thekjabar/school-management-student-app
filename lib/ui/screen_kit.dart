@@ -21,12 +21,16 @@ class ScreenHeader extends StatelessWidget {
   const ScreenHeader({
     super.key,
     required this.title,
+    this.subtitle,
     this.notificationCount = 0,
     this.onBell,
     this.trailing,
   });
 
   final String title;
+
+  /// A quieter second line under the title — which run, which route.
+  final String? subtitle;
   final int notificationCount;
   final VoidCallback? onBell;
   final Widget? trailing;
@@ -43,16 +47,31 @@ class ScreenHeader extends StatelessWidget {
           ),
           const SizedBox(width: 14),
           Expanded(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 21,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.6,
-                color: AppTheme.text,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.6,
+                    color: AppTheme.text,
+                  ),
+                ),
+                // Which run, under the word "run". A driver with two routes in
+                // a day needs the answer here, not three cards down.
+                if (subtitle != null && subtitle!.isNotEmpty)
+                  Text(
+                    subtitle!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                  ),
+              ],
             ),
           ),
           ?trailing,

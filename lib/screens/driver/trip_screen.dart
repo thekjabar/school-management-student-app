@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../api/crew_api.dart';
+import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
@@ -119,12 +120,6 @@ class _TripScreenState extends State<TripScreen> {
   final TextEditingController _search = TextEditingController();
   String _query = '';
 
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
-
   /// Whether this child answers the search. Name or seat number, because the
   /// seat is what is written on the paper list the office hands out.
   static bool _matches(RiderOnStop r, String q) =>
@@ -144,9 +139,22 @@ class _TripScreenState extends State<TripScreen> {
   String? _terminalStopId;
   bool _gateKnown = false;
 
-  /// The loaded run, so the header can offer the emergency call. Written by
-  /// _load before the result reaches the builder.
-  CrewTrip? _headerTrip;
+  /// The loaded run, so the header can name the route and offer the emergency
+  /// call.
+  ///
+  /// A notifier rather than a plain field: the header is a sibling of the
+  /// loader, not a child of it, so it is built BEFORE the load finishes and is
+  /// never rebuilt when the result lands. Assigning a field left the emergency
+  /// call permanently invisible — the one control on this screen that must
+  /// never be missing.
+  final ValueNotifier<CrewTrip?> _headerTrip = ValueNotifier<CrewTrip?>(null);
+
+  @override
+  void dispose() {
+    _headerTrip.dispose();
+    _search.dispose();
+    super.dispose();
+  }
 
   /// The campus gate, for the half of the run that does not happen at a child's
   /// own stop.
@@ -184,7 +192,7 @@ class _TripScreenState extends State<TripScreen> {
     // Kept for the header, which is built outside this loader and so cannot
     // reach the result: the emergency call belongs at the top of the screen,
     // not below a roster the driver has to scroll past to reach it.
-    _headerTrip = trips.where((t) => t.id == widget.tripId).firstOrNull;
+    _headerTrip.value = trips.where((t) => t.id == widget.tripId).firstOrNull;
     return _TripData(
       trip: trips.where((t) => t.id == widget.tripId).firstOrNull,
       plan: results[1] as TripPlan,
@@ -470,20 +478,24 @@ class _TripScreenState extends State<TripScreen> {
         bottom: false,
         child: Column(
           children: [
-            ScreenHeader(
-              title: t('driver.theRun'),
-              // At the top, always in the same place, reachable without
-              // scrolling. It used to sit below the headcount and above the
-              // stop list — which is to say, behind however far the driver had
-              // scrolled when the thing happened that he needed it for.
-              trailing: (_headerTrip != null &&
-                      _headerTrip!.startedAt != null &&
-                      _headerTrip!.endedAt == null)
-                  ? _PanicChip(
-                      busy: _busy != null,
-                      onPressed: () => _panic(_headerTrip!),
-                    )
-                  : null,
+            ValueListenableBuilder<CrewTrip?>(
+              valueListenable: _headerTrip,
+              builder: (context, trip, _) => ScreenHeader(
+                title: t('driver.theRun'),
+                subtitle: trip?.routeName,
+                // At the top, always in the same place, reachable without
+                // scrolling. It used to sit below the headcount and above the
+                // stop list — which is to say, behind however far the driver
+                // had scrolled when the thing happened that he needed it for.
+                trailing: (trip != null &&
+                        trip.startedAt != null &&
+                        trip.endedAt == null)
+                    ? _PanicChip(
+                        busy: _busy != null,
+                        onPressed: () => _panic(trip),
+                      )
+                    : null,
+              ),
             ),
             Expanded(
               child: Loader<_TripData>(
@@ -539,6 +551,7 @@ class _TripScreenState extends State<TripScreen> {
                       if (trip != null) ...[
                         _RunControls(
                           trip: trip,
+                          timing: data.plan.timing,
                           busy: _busy,
                           onStart: () => _startShift(trip),
                           onDepart: () => _act(t('driver.departed'), () => CrewApi.instance.depart(trip.id)),
@@ -597,11 +610,43 @@ class _TripScreenState extends State<TripScreen> {
                           borderRadius: BorderRadius.circular(AppTheme.radius),
                           child: SizedBox(
                             height: 230,
-                            child: RouteMap(
-                              stops: data.plan.stops,
-                              tint: Role.driver.tint,
-                              leg: trip?.leg ?? 'OUT',
-                              terminalStopId: data.terminalStopId,
+                            child: Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: RouteMap(
+                                    stops: data.plan.stops,
+                                    tint: Role.driver.tint,
+                                    leg: trip?.leg ?? 'OUT',
+                                    terminalStopId: data.terminalStopId,
+                                  ),
+                                ),
+                                // The stop the bus is heading for, over the map
+                                // that shows where it is. Held to 44% of the
+                                // width so the route it describes is still
+                                // visible beside it.
+                                if (data.plan.stops
+                                    .where((s) => s.departedAt == null)
+                                    .isNotEmpty)
+                                  Positioned(
+                                    top: 10,
+                                    right: 10,
+                                    child: _NextStopPanel(
+                                      stop: data.plan.stops
+                                          .firstWhere((s) => s.departedAt == null),
+                                      leg: trip?.leg ?? 'OUT',
+                                      onOpenMap: () => Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => RouteMapScreen(
+                                            stops: data.plan.stops,
+                                            tint: Role.driver.tint,
+                                            leg: trip?.leg ?? 'OUT',
+                                            terminalStopId: data.terminalStopId,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
@@ -893,37 +938,29 @@ class _HeadcountCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            counts.summary.isEmpty
-                // The server writes this sentence in the reader's language and
-                // usually sends it. When it does not, the fallback has to be a
-                // translated sentence too — it was English on every screen.
-                ? tv('driver.headcountLine', {
-                    'a': counts.onRegister,
-                    'b': counts.notComingToday,
-                    'c': counts.expected,
-                  })
-                : counts.summary,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, height: 1.4),
-          ),
-          const SizedBox(height: 14),
-          // Four tiles rather than four bare numbers in a row. Each carries its
-          // own icon and ground, so the one that matters is found by colour
-          // before it is read — which is how this card is used at a wheel.
+          // Four tiles, each with its own icon, ground and caption. The caption
+          // is what stops two of them being read as the same number: "28" under
+          // "To pick up" means nothing until it also says "remaining".
+          //
+          // The sentence that used to sit above these ("30 on the register, 0
+          // away, 30 to carry") said the same thing in prose and is now the
+          // first tile.
           Row(
             children: [
               _StatTile(
-                icon: Icons.directions_bus_filled_rounded,
-                value: '${counts.stillOnBoard}',
-                label: t('driver.onBoard'),
-                colour: AppTheme.blue,
-                wash: AppTheme.blueSoft,
+                icon: Icons.groups_rounded,
+                value: '${counts.expected}',
+                label: t('driver.students'),
+                caption: t('driver.onThisRun'),
+                colour: Role.driver.tint,
+                wash: Role.driver.wash,
               ),
               const SizedBox(width: 8),
               _StatTile(
                 icon: Icons.check_circle_outline_rounded,
-                value: '${counts.alighted}',
-                label: t('driver.dropped'),
+                value: '${counts.stillOnBoard}',
+                label: t('driver.onBoard'),
+                caption: t('driver.currently'),
                 colour: AppTheme.green,
                 wash: AppTheme.greenSoft,
               ),
@@ -932,16 +969,18 @@ class _HeadcountCard extends StatelessWidget {
                 icon: Icons.person_add_alt_rounded,
                 value: '$outstanding',
                 label: t('driver.stillToDrop'),
+                caption: t('driver.remaining'),
                 colour: outstanding > 0 ? AppTheme.amber : AppTheme.textMuted,
                 wash: outstanding > 0 ? AppTheme.amberSoft : AppTheme.neutralSoft,
               ),
               const SizedBox(width: 8),
               _StatTile(
-                icon: Icons.flag_rounded,
-                value: '${counts.stopsDone}/${counts.stopsTotal}',
-                label: t('driver.stops'),
-                colour: AppTheme.text,
-                wash: AppTheme.neutralSoft,
+                icon: Icons.account_balance_rounded,
+                value: '${counts.alighted}',
+                label: t('driver.dropped'),
+                caption: t('driver.atSchoolShort'),
+                colour: AppTheme.blue,
+                wash: AppTheme.blueSoft,
               ),
             ],
           ),
@@ -968,6 +1007,7 @@ class _HeadcountCard extends StatelessWidget {
 class _RunControls extends StatelessWidget {
   const _RunControls({
     required this.trip,
+    required this.timing,
     required this.busy,
     required this.onStart,
     required this.onDepart,
@@ -975,6 +1015,9 @@ class _RunControls extends StatelessWidget {
   });
 
   final CrewTrip trip;
+
+  /// The run's own timing, for the estimated finish shown on the card.
+  final TripTiming timing;
   final String? busy;
   final VoidCallback onStart;
   final VoidCallback onDepart;
@@ -1034,6 +1077,10 @@ class _RunControls extends StatelessWidget {
       _ => t('driver.statusFinished'),
     };
 
+    // Whose children these are. The driver's own school, from the session —
+    // the crew trip payload does not carry it.
+    final school = Session.instance.me?.schoolName ?? '';
+
     // Nothing left to do AND nothing left owed.
     final settled = trip.status == 'COMPLETED';
     final blocked = trip.status == 'BLOCKED';
@@ -1061,8 +1108,8 @@ class _RunControls extends StatelessWidget {
             children: [
               IconChip(
                 icon: Icons.directions_bus_filled_rounded,
-                color: AppTheme.textMuted,
-                background: AppTheme.neutralSoft,
+                color: Role.driver.tint,
+                background: Role.driver.wash,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1075,15 +1122,17 @@ class _RunControls extends StatelessWidget {
                       '${trip.vehicleLabel ?? t('driver.bus')}${trip.plate != null ? ' · ${trip.plate}' : ''}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                     ),
-                    Text(
-                      '${tn('driver.dueOut', hhmm(trip.scheduledDepartureAt))}'
-                      '${trip.startedAt != null ? ' · ${tn('driver.departedAt', hhmm(trip.startedAt))}' : ''}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                    ),
+                    // Who the run is for. The bus number alone does not say it,
+                    // and a driver covering two schools in a day needs it.
+                    if (school.isNotEmpty)
+                      Text(
+                        school,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                      ),
                   ],
                 ),
               ),
@@ -1132,21 +1181,62 @@ class _RunControls extends StatelessWidget {
               ),
             ],
           ),
-          // How far through the run the bus is, drawn rather than only counted.
-          // "Step 3 of 5" is a fact; a bar is the same fact readable at a
-          // glance from a driver's seat.
-          if (step != null) ...[
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: step / 5,
-                minHeight: 6,
-                backgroundColor: AppTheme.neutralSoft,
-                valueColor: AlwaysStoppedAnimation<Color>(accent),
+          const SizedBox(height: 14),
+          // When it left, when it is due in, and how far through it is — the
+          // three facts a driver checks against the clock on the dash, on one
+          // line instead of buried in a sentence.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _TimeFact(
+                icon: Icons.schedule_rounded,
+                label: trip.startedAt != null
+                    ? t('driver.startedAtLabel')
+                    : t('driver.dueOutLabel'),
+                value: hhmm(trip.startedAt ?? trip.scheduledDepartureAt),
+                colour: Role.driver.tint,
               ),
-            ),
-          ],
+              const SizedBox(width: 18),
+              _TimeFact(
+                icon: Icons.rocket_launch_outlined,
+                label: t('driver.estFinish'),
+                value: hhmm(timing.mustArriveBy),
+                colour: Role.driver.tint,
+              ),
+              const Spacer(),
+              // The step count and the bar say the same thing twice on purpose:
+              // one is exact, the other is readable at a glance from a seat.
+              if (step != null)
+                SizedBox(
+                  width: 96,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        tn('driver.stepOf', step),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          value: step / 5,
+                          minHeight: 6,
+                          backgroundColor: AppTheme.neutralSoft,
+                          valueColor: AlwaysStoppedAnimation<Color>(accent),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 14),
           // Why the bus is stopped, in the office's own words, above the button
           // that clears it. A driver who is not told the reason cannot fix it
@@ -1186,38 +1276,17 @@ class _RunControls extends StatelessWidget {
           // the sentence says the thing to do, and the step number tells him
           // where in the run he is standing. Both come from the switch that
           // chose the button, so neither can drift away from it.
+          // Kept, but no longer a tinted block the size of the card. The step
+          // number moved up beside the times, so all this owes the driver now
+          // is the sentence — and a sentence does not need a panel of its own
+          // to be read.
           if (how != null) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(13, 11, 13, 13),
-              decoration: BoxDecoration(
-                color: wash,
-                borderRadius: BorderRadius.circular(13),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (step != null) ...[
-                    Text(
-                      tn('driver.stepOf', step),
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.3,
-                        color: accent,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                  ],
-                  Text(
-                    how,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      height: 1.45,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+            Text(
+              how,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.45,
+                color: AppTheme.textMuted,
               ),
             ),
             const SizedBox(height: 12),
@@ -2160,6 +2229,7 @@ class _RiderRow extends StatelessWidget {
                 // the same shape pointing two ways, read at a glance by
                 // somebody who has just looked up from the road.
                 WordButton(
+                  icon: onBus ? Icons.logout_rounded : Icons.login_rounded,
                   label: onBus
                       ? (leg == 'OUT' ? t('driver.setDown') : t('driver.handOver'))
                       : t('driver.pickUp'),
@@ -2180,6 +2250,7 @@ class _RiderRow extends StatelessWidget {
                 if (!notRiding && !onBus) ...[
                   const SizedBox(width: 6),
                   WordButton(
+                    icon: Icons.close_rounded,
                     label: t('driver.notHere'),
                     colour: AppTheme.rose,
                     onTap: canPickUp ? onNoShow : null,
@@ -2523,11 +2594,233 @@ class _SweepCardState extends State<_SweepCard> {
   }
 }
 
+/// The stop the bus is heading for, laid over the map.
+///
+/// Deliberately narrow. An earlier version of this covered half the map with a
+/// panel describing the stop that was named again in full directly underneath
+/// it — the same fact three times, and the route it sat on hidden behind it.
+/// This one carries what a windscreen glance needs: which stop, what it looks
+/// like, how many children, how far.
+class _NextStopPanel extends StatelessWidget {
+  const _NextStopPanel({
+    required this.stop,
+    required this.leg,
+    required this.onOpenMap,
+  });
+
+  final PlannedStop stop;
+  final String leg;
+  final VoidCallback onOpenMap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = Role.driver.tint;
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width * 0.44,
+      ),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(11, 10, 11, 10),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              t('driver.nextStop'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.2,
+                color: tint,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: tint.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Text(
+                    '${stop.plannedSequence}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: tint,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        stop.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      if (stop.landmark != null && stop.landmark!.isNotEmpty)
+                        Text(
+                          stop.landmark!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (stop.remaining > 0) ...[
+              const SizedBox(height: 7),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.amberSoft,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  leg == 'RETURN'
+                      ? tn('driver.nToDropOff', stop.remaining)
+                      : tn('driver.nToPickUp', stop.remaining),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.amber,
+                  ),
+                ),
+              ),
+            ],
+            if (stop.metresAway != null) ...[
+              const SizedBox(height: 7),
+              Row(
+                children: [
+                  Icon(Icons.navigation_rounded, size: 13, color: tint),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      stop.metresAway! >= 1000
+                          ? tn('driver.kmAway', (stop.metresAway! / 100).round() / 10)
+                          : tn('driver.metresAway', stop.metresAway!),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: tint,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 4),
+            GestureDetector(
+              onTap: onOpenMap,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.list_alt_rounded, size: 13, color: AppTheme.textMuted),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        t('driver.viewFullRoute'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A time on the bus card: a small tinted icon, the label above the figure.
+class _TimeFact extends StatelessWidget {
+  const _TimeFact({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.colour,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color colour;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: colour),
+        const SizedBox(width: 7),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+            ),
+            Text(
+              value,
+              maxLines: 1,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 /// One figure from the headcount, on its own tinted ground.
 class _StatTile extends StatelessWidget {
   const _StatTile({
     required this.icon,
     required this.label,
+    required this.caption,
     required this.value,
     required this.colour,
     required this.wash,
@@ -2535,6 +2828,10 @@ class _StatTile extends StatelessWidget {
 
   final IconData icon;
   final String label;
+
+  /// The quiet second line. Without it "28 / To pick up" and "2 / Dropped" read
+  /// as the same kind of number; with it they say remaining and at school.
+  final String caption;
   final String value;
   final Color colour;
   final Color wash;
@@ -2570,7 +2867,18 @@ class _StatTile extends StatelessWidget {
               label,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 10.5, height: 1.25, color: AppTheme.textMuted),
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.25,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.text,
+              ),
+            ),
+            Text(
+              caption,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, color: AppTheme.textFaint),
             ),
           ],
         ),
