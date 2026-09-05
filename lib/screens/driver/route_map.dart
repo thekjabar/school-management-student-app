@@ -970,75 +970,141 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
           geometry: Point(coordinates: Position(pin.at.longitude, pin.at.latitude)),
           image: image,
           iconSize: 1,
-          // The number rides as native label text rather than being drawn into
-          // the image, so one image serves every stop of the same state.
-          textField: pin.school ? '' : '${pin.order}',
-          textColor: _pinInk(pin).toARGB32(),
-          textSize: widget.compact ? 10 : 13,
-          textOffset: const [0, 0.05],
+          // The number, the tick and the school icon are all drawn INTO the
+          // image, so a pin is one picture. A native label beside it would sit
+          // at its own offset and drift off the circle as the camera moves.
+          iconAnchor: IconAnchor.CENTER,
         ),
       );
       _stopForAnnotation[made.id] = pin.stop.stopId;
     }
   }
-
-  Color _pinInk(_Stop pin) {
-    if (pin.school) return Colors.white;
-    if (pin.stop.skipped) return AppTheme.amber;
-    if (pin.stop.departedAt != null) return Colors.white;
-    return pin.next ? Colors.white : widget.tint;
-  }
-
-  /// A pin drawn to PNG. Three states and the school, cached by their look, so
-  /// a run of forty stops rasterises four images rather than forty.
+  /// The pin, drawn to PNG exactly as the widget used to draw it.
+  ///
+  /// The first version of this file replaced the pin widget with a plain
+  /// circle and put the number on it as native label text, which quietly threw
+  /// away the design: the school lost its rounded square and its icon, a served
+  /// stop lost its tick and showed a number again, and the next stop lost the
+  /// halo that is the one thing on this map a driver should find without
+  /// looking for it.
+  ///
+  /// None of that was a limit of the map. This Flutter binding does not expose
+  /// Mapbox's view annotations, so a pin cannot BE a widget — but it can be
+  /// drawn, and a canvas draws the same shapes the widget did. Material icons
+  /// are glyphs in a font, so they paint through a TextPainter like any other
+  /// character.
+  ///
+  /// Cached by look rather than by stop: a run of forty stops rasterises four
+  /// or five images, not forty.
   static final Map<String, Uint8List> _images = {};
 
   Future<Uint8List> _pinImage(_Stop pin) async {
-    final done = pin.stop.departedAt != null;
+    final tint = widget.tint;
+    final done = pin.stop.done;
+    final plain = !pin.school && !done && !pin.next;
+    final size = widget.compact ? (pin.next ? 32.0 : 25.0) : (pin.next ? 52.0 : 40.0);
+
     final fill = pin.school
         ? AppTheme.blue
-        : pin.stop.skipped
-            ? AppTheme.amberSoft
-            : done
-                ? AppTheme.green
-                : pin.next
-                    ? widget.tint
-                    : Colors.white;
-    final ring = pin.school
-        ? Colors.white
         : done
-            ? Colors.white
+            ? AppTheme.green
             : pin.next
-                ? Colors.white
-                : widget.tint;
-    final size = widget.compact ? 26.0 : (pin.next || pin.school ? 46.0 : 38.0);
-    final key = '${fill.toARGB32()}:${ring.toARGB32()}:$size:${pin.school}';
+                ? tint
+                : AppTheme.surface;
+    final ink = plain ? tint : Colors.white;
+
+    // The number is part of the picture, so the whole pin is one image and the
+    // label can never drift off it as the camera moves.
+    final label = pin.school
+        ? null
+        : done
+            ? null
+            : '${pin.order}';
+    final key = '${fill.toARGB32()}:${ink.toARGB32()}:$size:${pin.school}:$done:'
+        '${pin.next}:${label ?? ''}';
     final cached = _images[key];
     if (cached != null) return cached;
 
+    // The halo sits outside the body, so the canvas has to be big enough for it.
+    final pad = pin.next ? 10.0 : 6.0;
+    final canvasSize = size + pad * 2;
+    final centre = Offset(canvasSize / 2, canvasSize / 2);
+
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    final r = size / 2;
-    // A soft shadow, so a white pin is still a pin against pale ground.
-    canvas.drawCircle(
-      Offset(r, r + 1),
-      r - 2,
-      Paint()
-        ..color = Colors.black.withValues(alpha: 0.18)
-        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 3),
-    );
-    canvas.drawCircle(Offset(r, r), r - 3, Paint()..color = fill);
-    canvas.drawCircle(
-      Offset(r, r),
-      r - 3,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..color = ring,
+
+    if (pin.next) {
+      canvas.drawCircle(
+        centre,
+        (size + 10) / 2,
+        Paint()..color = tint.withValues(alpha: 0.28),
+      );
+    }
+
+    final border = size > 34 ? 3.0 : 2.4;
+    final half = size / 2;
+    final rect = Rect.fromCenter(center: centre, width: size, height: size);
+
+    final shadow = Paint()
+      ..color = Colors.black.withValues(alpha: 0.28)
+      ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 3.5);
+    final body = Paint()..color = fill;
+    final stroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = border
+      ..color = plain ? tint : Colors.white;
+
+    if (pin.school) {
+      // A rounded square, not a circle. The gate is not a stop and must not
+      // read as one.
+      final r = RRect.fromRectAndRadius(rect, Radius.circular(size * 0.3));
+      canvas.drawRRect(r.shift(const Offset(0, 2)), shadow);
+      canvas.drawRRect(r, body);
+      canvas.drawRRect(r.deflate(border / 2), stroke);
+    } else {
+      canvas.drawCircle(centre.translate(0, 2), half, shadow);
+      canvas.drawCircle(centre, half, body);
+      canvas.drawCircle(centre, half - border / 2, stroke);
+    }
+
+    // Icons are font glyphs, so they paint as text.
+    final icon = pin.school
+        ? Icons.school_rounded
+        : done
+            ? Icons.check_rounded
+            : null;
+
+    final painter = TextPainter(textDirection: TextDirection.ltr);
+    if (icon != null) {
+      painter.text = TextSpan(
+        text: String.fromCharCode(icon.codePoint),
+        style: TextStyle(
+          fontSize: size * (pin.school ? 0.5 : 0.55),
+          fontFamily: icon.fontFamily,
+          package: icon.fontPackage,
+          color: Colors.white,
+          height: 1,
+        ),
+      );
+    } else {
+      painter.text = TextSpan(
+        text: label,
+        style: TextStyle(
+          fontSize: size * 0.42,
+          fontWeight: FontWeight.w800,
+          height: 1,
+          color: ink,
+        ),
+      );
+    }
+    painter.layout();
+    painter.paint(
+      canvas,
+      centre - Offset(painter.width / 2, painter.height / 2),
     );
 
     final picture = recorder.endRecording();
-    final image = await picture.toImage(size.round(), size.round());
+    final image = await picture.toImage(canvasSize.round(), canvasSize.round());
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     final out = bytes!.buffer.asUint8List();
     _images[key] = out;
