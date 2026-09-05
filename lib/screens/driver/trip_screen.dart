@@ -12,6 +12,7 @@ import '../../ui/format.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
+import 'roster_kit.dart';
 import 'route_map.dart';
 
 /* ---------------------------------------------------------------------------
@@ -1246,6 +1247,10 @@ class _StopCardState extends State<_StopCard> {
   String? _busyStudent;
   bool _busyStop = false;
 
+  /// Which of this stop's children the roster is showing. Per card, because a
+  /// driver narrowing one stop has said nothing about the others.
+  RosterFilter _show = RosterFilter.all;
+
   /// Redraws the hold countdown once a second, and only while one is running.
   Timer? _hold;
 
@@ -1635,7 +1640,19 @@ class _StopCardState extends State<_StopCard> {
                     ),
                   ),
                 ),
-              ...s.students
+              // Which of this stop's children to show. Only worth offering
+              // once there are enough of them to be worth narrowing, and never
+              // while a search is already narrowing the same list.
+              if (widget.query.isEmpty && s.students.length > 3)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 2, 14, 6),
+                  child: RosterFilters(
+                    riders: s.students,
+                    value: _show,
+                    onChanged: (f) => setState(() => _show = f),
+                  ),
+                ),
+              ...RosterFilters.apply(s.students, widget.query.isEmpty ? _show : RosterFilter.all)
                   .where((r) => _TripScreenState._matches(r, widget.query))
                   .map((r) => _RiderRow(
                     rider: r,
@@ -2006,8 +2023,13 @@ class _RiderRow extends StatelessWidget {
           else if (!off)
             Row(
               children: [
-                _Mini(
-                  icon: onBus ? Icons.logout_rounded : Icons.login_rounded,
+                // Words, not bare icons. A login arrow and a logout arrow are
+                // the same shape pointing two ways, read at a glance by
+                // somebody who has just looked up from the road.
+                WordButton(
+                  label: onBus
+                      ? (leg == 'OUT' ? t('driver.setDown') : t('driver.handOver'))
+                      : t('driver.pickUp'),
                   colour: onBus ? AppTheme.green : Role.driver.tint,
                   // Null, not a call that will be refused. The stop card says
                   // once, above this row, what has to happen first.
@@ -2022,10 +2044,10 @@ class _RiderRow extends StatelessWidget {
                 // boarding button above stays, so a child who turns up after
                 // all can still be picked up rather than the driver being stuck
                 // with a mark he made a second too early.
-                if (!notRiding) ...[
+                if (!notRiding && !onBus) ...[
                   const SizedBox(width: 6),
-                  _Mini(
-                    icon: Icons.close_rounded,
+                  WordButton(
+                    label: t('driver.notHere'),
                     colour: AppTheme.rose,
                     onTap: canPickUp ? onNoShow : null,
                   ),
@@ -2038,45 +2060,6 @@ class _RiderRow extends StatelessWidget {
   }
 }
 
-/// The board / drop / no-show buttons on a rider's row.
-///
-/// 46 square. These are pressed by somebody standing in an aisle, one handed,
-/// often wearing gloves, while the child is still in front of them — the 36 dp
-/// square they used to be is under every guideline there is and was missed
-/// often enough to be marked on the wrong row.
-///
-/// A null [onTap] draws the button plainly dead — grey, and flat against the
-/// row. Before the bus sets off the server will refuse the record anyway, and a
-/// coloured button that takes the tap and then fails teaches the driver that
-/// the app is broken rather than that he has missed a step.
-class _Mini extends StatelessWidget {
-  const _Mini({required this.icon, required this.colour, required this.onTap});
-
-  final IconData icon;
-  final Color colour;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final off = onTap == null;
-    final tone = off ? AppTheme.textFaint : colour;
-
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        width: 46,
-        height: 46,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: tone.withValues(alpha: off ? 0.07 : 0.10),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Icon(icon, size: 21, color: tone),
-      ),
-    );
-  }
-}
 
 /// The last thing before the bus is locked.
 ///

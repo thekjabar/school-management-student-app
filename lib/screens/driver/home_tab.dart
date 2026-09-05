@@ -11,6 +11,7 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/sheets.dart';
+import 'roster_kit.dart';
 import 'route_map.dart';
 import 'trip_screen.dart';
 
@@ -837,10 +838,8 @@ class _CurrentStopCard extends StatefulWidget {
   State<_CurrentStopCard> createState() => _CurrentStopCardState();
 }
 
-enum _Show { all, toPickUp, aboard, done }
-
 class _CurrentStopCardState extends State<_CurrentStopCard> {
-  _Show _show = _Show.all;
+  RosterFilter _show = RosterFilter.all;
   String? _busyStudent;
   Timer? _hold;
 
@@ -950,16 +949,7 @@ class _CurrentStopCardState extends State<_CurrentStopCard> {
     final holding = holdLeft > 0;
 
     final all = s.students;
-    final toPickUp = all.where((r) => !r.accountedFor).toList();
-    final aboard =
-        all.where((r) => r.boardedAt != null && r.alightedAt == null).toList();
-    final done = all.where((r) => r.alightedAt != null).toList();
-    final shown = switch (_show) {
-      _Show.all => all,
-      _Show.toPickUp => toPickUp,
-      _Show.aboard => aboard,
-      _Show.done => done,
-    };
+    final shown = RosterFilters.apply(all, _show);
 
     return Card16(
       padding: EdgeInsets.zero,
@@ -1081,41 +1071,12 @@ class _CurrentStopCardState extends State<_CurrentStopCard> {
 
           // ---- who is on this stop ----------------------------------------
           if (all.isNotEmpty) ...[
-            SizedBox(
-              height: 38,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                children: [
-                  _Chip(
-                    label: t('driver.filterAll'),
-                    count: all.length,
-                    on: _show == _Show.all,
-                    colour: AppTheme.text,
-                    onTap: () => setState(() => _show = _Show.all),
-                  ),
-                  _Chip(
-                    label: t('driver.toPickUp'),
-                    count: toPickUp.length,
-                    on: _show == _Show.toPickUp,
-                    colour: AppTheme.amber,
-                    onTap: () => setState(() => _show = _Show.toPickUp),
-                  ),
-                  _Chip(
-                    label: t('driver.onBoard'),
-                    count: aboard.length,
-                    on: _show == _Show.aboard,
-                    colour: AppTheme.blue,
-                    onTap: () => setState(() => _show = _Show.aboard),
-                  ),
-                  _Chip(
-                    label: t('driver.dropped'),
-                    count: done.length,
-                    on: _show == _Show.done,
-                    colour: AppTheme.green,
-                    onTap: () => setState(() => _show = _Show.done),
-                  ),
-                ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: RosterFilters(
+                riders: all,
+                value: _show,
+                onChanged: (f) => setState(() => _show = f),
               ),
             ),
             const SizedBox(height: 4),
@@ -1225,50 +1186,6 @@ class _CurrentStopCardState extends State<_CurrentStopCard> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// One filter on the stop's roster.
-class _Chip extends StatelessWidget {
-  const _Chip({
-    required this.label,
-    required this.count,
-    required this.on,
-    required this.colour,
-    required this.onTap,
-  });
-
-  final String label;
-  final int count;
-  final bool on;
-  final Color colour;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 7),
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 13),
-          decoration: BoxDecoration(
-            color: on ? colour : AppTheme.neutralSoft,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            '$label ($count)',
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w800,
-              color: on ? Colors.white : AppTheme.textMuted,
-            ),
-          ),
-        ),
       ),
     );
   }
