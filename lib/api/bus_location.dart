@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
@@ -91,14 +92,33 @@ class BusLocation {
 
     state.value = BusLocationState.waiting;
 
+    // A fix straight away, rather than waiting for the bus to move.
+    //
+    // getPositionStream only emits once the phone has actually produced a new
+    // location, which on a cold GPS can be half a minute, and with a distance
+    // filter not until the bus has moved at all. So the map opened with no dot
+    // on it, or with one that appeared late and then jumped. This asks for the
+    // current position once, immediately, and the stream takes over after.
+    //
+    // Deliberately NOT getLastKnownPosition: that hands back wherever the phone
+    // was hours ago, which on this screen would draw the bus somewhere it is
+    // not. A missing dot is honest; a stale one is not.
+    unawaited(
+      Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 30),
+        ),
+      ).then((p) {
+        if (_stream != null) _take(p);
+      }).catchError((Object _) {
+        // No first fix inside half a minute. The stream is still running and
+        // will deliver one when the sky clears; nothing to say to the driver.
+      }),
+    );
+
     _stream = Geolocator.getPositionStream(
-      locationSettings: LocationSettings(
-        accuracy: LocationAccuracy.high,
-        // Distance rather than time is what keeps a parked bus quiet: a bus at
-        // a stop for four minutes should not spend four minutes of battery and
-        // data saying it has not moved.
-        distanceFilter: 15,
-      ),
+      locationSettings: _settings(),
     ).listen(
       _take,
       onError: (_) {
@@ -111,6 +131,28 @@ class BusLocation {
     _flush = Timer.periodic(
       Duration(seconds: _policy.activeTripIntervalSeconds.clamp(5, 300)),
       (_) => _send(),
+    );
+  }
+
+  /// How often the handset should hand over a new fix.
+  ///
+  /// The first version filtered on fifteen metres and nothing else, which is
+  /// the wrong trade for a screen a driver watches: below walking pace, and
+  /// stopped in traffic, Android emitted nothing at all and the dot sat still
+  /// while the bus crept forward. Five metres or five seconds moves with the
+  /// bus and still says nothing worth saying while it is parked — Android only
+  /// delivers on the interval if the position has actually changed.
+  LocationSettings _settings() {
+    if (Platform.isAndroid) {
+      return AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,
+        intervalDuration: const Duration(seconds: 5),
+      );
+    }
+    return const LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 5,
     );
   }
 
