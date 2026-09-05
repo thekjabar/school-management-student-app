@@ -50,6 +50,25 @@ void main() {
     }
   });
 
+  test('every placeholder is one something actually substitutes', () {
+    // tn() replaces `{n}` and tv() replaces `{name}`. Nothing replaces `{0}`,
+    // so a numbered placeholder reaches the screen verbatim: a driver was shown
+    // "Still to answer ({0}):". The test above cannot catch it — it only checks
+    // that the languages agree, and they agreed on the wrong token in all three.
+    final numbered = RegExp(r'\{\d+\}');
+    for (final lang in Lang.values) {
+      tableFor(lang).forEach((key, value) {
+        expect(
+          numbered.hasMatch(value),
+          isFalse,
+          reason: '$key in ${lang.code} uses a numbered placeholder '
+              'that nothing substitutes: "$value". Use {n} for tn(), or a '
+              'named {placeholder} for tv().',
+        );
+      });
+    }
+  });
+
   test('nothing is left as an empty string', () {
     for (final lang in Lang.values) {
       tableFor(lang).forEach((key, value) {
