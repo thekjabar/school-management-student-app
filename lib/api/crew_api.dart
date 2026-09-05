@@ -180,6 +180,39 @@ class CustodyOutcome {
   final CustodyVerdict verdict;
 }
 
+/// How often the handset should sample its position, and how often to send.
+///
+/// The server owns these numbers. The defaults here are the ones written in
+/// tracking-service's SAMPLING constants, and exist only so a handset that
+/// cannot read the policy still behaves sensibly rather than not at all.
+class TelemetryPolicy {
+  const TelemetryPolicy({
+    required this.activeTripIntervalSeconds,
+    required this.idleIntervalSeconds,
+    required this.maxBatchPoints,
+  });
+
+  final int activeTripIntervalSeconds;
+  final int idleIntervalSeconds;
+  final int maxBatchPoints;
+
+  static const TelemetryPolicy fallback = TelemetryPolicy(
+    activeTripIntervalSeconds: 15,
+    idleIntervalSeconds: 120,
+    maxBatchPoints: 200,
+  );
+
+  factory TelemetryPolicy.fromJson(Map<String, dynamic> j) => TelemetryPolicy(
+        activeTripIntervalSeconds:
+            (j['activeTripIntervalSeconds'] as num?)?.toInt() ??
+                fallback.activeTripIntervalSeconds,
+        idleIntervalSeconds: (j['idleIntervalSeconds'] as num?)?.toInt() ??
+            fallback.idleIntervalSeconds,
+        maxBatchPoints:
+            (j['maxBatchPoints'] as num?)?.toInt() ?? fallback.maxBatchPoints,
+      );
+}
+
 /// A run the crew is on today.
 class CrewTrip {
   CrewTrip({
@@ -1106,6 +1139,32 @@ class CrewApi {
 
   Future<void> leaveStop(String tripId, int sequence) =>
       _api.post('/crew/trips/$tripId/stops/$sequence/depart');
+
+  /// How often this handset should be sampling and sending.
+  ///
+  /// Served by the platform rather than compiled in, precisely so a change of
+  /// cadence does not need an app release that half a fleet of prepaid handsets
+  /// would never install. Falls back to the server's own documented defaults if
+  /// it cannot be read.
+  Future<TelemetryPolicy> telemetryPolicy() async {
+    final j = await _api.get('/crew/telemetry/policy') as Map<String, dynamic>;
+    return TelemetryPolicy.fromJson(j);
+  }
+
+  /// Where the bus has been since the last flush.
+  ///
+  /// Sent as a batch, not a point at a time: a bus spends its morning in and
+  /// out of coverage, and a driver is not going to stop to nurse a network.
+  /// The trip is named rather than the vehicle so the server can tie each fix
+  /// to the run it belongs to without the app having to know the vehicle id.
+  Future<void> sendPositions({
+    required String tripInstanceId,
+    required List<Map<String, dynamic>> points,
+  }) =>
+      _api.post('/crew/telemetry/positions', {
+        'tripInstanceId': tripInstanceId,
+        'points': points,
+      });
 
   /// Pass a stop without stopping, with a reason.
   ///

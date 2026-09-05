@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../api/bus_location.dart';
 import '../../api/crew_api.dart';
 import '../../api/session.dart';
 import '../../i18n/strings.dart';
@@ -193,6 +195,19 @@ class _TripScreenState extends State<TripScreen> {
     // reach the result: the emergency call belongs at the top of the screen,
     // not below a roster the driver has to scroll past to reach it.
     _headerTrip.value = trips.where((t) => t.id == widget.tripId).firstOrNull;
+
+    // Follow the bus exactly as long as it is out.
+    //
+    // Driven from the loaded trip rather than from a button, so it survives the
+    // screen being backed out of and re-entered, and so a run that ends while
+    // the driver is looking at something else still stops reporting. Starting
+    // is idempotent; stopping flushes whatever is queued.
+    final live = _headerTrip.value;
+    if (live != null && live.startedAt != null && live.endedAt == null) {
+      unawaited(BusLocation.instance.start(live.id));
+    } else if (BusLocation.instance.isRunning) {
+      unawaited(BusLocation.instance.stop());
+    }
     return _TripData(
       trip: trips.where((t) => t.id == widget.tripId).firstOrNull,
       plan: results[1] as TripPlan,
@@ -600,6 +615,10 @@ class _TripScreenState extends State<TripScreen> {
                         },
                       ),
                       const SizedBox(height: 12),
+                      // Said once, where the consequence is visible: the map
+                      // below has no bus on it and the ordering toggle above
+                      // cannot work, and both are because of this.
+                      const _LocationNotice(),
                       // The same stops as the cards below, in the same order,
                       // on the ground. This is the one screen that knows which
                       // stop is the campus gate, so it is the one that can tell
@@ -2625,6 +2644,83 @@ class _SweepCardState extends State<_SweepCard> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Why there is no bus on the map, when there is none.
+///
+/// Only ever shown for a refusal or a switched-off service — never while a
+/// first fix is simply on its way, because "waiting" and "refused" look
+/// identical on a map and only one of them is the driver's to fix.
+class _LocationNotice extends StatelessWidget {
+  const _LocationNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<BusLocationState>(
+      valueListenable: BusLocation.instance.state,
+      builder: (context, state, _) {
+        if (state != BusLocationState.denied &&
+            state != BusLocationState.blocked) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Panel(
+            color: AppTheme.amberSoft,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.location_off_rounded, size: 18, color: AppTheme.amber),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        t('driver.locationOffTitle'),
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        t('driver.locationOffWhy'),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.45,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: () => state == BusLocationState.blocked
+                            ? Geolocator.openLocationSettings()
+                            : Geolocator.openAppSettings(),
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                            t('driver.locationOffFix'),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                              color: Role.driver.tint,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

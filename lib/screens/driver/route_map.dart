@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 // latlong2 exports a generic Path<T> for geodesic paths, which shadows
 // dart:ui's Path and breaks anything in the file that paints.
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 
+import '../../api/bus_location.dart';
 import '../../api/crew_api.dart';
 import '../../api/directions.dart';
 import '../../i18n/strings.dart';
@@ -44,9 +46,9 @@ bool stopIsPlaced(PlannedStop s) {
 ///     does not have. There is no caption saying so, because a straight line
 ///     between two pins is universally read as "these two connect" — the old
 ///     caption existed to excuse a drawing, and this is not a drawing.
-///   * There is no bus. Nothing in the crew payload carries a vehicle position
-///     — CrewTrip has no lat/lon, TripPlan has none, and this build has no
-///     location plugin — so no marker is invented for one.
+///   * The bus is drawn from THIS handset's own fix, and only once there is
+///     one. Before that no bus marker exists at all — an invented one is a bus
+///     on the wrong street, and the whole point of the dot is that it is real.
 ///
 /// Built for 06:40 in a yard, one-handed, in gloves: the next stop is the
 /// largest thing on the map, markers are finger-sized, and every pin, line and
@@ -239,6 +241,28 @@ class _RouteMapState extends State<RouteMap> {
                 ),
               ),
           ],
+        ),
+        // The bus itself, over its own route.
+        //
+        // Drawn from the live fix rather than the last position the server
+        // happened to store, so it is honest about being this handset's own
+        // idea of where it is. Nothing is drawn at all until there is a fix —
+        // a dot at 0,0 in the Gulf of Guinea is worse than no dot.
+        ValueListenableBuilder<Position?>(
+          valueListenable: BusLocation.instance.here,
+          builder: (context, me, _) {
+            if (me == null) return const SizedBox.shrink();
+            return MarkerLayer(
+              markers: [
+                Marker(
+                  point: LatLng(me.latitude, me.longitude),
+                  width: 26,
+                  height: 26,
+                  child: const _MeDot(),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -784,6 +808,38 @@ class _Credit extends StatelessWidget {
 /// A themed panel that names the problem, rather than an empty map of
 /// somewhere: a map centred on a default city with no pins on it would be read
 /// as the run.
+/// The bus, where this handset says it is.
+///
+/// A blue dot with a white collar rather than a bus glyph: it is the shape
+/// every mapping app on the phone already uses for "you are here", and a
+/// driver should not have to learn a new one from us. Deliberately smaller
+/// than a stop pin — it moves, and the stops are what the run is about.
+class _MeDot extends StatelessWidget {
+  const _MeDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 18,
+        height: 18,
+        decoration: BoxDecoration(
+          color: AppTheme.blue,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 3),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 5,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _NoMap extends StatelessWidget {
   const _NoMap({required this.compact, required this.tint, required this.reason});
 

@@ -14,6 +14,21 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
     <!--
+      Where the bus is. Asked for by the DRIVER build only at runtime, and the
+      one thing this platform could not do without it is most of what it was
+      built for: a parent watching the bus approach, the nearest-stop ordering
+      on the run screen, the geofences the school configured, and the ledger's
+      answer to "where was the bus when that child was set down".
+
+      Coarse is declared beside fine because Android 12 and later let a person
+      grant only the approximate one, and an approximate position still places
+      a bus on a street. The app treats a refusal as a refusal — it keeps
+      working, sends nothing, and says so — rather than nagging.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+
+    <!--
       The camera. The driver app cannot open a shift without a photograph of
       the crew member standing at the bus: shift-start refuses any asset id
       that is not a real file this person uploaded, so a handset with no way to

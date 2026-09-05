@@ -81,6 +81,7 @@ dependencies:
   # Sulaymaniyah is good.
   flutter_map: ^8.1.1
   latlong2: ^0.9.1
+  geolocator: ^14.0.3
 
   # Google Maps, for the parent tracking screen only.
   #
