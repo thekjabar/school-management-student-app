@@ -184,9 +184,22 @@ class _TripScreenState extends State<TripScreen> {
 
   Future<_TripData> _load() async {
     final api = CrewApi.instance;
+    // Where the bus is, sent WITH the request that asks how far away each stop
+    // is. The server has always computed that from a lat/lon on the query
+    // string — there is no stored position it falls back to — and no screen in
+    // this app has ever sent one. So every stop came back with no distance,
+    // "1.2 km away" could never appear, and nearest-first had nothing to sort
+    // by and said so: "needs the bus position, which this phone did not send."
+    // It was telling the exact truth.
+    final me = BusLocation.instance.here.value;
     final results = await Future.wait([
       _dutyList(),
-      api.plan(widget.tripId, nearest: _nearestFirst),
+      api.plan(
+        widget.tripId,
+        nearest: _nearestFirst,
+        lat: me?.latitude,
+        lon: me?.longitude,
+      ),
       api.sweepState(widget.tripId),
       _gate(),
     ]);

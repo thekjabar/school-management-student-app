@@ -27,10 +27,8 @@ class Place {
 /// how a parent fills this in. Typing the name and being taken there is the
 /// short way.
 ///
-/// Mapbox rather than Nominatim for this one: the tiles under the pin are
-/// already Mapbox, so a search that agrees with what is drawn beats a second
-/// provider's idea of where a quarter begins. Reverse geocoding stays on
-/// Nominatim — it is doing a different job and it is free.
+/// Mapbox, so a search agrees with the tiles drawn under the pin rather than
+/// offering a second provider's idea of where a quarter begins.
 class PlaceSearch {
   PlaceSearch._();
 
@@ -111,17 +109,21 @@ class PlaceSearch {
 /// rather than a number and a street name, and where the parent typing it is
 /// often doing so one-handed.
 ///
-/// OpenStreetMap's Nominatim: the same data behind the tiles already drawn on
-/// that map, so there is no second provider, no key and no bill.
+/// Mapbox, like every other map call in this app.
+///
+/// This was the one exception: OpenStreetMap's Nominatim, chosen because it is
+/// the same data under the tiles and costs nothing. It is a free community
+/// service with published rate limits, no delivery guarantee and terms that
+/// refuse anonymous traffic — fine for a hobby, wrong for the line an office
+/// reads when it decides which stop a child rides from. One vendor now, one
+/// contract, one place to ask why an answer was poor.
 class Geocode {
   Geocode._();
 
-  static const _host = 'nominatim.openstreetmap.org';
-
-  /// Nominatim's terms require an application to identify itself and refuse
-  /// anonymous traffic. A blocked geocoder shows up as a box that silently
-  /// stays empty, so this is not decoration.
-  static const _agent = 'KSP/1.0 (+https://kurdistanstudentprotection.com)';
+  /// Reverse geocoding needs the same token the tiles do, so a build with no
+  /// token has no geocoder either — and says so by leaving the box alone
+  /// rather than by failing.
+  static bool get available => MapTiles.token.isNotEmpty;
 
   /// Answers already seen, so nudging the pin back and forth costs one request
   /// rather than ten. Four decimal places is about eleven metres — finer than
@@ -136,36 +138,50 @@ class Geocode {
   /// Never throws. An address that cannot be fetched leaves the box exactly as
   /// it was, which is what it did before any of this existed.
   static Future<String?> at(double lat, double lon) async {
+    if (!available) return null;
     final key = _key(lat, lon);
     if (_seen.containsKey(key)) return _seen[key];
 
     try {
-      final uri = Uri.https(_host, '/reverse', {
-        'format': 'jsonv2',
-        'lat': '$lat',
-        'lon': '$lon',
-        // House and street, rather than the whole postal envelope.
-        'zoom': '18',
-        'addressdetails': '1',
-        // Kurdish and Arabic names where OSM carries them, which in Erbil it
-        // largely does — the tiles on the screen are already labelled in them.
-        'accept-language': AppLocale.current.value.code,
-      });
+      // Longitude first. Mapbox orders coordinates lon,lat throughout its API,
+      // which is the opposite of how everyone says them aloud and the easiest
+      // mistake to make here — reversed, an Erbil pin lands in Somalia and the
+      // box fills with a confident wrong answer rather than staying empty.
+      final uri = Uri.https(
+        'api.mapbox.com',
+        '/geocoding/v5/mapbox.places/$lon,$lat.json',
+        {
+          'access_token': MapTiles.token,
+          // Nearest first: the door, then the street, then the quarter. Asking
+          // for the whole list and picking is what lets a pin on a house come
+          // back as a house rather than as the district it sits in.
+          'types': 'address,poi,neighborhood,locality,place',
+          // No limit: with more than one type asked for, Mapbox refuses any
+          // limit but the default of one, and returns an error rather than the
+          // nearest match. The default is the nearest match, which is what we
+          // want anyway.
+          //
+          // Language only where Mapbox has one. Sorani is not among them and
+          // asking for it errors instead of falling back, so a Sorani reader
+          // gets the local name — which in Erbil is usually what is on the
+          // street sign. Same rule as the search above.
+          if (AppLocale.current.value == Lang.ar) 'language': 'ar',
+          if (AppLocale.current.value == Lang.en) 'language': 'en',
+        },
+      );
 
-      final res = await http
-          .get(uri, headers: const {'User-Agent': _agent})
-          .timeout(const Duration(seconds: 8));
+      final res = await http.get(uri).timeout(const Duration(seconds: 8));
       if (res.statusCode != 200) return null;
 
       final body = jsonDecode(utf8.decode(res.bodyBytes));
       if (body is! Map) return null;
 
-      final text = _compose(body['address'], body['display_name']);
+      final text = _compose(body['features']);
       _seen[key] = text;
       return text;
     } catch (_) {
-      // Offline, rate-limited, or a shape that has changed under us. The box
-      // stays as it was and the parent types, as they had to before.
+      // Offline, or a shape that has changed under us. The box stays as it was
+      // and the parent types, as they had to before.
       return null;
     }
   }
@@ -176,38 +192,25 @@ class Geocode {
   /// governorate, postcode, country. A parent recognises the first few of those;
   /// the rest is noise the office has to read past to find the part that says
   /// which street the bus turns into.
-  static String? _compose(Object? address, Object? fallback) {
-    if (address is Map) {
-      // House and street first, then the quarter, then the town. Nominatim's
-      // own display_name runs on through governorate, postcode and country,
-      // which a parent standing in the building does not need and the office
-      // has to read past — but cutting at the district lost the town, and a
-      // street name alone is not an address. Amenity leads because in Erbil a
-      // place is very often named before it is numbered.
-      const near = [
-        'amenity',
-        'house_number',
-        'road',
-        'neighbourhood',
-        'quarter',
-        'suburb',
-        'city_district',
-        'city',
-        'town',
-        'village',
-      ];
-      final parts = <String>[
-        for (final k in near)
-          if (address[k] is String && (address[k] as String).trim().isNotEmpty)
-            (address[k] as String).trim(),
-      ];
-      if (parts.isNotEmpty) return parts.join(', ');
-    }
+  static String? _compose(Object? features) {
+    if (features is! List || features.isEmpty) return null;
 
-    if (fallback is String && fallback.trim().isNotEmpty) {
-      final head = fallback.split(',').take(3).map((p) => p.trim()).where((p) => p.isNotEmpty);
-      if (head.isNotEmpty) return head.join(', ');
-    }
-    return null;
+    // Mapbox returns the matches nearest-first, each with a place_name that
+    // runs all the way out to the country. The near end is what a parent
+    // recognises and what the office needs; the rest is what they have to read
+    // past to find the street the bus turns into.
+    final first = features.first;
+    if (first is! Map) return null;
+
+    final text = first['place_name'] ?? first['text'];
+    if (text is! String || text.trim().isEmpty) return null;
+
+    final head = text
+        .split(',')
+        .take(3)
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty);
+    return head.isEmpty ? null : head.join(', ');
   }
+
 }

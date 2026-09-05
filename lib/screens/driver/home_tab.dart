@@ -8,6 +8,7 @@ import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
+import '../../api/bus_location.dart';
 import 'route_map.dart';
 import 'trip_screen.dart';
 
@@ -131,7 +132,12 @@ class _DriverHomeState extends State<DriverHome> {
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
       load: () async {
         final live = await loadDutyTrip();
-        final plan = live == null ? null : await CrewApi.instance.plan(live.id);
+        // The bus's own position, so the card can say how far the next stop
+        // is. Without it the server has nothing to measure from.
+        final me = BusLocation.instance.here.value;
+        final plan = live == null
+            ? null
+            : await CrewApi.instance.plan(live.id, lat: me?.latitude, lon: me?.longitude);
         return _Duty(trip: live, plan: plan);
       },
       builder: (context, duty) {
