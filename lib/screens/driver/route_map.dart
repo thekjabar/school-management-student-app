@@ -238,15 +238,10 @@ class _RouteMapState extends State<RouteMap> {
             if (me == null) return const SizedBox.shrink();
             final next = pins.where((p) => p.stop.departedAt == null).firstOrNull;
             if (next == null) return const SizedBox.shrink();
-            return PolylineLayer(
-              polylines: [
-                Polyline(
-                  points: [LatLng(me.latitude, me.longitude), next.at],
-                  strokeWidth: widget.compact ? 2.5 : 3.5,
-                  color: AppTheme.blue.withValues(alpha: 0.75),
-                  pattern: StrokePattern.dashed(segments: const [7, 6]),
-                ),
-              ],
+            return _LiveLeg(
+              from: LatLng(me.latitude, me.longitude),
+              to: next.at,
+              compact: widget.compact,
             );
           },
         ),
@@ -834,6 +829,85 @@ class _Credit extends StatelessWidget {
 /// A themed panel that names the problem, rather than an empty map of
 /// somewhere: a map centred on a default city with no pins on it would be read
 /// as the run.
+/// The leg the bus is on: from where it is now to the stop it is heading for,
+/// along the roads rather than through the buildings between them.
+///
+/// The stop-to-stop line has always been fetched from the directions service.
+/// This one was added as a plain two-point line and so was the one segment on
+/// the map that cut across the city in a straight diagonal — next to a route
+/// that follows streets, it read as a bug, and it was.
+///
+/// Asking for it is not free, and the naive version is expensive in a way that
+/// only shows up on somebody's bill: the position updates every fifteen seconds
+/// or fifteen metres, the directions cache is keyed to about a metre, so a
+/// morning's driving would be several hundred requests and several hundred
+/// cache entries for lines nobody could tell apart. So the bus's end of the leg
+/// is snapped to roughly a hundred metres before it is asked for. Inside that,
+/// the answer is reused; the dot still moves smoothly, because the dot is drawn
+/// from the real fix and only the road line is snapped.
+class _LiveLeg extends StatefulWidget {
+  const _LiveLeg({required this.from, required this.to, required this.compact});
+
+  final LatLng from;
+  final LatLng to;
+  final bool compact;
+
+  @override
+  State<_LiveLeg> createState() => _LiveLegState();
+}
+
+class _LiveLegState extends State<_LiveLeg> {
+  List<LatLng>? _road;
+  String? _roadFor;
+
+  /// About 110 m of latitude, and less of longitude at this latitude. Fine
+  /// enough that the drawn road still leaves from where the bus is, coarse
+  /// enough that a bus standing at a stop asks once and not forty times.
+  LatLng get _snapped => LatLng(
+        double.parse(widget.from.latitude.toStringAsFixed(3)),
+        double.parse(widget.from.longitude.toStringAsFixed(3)),
+      );
+
+  void _want() {
+    final from = _snapped;
+    final key = '${from.latitude},${from.longitude}'
+        '>${widget.to.latitude.toStringAsFixed(5)},${widget.to.longitude.toStringAsFixed(5)}';
+    if (_roadFor == key) return;
+    _roadFor = key;
+
+    final ready = Directions.cached([from, widget.to]);
+    if (ready != null) {
+      _road = ready;
+      return;
+    }
+    // The straight line stays on screen meanwhile. The leg being driven is
+    // worth showing immediately, and a network round trip is not a reason to
+    // show nothing.
+    _road = null;
+    Directions.road([from, widget.to]).then((line) {
+      if (!mounted || _roadFor != key) return;
+      setState(() => _road = line);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _want();
+    return PolylineLayer(
+      polylines: [
+        Polyline(
+          points: _road ?? [widget.from, widget.to],
+          strokeWidth: widget.compact ? 2.5 : 3.5,
+          color: AppTheme.blue.withValues(alpha: 0.75),
+          // Dashed whichever line it is: this is the bus catching up with its
+          // route, not part of the route the office authored.
+          pattern: StrokePattern.dashed(segments: const [7, 6]),
+        ),
+      ],
+    );
+  }
+}
+
 /// The bus, where this handset says it is.
 ///
 /// A blue dot with a white collar rather than a bus glyph: it is the shape
