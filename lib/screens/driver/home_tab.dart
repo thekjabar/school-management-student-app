@@ -855,6 +855,10 @@ class _CurrentStopCardState extends State<_CurrentStopCard> {
     final s = widget.stop;
     final at = s?.arrivedAt;
     if (s == null || at == null || s.departedAt != null) return 0;
+    // Nothing left to wait for once every child here is accounted for. See the
+    // note on the run screen: the hold gives a child time to reach the bus, it
+    // is not a penalty for finishing early.
+    if (s.remaining == 0) return 0;
     final left = _holdSeconds - DateTime.now().difference(at).inSeconds;
     if (left <= 0) return 0;
     return left > _holdSeconds ? _holdSeconds : left;

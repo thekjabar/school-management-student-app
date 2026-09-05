@@ -144,6 +144,10 @@ class _TripScreenState extends State<TripScreen> {
   String? _terminalStopId;
   bool _gateKnown = false;
 
+  /// The loaded run, so the header can offer the emergency call. Written by
+  /// _load before the result reaches the builder.
+  CrewTrip? _headerTrip;
+
   /// The campus gate, for the half of the run that does not happen at a child's
   /// own stop.
   ///
@@ -177,6 +181,10 @@ class _TripScreenState extends State<TripScreen> {
       _gate(),
     ]);
     final trips = results[0] as List<CrewTrip>;
+    // Kept for the header, which is built outside this loader and so cannot
+    // reach the result: the emergency call belongs at the top of the screen,
+    // not below a roster the driver has to scroll past to reach it.
+    _headerTrip = trips.where((t) => t.id == widget.tripId).firstOrNull;
     return _TripData(
       trip: trips.where((t) => t.id == widget.tripId).firstOrNull,
       plan: results[1] as TripPlan,
@@ -462,7 +470,21 @@ class _TripScreenState extends State<TripScreen> {
         bottom: false,
         child: Column(
           children: [
-            ScreenHeader(title: t('driver.theRun')),
+            ScreenHeader(
+              title: t('driver.theRun'),
+              // At the top, always in the same place, reachable without
+              // scrolling. It used to sit below the headcount and above the
+              // stop list — which is to say, behind however far the driver had
+              // scrolled when the thing happened that he needed it for.
+              trailing: (_headerTrip != null &&
+                      _headerTrip!.startedAt != null &&
+                      _headerTrip!.endedAt == null)
+                  ? _PanicChip(
+                      busy: _busy != null,
+                      onPressed: () => _panic(_headerTrip!),
+                    )
+                  : null,
+            ),
             Expanded(
               child: Loader<_TripData>(
                 key: _loaderKey,
@@ -554,10 +576,6 @@ class _TripScreenState extends State<TripScreen> {
                           busy: _busy != null,
                           onPressed: () => _recordAllOff(data),
                         ),
-                      ],
-                      if (trip != null && running) ...[
-                        const SizedBox(height: 12),
-                        _PanicButton(busy: _busy != null, onPressed: () => _panic(trip)),
                       ],
                       SectionHead(t('driver.stops')),
                       _OrderToggle(
@@ -889,16 +907,42 @@ class _HeadcountCard extends StatelessWidget {
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, height: 1.4),
           ),
           const SizedBox(height: 14),
+          // Four tiles rather than four bare numbers in a row. Each carries its
+          // own icon and ground, so the one that matters is found by colour
+          // before it is read — which is how this card is used at a wheel.
           Row(
             children: [
-              _Fig(label: t('driver.onBoard'), value: '${counts.stillOnBoard}', colour: AppTheme.blue),
-              _Fig(label: t('driver.dropped'), value: '${counts.alighted}', colour: AppTheme.green),
-              _Fig(
-                label: t('driver.stillToDrop'),
-                value: '$outstanding',
-                colour: outstanding > 0 ? AppTheme.amber : AppTheme.textMuted,
+              _StatTile(
+                icon: Icons.directions_bus_filled_rounded,
+                value: '${counts.stillOnBoard}',
+                label: t('driver.onBoard'),
+                colour: AppTheme.blue,
+                wash: AppTheme.blueSoft,
               ),
-              _Fig(label: t('driver.stops'), value: '${counts.stopsDone}/${counts.stopsTotal}', colour: AppTheme.text),
+              const SizedBox(width: 8),
+              _StatTile(
+                icon: Icons.check_circle_outline_rounded,
+                value: '${counts.alighted}',
+                label: t('driver.dropped'),
+                colour: AppTheme.green,
+                wash: AppTheme.greenSoft,
+              ),
+              const SizedBox(width: 8),
+              _StatTile(
+                icon: Icons.person_add_alt_rounded,
+                value: '$outstanding',
+                label: t('driver.stillToDrop'),
+                colour: outstanding > 0 ? AppTheme.amber : AppTheme.textMuted,
+                wash: outstanding > 0 ? AppTheme.amberSoft : AppTheme.neutralSoft,
+              ),
+              const SizedBox(width: 8),
+              _StatTile(
+                icon: Icons.flag_rounded,
+                value: '${counts.stopsDone}/${counts.stopsTotal}',
+                label: t('driver.stops'),
+                colour: AppTheme.text,
+                wash: AppTheme.neutralSoft,
+              ),
             ],
           ),
           if (counts.excluded.isNotEmpty) ...[
@@ -1023,8 +1067,52 @@ class _RunControls extends StatelessWidget {
                   ],
                 ),
               ),
+              // Where the run stands, as a word, beside the bus it describes.
+              // The status was only ever implied by which button happened to be
+              // showing, which is a poor way to answer "is this thing running".
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: wash,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: accent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
+          // How far through the run the bus is, drawn rather than only counted.
+          // "Step 3 of 5" is a fact; a bar is the same fact readable at a
+          // glance from a driver's seat.
+          if (step != null) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: step / 5,
+                minHeight: 6,
+                backgroundColor: AppTheme.neutralSoft,
+                valueColor: AlwaysStoppedAnimation<Color>(accent),
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           // Why the bus is stopped, in the office's own words, above the button
           // that clears it. A driver who is not told the reason cannot fix it
@@ -1268,6 +1356,12 @@ class _StopCardState extends State<_StopCard> {
   int get _holdLeft {
     final at = widget.stop.arrivedAt;
     if (at == null || widget.stop.departedAt != null) return 0;
+    // Nobody here is owed anything any more, so there is nothing to wait for.
+    // The hold exists to give a child walking to the bus time to reach it — it
+    // is not a penalty. Once every child at this stop is aboard, set down, or
+    // marked not here, holding the bus only idles it at the kerb with a full
+    // load and a driver watching a clock.
+    if (widget.stop.remaining == 0) return 0;
     // Capped at the full hold as well as floored at zero. The arrival is the
     // SERVER's clock and this is the handset's: a phone running a few minutes
     // slow would otherwise compute a negative elapsed time and hold the bus for
@@ -2390,25 +2484,57 @@ class _SweepCardState extends State<_SweepCard> {
   }
 }
 
-class _Fig extends StatelessWidget {
-  const _Fig({required this.label, required this.value, required this.colour});
+/// One figure from the headcount, on its own tinted ground.
+class _StatTile extends StatelessWidget {
+  const _StatTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.colour,
+    required this.wash,
+  });
 
+  final IconData icon;
   final String label;
   final String value;
   final Color colour;
+  final Color wash;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            value,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.6, color: colour),
-          ),
-          Text(label, style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-        ],
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(9, 10, 9, 10),
+        decoration: BoxDecoration(
+          color: wash,
+          borderRadius: BorderRadius.circular(13),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 15, color: colour),
+            const SizedBox(height: 6),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.6,
+                  color: colour,
+                ),
+              ),
+            ),
+            Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10.5, height: 1.25, color: AppTheme.textMuted),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -3544,31 +3670,40 @@ class _ChildFoundSheet extends StatelessWidget {
 /// as a driver with a flat tyre, which is to say a phone call to an office
 /// that may not answer. The server has taken an SOS all along and turns it
 /// into the loudest thing this platform can do.
-class _PanicButton extends StatelessWidget {
-  const _PanicButton({required this.busy, required this.onPressed});
+class _PanicChip extends StatelessWidget {
+  const _PanicChip({required this.busy, required this.onPressed});
 
   final bool busy;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: SizedBox(
-        width: double.infinity,
-        child: OutlinedButton.icon(
-          onPressed: busy ? null : onPressed,
-          icon: Icon(Icons.emergency_share_rounded, size: 19, color: AppTheme.rose),
-          label: Text(
-            t('driver.sos'),
-            style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: AppTheme.rose),
-          ),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-            side: BorderSide(color: AppTheme.rose.withValues(alpha: 0.5)),
-            backgroundColor: AppTheme.roseSoft,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          ),
+    return GestureDetector(
+      onTap: busy ? null : onPressed,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppTheme.roseSoft,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.rose.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.emergency_share_rounded, size: 17, color: AppTheme.rose),
+            const SizedBox(width: 7),
+            Text(
+              t('driver.sos'),
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.rose,
+              ),
+            ),
+          ],
         ),
       ),
     );
