@@ -74,6 +74,15 @@ class MapTiles {
   static String get _style =>
       _styleOverride.isEmpty ? _fallbackStyle : _styleOverride;
 
+  /// The style as the native SDK wants it named.
+  ///
+  /// The raster endpoint takes `owner/styleid` in a URL path; the GL engine
+  /// takes the same pair as a `mapbox://styles/` URI and resolves the style's
+  /// imports itself. That difference is the whole reason the engine changed —
+  /// a Standard style is nothing but an import, so the raster renderer drew
+  /// blank tiles from it and this one draws the map the school designed.
+  static String get styleUri => 'mapbox://styles/$_style';
+
   /// Supplied at build time, never committed.
   ///
   /// A Mapbox public token is designed to ship inside a client and can be read
