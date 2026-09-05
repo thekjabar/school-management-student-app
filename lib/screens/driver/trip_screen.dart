@@ -1772,51 +1772,56 @@ class _StopCardState extends State<_StopCard> {
                     ),
                     onNoShow: () => _mark(r, 'NO_SHOW', t('driver.notRiding')),
                   )),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    BigButton(
-                      // The clock is on the button itself. A disabled button
-                      // with the reason somewhere else is the same dead button
-                      // this screen has been taught not to draw.
-                      label: holding
-                          ? '${t('driver.movingOn')} · ${holdLeft ~/ 60}:${(holdLeft % 60).toString().padLeft(2, '0')}'
-                          : t('driver.movingOn'),
-                      color: AppTheme.blue,
-                      busy: _busyStop,
-                      onPressed: widget.running && !holding
-                          ? () => _stopAction(
-                                () => CrewApi.instance
-                                    .leaveStop(widget.tripId, s.plannedSequence),
-                                t('driver.movingOn'),
-                              )
-                          : null,
-                    ),
-                    if (holding) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.timer_outlined, size: 16, color: AppTheme.textMuted),
-                          const SizedBox(width: 7),
-                          Expanded(
-                            child: Text(
-                              t('driver.holdAtStop'),
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                height: 1.45,
-                                color: AppTheme.textMuted,
+              // Gone once the bus has left, the same way Arrived goes once the
+              // bus has pulled up. A departed stop kept offering to depart
+              // again, which the server refuses — and the "Done" badge in the
+              // header above has already said the stop is finished with.
+              if (!s.done)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      BigButton(
+                        // The clock is on the button itself. A disabled button
+                        // with the reason somewhere else is the same dead button
+                        // this screen has been taught not to draw.
+                        label: holding
+                            ? '${t('driver.movingOn')} · ${holdLeft ~/ 60}:${(holdLeft % 60).toString().padLeft(2, '0')}'
+                            : t('driver.movingOn'),
+                        color: AppTheme.blue,
+                        busy: _busyStop,
+                        onPressed: widget.running && !holding
+                            ? () => _stopAction(
+                                  () => CrewApi.instance
+                                      .leaveStop(widget.tripId, s.plannedSequence),
+                                  t('driver.movingOn'),
+                                )
+                            : null,
+                      ),
+                      if (holding) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.timer_outlined, size: 16, color: AppTheme.textMuted),
+                            const SizedBox(width: 7),
+                            Expanded(
+                              child: Text(
+                                t('driver.holdAtStop'),
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  height: 1.45,
+                                  color: AppTheme.textMuted,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
             ],
           ],
         ),
