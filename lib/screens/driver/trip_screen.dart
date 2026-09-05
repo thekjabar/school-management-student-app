@@ -1382,7 +1382,7 @@ class _StopCardState extends State<_StopCard> {
   Future<void> _skipStop() async {
     final reason = await showAppSheet<String>(
       context,
-      builder: (_) => const _SkipStopSheet(),
+      builder: (_) => const SkipStopSheet(),
     );
     if (reason == null || _busyStop) return;
     setState(() => _busyStop = true);
@@ -1721,14 +1721,14 @@ class _StopCardState extends State<_StopCard> {
 /// button beside the field the way `_PanicSheet` has none beside its
 /// confirm — dragging the sheet down does that, and the confirm button stays
 /// the only button, disabled rather than duplicated by a second one.
-class _SkipStopSheet extends StatefulWidget {
-  const _SkipStopSheet();
+class SkipStopSheet extends StatefulWidget {
+  const SkipStopSheet({super.key});
 
   @override
-  State<_SkipStopSheet> createState() => _SkipStopSheetState();
+  State<SkipStopSheet> createState() => _SkipStopSheetState();
 }
 
-class _SkipStopSheetState extends State<_SkipStopSheet> {
+class _SkipStopSheetState extends State<SkipStopSheet> {
   final TextEditingController _reason = TextEditingController();
   String _text = '';
 

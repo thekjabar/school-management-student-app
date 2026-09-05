@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api/crew_api.dart';
@@ -8,6 +10,7 @@ import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
+import '../../ui/sheets.dart';
 import 'route_map.dart';
 import 'trip_screen.dart';
 
@@ -132,7 +135,19 @@ class _DriverHomeState extends State<DriverHome> {
       load: () async {
         final live = await loadDutyTrip();
         final plan = live == null ? null : await CrewApi.instance.plan(live.id);
-        return _Duty(trip: live, plan: plan);
+        // The campus gate, needed the moment this card can record a boarding
+        // itself. A failure here must not take the run down with it: without it
+        // the app states no stopId, which the server records as "not stated" —
+        // a gap in the ledger rather than a false alarm.
+        String? gate;
+        if (live != null) {
+          try {
+            gate = await CrewApi.instance.terminalStopId(live.id);
+          } catch (_) {
+            gate = null;
+          }
+        }
+        return _Duty(trip: live, plan: plan, terminalStopId: gate);
       },
       builder: (context, duty) {
         final trip = duty.trip;
@@ -157,67 +172,60 @@ class _DriverHomeState extends State<DriverHome> {
             _DutyCard(trip: trip, plan: duty.plan, onOpen: () => _open(context, trip)),
             const SizedBox(height: kCardGap),
 
+            // The whole run in one line rather than four tiles.
+            //
+            // The tiles restated the same roll four ways and competed with the
+            // stop the driver is actually working: "28 to pick up" beside a
+            // stop owing three is two numbers to reconcile at the wheel. The
+            // run-level figures are context, so they read as context.
             if (counts != null) ...[
-              Card16(
-                padding: const EdgeInsets.fromLTRB(12, 13, 12, 13),
-                child: IconFigureStrip(
-                  figures: [
-                    IconFigure(
-                      icon: Icons.groups_rounded,
-                      label: t('driver.studentsOnRoute'),
-                      value: '${counts.expected}',
-                      caption: t('driver.onRoute'),
-                      color: Role.driver.tint,
-                    ),
-                    IconFigure(
-                      icon: Icons.check_circle_outline_rounded,
-                      label: t('driver.pickedUp'),
-                      value: '${counts.boarded}',
-                      caption: _percent(counts.boarded, counts.expected),
-                      color: AppTheme.green,
-                    ),
-                    IconFigure(
-                      icon: Icons.person_add_alt_rounded,
-                      label: t('driver.toPickUp'),
-                      value: '${(counts.expected - counts.boarded).clamp(0, 9999)}',
-                      caption: _percent(counts.expected - counts.boarded, counts.expected),
-                      color: AppTheme.amber,
-                    ),
-                    IconFigure(
-                      icon: Icons.account_balance_rounded,
-                      label: t('driver.toDropOff'),
-                      value: '${counts.stillOnBoard}',
-                      caption: t('driver.school'),
-                      color: AppTheme.blue,
-                    ),
-                  ],
-                ),
+              _RunSummary(counts: counts),
+              const SizedBox(height: kCardGap),
+            ],
+
+            if ((duty.plan?.stops ?? const <PlannedStop>[]).isNotEmpty) ...[
+              _MapStrip(
+                stops: duty.plan!.stops,
+                leg: trip.leg,
+                terminalStopId: duty.terminalStopId,
               ),
               const SizedBox(height: kCardGap),
             ],
 
-            // ---- The stop they are driving to -----------------------------
-            _NextStopCard(
+            // ---- The stop they are working, and the children on it ---------
+            //
+            // One card, not two. The old pair named the same stop twice with
+            // different counts — a "next stop" panel saying six to pick up
+            // above a roster saying three left — and put the children three
+            // taps away on another screen. This is the working surface: who is
+            // here, one tap each, and the two stop buttons under them.
+            _CurrentStopCard(
               stop: next,
+              tripId: trip.id,
               leg: trip.leg,
               busy: _busy,
+              running: trip.running,
+              terminalStopId: duty.terminalStopId,
+              schoolReached: duty.plan?.terminalArrivedAt != null,
               onOpen: () => _open(context, trip),
-              // Only while the run is actually under way. Recording an arrival
-              // at a stop on a run nobody has started is a call the server is
-              // right to refuse, and offering it invites the refusal.
-              onStopAction: next == null || !trip.running
+              onChanged: () => _loaderKey.currentState?.reload(),
+              onArrive: next == null || !trip.running
                   ? null
-                  : () => next.arrivedAt == null
-                      ? _stopAction(
-                          () => CrewApi.instance
-                              .arriveAtStop(trip.id, next.plannedSequence),
-                          t('driver.arrived'),
-                        )
-                      : _stopAction(
-                          () => CrewApi.instance
-                              .leaveStop(trip.id, next.plannedSequence),
-                          t('driver.movingOn'),
-                        ),
+                  : () => _stopAction(
+                        () => CrewApi.instance
+                            .arriveAtStop(trip.id, next.plannedSequence),
+                        t('driver.arrived'),
+                      ),
+              onLeave: next == null || !trip.running
+                  ? null
+                  : () => _stopAction(
+                        () => CrewApi.instance
+                            .leaveStop(trip.id, next.plannedSequence),
+                        t('driver.movingOn'),
+                      ),
+              onSkip: next == null || !trip.running
+                  ? null
+                  : () => _skip(context, trip, next),
             ),
             const SizedBox(height: kCardGap),
 
@@ -297,8 +305,21 @@ class _DriverHomeState extends State<DriverHome> {
     );
   }
 
-  static String _percent(int part, int whole) =>
-      whole <= 0 ? '—' : '(${(part / whole * 100).round()}%)';
+  /// Skipping a stop, with the reason the ledger keeps.
+  ///
+  /// The same confirm the run screen uses. A skip is a stop nobody was served
+  /// at, so it is never a bare tap: the office reads the reason back.
+  Future<void> _skip(BuildContext context, CrewTrip trip, PlannedStop stop) async {
+    final reason = await showAppSheet<String>(
+      context,
+      builder: (_) => const SkipStopSheet(),
+    );
+    if (reason == null) return;
+    await _stopAction(
+      () => CrewApi.instance.skipStop(trip.id, stop.plannedSequence, reason),
+      t('driver.skipped'),
+    );
+  }
 
   void _open(BuildContext context, CrewTrip trip) {
     Navigator.of(context).push(
@@ -310,10 +331,13 @@ class _DriverHomeState extends State<DriverHome> {
 }
 
 class _Duty {
-  _Duty({required this.trip, required this.plan});
+  _Duty({required this.trip, required this.plan, this.terminalStopId});
 
   final CrewTrip? trip;
   final TripPlan? plan;
+
+  /// The campus gate's stop id, or null if it could not be read.
+  final String? terminalStopId;
 
   /// The first stop not yet departed. Not "the nearest" — a driver following
   /// the route wants the next one in order, and the nearest is the one they
@@ -581,250 +605,189 @@ class _Fact extends StatelessWidget {
 }
 
 /* ---------------------------------------------------------------------------
- * The next stop
+ * The run, in one line
  * ------------------------------------------------------------------------- */
 
-class _NextStopCard extends StatelessWidget {
-  const _NextStopCard({
-    required this.stop,
-    required this.leg,
-    required this.busy,
-    required this.onOpen,
-    required this.onStopAction,
-  });
+/// The whole roll, small, as context for the stop being worked.
+///
+/// This replaced four figure tiles. The tiles were the same roll counted four
+/// ways, each as loud as the stop card under them, so "28 to pick up" sat
+/// beside a stop owing three and the driver had two numbers to reconcile before
+/// touching anything. Run totals are background: they belong on one line, in
+/// muted type, under the card that names the bus.
+class _RunSummary extends StatelessWidget {
+  const _RunSummary({required this.counts});
 
-  final PlannedStop? stop;
-  final String leg;
-  final bool busy;
-  final VoidCallback onOpen;
-
-  /// Arrive, or move on — whichever the stop is owed. Null when there is no
-  /// stop left to act on.
-  final VoidCallback? onStopAction;
+  final Headcount counts;
 
   @override
   Widget build(BuildContext context) {
-    final tint = Role.driver.tint;
-    final s = stop;
-
+    final toGo = (counts.expected - counts.boarded).clamp(0, 9999);
     return Card16(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
         children: [
-          SectionRow(
-            title: t('driver.nextStop'),
-            actionLabel: t('driver.viewAllStops'),
-            onAction: onOpen,
-          ),
-          if (s == null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Text(
-                t('driver.noStopsLeft'),
-                style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
-              ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: tint.withValues(alpha: AppTheme.dark ? 0.14 : 0.08),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: AppTheme.surface,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(Icons.flag_rounded, size: 19, color: tint),
-                      ),
-                      const SizedBox(width: 11),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              s.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.3,
-                                color: AppTheme.text,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              leg == 'RETURN'
-                                  ? tn('driver.nToDropOff', s.students.length)
-                                  : tn('driver.nToPickUp', s.students.length),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                            ),
-                            // The landmark. In much of the Region this is the
-                            // only usable address, and it was on the run screen
-                            // three taps away instead of on the card naming the
-                            // stop the driver is heading for.
-                            if (s.landmark != null && s.landmark!.isNotEmpty) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                s.landmark!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 11, color: AppTheme.textFaint),
-                              ),
-                            ],
-                            // When the bus is due at it. The card names the
-                            // stop the driver is heading for, and the time was
-                            // three taps away on the run screen.
-                            if (s.etaAt != null) ...[
-                              const SizedBox(height: 4),
-                              StopEta(stop: s),
-                            ],
-                            if (s.metresAway != null) ...[
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Icon(Icons.place_rounded, size: 12, color: tint),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    s.metresAway! >= 1000
-                                        ? tn('driver.kmAway',
-                                            (s.metresAway! / 100).round() / 10)
-                                        : tn('driver.metresAway', s.metresAway!),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: tint,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 11),
-                  Row(
-                    children: [
-                      Expanded(
-                        // Records the arrival, or the departure once the bus is
-                        // there. It used to open the run screen and record
-                        // nothing, under a label that said it had.
-                        child: _Button(
-                          // Nothing directional: an east arrow points the wrong
-                          // way on a Kurdish or Arabic screen.
-                          icon: s.arrivedAt == null
-                              ? Icons.check_circle_outline_rounded
-                              : Icons.directions_bus_rounded,
-                          label: s.arrivedAt == null
-                              ? t('driver.iveArrived')
-                              : t('driver.movingOn'),
-                          filled: true,
-                          busy: busy,
-                          onTap: onStopAction,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        // Was "Navigate", and opened the same run screen. There
-                        // is no navigation in this build — no maps app is
-                        // launched from anywhere — so the button now says what
-                        // it does.
-                        child: _Button(
-                          icon: Icons.list_alt_rounded,
-                          label: t('driver.openRun'),
-                          filled: false,
-                          onTap: onOpen,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+          Icon(Icons.groups_rounded, size: 17, color: AppTheme.textMuted),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _Stat(value: '${counts.expected}', label: t('driver.onRoute')),
+                _Dot(),
+                _Stat(
+                  value: '${counts.stillOnBoard}',
+                  label: t('driver.aboardNow'),
+                  color: AppTheme.blue,
+                ),
+                _Dot(),
+                _Stat(
+                  value: '$toGo',
+                  label: t('driver.stillToPickUp'),
+                  color: toGo == 0 ? AppTheme.green : AppTheme.amber,
+                ),
+              ],
             ),
+          ),
         ],
       ),
     );
   }
 }
 
-/// One of the two buttons under the next stop.
-///
-/// 48 high, because a bus is not a desk. The pair used to be 40, which is under
-/// every platform's floor and well under what a gloved thumb hits at the first
-/// attempt.
-class _Button extends StatelessWidget {
-  const _Button({
-    required this.icon,
-    required this.label,
-    required this.filled,
-    required this.onTap,
-    this.busy = false,
-  });
+class _Stat extends StatelessWidget {
+  const _Stat({required this.value, required this.label, this.color});
 
-  final IconData icon;
+  final String value;
   final String label;
-  final bool filled;
-  final VoidCallback? onTap;
-  final bool busy;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
-    final tint = Role.driver.tint;
-    final off = onTap == null || busy;
-    final ink = filled ? Colors.white : tint;
-
-    return GestureDetector(
-      onTap: busy ? null : onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Opacity(
-        opacity: off ? 0.55 : 1,
-        child: Container(
-          height: 48,
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: filled ? tint : AppTheme.surface,
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: filled ? tint : tint.withValues(alpha: 0.45)),
+    return RichText(
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: color ?? AppTheme.text,
+            ),
           ),
-          child: busy
-              ? SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2.2, color: ink),
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+          TextSpan(
+            text: ' $label',
+            style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) =>
+      Text('·', style: TextStyle(fontSize: 13, color: AppTheme.textFaint));
+}
+
+/* ---------------------------------------------------------------------------
+ * The map, as a strip
+ * ------------------------------------------------------------------------- */
+
+/// The route, small, with the whole map one tap away.
+///
+/// A map is worth having on the screen the driver lives on, but not worth the
+/// half of it the mocked-up panel took: the overlay covered the route it was
+/// describing and repeated the stop named directly underneath it. So the strip
+/// shows the shape of the run and nothing else, and opens the real map — which
+/// already exists, full screen, with its own controls — when touched.
+class _MapStrip extends StatelessWidget {
+  const _MapStrip({
+    required this.stops,
+    required this.leg,
+    required this.terminalStopId,
+  });
+
+  final List<PlannedStop> stops;
+  final String leg;
+  final String? terminalStopId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card16(
+      padding: EdgeInsets.zero,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          children: [
+            SizedBox(
+              height: 140,
+              width: double.infinity,
+              child: IgnorePointer(
+                child: RouteMap(
+                  stops: stops,
+                  tint: Role.driver.tint,
+                  leg: leg,
+                  terminalStopId: terminalStopId,
+                ),
+              ),
+            ),
+            // The whole strip is the target, not a small corner button: this is
+            // pressed one-handed from a driver's seat.
+            Positioned.fill(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => RouteMapScreen(
+                        stops: stops,
+                        tint: Role.driver.tint,
+                        leg: leg,
+                        terminalStopId: terminalStopId,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 10,
+              bottom: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.10),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(icon, size: 16, color: ink),
+                    Icon(Icons.open_in_full_rounded, size: 13, color: Role.driver.tint),
                     const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: ink,
-                        ),
+                    Text(
+                      t('driver.viewFullRoute'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Role.driver.tint,
                       ),
                     ),
                   ],
                 ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -832,8 +795,642 @@ class _Button extends StatelessWidget {
 }
 
 /* ---------------------------------------------------------------------------
- * The four tiles
+ * The stop being worked
  * ------------------------------------------------------------------------- */
+
+/// Where the driver actually does the job.
+///
+/// One card for one stop: which stop, whether the bus has arrived, who is on
+/// it, one tap per child, and the two stop buttons underneath. It replaced a
+/// pair of cards that named the same stop twice with different counts and put
+/// the children on another screen entirely.
+class _CurrentStopCard extends StatefulWidget {
+  const _CurrentStopCard({
+    required this.stop,
+    required this.tripId,
+    required this.leg,
+    required this.busy,
+    required this.running,
+    required this.terminalStopId,
+    required this.schoolReached,
+    required this.onOpen,
+    required this.onChanged,
+    required this.onArrive,
+    required this.onLeave,
+    required this.onSkip,
+  });
+
+  final PlannedStop? stop;
+  final String tripId;
+  final String leg;
+  final bool busy;
+  final bool running;
+  final String? terminalStopId;
+  final bool schoolReached;
+  final VoidCallback onOpen;
+  final VoidCallback onChanged;
+  final VoidCallback? onArrive;
+  final VoidCallback? onLeave;
+  final VoidCallback? onSkip;
+
+  @override
+  State<_CurrentStopCard> createState() => _CurrentStopCardState();
+}
+
+enum _Show { all, toPickUp, aboard, done }
+
+class _CurrentStopCardState extends State<_CurrentStopCard> {
+  _Show _show = _Show.all;
+  String? _busyStudent;
+  Timer? _hold;
+
+  /// How long the bus stands here before it may move on. The stop's own planned
+  /// dwell, which the server derives from the children booked onto it, clamped
+  /// so a one-child stop is not held as long as an eight-child one and no stop
+  /// holds a bus that is ready for longer than is fair. Identical to the rule
+  /// on the run screen: a driver must not be able to dodge the wait by doing
+  /// the same job from the other screen.
+  int get _holdSeconds => (widget.stop?.dwellSeconds ?? 0).clamp(20, 90);
+
+  int get _holdLeft {
+    final s = widget.stop;
+    final at = s?.arrivedAt;
+    if (s == null || at == null || s.departedAt != null) return 0;
+    final left = _holdSeconds - DateTime.now().difference(at).inSeconds;
+    if (left <= 0) return 0;
+    return left > _holdSeconds ? _holdSeconds : left;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _syncHold();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CurrentStopCard old) {
+    super.didUpdateWidget(old);
+    _syncHold();
+  }
+
+  @override
+  void dispose() {
+    _hold?.cancel();
+    super.dispose();
+  }
+
+  void _syncHold() {
+    final wanted = _holdLeft > 0;
+    if (wanted && _hold == null) {
+      _hold = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted) return;
+        setState(() {});
+        if (_holdLeft <= 0) {
+          _hold?.cancel();
+          _hold = null;
+        }
+      });
+    } else if (!wanted && _hold != null) {
+      _hold!.cancel();
+      _hold = null;
+    }
+  }
+
+  /// Board a child, or mark them as not here. The same call the run screen
+  /// makes, including the stop the BUS is at rather than the child's own.
+  Future<void> _mark(RiderOnStop r, String eventType, String label) async {
+    final s = widget.stop;
+    if (s == null) return;
+    setState(() => _busyStudent = r.studentId);
+    try {
+      final verdict = await CrewApi.instance.recordCustody(
+        tripId: widget.tripId,
+        studentId: r.studentId,
+        eventType: eventType,
+        stopId: custodyStopId(
+          leg: widget.leg,
+          eventType: eventType,
+          riderStopId: s.stopId,
+          terminalStopId: widget.terminalStopId,
+        ),
+      );
+      widget.onChanged();
+      if (!mounted) return;
+      // What the SERVER did, not what was asked of it: the batch endpoint
+      // answers 200 even when it rewrote or refused the event inside.
+      showNote(
+        context,
+        verdict.accepted ? label : (verdict.reason ?? label),
+        bad: !verdict.accepted,
+      );
+    } catch (e) {
+      if (mounted) showNote(context, errorText(e), bad: true);
+    } finally {
+      if (mounted) setState(() => _busyStudent = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.stop;
+    final tint = Role.driver.tint;
+
+    if (s == null) {
+      return Card16(
+        padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+        child: Text(
+          t('driver.noStopsLeft'),
+          style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+        ),
+      );
+    }
+
+    final arrived = s.arrivedAt != null;
+    final holdLeft = _holdLeft;
+    final holding = holdLeft > 0;
+
+    final all = s.students;
+    final toPickUp = all.where((r) => !r.accountedFor).toList();
+    final aboard =
+        all.where((r) => r.boardedAt != null && r.alightedAt == null).toList();
+    final done = all.where((r) => r.alightedAt != null).toList();
+    final shown = switch (_show) {
+      _Show.all => all,
+      _Show.toPickUp => toPickUp,
+      _Show.aboard => aboard,
+      _Show.done => done,
+    };
+
+    return Card16(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ---- which stop, and whether the bus is on it -------------------
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color:
+                        arrived ? AppTheme.greenSoft : tint.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Text(
+                    '${s.plannedSequence}',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: arrived ? AppTheme.green : tint,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      if (s.landmark != null && s.landmark!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          s.landmark!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                        ),
+                      ],
+                      const SizedBox(height: 5),
+                      if (arrived)
+                        Row(
+                          children: [
+                            Icon(Icons.check_circle_rounded,
+                                size: 14, color: AppTheme.green),
+                            const SizedBox(width: 5),
+                            Text(
+                              '${t('driver.arrived')} ${hhmm(s.arrivedAt)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.green,
+                              ),
+                            ),
+                          ],
+                        )
+                      else ...[
+                        if (s.etaAt != null) StopEta(stop: s),
+                        if (s.metresAway != null) ...[
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Icon(Icons.place_rounded, size: 12, color: tint),
+                              const SizedBox(width: 4),
+                              Text(
+                                s.metresAway! >= 1000
+                                    ? tn('driver.kmAway',
+                                        (s.metresAway! / 100).round() / 10)
+                                    : tn('driver.metresAway', s.metresAway!),
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: tint,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ],
+                  ),
+                ),
+                if (s.remaining > 0)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppTheme.amberSoft,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      tn('driver.nLeft', s.remaining),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.amber,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // ---- who is on this stop ----------------------------------------
+          if (all.isNotEmpty) ...[
+            SizedBox(
+              height: 38,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                children: [
+                  _Chip(
+                    label: t('driver.filterAll'),
+                    count: all.length,
+                    on: _show == _Show.all,
+                    colour: AppTheme.text,
+                    onTap: () => setState(() => _show = _Show.all),
+                  ),
+                  _Chip(
+                    label: t('driver.toPickUp'),
+                    count: toPickUp.length,
+                    on: _show == _Show.toPickUp,
+                    colour: AppTheme.amber,
+                    onTap: () => setState(() => _show = _Show.toPickUp),
+                  ),
+                  _Chip(
+                    label: t('driver.onBoard'),
+                    count: aboard.length,
+                    on: _show == _Show.aboard,
+                    colour: AppTheme.blue,
+                    onTap: () => setState(() => _show = _Show.aboard),
+                  ),
+                  _Chip(
+                    label: t('driver.dropped'),
+                    count: done.length,
+                    on: _show == _Show.done,
+                    colour: AppTheme.green,
+                    onTap: () => setState(() => _show = _Show.done),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            if (shown.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
+                child: Text(
+                  t('driver.nobodyInFilter'),
+                  style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                ),
+              )
+            else
+              ...shown.map((r) => _StopRider(
+                    rider: r,
+                    leg: widget.leg,
+                    schoolReached: widget.schoolReached,
+                    busy: _busyStudent == r.studentId,
+                    canPickUp: widget.running,
+                    onBoard: () => _mark(r, 'BOARDED', t('driver.onBoard')),
+                    onNoShow: () => _mark(r, 'NO_SHOW', t('driver.notRiding')),
+                  )),
+          ],
+
+          // ---- and the two things to do with the stop itself ---------------
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+            child: Column(
+              children: [
+                if (!arrived) ...[
+                  BigButton(
+                    label: t('driver.arrived'),
+                    color: tint,
+                    busy: widget.busy,
+                    onPressed: widget.onArrive,
+                  ),
+                  // Only before the bus is on the stop: the server refuses a
+                  // skip the instant an arrival is recorded, so offering it
+                  // afterwards is offering a refusal.
+                  if (widget.onSkip != null) ...[
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 42,
+                      child: TextButton.icon(
+                        onPressed: widget.busy ? null : widget.onSkip,
+                        icon: Icon(Icons.skip_next_rounded,
+                            size: 18, color: AppTheme.textMuted),
+                        label: Text(
+                          t('driver.skipStop'),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ] else ...[
+                  BigButton(
+                    label: holding
+                        ? '${t('driver.movingOn')} · ${holdLeft ~/ 60}:${(holdLeft % 60).toString().padLeft(2, '0')}'
+                        : t('driver.movingOn'),
+                    color: AppTheme.blue,
+                    busy: widget.busy,
+                    onPressed: holding ? null : widget.onLeave,
+                  ),
+                  if (holding) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.timer_outlined,
+                            size: 15, color: AppTheme.textMuted),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            t('driver.holdAtStop'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.45,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+                const SizedBox(height: 6),
+                SizedBox(
+                  width: double.infinity,
+                  height: 40,
+                  child: TextButton(
+                    onPressed: widget.onOpen,
+                    child: Text(
+                      t('driver.openRun'),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: tint,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One filter on the stop's roster.
+class _Chip extends StatelessWidget {
+  const _Chip({
+    required this.label,
+    required this.count,
+    required this.on,
+    required this.colour,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final bool on;
+  final Color colour;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 7),
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 13),
+          decoration: BoxDecoration(
+            color: on ? colour : AppTheme.neutralSoft,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            '$label ($count)',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+              color: on ? Colors.white : AppTheme.textMuted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A child on the stop being worked, with the one tap they are owed.
+///
+/// The actions are words, not bare icons: this list is read by somebody who has
+/// glanced up from the road, and a green arrow beside a red cross is two
+/// guesses rather than two answers.
+class _StopRider extends StatelessWidget {
+  const _StopRider({
+    required this.rider,
+    required this.leg,
+    required this.schoolReached,
+    required this.busy,
+    required this.canPickUp,
+    required this.onBoard,
+    required this.onNoShow,
+  });
+
+  final RiderOnStop rider;
+  final String leg;
+  final bool schoolReached;
+  final bool busy;
+  final bool canPickUp;
+  final VoidCallback onBoard;
+  final VoidCallback onNoShow;
+
+  @override
+  Widget build(BuildContext context) {
+    final onBus = rider.boardedAt != null && rider.alightedAt == null;
+    final off = rider.alightedAt != null;
+    final notRiding = !off && !onBus && rider.notTravelling;
+
+    final String status;
+    final Color tone;
+    if (off) {
+      status =
+          '${leg == 'OUT' ? (schoolReached ? t('driver.atSchool') : t('driver.setDownEarly')) : t('driver.handedOver')} ${hhmm(rider.alightedAt)}';
+      tone = leg == 'OUT' && !schoolReached ? AppTheme.amber : AppTheme.green;
+    } else if (onBus) {
+      status = tn('driver.onBoardSince', hhmm(rider.boardedAt));
+      tone = AppTheme.blue;
+    } else if (notRiding) {
+      status = t('driver.notRiding');
+      tone = AppTheme.rose;
+    } else {
+      status = t('driver.waitingAtStop');
+      tone = AppTheme.textMuted;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: off
+                  ? AppTheme.greenSoft
+                  : onBus
+                      ? AppTheme.blueSoft
+                      : notRiding
+                          ? AppTheme.roseSoft
+                          : AppTheme.neutralSoft,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              rider.seatNumber ?? '—',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: off
+                    ? AppTheme.green
+                    : onBus
+                        ? AppTheme.blue
+                        : notRiding
+                            ? AppTheme.rose
+                            : AppTheme.textMuted,
+              ),
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  rider.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(status, style: TextStyle(fontSize: 11.5, color: tone)),
+              ],
+            ),
+          ),
+          if (busy)
+            const SizedBox(
+                width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+          // Nothing left to offer once the child is settled: off the bus is the
+          // end of it, and a second "not here" on a child already marked not
+          // here is the tap that taught drivers this screen ignores them.
+          else if (!off && !onBus) ...[
+            _Word(
+              label: t('driver.pickUp'),
+              colour: AppTheme.green,
+              onTap: canPickUp ? onBoard : null,
+            ),
+            if (!notRiding) ...[
+              const SizedBox(width: 6),
+              _Word(
+                label: t('driver.notHere'),
+                colour: AppTheme.rose,
+                onTap: canPickUp ? onNoShow : null,
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A labelled action on a rider's row. 44 high, because it is pressed standing
+/// in an aisle, one-handed, often with the child already in front of you.
+class _Word extends StatelessWidget {
+  const _Word({required this.label, required this.colour, required this.onTap});
+
+  final String label;
+  final Color colour;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final dead = onTap == null;
+    final tone = dead ? AppTheme.textFaint : colour;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        height: 44,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 13),
+        decoration: BoxDecoration(
+          color: tone.withValues(alpha: dead ? 0.07 : 0.12),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          style:
+              TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: tone),
+        ),
+      ),
+    );
+  }
+}
 
 class _ActionTile extends StatelessWidget {
   const _ActionTile({
