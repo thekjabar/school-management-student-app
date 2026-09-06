@@ -1020,8 +1020,19 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
         : done
             ? null
             : '${pin.order}';
+    // Drawn at DEVICE pixels, not logical ones.
+    //
+    // A point annotation's image is placed pixel for pixel on the screen, with
+    // no scaling for the display's density — unlike a widget, which Flutter
+    // lays out in logical points. So a 40-point pin rasterised at 40 pixels
+    // came out at 40 physical pixels, which on a 3x phone is thirteen points:
+    // a third of the size, and far too small to press. It is drawn at
+    // size × ratio and shown at 1:1, which lands at the size it was designed
+    // for and stays sharp on a dense screen into the bargain.
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+
     final key = '${fill.toARGB32()}:${ink.toARGB32()}:$size:${pin.school}:$done:'
-        '${pin.next}:${label ?? ''}';
+        '${pin.next}:${label ?? ''}:$dpr';
     final cached = _images[key];
     if (cached != null) return cached;
 
@@ -1032,6 +1043,9 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
+    // Everything below is written in logical points; the canvas scales them up
+    // to the display's pixels once, here.
+    canvas.scale(dpr);
 
     if (pin.next) {
       canvas.drawCircle(
@@ -1104,7 +1118,10 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
     );
 
     final picture = recorder.endRecording();
-    final image = await picture.toImage(canvasSize.round(), canvasSize.round());
+    final image = await picture.toImage(
+      (canvasSize * dpr).round(),
+      (canvasSize * dpr).round(),
+    );
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     final out = bytes!.buffer.asUint8List();
     _images[key] = out;
