@@ -47,6 +47,21 @@ dependencies:
   # even ask whether a browser exists.
   url_launcher: ^6.3.1
   shared_preferences: ^2.3.3
+
+  # The Keystore, for the three things on this handset that are worth stealing:
+  # the access token, the rotating refresh token, and the /auth/me payload —
+  # which carries the crew member's name, their phone number, their tenants and
+  # their whole permission list.
+  #
+  # shared_preferences is a world-readable-to-backup XML file in the app's data
+  # directory. It is not readable by another app, but it IS carried off the
+  # handset by Android cloud backup and by device-to-device transfer, so a
+  # driver's tokens travelled to whatever phone they next set up — and to
+  # Google's servers on the way. This puts them in EncryptedSharedPreferences
+  # behind a Keystore key that cannot leave the device, and the manifest now
+  # refuses backup as well, so neither route exists any more.
+  flutter_secure_storage: ^10.0.0
+
   intl: ^0.20.2
 
   # Push, through OneSignal rather than FCM directly: a large share of handsets

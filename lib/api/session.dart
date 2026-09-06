@@ -42,6 +42,8 @@ class Me {
     required this.memberships,
     required this.active,
     this.locale,
+    this.pushIdentityToken,
+    this.passwordMustChange = false,
   });
 
   final String id;
@@ -51,11 +53,34 @@ class Me {
   final List<Membership> memberships;
   final Membership active;
 
+  /// The server's proof that this handset really is this person, for the push
+  /// provider — or null on a build of identity-service that does not mint one
+  /// yet.
+  ///
+  /// A Person id is not secret: it is in this very payload and in every portal
+  /// person listing. While the app claimed a push alias with the id alone,
+  /// anyone holding one could register their own handset under it and be sent
+  /// every notice that person is sent, including the boarded and set-down
+  /// messages that name the child, the stop and the minute. This is what makes
+  /// the claim checkable. Null is handled by not claiming anything at all —
+  /// see [Push.identify].
+  final String? pushIdentityToken;
+
   /// The language the SERVER will write this person's notifications in, as a
   /// `Locale` name (CKB/KMR/AR/EN), or null on a payload from an older build.
   /// Compared against the phone's own setting on start-up so a mismatch can be
   /// corrected without a write on every launch.
   final String? locale;
+
+  /// This password was issued by the office and has to be changed before the
+  /// rest of the app will answer.
+  ///
+  /// The server enforces it now — every route outside the change-password
+  /// screen and the four sign-in routes refuses with `PASSWORD_CHANGE_REQUIRED`
+  /// — so the app has to be able to see it on a cold start, not only in the
+  /// sign-in reply. A restored session that ignored this would draw the normal
+  /// screens and then fail on all of them.
+  final bool passwordMustChange;
 
   String get role => active.role;
   String get schoolName => active.tenantName;
@@ -79,6 +104,20 @@ class Me {
       phone: (person['phoneE164'] ?? '') as String,
       phoneVerified: (person['phoneVerified'] ?? false) as bool,
       locale: person['locale'] as String?,
+      // Read from either place. identity-service sends it at the top of the
+      // envelope; accepting it beside the person too costs nothing and means a
+      // later move does not silently stop delivering push to every family while
+      // looking exactly like a server that had not been updated.
+      pushIdentityToken: (j['pushIdentityToken'] ?? person['pushIdentityToken'])
+          as String?,
+      // The office issued this password and the server now REFUSES everything
+      // else until it is changed. Carried on /auth/me and not only on the
+      // sign-in reply, because a cold start restores the token from storage and
+      // never passes through sign-in — without it the app would draw its normal
+      // screens and every one of them would fail.
+      passwordMustChange:
+          ((j['blockers'] as Map<String, dynamic>?)?['passwordMustChange'] ??
+              false) as bool,
       memberships: memberships,
       active: Membership(
         tenantId: active['tenantId'] as String,
@@ -112,6 +151,15 @@ class Session {
   Session._();
 
   static final Session instance = Session._();
+
+  /// Why the last sign-out happened, when the reason is worth saying.
+  ///
+  /// A restored session on an office-issued password has to go back to the
+  /// front door: the change-password step needs the number and the temporary
+  /// password typed into the sign-in form, and a cold start has neither. Being
+  /// returned to sign-in with no explanation reads as the app having broken, so
+  /// the login screen picks this up, says what happened, and clears it.
+  static bool passwordChangeRequired = false;
 
   Me? _me;
   Me? get me => _me;
@@ -151,8 +199,9 @@ class Session {
       throw ApiException('Signed in, but your account could not be loaded.', 500);
     }
     // Tie the handset to this person so the server can address them by our own
-    // id rather than by a device token that changes on every reinstall.
-    await Push.identify(me.id);
+    // id rather than by a device token that changes on every reinstall. The
+    // claim carries the server's proof, because the id on its own is public.
+    await Push.identify(me.id, identityToken: me.pushIdentityToken);
     return SignInResult(
       me: me,
       mustChangePassword: (body['mustChangePassword'] ?? false) as bool,
@@ -186,7 +235,7 @@ class Session {
     await _api.saveMe(jsonEncode(json));
     // Also here, not only in signIn: a session restored from disk on a cold
     // start never passes through signIn, and would be subscribed to nothing.
-    await Push.identify(_me!.id);
+    await Push.identify(_me!.id, identityToken: _me!.pushIdentityToken);
     // Same reasoning for the language: a phone that was switched to English
     // while signed in, or signed in long before this existed, would otherwise
     // keep being sent Kurdish notifications. Writes nothing when they agree.

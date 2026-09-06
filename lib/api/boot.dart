@@ -100,6 +100,17 @@ class Boot {
       return const BootState(me: null, offline: true);
     }
     if (me == null) return const BootState(me: null);
+    if (me.passwordMustChange) {
+      // Signed in, but on a password the office issued — and the server now
+      // refuses everything except the change-password route until it is
+      // replaced. Drawing the app would give a driver a home screen whose every
+      // call fails. Sign-in is the screen that can actually fix it, because the
+      // change-password step needs the number and the temporary password typed
+      // into that form.
+      Session.passwordChangeRequired = true;
+      await Session.instance.signOut();
+      return const BootState(me: null);
+    }
 
     return BootState(me: me);
   }
@@ -122,7 +133,19 @@ class Boot {
     // session down by this point; this covers the case where a renewal
     // succeeded and the account was still refused, which leaves the tokens in
     // place and every later call failing silently.
-    if (me == null) await Session.instance.signOut();
+    if (me == null) {
+      await Session.instance.signOut();
+      return;
+    }
+
+    // Same case as the cold path above, reached the other way: the app was
+    // drawn from what the phone remembered and the confirmation behind it says
+    // this password has to be changed first. Every screen already open would
+    // fail on its next call, so drop to sign-in and say why.
+    if (me.passwordMustChange) {
+      Session.passwordChangeRequired = true;
+      await Session.instance.signOut();
+    }
   }
 
   /// Only for tests, which must not inherit a previous test's boot.

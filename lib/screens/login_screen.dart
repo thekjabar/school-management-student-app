@@ -61,6 +61,14 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     // Named up front rather than discovered by failing.
     if (widget.offline) _error = t('common.offline');
+    // Boot sent them back here because the server refuses everything on an
+    // office-issued password until it is changed, and the change-password step
+    // needs the two fields on this form. Say so, and consume the flag so it
+    // does not reappear on the next visit to this screen.
+    if (Session.passwordChangeRequired) {
+      Session.passwordChangeRequired = false;
+      _error = t('login.mustChangeAgain');
+    }
     _phone.addListener(() => setState(() {}));
   }
 

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Nothing this app stores may leave the handset.
+
+  android:allowBackup="false" in the manifest is the Android 11 and earlier
+  half of this, and on Android 12 and later it only stops CLOUD backup —
+  device-to-device transfer, the flow every shop runs when it sells somebody a
+  new phone, still copies the whole data directory unless it is refused here.
+  That directory held a crew member's tokens and their /auth/me payload in a
+  plain XML file, and it still holds the encrypted store, the cached identity
+  and the language setting.
+
+  The tokens themselves have since moved into the Keystore (see
+  lib/api/client.dart), whose keys cannot leave the device at all — so a copy of
+  the encrypted file is worthless on the receiving phone. Refusing the copy is
+  the other side of the same door: the restored install must sign in, rather
+  than arrive holding an unreadable store the plugin would then have to reset.
+
+  Every domain is named rather than relying on "root" alone, because the
+  device_* domains are device-protected storage and are NOT covered by it.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+        <exclude domain="device_root" />
+        <exclude domain="device_file" />
+        <exclude domain="device_database" />
+        <exclude domain="device_sharedpref" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+        <exclude domain="device_root" />
+        <exclude domain="device_file" />
+        <exclude domain="device_database" />
+        <exclude domain="device_sharedpref" />
+    </device-transfer>
+</data-extraction-rules>

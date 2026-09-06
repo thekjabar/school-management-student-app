@@ -53,9 +53,30 @@
     -->
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
 
+    <!--
+      This handset carries a crew member's session and, through it, forty
+      children's names, faces and home pins. None of that may be copied off it.
+
+      allowBackup defaults to TRUE when it is not written down, and that default
+      is what carried the access token, the rotating refresh token and the whole
+      /auth/me payload — name, phone number, tenants, permission list — into
+      Google's cloud backup and onto whatever phone the driver set up next, out
+      of the plain preferences file they used to live in. Those three have since
+      moved into the Keystore (lib/api/client.dart), so a stolen copy of the
+      file would be unreadable; this stops the copy being taken at all, which is
+      the control the platform gives us and costs nothing — there is nothing in
+      this app worth restoring. Signing in again takes a phone number and a
+      password.
+
+      dataExtractionRules is the same refusal for Android 12 and later, where
+      allowBackup no longer covers device-to-device transfer. Both are needed:
+      the fleet these ship to spans Android 8 to 15.
+    -->
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"

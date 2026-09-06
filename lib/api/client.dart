@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import '../i18n/strings.dart';
@@ -91,6 +93,107 @@ class ApiClient {
   /// what to draw while the server is out of reach.
   static const _meKey = 'sm_me';
 
+  /// The keys that are secrets, as against settings.
+  ///
+  /// Kept as one list because all three move together: they are written to the
+  /// Keystore, they are migrated out of the old preferences file together, and
+  /// on sign-out they are erased from both places together. `_tenantKey` is
+  /// deliberately NOT here — which school a session is acting for is a setting,
+  /// it is worth nothing to anyone who reads it, and leaving it in plain
+  /// preferences keeps the ordinary path off the Keystore.
+  static const List<String> _secretKeys = [_tokenKey, _refreshKey, _meKey];
+
+  /// Where the secrets actually live: EncryptedSharedPreferences behind an
+  /// Android Keystore key on Android, the Keychain on iOS.
+  ///
+  /// These three were in plain `shared_preferences`, which is an XML file in
+  /// the app's data directory. No other app can read it — but Android cloud
+  /// backup and device-to-device transfer copy that directory wholesale, so a
+  /// crew member's access token, their rotating refresh token and their entire
+  /// /auth/me payload (name, phone number, tenants, permission list) left the
+  /// handset with the backup and arrived on whatever phone they set up next.
+  /// This is the handset that carries forty children's names, faces and home
+  /// pins. The manifest now also refuses backup outright, so the file that is
+  /// left behind carries nothing worth taking either way.
+  ///
+  /// `resetOnError` is the plugin's default and is kept: a Keystore that has
+  /// been invalidated (a factory reset restore, a lock-screen change on some
+  /// OEM builds) then reads as empty rather than throwing, and the person signs
+  /// in again — which is the correct outcome and not a crash on start-up.
+  static const FlutterSecureStorage _secure = FlutterSecureStorage(
+    aOptions: AndroidOptions(),
+    // Not `unlocked`: the app is opened at 06:40 by a driver whose phone has
+    // just come off charge, and the Keychain item has to be readable from the
+    // first unlock of the day rather than only while the screen is live.
+    // `_this_device` keeps it out of iCloud Keychain, which is the iOS half of
+    // the same backup problem this whole change is about.
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock_this_device,
+    ),
+  );
+
+  /// Runs once per launch, before anything reads a secret.
+  ///
+  /// An install that is being UPGRADED still has its tokens in the old
+  /// preferences file, and a driver halfway through a morning run must not be
+  /// silently signed out by the upgrade that fixed this. So the old values are
+  /// carried across on first run and only then deleted.
+  Future<void>? _migrating;
+
+  Future<void> _migrateLegacySecrets() => _migrating ??= () async {
+        final prefs = await SharedPreferences.getInstance();
+        for (final key in _secretKeys) {
+          final legacy = prefs.getString(key);
+          if (legacy == null) continue;
+          try {
+            // A value already in the Keystore is the newer one — this handset
+            // has migrated before and the preferences copy is a leftover from a
+            // write that failed to delete. Copying the old one over it would
+            // hand back a spent refresh token, which the server reads as theft
+            // and answers by revoking the whole family.
+            if (await _secure.read(key: key) == null) {
+              await _secure.write(key: key, value: legacy);
+            }
+          } catch (e) {
+            // The Keystore refused. The plaintext copy STAYS: erasing it here
+            // would sign out a driver mid-route to fix a privacy problem, which
+            // is the wrong trade in the middle of a run. The next launch tries
+            // again, and until then the session still works.
+            debugPrint('client: could not migrate $key to secure storage: $e');
+            return;
+          }
+          await prefs.remove(key);
+        }
+      }();
+
+  /// Read one secret, treating an unavailable Keystore as "nothing stored".
+  ///
+  /// Never rethrows. This runs inside start-up, and a handset whose Keystore is
+  /// in a state the plugin cannot use has to reach the sign-in screen rather
+  /// than the crash reporter.
+  Future<String?> _readSecret(String key) async {
+    try {
+      return await _secure.read(key: key);
+    } catch (e) {
+      debugPrint('client: could not read $key from secure storage: $e');
+      return null;
+    }
+  }
+
+  /// Write one secret, or carry on without it.
+  ///
+  /// A failure here costs the session at the NEXT cold start, not this one:
+  /// the token is already in memory and every request keeps working. That is
+  /// the milder failure, and much milder than throwing out of sign-in and
+  /// telling a driver at the bus that a password that was right was wrong.
+  Future<void> _writeSecret(String key, String value) async {
+    try {
+      await _secure.write(key: key, value: value);
+    } catch (e) {
+      debugPrint('client: could not write $key to secure storage: $e');
+    }
+  }
+
   final http.Client _http = http.Client();
 
   String? _access;
@@ -106,9 +209,12 @@ class ApiClient {
   /// not be asked again on the second — a login screen at 06:40 with cold hands
   /// is how people end up sharing accounts.
   Future<void> restore() async {
+    // Before the first read, so an upgrade finds its own tokens where it left
+    // them rather than finding nothing and dropping to the login screen.
+    await _migrateLegacySecrets();
     final prefs = await SharedPreferences.getInstance();
-    _access = prefs.getString(_tokenKey);
-    _refresh = prefs.getString(_refreshKey);
+    _access = await _readSecret(_tokenKey);
+    _refresh = await _readSecret(_refreshKey);
     _tenantId = prefs.getString(_tenantKey);
   }
 
@@ -121,22 +227,24 @@ class ApiClient {
     if (refresh != null) _refresh = refresh;
     if (tenantId != null) _tenantId = tenantId;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, access);
-    if (refresh != null) await prefs.setString(_refreshKey, refresh);
-    if (tenantId != null) await prefs.setString(_tenantKey, tenantId);
+    await _writeSecret(_tokenKey, access);
+    if (refresh != null) await _writeSecret(_refreshKey, refresh);
+    if (tenantId != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_tenantKey, tenantId);
+    }
   }
 
   /// Store the identity payload as it arrived, to be replayed offline.
-  Future<void> saveMe(String json) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_meKey, json);
-  }
+  Future<void> saveMe(String json) => _writeSecret(_meKey, json);
 
   /// The last identity this phone saw, or null on a fresh install.
   Future<String?> loadMe() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_meKey);
+    // Also migrated here and not only in [restore]: nothing in the language
+    // makes restore() run first, and a build that read this before the
+    // migration would show an upgrading driver a login screen.
+    await _migrateLegacySecrets();
+    return _readSecret(_meKey);
   }
 
   /// Record which school this session is acting for, without touching the token.
@@ -151,12 +259,22 @@ class ApiClient {
     _refresh = null;
     _tenantId = null;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_tokenKey);
-    await prefs.remove(_refreshKey);
     await prefs.remove(_tenantKey);
-    // Goes with the tokens. Left behind, the next person to open this handset
-    // would be greeted by the last one's name.
-    await prefs.remove(_meKey);
+    for (final key in _secretKeys) {
+      // The Keystore first — that is where they live now. The _meKey goes with
+      // the tokens: left behind, the next person to open this handset would be
+      // greeted by the last one's name.
+      try {
+        await _secure.delete(key: key);
+      } catch (e) {
+        debugPrint('client: could not clear $key from secure storage: $e');
+      }
+      // And the old plaintext copy as well, unconditionally. On a handset whose
+      // Keystore refused the migration the secret is still sitting in the
+      // preferences file, and signing out has to erase it wherever it is —
+      // phones are shared here, one handset between two parents.
+      await prefs.remove(key);
+    }
   }
 
   /// Fires when the session ends for good, so the app can return to sign-in

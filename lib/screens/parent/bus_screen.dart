@@ -120,6 +120,31 @@ class _BusScreenState extends State<BusScreen> {
                     );
                   }
 
+                  // A safeguarding or court order stops THIS adult seeing where
+                  // this child is. The server has already nulled the stops, the
+                  // times and the collector, so drawing the normal screen would
+                  // show a map with nothing on it and a route card full of
+                  // blanks — which reads as a broken app and sends somebody to
+                  // the office to report a fault instead of telling them
+                  // anything true.
+                  //
+                  // Say that the school is holding it, and stop. Never why, and
+                  // never who asked for it: that belongs to the safeguarding
+                  // case, and this screen is open in front of the person the
+                  // order is about.
+                  if (bus.transport.locationHidden) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 50),
+                      child: Center(
+                        child: Text(
+                          t('bus.locationHidden'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                        ),
+                      ),
+                    );
+                  }
+
                   final trip = bus.run;
                   WidgetsBinding.instance.addPostFrameCallback((_) => _frame(bus));
 

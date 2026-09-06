@@ -211,6 +211,8 @@ const Map<String, String> _en = {
   'login.rule': 'At least eight characters, with a letter and a number.',
   'login.tooShort': 'Use at least eight characters.',
   'login.mismatch': 'Those two do not match.',
+  'login.mustChangeAgain':
+      'This password was given to you by the school. Sign in with it once more and you will be asked to choose your own.',
   'login.saveContinue': 'Save and continue',
 
   // Navigation
@@ -703,6 +705,8 @@ const Map<String, String> _en = {
   'bus.atSchool': 'At school',
   'bus.handedOver': 'Handed over',
   'bus.notOnBus': '{n} is not on a school bus.',
+  'bus.locationHidden':
+      'The school is keeping this journey private. Please speak to the school office.',
   'bus.askOffice': 'If that is wrong, the school office can add them to a route.',
   'bus.dropElsewhere': 'Drop off somewhere else',
   'bus.usuallyAt': 'Usually dropped at {n}',
@@ -1722,6 +1726,8 @@ const Map<String, String> _ckb = {
   'login.rule': 'لانیکەم هەشت پیت، بە پیتێک و ژمارەیەکەوە.',
   'login.tooShort': 'لانیکەم هەشت پیت بەکاربهێنە.',
   'login.mismatch': 'ئەو دووانە وەک یەک نین.',
+  'login.mustChangeAgain':
+      'ئەم وشەی نهێنییە قوتابخانە پێیداویت. جارێکی تر پێی بچۆرە ژوورەوە، ئینجا داوات لێدەکرێت وشەیەکی نهێنی خۆت هەڵبژێریت.',
   'login.saveContinue': 'پاشەکەوتکردن و بەردەوامبوون',
 
   'nav.home': 'سەرەکی',
@@ -2174,6 +2180,8 @@ const Map<String, String> _ckb = {
   'bus.atSchool': 'لە قوتابخانە',
   'bus.handedOver': 'تەسلیمکرا',
   'bus.notOnBus': '{n} لەسەر پاسی قوتابخانە نییە.',
+  'bus.locationHidden':
+      'قوتابخانە زانیاری ئەم گەشتە بە نهێنی دەپارێزێت. تکایە لەگەڵ نووسینگەی قوتابخانە بدوێ.',
   'bus.askOffice': 'ئەگەر ئەمە هەڵەیە، نووسینگەی قوتابخانە دەتوانێت زیادی بکات بۆ ڕێڕەوێک.',
   'bus.dropElsewhere': 'دابەزاندن لە شوێنێکی تر',
   'bus.usuallyAt': 'بەزۆری لە {n} دادەبەزێت',
@@ -3182,6 +3190,8 @@ const Map<String, String> _ar = {
   'login.rule': 'ثمانية أحرف على الأقل، مع حرف ورقم.',
   'login.tooShort': 'استخدم ثمانية أحرف على الأقل.',
   'login.mismatch': 'الكلمتان غير متطابقتين.',
+  'login.mustChangeAgain':
+      'هذه كلمة المرور أعطتها لك المدرسة. سجّل الدخول بها مرة أخرى وسيُطلب منك اختيار كلمة مرور خاصة بك.',
   'login.saveContinue': 'حفظ ومتابعة',
 
   'nav.home': 'الرئيسية',
@@ -3631,6 +3641,8 @@ const Map<String, String> _ar = {
   'bus.atSchool': 'في المدرسة',
   'bus.handedOver': 'تم التسليم',
   'bus.notOnBus': '{n} ليس على حافلة المدرسة.',
+  'bus.locationHidden':
+      'المدرسة تحتفظ بتفاصيل هذه الرحلة بصورة خاصة. يُرجى التحدث إلى إدارة المدرسة.',
   'bus.askOffice': 'إذا كان هذا خطأ، يمكن لمكتب المدرسة إضافته إلى مسار.',
   'bus.dropElsewhere': 'التنزيل في مكان آخر',
   'bus.usuallyAt': 'يُنزَّل عادة في {n}',

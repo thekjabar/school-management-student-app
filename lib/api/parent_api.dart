@@ -1379,6 +1379,7 @@ class TransportInfo {
     required this.dropoffStopName,
     required this.dropoffLandmark,
     required this.today,
+    this.locationHidden = false,
   });
 
   final bool ridesTheBus;
@@ -1390,6 +1391,17 @@ class TransportInfo {
   final String? dropoffStopName;
   final String? dropoffLandmark;
   final List<TripToday> today;
+
+  /// A court or safeguarding order stops THIS adult seeing where this child is.
+  ///
+  /// The server nulls the stops, the landmarks, the boarding and setting-down
+  /// times and the collector rather than refusing the whole call, so without
+  /// reading this the screen simply draws itself empty — which looks like a
+  /// fault, sends the parent to the school to report a broken app, and tells
+  /// them nothing. The flag is what lets the screen say the school is holding
+  /// this information and who to speak to. It says nothing about WHY, and it
+  /// must not: the reason is the safeguarding case.
+  final bool locationHidden;
 
   factory TransportInfo.fromJson(Map<String, dynamic> j) {
     final route = j['route'] as Map<String, dynamic>?;
@@ -1407,6 +1419,7 @@ class TransportInfo {
       today: ((j['today'] as List?) ?? [])
           .map((e) => TripToday.fromJson(e as Map<String, dynamic>))
           .toList(),
+      locationHidden: (j['locationHidden'] ?? false) as bool,
     );
   }
 }
