@@ -12,6 +12,7 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
 import '../../ui/screen_kit.dart';
+import '../../ui/sheets.dart';
 import 'teacher_kit.dart';
 
 /// A teacher's classes, and the register for one of them.
@@ -1055,6 +1056,21 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
   final _loaderKey = GlobalKey<LoaderState<List<ClassStudent>>>();
   final _search = TextEditingController();
 
+  /// Write down what a child did.
+  ///
+  /// The class this is recorded against is the slot the teacher opened the
+  /// roster from, so the office sees which lesson it happened in without the
+  /// teacher having to say.
+  Future<void> _recordBehaviour(BuildContext context, ClassStudent student) async {
+    final saved = await showAppSheet<bool>(
+      context,
+      builder: (_) => BehaviourSheet(student: student, classId: widget.slot.classId),
+    );
+    if (saved == true && context.mounted) {
+      showNote(context, t('behaviour.saved'));
+    }
+  }
+
   /// The roster as it arrived, already ordered.
   ///
   /// Held here as well as inside the loader because the header counts it, and
@@ -1372,7 +1388,15 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
                               itemCount: rows.length,
                               itemBuilder: (context, i) => Padding(
                                 padding: const EdgeInsets.only(bottom: kCardGap),
-                                child: _RosterRow(student: rows[i]),
+                                child: _RosterRow(
+                                  student: rows[i],
+                                  // The roster is the only screen in this app
+                                  // that lists a class by name with nothing to
+                                  // do to any of them. Recording what a child
+                                  // did belongs exactly here — one tap from the
+                                  // list a teacher already has open.
+                                  onTap: () => _recordBehaviour(context, rows[i]),
+                                ),
                               ),
                             ),
                           const SliverToBoxAdapter(child: SizedBox(height: 16)),
@@ -1631,13 +1655,15 @@ class _RosterHeadings extends StatelessWidget {
 
 /// One child on the roster.
 class _RosterRow extends StatelessWidget {
-  const _RosterRow({required this.student});
+  const _RosterRow({required this.student, this.onTap});
 
   final ClassStudent student;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Card16(
+      onTap: onTap,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       child: Row(
         children: [
@@ -1699,6 +1725,353 @@ class _RosterRow extends StatelessWidget {
             style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Write down what a child did.
+///
+/// The last missing side of a feature that was otherwise finished. Teachers
+/// hold `academic.behavior.write`, the service has served the whole behaviour
+/// surface since it was built, the console has a page for it, and the PARENT
+/// app already displays these records — so the family's screen was fed by
+/// records the person best placed to write them could not write.
+///
+/// TWO DECISIONS, AND ONLY TWO. What kind of thing it was, and whether the
+/// family sees it. Everything else on the server's DTO — category, points,
+/// incident links — is either optional or belongs to the office, and a form
+/// with seven fields is one a teacher fills in for the first child and never
+/// again.
+///
+/// Telling the family is deliberately a separate, explicit switch, off by
+/// default, and it says what it costs: the server publishes immediately and
+/// then REFUSES to let the record be edited, because a parent has read it and
+/// quietly rewording it afterwards is how a behaviour log stops being evidence
+/// of anything.
+class BehaviourSheet extends StatefulWidget {
+  const BehaviourSheet({super.key, required this.student, required this.classId});
+
+  final ClassStudent student;
+  final String? classId;
+
+  @override
+  State<BehaviourSheet> createState() => _BehaviourSheetState();
+}
+
+class _BehaviourSheetState extends State<BehaviourSheet> {
+  /// MERIT or CONCERN. INCIDENT is the third kind the server accepts and is
+  /// deliberately not offered: an incident is a safeguarding record with its
+  /// own process and its own screen in the console, and a teacher reaching for
+  /// it from a class list is a teacher filing the wrong kind of thing.
+  String _kind = 'MERIT';
+  String? _category;
+  final _note = TextEditingController();
+  bool _tellFamily = false;
+  bool _busy = false;
+  String? _error;
+
+  /// The categories that belong to each kind. Showing "bullying" under a merit
+  /// is how a form teaches people it was not written for them.
+  static const _merit = ['ACADEMIC_EFFORT', 'ACADEMIC_EXCELLENCE', 'HELPFULNESS', 'ATTENDANCE'];
+  static const _concern = [
+    'DISRUPTION',
+    'HOMEWORK',
+    'UNIFORM',
+    'DISRESPECT',
+    'PHONE_OR_DEVICE',
+    'BUS_CONDUCT',
+    'PROPERTY_DAMAGE',
+    'BULLYING',
+    'VIOLENCE',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _note.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await TeacherApi.instance.recordBehaviour(
+        studentId: widget.student.studentId,
+        kind: _kind,
+        classId: widget.classId,
+        category: _category,
+        // Signed, as the server expects: a merit adds, a concern takes away. A
+        // house total that cannot go down is not a points system.
+        points: _kind == 'MERIT' ? 1 : -1,
+        note: _note.text,
+        visibleToGuardian: _tellFamily,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) setState(() => _error = errorText(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = Role.teacher.tint;
+    final inset = MediaQuery.of(context).viewInsets.bottom;
+    final merit = _kind == 'MERIT';
+    final colour = merit ? AppTheme.green : AppTheme.amber;
+    final categories = merit ? _merit : _concern;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: inset),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                widget.student.name,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  color: AppTheme.text,
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _KindTile(
+                      label: t('behaviour.merit'),
+                      icon: Icons.star_rounded,
+                      colour: AppTheme.green,
+                      on: merit,
+                      // Clearing the category is not tidiness: the two lists do
+                      // not overlap, and keeping "bullying" selected while the
+                      // kind flips to a merit would send exactly that.
+                      onTap: () => setState(() {
+                        _kind = 'MERIT';
+                        _category = null;
+                      }),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _KindTile(
+                      label: t('behaviour.concern'),
+                      icon: Icons.error_outline_rounded,
+                      colour: AppTheme.amber,
+                      on: !merit,
+                      onTap: () => setState(() {
+                        _kind = 'CONCERN';
+                        _category = null;
+                      }),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              Text(
+                t('behaviour.what'),
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                  color: AppTheme.textMuted,
+                ),
+              ),
+              const SizedBox(height: 9),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final c in categories)
+                    InkWell(
+                      onTap: () => setState(() => _category = _category == c ? null : c),
+                      borderRadius: BorderRadius.circular(999),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: _category == c
+                              ? colour.withValues(alpha: 0.12)
+                              : AppTheme.canvas,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: _category == c ? colour : AppTheme.border,
+                            width: _category == c ? 1.4 : 1,
+                          ),
+                        ),
+                        child: Text(
+                          t('behaviour.cat.$c'),
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: _category == c ? FontWeight.w700 : FontWeight.w500,
+                            color: _category == c ? colour : AppTheme.text,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              TextField(
+                controller: _note,
+                maxLines: 3,
+                maxLength: 2000,
+                textCapitalization: TextCapitalization.sentences,
+                style: TextStyle(fontSize: 14, color: AppTheme.text),
+                decoration: InputDecoration(
+                  hintText: t('behaviour.noteHint'),
+                  counterText: '',
+                  filled: true,
+                  fillColor: AppTheme.canvas,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: AppTheme.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: AppTheme.border),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+
+              // The consequential switch, and it says what it costs.
+              SwitchListTile.adaptive(
+                value: _tellFamily,
+                onChanged: (v) => setState(() => _tellFamily = v),
+                activeThumbColor: tint,
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  t('behaviour.tellFamily'),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.text,
+                  ),
+                ),
+                subtitle: Text(
+                  _tellFamily
+                      ? t('behaviour.tellFamilyOn')
+                      : t('behaviour.tellFamilyOff'),
+                  style: TextStyle(fontSize: 11.5, height: 1.4, color: AppTheme.textMuted),
+                ),
+              ),
+
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _error!,
+                  style: TextStyle(fontSize: 12.5, height: 1.35, color: AppTheme.rose),
+                ),
+              ],
+
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton(
+                  onPressed: _busy ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colour,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  ),
+                  child: _busy
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                        )
+                      : Text(
+                          t('behaviour.save'),
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _KindTile extends StatelessWidget {
+  const _KindTile({
+    required this.label,
+    required this.icon,
+    required this.colour,
+    required this.on,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color colour;
+  final bool on;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: on ? colour.withValues(alpha: 0.12) : AppTheme.canvas,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: on ? colour : AppTheme.border, width: on ? 1.5 : 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 19, color: on ? colour : AppTheme.textMuted),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: on ? FontWeight.w800 : FontWeight.w600,
+                color: on ? colour : AppTheme.text,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

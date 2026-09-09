@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import '../i18n/strings.dart';
+import 'attachments.dart';
 import 'client.dart';
 
 /// One child on this guardian's account.
@@ -2192,9 +2193,9 @@ class ParentApi {
   /// HOW MANY there are, which is all that is needed to decide whether to offer
   /// the button, and pulling every attachment of every announcement on every
   /// open would be a great deal of work for the few that are ever tapped.
-  Future<List<AnnouncementFile>> announcementAttachments(String id) async {
+  Future<List<AttachedFile>> announcementAttachments(String id) async {
     final json = await _api.get('/parent/announcements/$id/attachments?pageSize=50');
-    return Paged.from<AnnouncementFile>(json, AnnouncementFile.fromJson).rows;
+    return Paged.from<AttachedFile>(json, AttachedFile.fromJson).rows;
   }
 
   /// Mark every notice this guardian can see as read.
@@ -2351,61 +2352,6 @@ class ParentApi {
 }
 
 /// A notice from the school office.
-/// One file the school attached to a notice.
-class AnnouncementFile {
-  AnnouncementFile({
-    required this.id,
-    required this.caption,
-    required this.url,
-    required this.thumbnailUrl,
-    required this.kind,
-    required this.mime,
-    required this.bytes,
-    required this.filename,
-  });
-
-  final String id;
-  final String? caption;
-
-  /// Where the file actually is. Null where the asset has no readable URL —
-  /// which the screen must handle rather than opening about:blank.
-  final String? url;
-  final String? thumbnailUrl;
-
-  /// IMAGE, DOCUMENT, VIDEO and so on. Decides the icon, not the behaviour.
-  final String kind;
-  final String? mime;
-  final int? bytes;
-
-  /// What the office called it when they uploaded it. The best label there is:
-  /// "Trip consent form.pdf" says more than any caption the app could invent.
-  final String? filename;
-
-  /// A caption if the office wrote one, otherwise the original filename,
-  /// otherwise something rather than a blank row.
-  String label(String fallback) {
-    final c = caption?.trim();
-    if (c != null && c.isNotEmpty) return c;
-    final f = filename?.trim();
-    if (f != null && f.isNotEmpty) return f;
-    return fallback;
-  }
-
-  factory AnnouncementFile.fromJson(Map<String, dynamic> j) {
-    final asset = (j['mediaAsset'] ?? const {}) as Map<String, dynamic>;
-    return AnnouncementFile(
-      id: (j['id'] ?? '') as String,
-      caption: j['caption'] as String?,
-      url: asset['url'] as String?,
-      thumbnailUrl: asset['thumbnailUrl'] as String?,
-      kind: (asset['kind'] ?? 'OTHER') as String,
-      mime: asset['mime'] as String?,
-      bytes: (asset['bytes'] as num?)?.toInt(),
-      filename: asset['originalFilename'] as String?,
-    );
-  }
-}
-
 class Announcement {
   Announcement({
     required this.id,

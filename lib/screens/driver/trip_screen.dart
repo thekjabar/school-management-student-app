@@ -1543,6 +1543,73 @@ class _StopCardState extends State<_StopCard> {
     }
   }
 
+  /// "That was wrong."
+  ///
+  /// The ledger has no UPDATE and never will — the database role does not hold
+  /// one — so a mistake is put right by writing a new row that points at the
+  /// old one, and BOTH survive. That is the only version of "we fixed it" worth
+  /// anything to somebody reading this six months later, and it is why the
+  /// sheet says the original stays rather than pretending the tap is undone.
+  ///
+  /// The correction is about the same child. The server refuses otherwise and
+  /// says why, so "I tapped the wrong name" is fixed in two moves: put right
+  /// what was recorded against HER, then record HIM properly. Offering a
+  /// child-swap here would only produce a refusal the driver could not act on.
+  Future<void> _correct(RiderOnStop rider) async {
+    final answer = await showAppSheet<({String type, String reason})>(
+      context,
+      builder: (_) => _CorrectionSheet(rider: rider, leg: widget.leg),
+    );
+    if (answer == null) return;
+
+    setState(() => _busyStudent = rider.studentId);
+    try {
+      // The id of the row being corrected. The handset mints a uuid, posts it
+      // and forgets it, so the only way to point at the original is to ask the
+      // server what it holds — and to take the LAST event for this child that
+      // is not itself a correction, which is the one standing.
+      final events = await CrewApi.instance.tripCustodyEvents(widget.tripId);
+      final theirs = events
+          .where((e) => e['studentId'] == rider.studentId && e['correctsEventId'] == null)
+          .toList()
+        ..sort((a, b) => ((b['effectiveTime'] ?? '') as String)
+            .compareTo((a['effectiveTime'] ?? '') as String));
+      final original = theirs.firstOrNull;
+      if (original == null) {
+        if (mounted) showNote(context, t('driver.nothingToCorrect'), bad: true);
+        return;
+      }
+
+      final verdict = await CrewApi.instance.correctCustody(
+        eventId: (original['id'] ?? '') as String,
+        correctedType: answer.type,
+        correctionReason: answer.reason,
+        stopId: custodyStopId(
+          leg: widget.leg,
+          eventType: answer.type,
+          riderStopId: widget.stop.stopId,
+          terminalStopId: widget.terminalStopId,
+        ),
+      );
+      widget.onChanged();
+      if (!mounted) return;
+      // What the SERVER did, as everywhere else on this screen. A 200 on the
+      // batch endpoint does not mean the row inside it was accepted.
+      if (!verdict.accepted) {
+        showNote(context, verdict.reason ?? t('driver.correctionRefused'), bad: true);
+        return;
+      }
+      showNote(context, t('driver.corrected'));
+    } catch (e) {
+      // The same translator every other write on this screen uses, so a
+      // correction that fails on a car park's signal reads like everything else
+      // rather than like a stack trace.
+      if (mounted) showNote(context, _driverError(e), bad: true);
+    } finally {
+      if (mounted) setState(() => _busyStudent = null);
+    }
+  }
+
   Future<void> _mark(RiderOnStop rider, String eventType, String label) async {
     setState(() => _busyStudent = rider.studentId);
     try {
@@ -1906,6 +1973,7 @@ class _StopCardState extends State<_StopCard> {
                           : t('driver.handedOver'),
                     ),
                     onNoShow: () => _mark(r, 'NO_SHOW', t('driver.notRiding')),
+                    onCorrect: () => _correct(r),
                   )),
               // Gone once the bus has left, the same way Arrived goes once the
               // bus has pulled up. A departed stop kept offering to depart
@@ -2140,6 +2208,7 @@ class _RiderRow extends StatelessWidget {
     required this.onBoard,
     required this.onOff,
     required this.onNoShow,
+    required this.onCorrect,
   });
 
   final RiderOnStop rider;
@@ -2160,6 +2229,10 @@ class _RiderRow extends StatelessWidget {
   final VoidCallback onBoard;
   final VoidCallback onOff;
   final VoidCallback onNoShow;
+
+  /// "That was wrong." Offered only once this child HAS a record to correct —
+  /// there is nothing to put right about a row nobody has touched.
+  final VoidCallback onCorrect;
 
   @override
   Widget build(BuildContext context) {
@@ -2254,7 +2327,19 @@ class _RiderRow extends StatelessWidget {
           ),
           if (busy)
             const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-          else if (!off)
+          // A child who is already set down has no buttons at all, and that is
+          // where a wrong record is most likely to be noticed — the driver looks
+          // up, sees a name marked off that should not be, and until now had
+          // nowhere to say so. So the correction is the one thing this row
+          // offers once everything else is finished with.
+          else if (off)
+            WordButton(
+              icon: Icons.edit_note_rounded,
+              label: t('driver.wrong'),
+              colour: AppTheme.textMuted,
+              onTap: onCorrect,
+            )
+          else
             Row(
               children: [
                 // Words, not bare icons. A login arrow and a logout arrow are
@@ -2286,6 +2371,18 @@ class _RiderRow extends StatelessWidget {
                     label: t('driver.notHere'),
                     colour: AppTheme.rose,
                     onTap: canPickUp ? onNoShow : null,
+                  ),
+                ],
+                // Only once there is something to put right. A child nobody has
+                // touched has no record to correct, and offering it would be a
+                // third button on a row read at arm's length for no reason.
+                if (onBus || notRiding) ...[
+                  const SizedBox(width: 6),
+                  WordButton(
+                    icon: Icons.edit_note_rounded,
+                    label: t('driver.wrong'),
+                    colour: AppTheme.textMuted,
+                    onTap: onCorrect,
                   ),
                 ],
               ],
@@ -4497,6 +4594,226 @@ class _PanicSheet extends StatelessWidget {
             onPressed: () => Navigator.of(context).pop(true),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// "That was wrong" — what actually happened, and why the record is changing.
+///
+/// The sheet says plainly that the original stays. It has to: there is no
+/// UPDATE on the custody ledger, a correction is a NEW row pointing at the old
+/// one, and a driver who believes he has erased something will describe it that
+/// way afterwards to somebody who can see both rows.
+///
+/// The reason is required and is not a tick box. The server wants five
+/// characters and an investigator wants a sentence — the useful part is always
+/// the bit a dropdown would not have anticipated.
+class _CorrectionSheet extends StatefulWidget {
+  const _CorrectionSheet({required this.rider, required this.leg});
+
+  final RiderOnStop rider;
+  final String leg;
+
+  @override
+  State<_CorrectionSheet> createState() => _CorrectionSheetState();
+}
+
+class _CorrectionSheetState extends State<_CorrectionSheet> {
+  String? _type;
+  final _reason = TextEditingController();
+
+  /// The server requires at least five characters on a correction reason.
+  static const _minReason = 5;
+
+  @override
+  void initState() {
+    super.initState();
+    _reason.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = Role.driver.tint;
+    final inset = MediaQuery.of(context).viewInsets.bottom;
+    final ready = _type != null && _reason.text.trim().length >= _minReason;
+
+    // What a driver can honestly say happened instead. Deliberately short: the
+    // three states this row can actually be in, named the way the crew would
+    // say them rather than the way the enum spells them.
+    final options = <(String, String, IconData)>[
+      ('NO_SHOW', t('driver.correctNotThere'), Icons.close_rounded),
+      ('BOARDED', t('driver.correctDidBoard'), Icons.login_rounded),
+      (
+        widget.leg == 'OUT' ? 'ALIGHTED' : 'HANDOVER',
+        widget.leg == 'OUT' ? t('driver.correctDidGetOff') : t('driver.correctWasHandedOver'),
+        Icons.logout_rounded,
+      ),
+    ];
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: inset),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                t('driver.correctTitle'),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  color: AppTheme.text,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                tv('driver.correctFor', {'name': widget.rider.name}),
+                style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+              ),
+              const SizedBox(height: 14),
+
+              Text(
+                t('driver.correctWhatHappened'),
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                  color: AppTheme.textMuted,
+                ),
+              ),
+              const SizedBox(height: 9),
+              for (final o in options)
+                InkWell(
+                  onTap: () => setState(() => _type = o.$1),
+                  borderRadius: BorderRadius.circular(13),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 13),
+                    decoration: BoxDecoration(
+                      color: _type == o.$1 ? tint.withValues(alpha: 0.10) : AppTheme.canvas,
+                      borderRadius: BorderRadius.circular(13),
+                      border: Border.all(
+                        color: _type == o.$1 ? tint : AppTheme.border,
+                        width: _type == o.$1 ? 1.4 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(o.$3, size: 19, color: _type == o.$1 ? tint : AppTheme.textMuted),
+                        const SizedBox(width: 11),
+                        Expanded(
+                          child: Text(
+                            o.$2,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: _type == o.$1 ? FontWeight.w700 : FontWeight.w500,
+                              color: _type == o.$1 ? tint : AppTheme.text,
+                            ),
+                          ),
+                        ),
+                        if (_type == o.$1)
+                          Icon(Icons.check_circle_rounded, size: 19, color: tint),
+                      ],
+                    ),
+                  ),
+                ),
+
+              const SizedBox(height: 8),
+              Text(
+                t('driver.correctWhy'),
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                  color: AppTheme.textMuted,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _reason,
+                maxLines: 2,
+                maxLength: 500,
+                textCapitalization: TextCapitalization.sentences,
+                style: TextStyle(fontSize: 14, color: AppTheme.text),
+                decoration: InputDecoration(
+                  hintText: t('driver.correctWhyHint'),
+                  counterText: '',
+                  filled: true,
+                  fillColor: AppTheme.canvas,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: AppTheme.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: AppTheme.border),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.history_edu_rounded, size: 16, color: AppTheme.textFaint),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      t('driver.correctBothKept'),
+                      style: TextStyle(fontSize: 11.5, height: 1.4, color: AppTheme.textFaint),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton(
+                  onPressed: ready
+                      ? () => Navigator.of(context)
+                          .pop((type: _type!, reason: _reason.text.trim()))
+                      : null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: tint,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  ),
+                  child: Text(
+                    t('driver.correctSend'),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

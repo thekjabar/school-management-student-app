@@ -9,6 +9,7 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../api/bus_location.dart';
+import 'credentials_screen.dart';
 import 'route_map.dart';
 import 'trip_screen.dart';
 
@@ -143,14 +144,24 @@ class _DriverHomeState extends State<DriverHome> {
       builder: (context, duty) {
         final trip = duty.trip;
         if (trip == null) {
-          return Padding(
-            padding: const EdgeInsets.only(top: 40),
-            child: Center(
-              child: Text(
-                t('driver.noRunsToday'),
-                style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+          // Still shown on a day with no run — in fact ESPECIALLY then. A
+          // driver whose licence has already blocked him has no duty today
+          // BECAUSE of it, and "no runs today" on its own is the least useful
+          // possible explanation of that.
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const CredentialWarning(),
+              Padding(
+                padding: const EdgeInsets.only(top: 40),
+                child: Center(
+                  child: Text(
+                    t('driver.noRunsToday'),
+                    style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                  ),
+                ),
               ),
-            ),
+            ],
           );
         }
 
@@ -160,6 +171,11 @@ class _DriverHomeState extends State<DriverHome> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Above the run, because a driver who is about to be stopped needs
+            // to know before he plans his morning around it — not at the depot
+            // gate when the tap fails. Draws nothing when the paperwork is in
+            // order, so it costs a compliant driver no space at all.
+            const CredentialWarning(),
             _DutyCard(trip: trip, plan: duty.plan, onOpen: () => _open(context, trip)),
             const SizedBox(height: kCardGap),
 

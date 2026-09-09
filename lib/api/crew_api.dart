@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show ValueNotifier;
 
 import '../i18n/strings.dart';
+import 'attachments.dart';
 import 'client.dart';
 
 /// A version 4 uuid, minted on the handset.
@@ -949,6 +950,77 @@ class CrewAnnouncement {
       );
 }
 
+/// One piece of a crew member's own paperwork, and when it stops counting.
+///
+/// Two dates matter and they are not the same. [expiresOn] is when the document
+/// itself runs out. [rosterBlockFrom] is when this platform stops letting the
+/// person be rostered — earlier, by the lead days the office set, so that a
+/// licence expiring on the 30th takes somebody off the board on the 16th and
+/// there is time to renew rather than a bus with no driver on the morning of
+/// the 31st. The one that matters to a driver is the second.
+class Credential {
+  Credential({
+    required this.id,
+    required this.kind,
+    required this.label,
+    required this.status,
+    required this.derivedStatus,
+    required this.number,
+    required this.expiresOn,
+    required this.rosterBlockFrom,
+    required this.daysUntilRosterBlock,
+    required this.rejectedReason,
+  });
+
+  final String id;
+  final String kind;
+
+  /// The server's own wording for this kind of document, so a renamed
+  /// credential type does not need an app release.
+  final String label;
+
+  /// What the office has done with it: PENDING_VERIFICATION, VERIFIED,
+  /// REJECTED, SUSPENDED, REVOKED.
+  final String status;
+
+  /// What it amounts to TODAY once the dates are applied — a verified licence
+  /// that expired last week is not verified in any sense a driver cares about.
+  final String derivedStatus;
+  final String? number;
+  final DateTime? expiresOn;
+  final DateTime? rosterBlockFrom;
+
+  /// Negative once the block has already started.
+  final int? daysUntilRosterBlock;
+  final String? rejectedReason;
+
+  /// Already stopping this person being rostered.
+  bool get blocking =>
+      daysUntilRosterBlock != null && daysUntilRosterBlock! <= 0 ||
+      derivedStatus == 'EXPIRED' ||
+      derivedStatus == 'REVOKED' ||
+      derivedStatus == 'SUSPENDED';
+
+  /// Close enough that the driver should be doing something about it. Fourteen
+  /// days is a working fortnight — long enough to get a medical appointment,
+  /// which is the slowest of these to renew.
+  bool get expiringSoon =>
+      !blocking && daysUntilRosterBlock != null && daysUntilRosterBlock! <= 14;
+
+  factory Credential.fromJson(Map<String, dynamic> j) => Credential(
+        id: (j['id'] ?? '') as String,
+        kind: (j['kind'] ?? 'OTHER') as String,
+        label: (j['label'] ?? '') as String,
+        status: (j['status'] ?? '') as String,
+        derivedStatus: (j['derivedStatus'] ?? j['status'] ?? '') as String,
+        number: j['number'] as String?,
+        expiresOn: DateTime.tryParse((j['expiresOn'] ?? '') as String)?.toLocal(),
+        rosterBlockFrom: DateTime.tryParse((j['rosterBlockFrom'] ?? '') as String)?.toLocal(),
+        daysUntilRosterBlock: (j['daysUntilRosterBlock'] as num?)?.toInt(),
+        rejectedReason: j['rejectedReason'] as String?,
+      );
+}
+
 /// Everything the driver and attendant app asks the platform for.
 class CrewApi {
   CrewApi._();
@@ -1275,6 +1347,69 @@ class CrewApi {
     );
   }
 
+  /// Say that an earlier scan was wrong.
+  ///
+  /// There is no UPDATE on the custody table and there never will be — the
+  /// application's database role does not hold one. A mistake is corrected by
+  /// writing a NEW row that points at the old one, so that both the mistake and
+  /// the correction survive, which is the only version of "we fixed it" worth
+  /// anything to somebody reading the ledger six months later.
+  ///
+  /// The server has answered this route since the ledger was built and the app
+  /// never called it. So a driver who tapped the wrong name had no way to say
+  /// so: the row stood, the child was on the register as aboard a bus she was
+  /// not on, and the only remedy was a telephone call to an office that would
+  /// have to do it for him.
+  ///
+  /// A correction is about the SAME CHILD as the event it corrects — the server
+  /// refuses otherwise, and says why: record the right child as a new event
+  /// instead. So this fixes "what happened to her", never "it was actually him".
+  ///
+  /// [correctionReason] is required and the server wants at least five
+  /// characters. It is the sentence an investigator reads, so the screen asks
+  /// for it in those terms rather than offering a tick box.
+  Future<CustodyVerdict> correctCustody({
+    required String eventId,
+    required String correctedType,
+    required String correctionReason,
+    String? stopId,
+  }) async {
+    final id = uuidV4();
+    final json = await _api.post('/crew/custody/events/$eventId/correction', {
+      'id': id,
+      'type': correctedType,
+      'correctionReason': correctionReason,
+      'deviceTime': DateTime.now().toUtc().toIso8601String(),
+      'stopId': ?stopId,
+    }) as Map<String, dynamic>;
+
+    final results = (json['results'] as List?) ?? const [];
+    final mine = results.cast<Map<String, dynamic>>().where((r) => r['id'] == id).firstOrNull;
+    if (mine == null) return const CustodyVerdict(accepted: false);
+
+    final outcome = (mine['outcome'] ?? '') as String;
+    if (outcome == 'REJECTED') {
+      return CustodyVerdict(accepted: false, reason: mine['reason'] as String?);
+    }
+    final recorded = mine['recordedType'] as String?;
+    return CustodyVerdict(
+      accepted: true,
+      duplicate: outcome == 'DUPLICATE',
+      rewrittenTo: recorded != null && recorded != correctedType ? recorded : null,
+      alertRaised: mine['alertRaised'] == true,
+    );
+  }
+
+  /// The custody rows the server holds for this trip.
+  ///
+  /// Needed to correct one: a correction points at the id of the event it
+  /// replaces, and the handset does not keep those — it mints a uuid, posts it
+  /// and forgets it.
+  Future<List<Map<String, dynamic>>> tripCustodyEvents(String tripId) async {
+    final json = await _api.get('/crew/custody/trips/$tripId/events?pageSize=200');
+    return Paged.from<Map<String, dynamic>>(json, (m) => m).rows;
+  }
+
   /// Record a whole busload off in ONE request.
   ///
   /// At the school gate the driver has twenty-nine children going down the
@@ -1503,6 +1638,66 @@ class CrewApi {
   Future<Map<String, dynamic>> me() async =>
       await _api.get('/crew/me') as Map<String, dynamic>;
 
+  /// This crew member's own paperwork, and when each piece stops counting.
+  ///
+  /// fleet-service has served this since credentials were built, and its own
+  /// docstring says why it exists: "knowing that his licence stops counting on
+  /// the 16th rather than the 30th is the entire reason the lead time exists".
+  /// The app never asked. So an expired licence sets the trip to BLOCKED and
+  /// the first the driver hears of it is "This bus is blocked" at the depot at
+  /// half past six, with the children already arriving — about a date the
+  /// server knew weeks ago.
+  Future<List<Credential>> myCredentials() async {
+    final json = await _api.get('/crew/me/credentials?pageSize=50');
+    return Paged.from<Credential>(json, Credential.fromJson).rows;
+  }
+
+  /// Hand in a renewed document from the handset.
+  ///
+  /// Always lands as PENDING_VERIFICATION and never touches the row it
+  /// replaces: a driver photographing a licence is evidence for the office to
+  /// check, not a decision. If submitting one could clear the gate by itself
+  /// the gate would be worth nothing.
+  Future<void> submitCredential({
+    required String kind,
+    String? number,
+    DateTime? expiresOn,
+    String? documentAssetId,
+  }) async {
+    await _api.post('/crew/me/credentials', {
+      'kind': kind,
+      'number': ?(number == null || number.trim().isEmpty ? null : number.trim()),
+      'expiresOn': ?expiresOn?.toIso8601String(),
+      'documentAssetId': ?documentAssetId,
+    });
+  }
+
+  /// A photograph of the renewed document.
+  ///
+  /// STAFF_DOCUMENT rather than one of the operational kinds, and the server
+  /// routes it down a self-authorised path: filing somebody's paperwork needs
+  /// an HR permission, which a driver rightly does not hold, but photographing
+  /// his own renewed licence is not that act.
+  Future<String> uploadCredentialPhoto({
+    required Uint8List bytes,
+    required String filename,
+    required String mime,
+  }) async {
+    final json = await _api.upload(
+      '/crew/uploads/direct',
+      field: 'file',
+      bytes: bytes,
+      filename: filename,
+      mime: mime,
+      fields: {'kind': 'STAFF_DOCUMENT'},
+    );
+    final id = json is Map ? json['id'] : null;
+    if (id is! String || id.isEmpty) {
+      throw ApiException('The photograph could not be stored.', 500);
+    }
+    return id;
+  }
+
   /// How many notices this crew member has not opened yet.
   ///
   /// Seeded by every fetch of [announcements] and moved by the screen itself
@@ -1542,4 +1737,13 @@ class CrewApi {
   /// closed to buses. Twice is a success, same as the server.
   Future<void> acknowledgeAnnouncement(String id) =>
       _api.post('/crew/announcements/$id/acknowledge', const <String, dynamic>{});
+  /// The files attached to a notice — a route diversion map, a policy page.
+  ///
+  /// The list has always carried the count and the app showed it as a number
+  /// with nothing behind it, which is a worse answer than not mentioning the
+  /// files at all.
+  Future<List<AttachedFile>> announcementAttachments(String id) async {
+    final json = await _api.get('/crew/announcements/$id/attachments?pageSize=50');
+    return Paged.from<AttachedFile>(json, AttachedFile.fromJson).rows;
+  }
 }

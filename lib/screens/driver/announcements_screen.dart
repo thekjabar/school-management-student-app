@@ -4,6 +4,7 @@ import '../../api/crew_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
+import '../../ui/attachments.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
@@ -333,9 +334,26 @@ class _NoticeDialogState extends State<_NoticeDialog> {
             const SizedBox(height: 14),
             Flexible(
               child: SingleChildScrollView(
-                child: Text(
-                  item.body,
-                  style: TextStyle(fontSize: 13.5, height: 1.55, color: AppTheme.textMuted),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.body,
+                      style: TextStyle(fontSize: 13.5, height: 1.55, color: AppTheme.textMuted),
+                    ),
+                    // The files, where the office attached any. The count has
+                    // always been in the payload and this screen showed it as a
+                    // bare number with nothing behind it — which is a worse
+                    // answer than not mentioning the files at all.
+                    if (item.attachmentCount > 0) ...[
+                      const SizedBox(height: 16),
+                      AttachmentList(
+                        count: item.attachmentCount,
+                        tint: Role.driver.tint,
+                        load: () => CrewApi.instance.announcementAttachments(item.id),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),

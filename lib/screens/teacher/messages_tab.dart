@@ -5,6 +5,7 @@ import '../../api/teacher_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
+import '../../ui/attachments.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
@@ -289,12 +290,50 @@ class _NoticeDialog extends StatelessWidget {
             const SizedBox(height: 14),
             Flexible(
               child: SingleChildScrollView(
-                child: Text(
-                  item.body,
-                  style: TextStyle(fontSize: 13.5, height: 1.55, color: AppTheme.textMuted),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.body,
+                      style: TextStyle(fontSize: 13.5, height: 1.55, color: AppTheme.textMuted),
+                    ),
+                    if (item.attachmentCount > 0) ...[
+                      const SizedBox(height: 16),
+                      AttachmentList(
+                        count: item.attachmentCount,
+                        tint: tint,
+                        load: () => TeacherApi.instance.announcementAttachments(item.id),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
+            // A notice that ASKS for an answer gets one. The route has always
+            // existed and nothing called it, so the office's list of who had
+            // not answered carried teachers who had read the notice and had no
+            // way to say so.
+            if (item.requiresAcknowledgement && item.acknowledgedAt == null) ...[
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: BigButton(
+                  label: t('msg.gotIt'),
+                  color: tint,
+                  height: 46,
+                  onPressed: () async {
+                    try {
+                      await TeacherApi.instance.acknowledgeAnnouncement(item.id);
+                      if (context.mounted) Navigator.of(context).pop(true);
+                    } catch (e) {
+                      // Kept open rather than pretending. The office list is
+                      // the thing this button exists to change.
+                      if (context.mounted) showNote(context, errorText(e), bad: true);
+                    }
+                  },
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,

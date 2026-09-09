@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show ValueNotifier;
 
+import 'attachments.dart';
 import 'client.dart';
 import 'parent_api.dart' show Announcement;
 
@@ -315,6 +316,44 @@ class TeacherApi {
   static final TeacherApi instance = TeacherApi._();
   final ApiClient _api = ApiClient.instance;
 
+  /// Write down what a child did — a merit or a concern.
+  ///
+  /// Every piece of this has existed except the way in. Teachers hold
+  /// `academic.behavior.write` in their own role template, school-work-service
+  /// has served the full behaviour surface since it was built, the console has
+  /// a Behaviour page, and the PARENT app already reads and displays these
+  /// records on its attitude screen. The teacher app had no way to create one —
+  /// so the screen a family checks was fed by records the person best placed to
+  /// write them could not write from the phone in their hand.
+  ///
+  /// [visibleToGuardian] is the consequential argument, and it is why the sheet
+  /// asks rather than assuming. It defaults to false server-side; when true the
+  /// record is published to the family immediately, and the server then REFUSES
+  /// to let it be edited — "the parent has read it; quietly changing the wording
+  /// afterwards is how a behaviour log stops being evidence of anything".
+  ///
+  /// [points] is signed on purpose: positive for a merit, negative for a
+  /// demerit. A house total that cannot go down is not a points system.
+  Future<void> recordBehaviour({
+    required String studentId,
+    required String kind,
+    String? classId,
+    String? category,
+    int? points,
+    String? note,
+    bool visibleToGuardian = false,
+  }) async {
+    await _api.post('/school/behavior', {
+      'studentId': studentId,
+      'kind': kind,
+      'classId': ?classId,
+      'category': ?category,
+      'points': ?points,
+      'note': ?(note == null || note.trim().isEmpty ? null : note.trim()),
+      'visibleToGuardian': visibleToGuardian,
+    });
+  }
+
   /// How many notices this teacher has not opened yet.
   ///
   /// The dot on Messages is drawn from a count the shell takes once, at
@@ -352,6 +391,20 @@ class TeacherApi {
   Future<int> markAllAnnouncementsRead() async {
     final json = await _api.post('/teacher/announcements/read-all');
     return ((json as Map<String, dynamic>?)?['marked'] as num?)?.toInt() ?? 0;
+  }
+  /// "I have seen this and I am acting on it."
+  ///
+  /// A notice that ASKS for an answer gets one. The route has always been
+  /// there and the app never called it, so the office list of who had not
+  /// answered carried the names of teachers who had read the notice and had
+  /// no way to say so.
+  Future<void> acknowledgeAnnouncement(String id) =>
+      _api.post('/teacher/announcements/$id/acknowledge', const <String, dynamic>{});
+
+  /// The files attached to a notice — the circular, the timetable, the form.
+  Future<List<AttachedFile>> announcementAttachments(String id) async {
+    final json = await _api.get('/teacher/announcements/$id/attachments?pageSize=50');
+    return Paged.from<AttachedFile>(json, AttachedFile.fromJson).rows;
   }
 
   Future<List<TeachingSlot>> classes() async {
