@@ -20,6 +20,8 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/map_tiles.dart';
 import '../../ui/screen_kit.dart';
+import 'contact_school_screen.dart';
+import 'skip_ride_screen.dart';
 import 'track_screen.dart';
 
 /// Where the bus is, and when it gets there.
@@ -156,6 +158,110 @@ class _BusScreenState extends State<BusScreen> {
                       _RouteCard(bus: bus),
                       const SizedBox(height: kCardGap),
                       _Tiles(bus: bus, trip: trip),
+                      const SizedBox(height: kCardGap),
+                      // Put where a parent already is when the thought occurs.
+                      // "She is going with her grandmother today" is something
+                      // you realise while looking at the bus, not while hunting
+                      // through a menu — and telling the school is what stops
+                      // her being recorded as a no-show and the office ringing
+                      // round to find her.
+                      Card16(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => SkipRideScreen(child: widget.child),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.event_busy_rounded, size: 20, color: tint),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    t('skip.newTitle'),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.text,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    t('skip.busCardLine'),
+                                    style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded, color: AppTheme.textFaint),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: kCardGap),
+                      // The way out when something is wrong.
+                      //
+                      // On this screen and not buried in a menu, because the
+                      // moment it is needed is the moment a parent is staring
+                      // at this map wondering why the bus has not come. Until
+                      // now the only answer was a telephone call to an office
+                      // that might not be open.
+                      Card16(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ContactSchoolScreen(child: widget.child),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: AppTheme.rose
+                                    .withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.support_agent_rounded,
+                                size: 20,
+                                color: AppTheme.rose,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    t('contact.title'),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.text,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    t('contact.busCardLine'),
+                                    style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded, color: AppTheme.textFaint),
+                          ],
+                        ),
+                      ),
                       if (!_dismissedAlerts && !Push.granted) ...[
                         const SizedBox(height: kCardGap),
                         NoticeBanner(

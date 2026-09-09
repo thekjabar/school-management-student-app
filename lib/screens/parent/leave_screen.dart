@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../api/biometrics.dart';
 import '../../api/client.dart';
@@ -413,6 +414,72 @@ class _AskSheetState extends State<_AskSheet> {
   bool _busy = false;
   String? _error;
 
+  /// The uploaded note, if the family attached one. Uploaded BEFORE the request
+  /// is filed, because the server takes an asset id rather than a file — so a
+  /// failed upload costs a retry rather than a lost leave request.
+  String? _noteAssetId;
+  bool _uploading = false;
+
+  /// Take a photograph of the note, or pick one already on the phone.
+  ///
+  /// Compressed on the way out. A modern handset camera produces four or five
+  /// megabytes, most families here are on mobile data, and a doctor's note is
+  /// legible at a fraction of that — an upload that takes two minutes on the
+  /// school run is one nobody finishes.
+  Future<void> _attachNote() async {
+    final source = await pickOne<ImageSource>(
+      context,
+      tint: Role.parent.tint,
+      title: t('leave.noteAdd'),
+      options: [
+        PickOption(
+          value: ImageSource.camera,
+          label: t('leave.notePhotograph'),
+          icon: Icons.photo_camera_rounded,
+        ),
+        PickOption(
+          value: ImageSource.gallery,
+          label: t('leave.noteFromPhone'),
+          icon: Icons.photo_library_rounded,
+        ),
+      ],
+    );
+    if (source == null) return;
+
+    setState(() {
+      _uploading = true;
+      _error = null;
+    });
+    try {
+      final shot = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 2000,
+        imageQuality: 80,
+      );
+      if (shot == null) return;
+      final bytes = await shot.readAsBytes();
+      final id = await ParentApi.instance.uploadFile(
+        bytes: bytes,
+        // image_picker re-encodes to JPEG whenever imageQuality is set, so the
+        // name and the type must say JPEG whatever the original was — the
+        // upload route checks the part's content type against the kind it was
+        // told to expect and refuses a mismatch.
+        filename: 'note.jpg',
+        mime: 'image/jpeg',
+        kind: 'MEDICAL_DOCUMENT',
+        studentId: widget.child.studentId,
+        capturedAt: DateTime.now(),
+      );
+      if (mounted) setState(() => _noteAssetId = id);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = t('leave.noteFailed'));
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -466,6 +533,7 @@ class _AskSheetState extends State<_AskSheet> {
         from: _from,
         to: _to,
         reason: _reason.text.trim(),
+        doctorNoteAssetId: _noteAssetId,
       );
       if (mounted) Navigator.of(context).pop(true);
     } on ApiException catch (e) {
@@ -596,6 +664,24 @@ class _AskSheetState extends State<_AskSheet> {
                   style: TextStyle(fontSize: 11, color: AppTheme.textFaint),
                 ),
               ),
+
+              // The doctor's note.
+              //
+              // The schema has carried `doctorNoteAssetId` and the DTO has
+              // accepted it since leave requests shipped, and identity-service
+              // built `/parent/uploads` specifically because a guardian holds
+              // no upload permission and therefore could not send one. Nothing
+              // ever called either, so every note arrived on paper at the gate
+              // and a clerk photographed it.
+              const SizedBox(height: 14),
+              _NoteAttachment(
+                studentId: widget.child.studentId,
+                assetId: _noteAssetId,
+                busy: _uploading,
+                onPick: _attachNote,
+                onClear: () => setState(() => _noteAssetId = null),
+              ),
+
               const SizedBox(height: 12),
 
               Container(
@@ -837,6 +923,85 @@ class _DateField extends StatelessWidget {
               ),
             ),
             Icon(Icons.expand_more_rounded, size: 18, color: AppTheme.textFaint),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The doctor's note control on the request sheet.
+///
+/// Three states and no more: nothing attached, uploading, attached. There is
+/// deliberately no preview of the file — it is a photograph of a medical
+/// document, the parent has just this second taken it, and rendering it back at
+/// them in a sheet that a clerk may be standing over adds nothing.
+class _NoteAttachment extends StatelessWidget {
+  const _NoteAttachment({
+    required this.studentId,
+    required this.assetId,
+    required this.busy,
+    required this.onPick,
+    required this.onClear,
+  });
+
+  final String studentId;
+  final String? assetId;
+  final bool busy;
+  final VoidCallback onPick;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = Role.parent.tint;
+    final attached = assetId != null;
+
+    return InkWell(
+      onTap: busy ? null : (attached ? onClear : onPick),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+        decoration: BoxDecoration(
+          color: attached ? tint.withValues(alpha: 0.08) : AppTheme.canvas,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: attached ? tint.withValues(alpha: 0.45) : AppTheme.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            if (busy)
+              SizedBox(
+                width: 19,
+                height: 19,
+                child: CircularProgressIndicator(strokeWidth: 2.2, color: tint),
+              )
+            else
+              Icon(
+                attached ? Icons.check_circle_rounded : Icons.attach_file_rounded,
+                size: 19,
+                color: attached ? tint : AppTheme.textMuted,
+              ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Text(
+                busy
+                    ? t('leave.noteUploading')
+                    : attached
+                        ? t('leave.noteAttached')
+                        : t('leave.noteAdd'),
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: attached ? FontWeight.w600 : FontWeight.w500,
+                  color: attached ? tint : AppTheme.text,
+                ),
+              ),
+            ),
+            if (attached && !busy)
+              Text(
+                t('leave.noteRemove'),
+                style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+              ),
           ],
         ),
       ),

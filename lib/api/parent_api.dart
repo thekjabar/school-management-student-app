@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../i18n/strings.dart';
 import 'client.dart';
 
@@ -1570,6 +1572,92 @@ class LiveBus {
   }
 }
 
+/// One thing this family has raised with the school, and where it has got to.
+class ConcernStatus {
+  ConcernStatus({
+    required this.id,
+    required this.title,
+    required this.urgent,
+    required this.state,
+    required this.raisedAt,
+    required this.timesRaised,
+  });
+
+  final String id;
+  final String title;
+  final bool urgent;
+
+  /// SENT, SEEN or CLOSED. Three words because that is all a family can act on:
+  /// we have it, we are on it, it is done.
+  final String state;
+  final DateTime? raisedAt;
+  final int timesRaised;
+
+  factory ConcernStatus.fromJson(Map<String, dynamic> j) => ConcernStatus(
+        id: (j['id'] ?? '') as String,
+        title: (j['title'] ?? '') as String,
+        urgent: (j['urgent'] ?? false) as bool,
+        state: (j['state'] ?? 'SENT') as String,
+        raisedAt: DateTime.tryParse((j['raisedAt'] ?? '') as String)?.toLocal(),
+        timesRaised: (j['timesRaised'] as num?)?.toInt() ?? 1,
+      );
+}
+
+/// Whether each of today's legs can still be skipped.
+///
+/// The cut-off sits a fixed number of minutes before each departure, because a
+/// request that lands after the bus has gone cannot suppress an alarm that has
+/// already fired. The server decides it; this is only what the screen needs to
+/// avoid offering a button that would do nothing.
+class SkipLegEligibility {
+  SkipLegEligibility({
+    required this.leg,
+    required this.open,
+    required this.scheduledDepartureAt,
+    required this.cutoffAt,
+  });
+
+  /// 'OUT' (home to school) or 'RETURN' (school to home).
+  final String leg;
+  final bool open;
+  final DateTime? scheduledDepartureAt;
+  final DateTime? cutoffAt;
+
+  factory SkipLegEligibility.fromJson(Map<String, dynamic> j) => SkipLegEligibility(
+        leg: (j['leg'] ?? '') as String,
+        open: (j['open'] ?? false) as bool,
+        scheduledDepartureAt:
+            DateTime.tryParse((j['scheduledDepartureAt'] ?? '') as String)?.toLocal(),
+        cutoffAt: DateTime.tryParse((j['cutoffAt'] ?? '') as String)?.toLocal(),
+      );
+}
+
+class SkipEligibility {
+  SkipEligibility({required this.serviceDate, required this.legs});
+
+  final String serviceDate;
+  final List<SkipLegEligibility> legs;
+
+  /// True when at least one leg of the day can still be skipped. A day with
+  /// both legs closed is one where the honest thing is to say the buses have
+  /// gone, not to take a request that will suppress nothing.
+  bool get anyOpen => legs.any((l) => l.open);
+
+  SkipLegEligibility? leg(String leg) {
+    for (final l in legs) {
+      if (l.leg == leg) return l;
+    }
+    return null;
+  }
+
+  factory SkipEligibility.fromJson(Map<String, dynamic> j) => SkipEligibility(
+        serviceDate: (j['serviceDate'] ?? '') as String,
+        legs: ((j['legs'] as List?) ?? [])
+            .map((e) => SkipLegEligibility.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
 /// One approved alternative address for a child.
 class DropoffOption {
   DropoffOption({required this.id, required this.label, required this.stopName, required this.landmark});
@@ -1829,6 +1917,10 @@ class ParentApi {
     required DateTime from,
     required DateTime to,
     required String reason,
+    /// The doctor's note, already uploaded through [uploadFile]. The schema has
+    /// carried `doctorNoteAssetId` and the DTO has accepted it all along; the
+    /// app simply never sent one, so every note came in on paper.
+    String? doctorNoteAssetId,
   }) async {
     final why = reason.trim();
     await _api.post('/parent/leave-requests', {
@@ -1836,6 +1928,7 @@ class ParentApi {
       'kind': kind,
       'fromDate': _dateOnly(from),
       'toDate': _dateOnly(to),
+      'doctorNoteAssetId': ?doctorNoteAssetId,
       // Left out when blank, never sent empty. The sheet labels the reason
       // optional and the DTO agrees - but it is @Length(2, 500) WHEN PRESENT,
       // so an empty string was refused and a parent who simply had nothing to
@@ -1937,6 +2030,147 @@ class ParentApi {
     return Paged.from<Map<String, dynamic>>(json, (m) => m).rows;
   }
 
+  /// Send the school a file — the doctor's note, the signed consent form.
+  ///
+  /// There were three upload routes in the product and every one of them
+  /// required a permission no guardian holds, so a note behind a leave request
+  /// arrived on paper, at the gate, in the morning, and a clerk photographed
+  /// it. identity-service built `/parent/uploads` for exactly this and the app
+  /// never called it.
+  ///
+  /// What authorises a parent here is not a permission — they have none — but a
+  /// live guardian link to the child the file is about, checked server-side
+  /// against the tenant this request is acting in.
+  ///
+  /// Returns the asset id, which is what a leave request then carries as its
+  /// `doctorNoteAssetId`.
+  Future<String> uploadFile({
+    required Uint8List bytes,
+    required String filename,
+    required String mime,
+    required String kind,
+    String? studentId,
+    String? note,
+    DateTime? capturedAt,
+  }) async {
+    final json = await _api.upload(
+      '/parent/uploads',
+      field: 'file',
+      bytes: bytes,
+      filename: filename,
+      mime: mime,
+      fields: {
+        'kind': kind,
+        'subjectStudentId': ?studentId,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+        'capturedAt': ?capturedAt?.toUtc().toIso8601String(),
+      },
+    );
+    final id = json is Map ? json['id'] : null;
+    if (id is! String || id.isEmpty) {
+      throw ApiException('The school could not store that file.', 500);
+    }
+    return id;
+  }
+
+  /// Tell the school something is wrong, or ask them something.
+  ///
+  /// The app has never had a way to do this. Announcements travel one way, and
+  /// crew feedback is a record about a driver's conduct — the wrong place to
+  /// put "the bus is forty minutes late and my daughter is not home". So the
+  /// only route was a telephone call to an office that might not be open.
+  ///
+  /// This lands on the dispatch board the office already watches all day,
+  /// beside the late buses and the unaccounted children, and it is answered by
+  /// TELEPHONE. There is no reply channel; the app says so rather than implying
+  /// a conversation nobody is staffed to have.
+  ///
+  /// [urgency] is 'URGENT' or 'QUESTION'. [topic] is one of BUS_LATE,
+  /// CHILD_NOT_HOME, PICKUP_ARRANGEMENT, SOMETHING_ELSE.
+  Future<Map<String, dynamic>> raiseConcern({
+    required String studentId,
+    required String urgency,
+    required String topic,
+    String? message,
+  }) async {
+    final json = await _api.post('/parent/concerns', {
+      'studentId': studentId,
+      'urgency': urgency,
+      'topic': topic,
+      if (message != null && message.trim().isNotEmpty) 'message': message.trim(),
+    });
+    return (json as Map).cast<String, dynamic>();
+  }
+
+  /// What this family has raised and whether the office has picked it up.
+  ///
+  /// State only — never the office's own notes. A dispatcher writing "mother
+  /// sounds distressed, ringing back" is writing for colleagues, and a family
+  /// reading that verbatim would be the last time anybody wrote anything
+  /// useful there.
+  Future<List<ConcernStatus>> concerns({String? studentId}) async {
+    final q = studentId == null ? '' : '?studentId=$studentId';
+    final json = await _api.get('/parent/concerns$q') as Map<String, dynamic>;
+    return ((json['rows'] as List?) ?? [])
+        .map((e) => ConcernStatus.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Whether today's runs can still be skipped, per leg.
+  ///
+  /// Asked BEFORE the form is drawn so a parent is told "the bus has already
+  /// left" instead of being allowed to file something that will silently
+  /// suppress nothing. The cut-off is the server's to decide and it stores the
+  /// one it used, so a timetable edited next week cannot rewrite whether this
+  /// morning's request was in time.
+  Future<SkipEligibility> skipRideEligibility(String studentId, {DateTime? on}) async {
+    final date = on == null ? '' : '&date=${_day(on)}';
+    final json = await _api.get('/parent/skip-rides/eligibility?studentId=$studentId$date')
+        as Map<String, dynamic>;
+    return SkipEligibility.fromJson(json);
+  }
+
+  /// "She is not riding today."
+  ///
+  /// This is not a convenience feature, and the server's own docstring says so:
+  /// it SUPPRESSES A FALSE NO-SHOW ALARM. A child driven to school by her
+  /// mother all week is otherwise recorded as a no-show three mornings running,
+  /// the office is alerted three times, and an office that learns no-show
+  /// alerts are noise will ignore the one in November that means a seven year
+  /// old is standing on the wrong road in the dark.
+  ///
+  /// [idempotencyKey] is minted by the caller before the first attempt, so a
+  /// parent tapping twice on a bad connection files one skip rather than two.
+  Future<Map<String, dynamic>> createSkipRide({
+    required String studentId,
+    required DateTime from,
+    required DateTime to,
+    required String legScope,
+    required String reason,
+    String? note,
+    required String idempotencyKey,
+  }) async {
+    final json = await _api.post('/parent/skip-rides', {
+      'studentId': studentId,
+      'dateFrom': _day(from),
+      'dateTo': _day(to),
+      'legScope': legScope,
+      'reason': reason,
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      'idempotencyKey': idempotencyKey,
+    });
+    return (json as Map).cast<String, dynamic>();
+  }
+
+  /// Withdraw a skip that has not been consumed yet — the child is riding after
+  /// all. The server puts the suppressed lines back on the manifest, which is
+  /// what makes the crew expect her again.
+  Future<void> cancelSkipRide(String id, {String? note}) async {
+    await _api.post('/parent/skip-rides/$id/cancel', {
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    });
+  }
+
   Future<List<Announcement>> announcements() async {
     final json = await _api.get('/parent/announcements?pageSize=50');
     return Paged.from<Announcement>(json, Announcement.fromJson).rows;
@@ -1950,6 +2184,17 @@ class ParentApi {
   /// fire this on every open without first checking.
   Future<void> markAnnouncementRead(String id) async {
     await _api.post('/parent/announcements/$id/read');
+  }
+
+  /// The files attached to one notice.
+  ///
+  /// Fetched only when a parent asks to see them: the list route already says
+  /// HOW MANY there are, which is all that is needed to decide whether to offer
+  /// the button, and pulling every attachment of every announcement on every
+  /// open would be a great deal of work for the few that are ever tapped.
+  Future<List<AnnouncementFile>> announcementAttachments(String id) async {
+    final json = await _api.get('/parent/announcements/$id/attachments?pageSize=50');
+    return Paged.from<AnnouncementFile>(json, AnnouncementFile.fromJson).rows;
   }
 
   /// Mark every notice this guardian can see as read.
@@ -2106,6 +2351,61 @@ class ParentApi {
 }
 
 /// A notice from the school office.
+/// One file the school attached to a notice.
+class AnnouncementFile {
+  AnnouncementFile({
+    required this.id,
+    required this.caption,
+    required this.url,
+    required this.thumbnailUrl,
+    required this.kind,
+    required this.mime,
+    required this.bytes,
+    required this.filename,
+  });
+
+  final String id;
+  final String? caption;
+
+  /// Where the file actually is. Null where the asset has no readable URL —
+  /// which the screen must handle rather than opening about:blank.
+  final String? url;
+  final String? thumbnailUrl;
+
+  /// IMAGE, DOCUMENT, VIDEO and so on. Decides the icon, not the behaviour.
+  final String kind;
+  final String? mime;
+  final int? bytes;
+
+  /// What the office called it when they uploaded it. The best label there is:
+  /// "Trip consent form.pdf" says more than any caption the app could invent.
+  final String? filename;
+
+  /// A caption if the office wrote one, otherwise the original filename,
+  /// otherwise something rather than a blank row.
+  String label(String fallback) {
+    final c = caption?.trim();
+    if (c != null && c.isNotEmpty) return c;
+    final f = filename?.trim();
+    if (f != null && f.isNotEmpty) return f;
+    return fallback;
+  }
+
+  factory AnnouncementFile.fromJson(Map<String, dynamic> j) {
+    final asset = (j['mediaAsset'] ?? const {}) as Map<String, dynamic>;
+    return AnnouncementFile(
+      id: (j['id'] ?? '') as String,
+      caption: j['caption'] as String?,
+      url: asset['url'] as String?,
+      thumbnailUrl: asset['thumbnailUrl'] as String?,
+      kind: (asset['kind'] ?? 'OTHER') as String,
+      mime: asset['mime'] as String?,
+      bytes: (asset['bytes'] as num?)?.toInt(),
+      filename: asset['originalFilename'] as String?,
+    );
+  }
+}
+
 class Announcement {
   Announcement({
     required this.id,
@@ -2119,6 +2419,7 @@ class Announcement {
     this.acknowledgedAt,
     required this.authorName,
     required this.readAt,
+    this.attachmentCount = 0,
   });
 
   final String id;
@@ -2138,6 +2439,15 @@ class Announcement {
   final String authorName;
   final DateTime? readAt;
 
+  /// How many files the school attached — the scanned circular, the trip
+  /// consent form, the term timetable.
+  ///
+  /// The office has been able to attach these since the first version of the
+  /// screen and the list has always carried this number. Nothing read it, so a
+  /// school could publish a consent form and no family had any way to know it
+  /// was there, let alone open it.
+  final int attachmentCount;
+
   factory Announcement.fromJson(Map<String, dynamic> j) => Announcement(
         id: j['id'] as String,
         title: (j['title'] ?? '') as String,
@@ -2152,6 +2462,7 @@ class Announcement {
             : DateTime.parse(j['acknowledgedAt'] as String).toLocal(),
         authorName: (j['authorName'] ?? '') as String,
         readAt: j['readAt'] == null ? null : DateTime.parse(j['readAt'] as String).toLocal(),
+        attachmentCount: (j['attachmentCount'] as num?)?.toInt() ?? 0,
       );
 }
 
