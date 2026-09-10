@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/client.dart';
@@ -1222,15 +1223,31 @@ class _DeclareSheetState extends State<_DeclareSheet> {
   bool _busy = false;
   String? _error;
 
+  /// The transfer slip, if one has been attached. Uploaded BEFORE the notice is
+  /// filed, because the server takes an asset id rather than a file — so a
+  /// failed upload costs a retry rather than a lost payment notice.
+  String? _proofAssetId;
+  bool _uploadingProof = false;
+
+  /// Whether the school will refuse this notice without a photograph of the
+  /// slip. money-service asks for one on BANK_TRANSFER alone, and only where
+  /// the school has set it — so the question is put on that method and on no
+  /// other, rather than a proof being demanded of somebody paying cash.
+  bool get _proofRequired =>
+      _method == 'BANK_TRANSFER' && widget.options.requireProofForTransfer;
+
   @override
   void initState() {
     super.initState();
     _targets = _Target.listFor(widget.invoices, widget.children);
     // Taken from the server rather than written out here: CARD is a real
     // payment method the schema knows and one a parent may not claim, and that
-    // list is the server's to change. A bank transfer is dropped while the
-    // school demands a photograph of the slip, because there is no route by
-    // which a parent can upload one — see PaymentOptions.usableMethods.
+    // list is the server's to change.
+    //
+    // The whole list now, bank transfer included. It used to arrive already
+    // stripped of BANK_TRANSFER whenever the school wanted a slip, because the
+    // app had no way to send one — see PaymentOptions.usableMethods for what
+    // that cost and what changed.
     _methods = widget.options.usableMethods;
     _method = _methods.isEmpty ? null : _methods.first;
     _idempotencyKey = _nonce();
@@ -1275,7 +1292,14 @@ class _DeclareSheetState extends State<_DeclareSheet> {
   }
 
   bool get _ready =>
-      _target != null && _method != null && _amountIqd != null && _amountProblem == null;
+      _target != null &&
+      _method != null &&
+      _amountIqd != null &&
+      _amountProblem == null &&
+      // The server refuses a transfer with no slip. Dark here rather than a
+      // 400 after the tap, which is the same rule the other three follow.
+      !(_proofRequired && _proofAssetId == null) &&
+      !_uploadingProof;
 
   void _choose(_Target target) {
     // Only into an empty box. A bill's balance is a good guess at what is being
@@ -1302,6 +1326,70 @@ class _DeclareSheetState extends State<_DeclareSheet> {
     setState(() => _paidAt = picked);
   }
 
+  /// Photograph the transfer slip, or pick one already on the phone.
+  ///
+  /// Compressed on the way out, for the same reason the doctor's note is: a
+  /// modern handset camera produces four or five megabytes, most families here
+  /// are on mobile data, and a bank slip is legible at a fraction of that.
+  ///
+  /// The child is named where the parent picked one. Where they picked a BILL
+  /// there is no child to name — money-service issues an invoice against the
+  /// FAMILY, and the only student on it is a name on a line with no id — so
+  /// none is sent, and identity-service files the slip against the guardian
+  /// instead. See the subject-student exemption in uploadForGuardian.
+  Future<void> _attachProof() async {
+    final source = await pickOne<ImageSource>(
+      context,
+      tint: Role.parent.tint,
+      title: t('dec.proofAdd'),
+      options: [
+        PickOption(
+          value: ImageSource.camera,
+          label: t('dec.proofPhotograph'),
+          icon: Icons.photo_camera_rounded,
+        ),
+        PickOption(
+          value: ImageSource.gallery,
+          label: t('dec.proofFromPhone'),
+          icon: Icons.photo_library_rounded,
+        ),
+      ],
+    );
+    if (source == null) return;
+
+    setState(() {
+      _uploadingProof = true;
+      _error = null;
+    });
+    try {
+      final shot = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 2000,
+        imageQuality: 80,
+      );
+      if (shot == null) return;
+      final bytes = await shot.readAsBytes();
+      final id = await ParentApi.instance.uploadFile(
+        bytes: bytes,
+        // image_picker re-encodes to JPEG whenever imageQuality is set, so the
+        // name and the type must say JPEG whatever the original was — the
+        // upload route measures the type and refuses a mismatch with the kind.
+        filename: 'slip.jpg',
+        mime: 'image/jpeg',
+        kind: 'PAYMENT_PROOF',
+        studentId: _target?.studentId,
+        capturedAt: DateTime.now(),
+      );
+      if (mounted) setState(() => _proofAssetId = id);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = t('dec.proofFailed'));
+    } finally {
+      if (mounted) setState(() => _uploadingProof = false);
+    }
+  }
+
   Future<void> _send() async {
     if (!_ready || _busy) return;
     setState(() {
@@ -1321,6 +1409,10 @@ class _DeclareSheetState extends State<_DeclareSheet> {
         paidAt: _paidAt,
         reference: _reference.text,
         notes: _note.text,
+        // Sent whenever one was attached, not only where it is demanded: a
+        // family that photographs the slip for a cash payment has given the
+        // office something worth keeping against the claim.
+        proofAssetId: _proofAssetId,
       );
       if (mounted) Navigator.of(context).pop(true);
     } on ApiException catch (e) {
@@ -1434,6 +1526,21 @@ class _DeclareSheetState extends State<_DeclareSheet> {
                     ),
                 ],
               ),
+
+              // The slip.
+              //
+              // Offered on every method, because a photograph of the receipt
+              // helps the office confirm a cash payment too — but it is only
+              // ASKED FOR on a transfer, where the server will refuse the
+              // notice without one.
+              const SizedBox(height: 14),
+              _ProofAttachment(
+                assetId: _proofAssetId,
+                busy: _uploadingProof,
+                required: _proofRequired,
+                onPick: _attachProof,
+                onClear: () => setState(() => _proofAssetId = null),
+              ),
               const SizedBox(height: 18),
 
               _Label(t('dec.when')),
@@ -1490,6 +1597,91 @@ class _DeclareSheetState extends State<_DeclareSheet> {
 /* ---------------------------------------------------------------------------
  * Small pieces
  * ------------------------------------------------------------------------- */
+
+/// Attach the transfer slip, or take it off again.
+///
+/// One row rather than a field, because there is exactly one of these and it is
+/// either there or it is not. Tapping attaches; tapping an attached one removes
+/// it, which is the same gesture the doctor's note on the leave form uses.
+///
+/// [required] changes only the words. A slip is worth having on any payment, so
+/// the row is offered on all of them — but on a bank transfer the school will
+/// refuse the notice without one, and a parent should be told that here rather
+/// than by a send button that will not light.
+class _ProofAttachment extends StatelessWidget {
+  const _ProofAttachment({
+    required this.assetId,
+    required this.busy,
+    required this.required,
+    required this.onPick,
+    required this.onClear,
+  });
+
+  final String? assetId;
+  final bool busy;
+  final bool required;
+  final VoidCallback onPick;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = Role.parent.tint;
+    final attached = assetId != null;
+
+    return InkWell(
+      onTap: busy ? null : (attached ? onClear : onPick),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+        decoration: BoxDecoration(
+          color: attached ? tint.withValues(alpha: 0.08) : AppTheme.canvas,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: attached ? tint.withValues(alpha: 0.45) : AppTheme.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            if (busy)
+              SizedBox(
+                width: 19,
+                height: 19,
+                child: CircularProgressIndicator(strokeWidth: 2.2, color: tint),
+              )
+            else
+              Icon(
+                attached ? Icons.check_circle_rounded : Icons.attach_file_rounded,
+                size: 19,
+                color: attached ? tint : AppTheme.textMuted,
+              ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Text(
+                busy
+                    ? t('dec.proofUploading')
+                    : attached
+                        ? t('dec.proofAttached')
+                        : required
+                            ? t('dec.proofNeeded')
+                            : t('dec.proofAdd'),
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: attached ? FontWeight.w600 : FontWeight.w500,
+                  color: attached ? tint : AppTheme.text,
+                ),
+              ),
+            ),
+            if (attached && !busy)
+              Text(
+                t('dec.proofRemove'),
+                style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 /// A quiet second line under a card's head: an icon and a fact.
 class _Detail extends StatelessWidget {

@@ -2301,6 +2301,12 @@ class ParentApi {
   /// instead of a second claim the office has to unpick. A 409 means two
   /// identical claims raced each other past the server's own replay lookup —
   /// the same good outcome through a different door, so it is not an error.
+  ///
+  /// [proofAssetId] is the photograph of the transfer slip, already uploaded
+  /// through [uploadFile] — the server takes an id here, never a file, so a
+  /// failed upload costs a retry rather than a lost payment notice. Required
+  /// by money-service for BANK_TRANSFER wherever the school sets
+  /// requireProofForTransfer, which is the default.
   Future<void> declarePayment({
     required int amountIqd,
     required String method,
@@ -2310,6 +2316,7 @@ class ParentApi {
     DateTime? paidAt,
     String? reference,
     String? notes,
+    String? proofAssetId,
   }) async {
     final ref = reference?.trim() ?? '';
     final note = notes?.trim() ?? '';
@@ -2327,6 +2334,7 @@ class ParentApi {
         if (ref.isNotEmpty) 'reference': ref,
         // Two characters is the server's floor for a note; one is refused.
         if (note.length >= 2) 'notes': note,
+        if (proofAssetId != null && proofAssetId.isNotEmpty) 'proofAssetId': proofAssetId,
       });
     } on ApiException catch (e) {
       if (e.status == 409) return;
@@ -2541,10 +2549,18 @@ class PaymentOptions {
   final String? instructions;
 
   /// The methods a parent can actually get accepted from this app today.
-  List<String> get usableMethods => [
-        for (final m in methods)
-          if (!(m == 'BANK_TRANSFER' && requireProofForTransfer)) m,
-      ];
+  ///
+  /// This used to drop BANK_TRANSFER whenever [requireProofForTransfer] was
+  /// set — which is the default — and so hid the commonest way to pay in this
+  /// market from every family in it. Not out of policy: the app simply had no
+  /// way to send the slip the server would demand, so offering the method
+  /// would only have produced a 400 nobody could act on.
+  ///
+  /// It can now. The form uploads the photograph first and passes the id to
+  /// declarePayment, so the whole list is offered and the proof is asked for
+  /// where it is needed. Nothing is filtered here any more; the field is still
+  /// read, but by the form, to decide whether the slip is required or optional.
+  List<String> get usableMethods => methods;
 
   factory PaymentOptions.fromJson(Map<String, dynamic> j) {
     final written = (j['paymentInstructions'] as String?)?.trim() ?? '';
