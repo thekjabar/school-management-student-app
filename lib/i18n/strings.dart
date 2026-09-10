@@ -736,6 +736,7 @@ const Map<String, String> _en = {
   'driver.nothingToCorrect': 'There is no record for this child to correct.',
   // Recording what a child did.
   'behaviour.merit': 'Merit',
+  'behaviour.rosterHint': 'Tap a child to record a merit or a concern.',
   'behaviour.concern': 'Concern',
   'behaviour.what': 'What it was about',
   'behaviour.noteHint': 'What happened, in your words',
@@ -2365,6 +2366,7 @@ const Map<String, String> _ckb = {
   'driver.nothingToCorrect': 'هیچ تۆمارێک نییە بۆ ئەم منداڵە کە ڕاست بکرێتەوە.',
   // Recording what a child did.
   'behaviour.merit': 'خاڵی باش',
+  'behaviour.rosterHint': 'دەست بنێ بە ناوی منداڵێک بۆ تۆمارکردنی خاڵی باش یان نیگەرانی.',
   'behaviour.concern': 'نیگەرانی',
   'behaviour.what': 'دەربارەی چی بوو',
   'behaviour.noteHint': 'چی ڕوویدا، بە وشەکانی خۆت',
@@ -3981,6 +3983,7 @@ const Map<String, String> _ar = {
   'driver.nothingToCorrect': 'لا يوجد سجل لهذا الطفل لتصحيحه.',
   // Recording what a child did.
   'behaviour.merit': 'نقطة إيجابية',
+  'behaviour.rosterHint': 'اضغط على اسم الطالب لتسجيل نقطة إيجابية أو ملاحظة.',
   'behaviour.concern': 'ملاحظة',
   'behaviour.what': 'بخصوص ماذا',
   'behaviour.noteHint': 'ما الذي حدث، بكلماتك',

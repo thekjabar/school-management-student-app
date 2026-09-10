@@ -1368,6 +1368,33 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
                                   className: widget.slot.className,
                                   subjectName: widget.slot.subjectName,
                                 ),
+                                // In words, once, above the list. The icon on
+                                // each row says a row is pressable; this says
+                                // what pressing one is for. Neither is obvious
+                                // from a column of names.
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2, bottom: 2),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.add_comment_outlined,
+                                        size: 13,
+                                        color: Role.teacher.tint,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          t('behaviour.rosterHint'),
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            height: 1.35,
+                                            color: AppTheme.textMuted,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                                 const _RosterHeadings(),
                               ],
                             ),
@@ -1724,6 +1751,31 @@ class _RosterRow extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
           ),
+          // Something that says the row DOES something.
+          //
+          // Recording a merit or a concern is the only action on this screen,
+          // and it was reached by tapping a row that gave no sign of being
+          // tappable: a roll number, a name, a code, and an InkWell with no
+          // chevron, no icon and no hint. A teacher had no reason to press a
+          // child's name, so the feature was shipped and not found — which is
+          // the same as not shipping it.
+          if (onTap != null) ...[
+            const SizedBox(width: 8),
+            Container(
+              width: 27,
+              height: 27,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Role.teacher.wash,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(
+                Icons.add_comment_outlined,
+                size: 15,
+                color: Role.teacher.tint,
+              ),
+            ),
+          ],
         ],
       ),
     );
