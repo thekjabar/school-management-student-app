@@ -15,7 +15,6 @@ import 'homework_tab.dart';
 import 'messages_tab.dart';
 import 'profile_tab.dart';
 import 'teacher_account.dart';
-import 'teacher_drawer.dart';
 
 /// The teacher app.
 ///
@@ -32,9 +31,6 @@ class TeacherApp extends StatefulWidget {
 }
 
 class _TeacherAppState extends State<TeacherApp> {
-  // Held so the header's menu button can open the drawer: the Scaffold that
-  // owns it is built by this method, so there is no context above it to ask.
-  final _scaffold = GlobalKey<ScaffoldState>();
   int _tab = 0;
   int _unread = 0;
 
@@ -78,9 +74,7 @@ class _TeacherAppState extends State<TeacherApp> {
             : t('greet.evening');
 
     return Scaffold(
-      key: _scaffold,
       backgroundColor: AppTheme.canvas,
-      drawer: const TeacherDrawer(),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -89,7 +83,6 @@ class _TeacherAppState extends State<TeacherApp> {
               greeting: greeting,
               name: me?.name ?? '',
               notificationCount: _unread,
-              onMenu: () => _scaffold.currentState?.openDrawer(),
               onBell: () => setState(() => _tab = 1),
             ),
             Expanded(
@@ -168,14 +161,12 @@ class _TeacherHeader extends StatelessWidget {
   const _TeacherHeader({
     required this.greeting,
     required this.name,
-    required this.onMenu,
     required this.onBell,
     this.notificationCount = 0,
   });
 
   final String greeting;
   final String name;
-  final VoidCallback onMenu;
   final VoidCallback onBell;
   final int notificationCount;
 
@@ -188,8 +179,15 @@ class _TeacherHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(kGutter, 8, kGutter, 12),
       child: Row(
         children: [
-          SquareButton(icon: Icons.menu_rounded, onTap: onMenu),
-          const SizedBox(width: 10),
+          // No menu button, and no drawer behind it.
+          //
+          // Every row it held already had a home on the bottom bar: the theme,
+          // the language, the notifications, the password and the way out are
+          // the Profile tab, and "Your week" is the Calendar tab — TeacherWeek
+          // is that same widget without the pushed-route furniture. So the
+          // burger was spending the left third of the header, the widest part
+          // of the app bar, on a second way to reach screens already one tap
+          // away. The face and the greeting start at the gutter instead.
           SizedBox(
             width: 48,
             height: 48,
