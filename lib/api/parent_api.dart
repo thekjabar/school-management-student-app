@@ -1377,8 +1377,10 @@ class TransportInfo {
     required this.routeName,
     required this.routeColorHex,
     required this.seatNumber,
+    required this.pickupStopId,
     required this.pickupStopName,
     required this.pickupLandmark,
+    required this.dropoffStopId,
     required this.dropoffStopName,
     required this.dropoffLandmark,
     required this.today,
@@ -1389,8 +1391,15 @@ class TransportInfo {
   final String? routeName;
   final String? routeColorHex;
   final String? seatNumber;
+
+  /// The registry id of the stop, which is what a correction is filed against.
+  ///
+  /// Null under a location order, and null for a child with no arrangement —
+  /// both of which are states where there is nothing to correct.
+  final String? pickupStopId;
   final String? pickupStopName;
   final String? pickupLandmark;
+  final String? dropoffStopId;
   final String? dropoffStopName;
   final String? dropoffLandmark;
   final List<TripToday> today;
@@ -1415,8 +1424,10 @@ class TransportInfo {
       routeName: route?['name'] as String?,
       routeColorHex: route?['colorHex'] as String?,
       seatNumber: j['seatNumber'] as String?,
+      pickupStopId: pickup?['id'] as String?,
       pickupStopName: pickup?['name'] as String?,
       pickupLandmark: pickup?['landmarkDescription'] as String?,
+      dropoffStopId: dropoff?['id'] as String?,
       dropoffStopName: dropoff?['name'] as String?,
       dropoffLandmark: dropoff?['landmarkDescription'] as String?,
       today: ((j['today'] as List?) ?? [])
@@ -1578,6 +1589,7 @@ class ConcernStatus {
   ConcernStatus({
     required this.id,
     required this.title,
+    required this.topic,
     required this.urgent,
     required this.state,
     required this.raisedAt,
@@ -1586,6 +1598,16 @@ class ConcernStatus {
 
   final String id;
   final String title;
+
+  /// BUS_LATE, CHILD_NOT_HOME, PICKUP_ARRANGEMENT or SOMETHING_ELSE — null on
+  /// a row whose key the server could not read a known topic out of.
+  ///
+  /// It matters because these rows are shown on two screens that mean different
+  /// things by them. The collection screen says "Closed on the office board.
+  /// That is not the school giving permission" against every row it draws, and
+  /// printing that against "the bus is late" tells a family something about a
+  /// collection that was never asked for.
+  final String? topic;
   final bool urgent;
 
   /// SENT, SEEN or CLOSED. Three words because that is all a family can act on:
@@ -1597,6 +1619,7 @@ class ConcernStatus {
   factory ConcernStatus.fromJson(Map<String, dynamic> j) => ConcernStatus(
         id: (j['id'] ?? '') as String,
         title: (j['title'] ?? '') as String,
+        topic: j['topic'] as String?,
         urgent: (j['urgent'] ?? false) as bool,
         state: (j['state'] ?? 'SENT') as String,
         raisedAt: DateTime.tryParse((j['raisedAt'] ?? '') as String)?.toLocal(),
@@ -1763,6 +1786,37 @@ class ParentApi {
       if (address != null) 'address': address.trim(),
       if (note != null) 'note': note.trim(),
     });
+  }
+
+  /// Tell the office the bus stop's pin is in the wrong place.
+  ///
+  /// A REQUEST, not a change. Nothing about the stop moves when this returns:
+  /// the office reads it, and either accepts the pin or turns it down. What the
+  /// server does immediately is mark the stop as under review so the next driver
+  /// is warned — which is why the reason has to be worth reading, and why the
+  /// screen that calls this must never say the stop has moved.
+  ///
+  /// The pin is optional. A parent who can only say "it is on the wrong side of
+  /// the road" has still told the office something they did not know.
+  ///
+  /// Only a stop one of this guardian's own children actually rides is
+  /// accepted; anything else comes back 403 with the office's phone number in
+  /// the sentence.
+  ///
+  /// Returns the server's own word for where the report now sits.
+  Future<String> submitStopCorrection({
+    required String stopId,
+    required String reason,
+    double? proposedLat,
+    double? proposedLon,
+  }) async {
+    final json = await _api.post('/parent/stops/$stopId/correction', {
+      'reason': reason.trim(),
+      'proposedLat': ?proposedLat,
+      'proposedLon': ?proposedLon,
+    });
+    return (json is Map<String, dynamic> ? json['status'] as String? : null) ??
+        'AWAITING_REVIEW';
   }
 
   /// The child's own record, as the school holds it.
@@ -2109,8 +2163,18 @@ class ParentApi {
   /// sounds distressed, ringing back" is writing for colleagues, and a family
   /// reading that verbatim would be the last time anybody wrote anything
   /// useful there.
-  Future<List<ConcernStatus>> concerns({String? studentId}) async {
-    final q = studentId == null ? '' : '?studentId=$studentId';
+  ///
+  /// [topic] narrows it to one of BUS_LATE, CHILD_NOT_HOME,
+  /// PICKUP_ARRANGEMENT, SOMETHING_ELSE. The server does the narrowing, not
+  /// this list: it answers with the thirty most recent rows, so a family with
+  /// thirty fresh "the bus is late" rows would otherwise have their collection
+  /// requests filtered off the end of a page that never arrived.
+  Future<List<ConcernStatus>> concerns({String? studentId, String? topic}) async {
+    final params = <String>[
+      if (studentId != null) 'studentId=$studentId',
+      if (topic != null) 'topic=$topic',
+    ];
+    final q = params.isEmpty ? '' : '?${params.join('&')}';
     final json = await _api.get('/parent/concerns$q') as Map<String, dynamic>;
     return ((json['rows'] as List?) ?? [])
         .map((e) => ConcernStatus.fromJson(e as Map<String, dynamic>))

@@ -72,6 +72,15 @@ const Set<String> kAlightingEvents = {
   'HANDOVER',
 };
 
+/// FleetDeviceKind.CREW_PHONE, from tracking-service's schema.
+///
+/// The one kind of device this app may speak for. A driver can also have a
+/// wired TRACKER or a PANIC_BUTTON bound to them, and heartbeating as one of
+/// those would tell dispatch that a box bolted into the bus is alive because a
+/// phone in somebody's pocket is — which is the precise lie the whole silence
+/// board exists to make impossible.
+const String kCrewPhoneDeviceKind = 'CREW_PHONE';
+
 /// The stop the bus is actually standing at when a custody event is recorded.
 ///
 /// This mirrors `expectedStopFor()` in custody.service.ts, and it has to,
@@ -1746,4 +1755,65 @@ class CrewApi {
     final json = await _api.get('/crew/announcements/$id/attachments?pageSize=50');
     return Paged.from<AttachedFile>(json, AttachedFile.fromJson).rows;
   }
+
+  /* -------------------------------------------------------------------------
+   * The handset itself
+   * ---------------------------------------------------------------------- */
+
+  /// The id of the crew phone the fleet has bound to this person, or null.
+  ///
+  /// `crew/heartbeat` is keyed on a Device row and refuses an id that is not
+  /// registered to the caller's organisation, so the app cannot mint one: it
+  /// has to be told which handset it is. This is the route that says so, and
+  /// it is self-scoped — `/crew/me/devices` takes no person id at all.
+  ///
+  /// Only [kCrewPhoneDeviceKind] is accepted. A driver may also be carrying a
+  /// panic button and be driving a bus with a wired tracker in it, and
+  /// heartbeating under either of those ids would mark hardware as alive on
+  /// the strength of a phone.
+  ///
+  /// Null is a real answer and not a failure: plenty of operators issue no
+  /// handsets, and the driver's own phone has no Device row. The heartbeat
+  /// simply does not run on those, which is honest — nothing on the fleet
+  /// board is expecting them.
+  Future<String?> myCrewPhoneId() async {
+    final json = await _api.get('/crew/me/devices?pageSize=50');
+    final rows = Paged.from<Map<String, dynamic>>(json, (row) => row).rows;
+    for (final row in rows) {
+      final device = row['device'];
+      if (device is! Map<String, dynamic>) continue;
+      if (device['kind'] != kCrewPhoneDeviceKind) continue;
+      final id = device['id'];
+      if (id is String && id.isNotEmpty) return id;
+    }
+    return null;
+  }
+
+  /// "I am alive", with what only this handset can see about itself.
+  ///
+  /// The payload is built by [DeviceHeartbeat] and passed through whole, so
+  /// that the one place that decides which optional fields it can honestly
+  /// fill in is the one place that reads the sensors. Returns the interval the
+  /// server wants the next one at, or null if it did not say — the cadence
+  /// belongs to the platform, exactly as the position sampling policy does.
+  Future<int?> sendHeartbeat(Map<String, dynamic> beat) async {
+    final json = await _api.post('/crew/heartbeat', beat);
+    return _heartbeatInterval(json);
+  }
+
+  /// Hand over heartbeats recorded while this phone had no data.
+  ///
+  /// This is what proves the handset was ALIVE through a coverage hole rather
+  /// than switched off in it — the difference, in the controller's own words,
+  /// between an operator being told to fix a mast and a driver being asked why
+  /// he turned his phone off. At most sixty per request: `HeartbeatFlushDto`
+  /// is `@ArrayMaxSize(60)` and a batch over it is refused whole.
+  Future<int?> flushHeartbeats(List<Map<String, dynamic>> beats) async {
+    final json = await _api.post('/crew/heartbeat/flush', {'heartbeats': beats});
+    return _heartbeatInterval(json);
+  }
+
+  static int? _heartbeatInterval(Object? json) => json is Map<String, dynamic>
+      ? (json['nextHeartbeatSeconds'] as num?)?.toInt()
+      : null;
 }

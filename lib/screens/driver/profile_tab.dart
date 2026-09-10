@@ -9,6 +9,7 @@ import '../../ui/kit.dart';
 import '../../ui/settings_widgets.dart';
 import '../../ui/sheets.dart';
 import '../login_screen.dart' show LanguagePicker;
+import '../staff_leave_screen.dart';
 import 'crew_account.dart';
 
 /// The driver's own tab.
@@ -68,15 +69,22 @@ class DriverProfile extends StatelessWidget {
         _Section(t('driver.papers')),
         Card16(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          child: TileRow(
-            icon: Icons.badge_rounded,
-            color: tint,
-            title: t('driver.papers'),
-            subtitle: t('driver.papersSub'),
-            last: true,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const CrewPapersScreen()),
-            ),
+          child: Column(
+            children: [
+              TileRow(
+                icon: Icons.badge_rounded,
+                color: tint,
+                title: t('driver.papers'),
+                subtitle: t('driver.papersSub'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CrewPapersScreen()),
+                ),
+              ),
+              // Time off sits with the papers rather than under Account: a
+              // driver looking for his own leave is looking for the same drawer
+              // his licence is in, not for a settings screen.
+              StaffLeaveTile(tint: tint),
+            ],
           ),
         ),
 

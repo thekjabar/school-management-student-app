@@ -11,6 +11,7 @@ import '../../ui/kit.dart';
 import '../../ui/settings_widgets.dart';
 import '../../ui/sheets.dart';
 import '../login_screen.dart' show LanguagePicker;
+import '../staff_leave_screen.dart';
 
 /// The teacher's own tab.
 ///
@@ -105,6 +106,12 @@ class TeacherProfileTab extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+
+          _Section(t('staffLeave.title')),
+          Card16(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+            child: StaffLeaveTile(tint: tint),
           ),
 
           _Section(t('settings.appearance')),

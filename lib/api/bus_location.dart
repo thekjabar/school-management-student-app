@@ -90,6 +90,15 @@ class BusLocation {
 
   bool get isRunning => _stream != null;
 
+  /// How many fixes are waiting for coverage.
+  ///
+  /// Read by the device heartbeat, which reports it to the platform as
+  /// `queuedEventCount`: a handset whose outbox is filling up is one whose
+  /// record of the run is not reaching anybody, and the office has no other
+  /// way to see that from outside. It is a MEASURED depth, never a guess —
+  /// nought is as true an answer as forty.
+  int get queuedCount => _pending.length;
+
   /// Begin following the bus for [tripId].
   ///
   /// Safe to call repeatedly — the same trip is a no-op, a different one

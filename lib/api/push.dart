@@ -45,6 +45,15 @@ class Push {
 
   static bool _started = false;
 
+  /// Whether the SDK is actually up on this handset.
+  ///
+  /// Exposed because [granted] answers false for two completely different
+  /// reasons — notifications are switched off, or OneSignal never started (no
+  /// app id, or an init that threw) — and a caller REPORTING that state to the
+  /// platform must not turn the second into "this driver has denied
+  /// notifications". The heartbeat leaves the field out instead.
+  static bool get started => _started;
+
   /// The person this handset is signed in as, kept so the OneSignal login can
   /// be re-issued once a subscription actually exists.
   static String? _personId;

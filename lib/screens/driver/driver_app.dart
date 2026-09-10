@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api/crew_api.dart';
+import '../../api/device_heartbeat.dart';
 import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
@@ -50,6 +53,25 @@ class _DriverAppState extends State<DriverApp> {
   void initState() {
     super.initState();
     _countUnread();
+    // "This handset is alive", from here on. Started at the shell rather than
+    // at the run screen because a phone that is switched on at 06:20 and does
+    // not reach the run until 06:55 has been alive for that half hour, and a
+    // liveness board that only knows about handsets mid-trip cannot tell a
+    // phone that is off from one that has simply not started yet.
+    //
+    // Fails silently and asks nothing of this screen: if the fleet has bound no
+    // crew phone to this person there is no Device row to beat under, and the
+    // service stops itself on the first attempt.
+    unawaited(DeviceHeartbeat.instance.start());
+  }
+
+  @override
+  void dispose() {
+    // The timer lives in the service, but it must not outlive the shell that
+    // armed it — a signed-out handset carrying on a request a minute is exactly
+    // the kind of thing nobody notices until the data bill arrives.
+    DeviceHeartbeat.instance.stop();
+    super.dispose();
   }
 
   Future<void> _countUnread() async {

@@ -20,8 +20,10 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/map_tiles.dart';
 import '../../ui/screen_kit.dart';
+import 'collection_request_screen.dart';
 import 'contact_school_screen.dart';
 import 'skip_ride_screen.dart';
+import 'stop_correction_screen.dart';
 import 'track_screen.dart';
 
 /// Where the bus is, and when it gets there.
@@ -70,6 +72,67 @@ class _BusScreenState extends State<BusScreen> {
     super.dispose();
   }
 
+  /// "My brother is collecting her today."
+  ///
+  /// Drawn on BOTH branches of this screen, and that is the point of it being a
+  /// method. A one-off collection authorisation is most wanted by the families
+  /// whose child does not ride a bus at all — they are collected at the gate
+  /// every afternoon, and "somebody else is coming for her" is the only
+  /// transport question they ever have. This screen returns on `ridesTheBus`
+  /// long before the card below, so for exactly those families there was no
+  /// route to the feature from anywhere in the app.
+  ///
+  /// [rides] travels through to the form, which drops its "which run?" question
+  /// when there is no run to meet.
+  Widget _collectCard(BuildContext context, {required bool rides}) {
+    return Card16(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => CollectionRequestScreen(child: widget.child, ridesTheBus: rides),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppTheme.amber.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.how_to_reg_rounded,
+              size: 20,
+              color: AppTheme.amber,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  t('ota.title'),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.text,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  t('ota.busCardLine'),
+                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: AppTheme.textFaint),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tint = Role.parent.tint;
@@ -110,15 +173,26 @@ class _BusScreenState extends State<BusScreen> {
                 },
                 builder: (context, bus) {
                   if (!bus.transport.ridesTheBus) {
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 50),
-                      child: Center(
-                        child: Text(
-                          t('bus.notOnBus'),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                    // Not a dead end. This child is walked to the gate and
+                    // collected there, which is precisely when a family needs
+                    // to tell the office that somebody else is coming for them
+                    // — and until this card was here, saying so had no route in
+                    // the app at all for exactly these children: the bus card
+                    // on Home is not tappable when a child does not ride, and
+                    // this screen returned before ever drawing the card below.
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 44, 0, 26),
+                          child: Text(
+                            t('bus.notOnBus'),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                          ),
                         ),
-                      ),
+                        _collectCard(context, rides: false),
+                      ],
                     );
                   }
 
@@ -207,6 +281,80 @@ class _BusScreenState extends State<BusScreen> {
                           ],
                         ),
                       ),
+                      // "That pin is on the wrong side of the road."
+                      //
+                      // Directly under the map that just drew the pin, because
+                      // that is the moment a parent sees it is wrong — not on a
+                      // settings page they would have to go looking for, and
+                      // not in the address screen, which is about where the
+                      // family lives rather than where the bus halts. Only when
+                      // the office has actually given the child a stop: with no
+                      // stop there is nothing to correct.
+                      if (bus.correctableStops.isNotEmpty) ...[
+                        const SizedBox(height: kCardGap),
+                        Card16(
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => StopCorrectionScreen(
+                                child: widget.child,
+                                stops: bus.correctableStops,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.amber
+                                      .withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.wrong_location_outlined,
+                                  size: 20,
+                                  color: AppTheme.amber,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      t('stopfix.title'),
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppTheme.text,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      t('stopfix.busCardLine'),
+                                      style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(Icons.chevron_right_rounded, color: AppTheme.textFaint),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: kCardGap),
+                      // "My brother is collecting her today."
+                      //
+                      // Next to the skip card because it is the same thought
+                      // arriving a second later — she is not going home on the
+                      // bus, somebody is coming for her — and because a family
+                      // who taps the skip card when they meant this one has
+                      // told the school she is not travelling and told nobody
+                      // that a man they have never heard of is coming to the
+                      // gate. The screen it opens is careful to say, three
+                      // times, that asking is not being allowed.
+                      _collectCard(context, rides: true),
                       const SizedBox(height: kCardGap),
                       // The way out when something is wrong.
                       //
@@ -398,6 +546,46 @@ class _Bus {
   /// The school is not among them. No parent endpoint returns a campus
   /// position, and a pin placed by guess is a wrong answer drawn confidently.
   List<LatLng> get mapPoints => [?busAt, ?stopAt];
+
+  /// The stops this child stands at, in the shape a correction is filed
+  /// against.
+  ///
+  /// The id comes from the transport call and the pin from the home call: no
+  /// single parent endpoint returns both, so the two are paired by their leg.
+  /// A stop with no id cannot be reported — /parent/stops/:id/correction has
+  /// nowhere to send it — and under a location order the server sends neither,
+  /// which is the right answer for a screen that must not name the corner.
+  ///
+  /// One entry, not two, when a child is collected and set down at the same
+  /// corner. That is most families, and asking them to pick between two
+  /// identical stops is asking a question with one answer.
+  List<StopToFix> get correctableStops {
+    final out = <StopToFix>[];
+    final pickupId = transport.pickupStopId;
+    final dropoffId = transport.dropoffStopId;
+
+    if (pickupId != null) {
+      final s = stops?.pickup;
+      out.add(StopToFix(
+        id: pickupId,
+        name: transport.pickupStopName ?? t('bus.stop'),
+        landmark: transport.pickupLandmark,
+        at: s?.lat != null && s?.lon != null ? LatLng(s!.lat!, s.lon!) : null,
+        pickup: true,
+      ));
+    }
+    if (dropoffId != null && dropoffId != pickupId) {
+      final s = stops?.dropoff;
+      out.add(StopToFix(
+        id: dropoffId,
+        name: transport.dropoffStopName ?? t('bus.stop'),
+        landmark: transport.dropoffLandmark,
+        at: s?.lat != null && s?.lon != null ? LatLng(s!.lat!, s.lon!) : null,
+        pickup: false,
+      ));
+    }
+    return out;
+  }
 }
 
 /* ---------------------------------------------------------------------------

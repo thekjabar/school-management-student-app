@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../api/bus_location.dart';
 import '../../api/crew_api.dart';
+import '../../api/device_heartbeat.dart';
 import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
@@ -218,8 +219,17 @@ class _TripScreenState extends State<TripScreen> {
     final live = _headerTrip.value;
     if (live != null && live.startedAt != null && live.endedAt == null) {
       unawaited(BusLocation.instance.start(live.id));
-    } else if (BusLocation.instance.isRunning) {
-      unawaited(BusLocation.instance.stop());
+      // And the same fact to the liveness board. A beat carrying this trip id
+      // is what binds this handset to the run, and it is what lifts the rate
+      // from a quarter-hour to a minute. It does not page anybody: the watchdog
+      // that pages walks devices bound to the VEHICLE and a crew phone is bound
+      // to the person — see the cadence note on DeviceHeartbeat.
+      DeviceHeartbeat.instance.noteTrip(live.id);
+    } else {
+      if (BusLocation.instance.isRunning) unawaited(BusLocation.instance.stop());
+      // The run is over, or has not started. Back to the idle cadence rather
+      // than a minute-by-minute beat about a parked bus on a metered SIM.
+      DeviceHeartbeat.instance.noteTrip(null);
     }
     return _TripData(
       trip: trips.where((t) => t.id == widget.tripId).firstOrNull,
