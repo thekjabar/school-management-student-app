@@ -433,7 +433,13 @@ class _ComposeSheetState extends State<_ComposeSheet> {
                   maxLength: 2000,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: InputDecoration(
+                    filled: false,
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
                     counterText: '',
                     hintText: t('crew.commentHint'),
                     hintStyle: TextStyle(fontSize: 14, color: AppTheme.textFaint),

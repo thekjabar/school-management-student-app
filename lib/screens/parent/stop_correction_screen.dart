@@ -253,7 +253,13 @@ class _StopCorrectionScreenState extends State<StopCorrectionScreen> {
             textCapitalization: TextCapitalization.sentences,
             style: const TextStyle(fontSize: 14.5, height: 1.4),
             decoration: InputDecoration(
+              filled: false,
               border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
               counterText: '',
               hintText: t('stopfix.reasonHint'),
               hintStyle: TextStyle(fontSize: 14, height: 1.4, color: AppTheme.textFaint),

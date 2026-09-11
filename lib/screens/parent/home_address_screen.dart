@@ -297,7 +297,13 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
   static const _entry = TextStyle(fontSize: 14.5, height: 1.4);
 
   InputDecoration _plain(String hint) => InputDecoration(
+        filled: false,
         border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        disabledBorder: InputBorder.none,
+        errorBorder: InputBorder.none,
+        focusedErrorBorder: InputBorder.none,
         counterText: '',
         hintText: hint,
         hintStyle: TextStyle(fontSize: 14, height: 1.4, color: AppTheme.textFaint),
@@ -478,7 +484,13 @@ class _PlaceSearchState extends State<_PlaceSearch> {
                   style: const TextStyle(fontSize: 14.5),
                   decoration: InputDecoration(
                     isDense: true,
+                    filled: false,
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
                     hintText: t('home.searchHint'),
                     hintStyle: TextStyle(fontSize: 14, color: AppTheme.textFaint),
                     contentPadding: const EdgeInsets.symmetric(vertical: 13),

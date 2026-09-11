@@ -205,14 +205,14 @@ class _RouteMapState extends State<RouteMap> {
           ),
         ),
         if (widget.fullScreen)
-          ValueListenableBuilder<geo.Position?>(
-            valueListenable: BusLocation.instance.here,
-            builder: (context, me, _) {
-              if (me == null) return const SizedBox.shrink();
-              return PositionedDirectional(
-                end: 10,
-                top: 64,
-                child: Semantics(
+          PositionedDirectional(
+            end: 10,
+            top: 64,
+            child: ValueListenableBuilder<geo.Position?>(
+              valueListenable: BusLocation.instance.here,
+              builder: (context, me, _) {
+                if (me == null) return const SizedBox.shrink();
+                return Semantics(
                   button: true,
                   label: t('driver.map.centreOnMe'),
                   child: GestureDetector(
@@ -243,9 +243,9 @@ class _RouteMapState extends State<RouteMap> {
                       ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         const _Credit(),
       ],
