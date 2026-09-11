@@ -647,11 +647,12 @@ class _Medical extends StatelessWidget {
               spacing: 6,
               runSpacing: 6,
               children: [
-                for (final f in m.flags) StatusChip(humanise(f), color: AppTheme.rose),
+                for (final f in m.flags)
+                  StatusChip(tOr('medFlag.$f', humanise(f)), color: AppTheme.rose),
               ],
             ),
           ],
-          if (m.actionText != null && m.actionText!.isNotEmpty) ...[
+          if (m.actionText != null && m.actionText!.trim().isNotEmpty) ...[
             const SizedBox(height: 11),
             Text(
               m.actionText!,
@@ -667,9 +668,9 @@ class _Medical extends StatelessWidget {
             _Line(
               icon: Icons.medication_outlined,
               color: AppTheme.rose,
-              text: m.medicationLocation == null || m.medicationLocation!.isEmpty
+              text: m.medicationLocation == null || m.medicationLocation!.trim().isEmpty
                   ? t('info.carriesMedication')
-                  : tv('info.carriesMedicationAt', {'where': m.medicationLocation!}),
+                  : tv('info.carriesMedicationAt', {'where': m.medicationLocation!.trim()}),
             ),
           if (m.emergencyContacts.isNotEmpty)
             _Line(

@@ -177,7 +177,7 @@ class MedicalSummary {
 
   bool get isEmpty =>
       flags.isEmpty &&
-      (actionText == null || actionText!.isEmpty) &&
+      (actionText == null || actionText!.trim().isEmpty) &&
       !carriesMedication &&
       emergencyContacts.isEmpty;
 

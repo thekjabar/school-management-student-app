@@ -92,13 +92,15 @@ class AppLocale {
   }
 }
 
-String t(String key) {
+String t(String key) => tOr(key, key);
+
+String tOr(String key, String fallback) {
   final table = switch (AppLocale.current.value) {
     Lang.ckb => _ckb,
     Lang.ar => _ar,
     Lang.en => _en,
   };
-  return table[key] ?? _en[key] ?? key;
+  return table[key] ?? _en[key] ?? fallback;
 }
 
 String tn(String key, Object value) => t(key).replaceAll('{n}', '$value');
@@ -998,7 +1000,7 @@ const Map<String, String> _en = {
   'info.carriesMedicationAt': 'Carries medication — {where}',
   'info.ringInOrder': 'In an emergency: {names}',
   'info.medicalStale': 'This card is due a review',
-  'info.medicalStaleBody': 'The office will ask you to confirm it is still correct.',
+  'info.medicalStaleBody': 'Tell the school office if anything has changed, so they can bring it up to date.',
   'info.support': 'Support arrangements',
   'info.escortRequired': 'An attendant travels with her',
   'info.rampVehicle': 'A vehicle with a ramp',
@@ -1006,6 +1008,18 @@ const Map<String, String> _en = {
   'info.fixedSeatAt': 'Seat {seat}, every day',
   'info.neverAlone': 'Never released alone',
   'info.correctionNote': 'The school office keeps this record. If anything here is wrong, tell them and they will correct it.',
+  'medFlag.ASTHMA': 'Asthma',
+  'medFlag.SEVERE_ALLERGY_ANAPHYLAXIS': 'Severe allergy',
+  'medFlag.EPILEPSY_SEIZURES': 'Epilepsy',
+  'medFlag.DIABETES': 'Diabetes',
+  'medFlag.CARDIAC': 'Heart condition',
+  'medFlag.HEAT_SENSITIVE': 'Sensitive to heat',
+  'medFlag.MOBILITY_IMPAIRMENT': 'Difficulty moving',
+  'medFlag.VISION_IMPAIRMENT': 'Sight difficulty',
+  'medFlag.HEARING_IMPAIRMENT': 'Hearing difficulty',
+  'medFlag.COMMUNICATION_SUPPORT': 'Needs help communicating',
+  'medFlag.MEDICATION_CARRIED': 'Carries medication',
+  'medFlag.OTHER': 'Other',
   'crew.title': 'Driver feedback',
   'crew.introTitle': 'Tell the school how the journey is going',
   'crew.introBody': 'Praise or a concern about the driver or attendant who carries your child. It goes to the school office. The driver is never shown it.',
@@ -2818,7 +2832,7 @@ const Map<String, String> _ckb = {
   'info.carriesMedicationAt': 'دەرمان لەگەڵ خۆی هەیە — {where}',
   'info.ringInOrder': 'لە کاتی فریاکەوتن: {names}',
   'info.medicalStale': 'ئەم کارتە پێویستی بە پێداچوونەوەیە',
-  'info.medicalStaleBody': 'نووسینگە داوات لێدەکات دڵنیای بکەیتەوە کە هێشتا ڕاستە.',
+  'info.medicalStaleBody': 'ئەگەر شتێک گۆڕاوە بە نووسینگەی قوتابخانە بڵێ، تا نوێی بکەنەوە.',
   'info.support': 'ڕێکخستنی پاڵپشتی',
   'info.escortRequired': 'هاوڕێیەک لەگەڵیدا دەڕوات',
   'info.rampVehicle': 'ئۆتۆمبێلێک بە ڕامپەوە',
@@ -2826,6 +2840,18 @@ const Map<String, String> _ckb = {
   'info.fixedSeatAt': 'کورسی {seat}، هەموو ڕۆژێک',
   'info.neverAlone': 'هەرگیز بە تەنها ناهێڵدرێت',
   'info.correctionNote': 'نووسینگەی قوتابخانە ئەم تۆمارە دەپارێزێت. ئەگەر شتێک هەڵەیە، پێیان بڵێ و ڕاستی دەکەنەوە.',
+  'medFlag.ASTHMA': 'ئازمە',
+  'medFlag.SEVERE_ALLERGY_ANAPHYLAXIS': 'هەستیاری توند',
+  'medFlag.EPILEPSY_SEIZURES': 'فێ',
+  'medFlag.DIABETES': 'شەکرە',
+  'medFlag.CARDIAC': 'نەخۆشی دڵ',
+  'medFlag.HEAT_SENSITIVE': 'هەستیار بە گەرما',
+  'medFlag.MOBILITY_IMPAIRMENT': 'کێشەی جوڵە',
+  'medFlag.VISION_IMPAIRMENT': 'کێشەی بینین',
+  'medFlag.HEARING_IMPAIRMENT': 'کێشەی بیستن',
+  'medFlag.COMMUNICATION_SUPPORT': 'پێویستی بە یارمەتی پەیوەندییە',
+  'medFlag.MEDICATION_CARRIED': 'دەرمان لەگەڵە',
+  'medFlag.OTHER': 'شتێکی تر',
   'crew.title': 'ڕای دەربارەی شۆفێر',
   'crew.introTitle': 'بە قوتابخانە بڵێ گەشتەکە چۆنە',
   'crew.introBody': 'پەسندکردن یان نیگەرانی دەربارەی شۆفێر یان هاوڕێی ناو پاسەکە. دەچێتە نووسینگەی قوتابخانە. شۆفێر هەرگیز نایبینێت.',
@@ -4630,7 +4656,7 @@ const Map<String, String> _ar = {
   'info.carriesMedicationAt': 'يحمل دواءً معه — {where}',
   'info.ringInOrder': 'عند الطوارئ: {names}',
   'info.medicalStale': 'هذه البطاقة بحاجة إلى مراجعة',
-  'info.medicalStaleBody': 'سيطلب منك المكتب تأكيد أنها ما زالت صحيحة.',
+  'info.medicalStaleBody': 'أخبر مكتب المدرسة إن تغيّر أي شيء حتى يحدّثوا البطاقة.',
   'info.support': 'ترتيبات الدعم',
   'info.escortRequired': 'يرافقه مشرف في الحافلة',
   'info.rampVehicle': 'مركبة مزوّدة بمنحدر',
@@ -4638,6 +4664,18 @@ const Map<String, String> _ar = {
   'info.fixedSeatAt': 'المقعد {seat}، كل يوم',
   'info.neverAlone': 'لا يُسلَّم وحده أبداً',
   'info.correctionNote': 'مكتب المدرسة هو من يحفظ هذا السجل. إن كان أي شيء هنا خاطئاً فأبلغهم وسيصححونه.',
+  'medFlag.ASTHMA': 'الربو',
+  'medFlag.SEVERE_ALLERGY_ANAPHYLAXIS': 'حساسية شديدة',
+  'medFlag.EPILEPSY_SEIZURES': 'الصرع',
+  'medFlag.DIABETES': 'السكري',
+  'medFlag.CARDIAC': 'حالة قلبية',
+  'medFlag.HEAT_SENSITIVE': 'حساسية للحرارة',
+  'medFlag.MOBILITY_IMPAIRMENT': 'صعوبة في الحركة',
+  'medFlag.VISION_IMPAIRMENT': 'ضعف البصر',
+  'medFlag.HEARING_IMPAIRMENT': 'ضعف السمع',
+  'medFlag.COMMUNICATION_SUPPORT': 'دعم التواصل',
+  'medFlag.MEDICATION_CARRIED': 'يحمل دواء',
+  'medFlag.OTHER': 'أخرى',
   'crew.title': 'رأيك في السائق',
   'crew.introTitle': 'أخبر المدرسة كيف تسير الرحلة',
   'crew.introBody': 'ثناء أو ملاحظة عن السائق أو المرافق الذي ينقل طفلك. تصل إلى مكتب المدرسة. ولا يراها السائق أبداً.',
