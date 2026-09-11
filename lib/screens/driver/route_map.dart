@@ -15,6 +15,7 @@ import '../../theme/app_theme.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/map_tiles.dart';
 import '../../ui/screen_kit.dart';
+import 'roster_kit.dart';
 
 bool stopIsPlaced(PlannedStop s) {
   final lat = s.lat;
@@ -142,7 +143,12 @@ class _RouteMapState extends State<RouteMap> {
           end: 62,
           child: Align(
             alignment: AlignmentDirectional.centerStart,
-            child: _Callout(pin: _shown(pins), tint: widget.tint, leg: widget.leg),
+            child: _Callout(
+              pin: _shown(pins),
+              tint: widget.tint,
+              leg: widget.leg,
+              expanded: _touched != null,
+            ),
           ),
         ),
         PositionedDirectional(
@@ -370,11 +376,17 @@ class _Stop {
 }
 
 class _Callout extends StatelessWidget {
-  const _Callout({required this.pin, required this.tint, required this.leg});
+  const _Callout({
+    required this.pin,
+    required this.tint,
+    required this.leg,
+    this.expanded = false,
+  });
 
   final _Stop? pin;
   final Color tint;
   final String leg;
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
@@ -405,7 +417,11 @@ class _Callout extends StatelessWidget {
                 ),
               ),
             )
-          : Row(
+          : Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+            Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
@@ -461,7 +477,51 @@ class _Callout extends StatelessWidget {
                 ),
               ],
             ),
+            if (expanded && !p.school) ..._riders(p),
+            ],
+          ),
     );
+  }
+
+  List<Widget> _riders(_Stop p) {
+    final riders = p.stop.students;
+    if (riders.isEmpty) {
+      return [
+        const SizedBox(height: 7),
+        Text(
+          t('driver.nobodyAtStop'),
+          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppTheme.textMuted),
+        ),
+      ];
+    }
+
+    return [
+      const SizedBox(height: 8),
+      Divider(height: 1, color: AppTheme.border),
+      const SizedBox(height: 7),
+      Text(
+        '${t('driver.atThisStop')} · ${riders.length}',
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.4,
+          color: AppTheme.textFaint,
+        ),
+      ),
+      const SizedBox(height: 6),
+      ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 236, maxWidth: 300),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final r in riders) _RiderLine(rider: r, tint: tint),
+            ],
+          ),
+        ),
+      ),
+    ];
   }
 
   String _line(_Stop p) => [
@@ -474,6 +534,71 @@ class _Callout extends StatelessWidget {
               ? tn('driver.nToDropOff', p.stop.students.length)
               : tn('driver.nToPickUp', p.stop.students.length),
       ].join(' · ');
+}
+
+class _RiderLine extends StatelessWidget {
+  const _RiderLine({required this.rider, required this.tint});
+
+  final RiderOnStop rider;
+  final Color tint;
+
+  String get _word {
+    if (rider.alightedAt != null) return t('driver.done');
+    if (rider.boardedAt != null) return t('driver.pickedUp');
+    if (rider.notTravelling) return t('driver.notRiding');
+    return t('driver.waitingAtStop');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = riderTone(rider);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SeatChip(rider: rider, size: 26),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        rider.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                    ),
+                    if (rider.requiresAssistance) ...[
+                      const SizedBox(width: 4),
+                      Icon(Icons.accessible_rounded, size: 13, color: AppTheme.amber),
+                    ],
+                  ],
+                ),
+                Text(
+                  _word,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: tone),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _Credit extends StatelessWidget {

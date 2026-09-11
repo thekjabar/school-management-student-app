@@ -385,8 +385,43 @@ class _DutyCard extends StatelessWidget {
                           color: tint,
                         ),
                       ),
+                      const SizedBox(height: 5),
+                      Container(
+                        padding: const EdgeInsetsDirectional.fromSTEB(8, 4, 10, 4),
+                        decoration: BoxDecoration(
+                          color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              trip.leg == 'RETURN'
+                                  ? Icons.home_rounded
+                                  : Icons.school_rounded,
+                              size: 13,
+                              color: tint,
+                            ),
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
+                                trip.leg == 'RETURN'
+                                    ? t('driver.legReturn')
+                                    : t('driver.legOut'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: tint,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       if (school.isNotEmpty) ...[
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 4),
                         Text(
                           school,
                           maxLines: 1,

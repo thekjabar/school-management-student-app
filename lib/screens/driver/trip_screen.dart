@@ -329,7 +329,9 @@ class _TripScreenState extends State<TripScreen> {
             ValueListenableBuilder<CrewTrip?>(
               valueListenable: _headerTrip,
               builder: (context, trip, _) => ScreenHeader(
-                title: t('driver.theRun'),
+                title: trip == null
+                    ? t('driver.theRun')
+                    : (trip.leg == 'RETURN' ? t('driver.legReturn') : t('driver.legOut')),
                 subtitle: trip?.routeName,
                 trailing: (trip != null &&
                         trip.startedAt != null &&
