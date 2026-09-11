@@ -19,27 +19,92 @@ class Place {
 class PlaceSearch {
   PlaceSearch._();
 
-  static bool get available => MapTiles.token.isNotEmpty;
+  static const _agent = 'KSP-Parent/1.0 (Kurdistan Student Protection; school transport)';
+
+  static bool get available => true;
+
+  static String get _language => switch (AppLocale.current.value) {
+        Lang.ar => 'ar',
+        Lang.ckb => 'ckb,ar,en',
+        Lang.en => 'en',
+      };
 
   static Future<List<Place>> suggest(String query, {double? nearLat, double? nearLon}) async {
     final q = query.trim();
-    if (q.length < 2 || !available) return const [];
+    if (q.length < 2) return const [];
+
+    final open = await _openStreetMap(q, nearLat: nearLat, nearLon: nearLon);
+    if (open.isNotEmpty) return open;
+    return _mapbox(q, nearLat: nearLat, nearLon: nearLon);
+  }
+
+  static Future<List<Place>> _openStreetMap(
+    String q, {
+    double? nearLat,
+    double? nearLon,
+  }) async {
+    try {
+      const span = 0.35;
+      final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
+        'q': q,
+        'format': 'jsonv2',
+        'limit': '8',
+        'countrycodes': 'iq',
+        'addressdetails': '1',
+        'accept-language': _language,
+        if (nearLat != null && nearLon != null)
+          'viewbox': '${nearLon - span},${nearLat + span},'
+              '${nearLon + span},${nearLat - span}',
+      });
+
+      final res = await http
+          .get(uri, headers: {'User-Agent': _agent})
+          .timeout(const Duration(seconds: 8));
+      if (res.statusCode != 200) return const [];
+
+      final body = jsonDecode(utf8.decode(res.bodyBytes));
+      if (body is! List) return const [];
+
+      final out = <Place>[];
+      final seen = <String>{};
+      for (final row in body) {
+        if (row is! Map) continue;
+        final lat = double.tryParse('${row['lat']}');
+        final lon = double.tryParse('${row['lon']}');
+        if (lat == null || lon == null) continue;
+
+        final full = ('${row['display_name'] ?? ''}').trim();
+        if (full.isEmpty) continue;
+        final parts = full.split(',').map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+
+        var name = ('${row['name'] ?? ''}').trim();
+        if (name.isEmpty) name = parts.isEmpty ? full : parts.first;
+        if (parts.isNotEmpty && parts.first == name) parts.removeAt(0);
+
+        final key = '$name|${lat.toStringAsFixed(4)}|${lon.toStringAsFixed(4)}';
+        if (!seen.add(key)) continue;
+
+        out.add(Place(name: name, detail: parts.take(3).join(', '), lat: lat, lon: lon));
+      }
+      return out;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<List<Place>> _mapbox(String q, {double? nearLat, double? nearLon}) async {
+    if (MapTiles.token.isEmpty) return const [];
 
     try {
-      final uri = Uri.https(
-        'api.mapbox.com',
-        '/geocoding/v5/mapbox.places/${Uri.encodeComponent(q)}.json',
-        {
-          'access_token': MapTiles.token,
-          'country': 'iq',
-          'limit': '6',
-          'types': 'address,poi,neighborhood,locality,place,district',
-          if (nearLat != null && nearLon != null)
-            'proximity': '$nearLon,$nearLat',
-          if (AppLocale.current.value == Lang.ar) 'language': 'ar',
-          if (AppLocale.current.value == Lang.en) 'language': 'en',
-        },
-      );
+      final uri = Uri.https('api.mapbox.com', '/search/geocode/v6/forward', {
+        'q': q,
+        'access_token': MapTiles.token,
+        'country': 'iq',
+        'limit': '6',
+        if (nearLat != null && nearLon != null) 'proximity': '$nearLon,$nearLat',
+        if (AppLocale.current.value != Lang.ckb)
+          'language': AppLocale.current.value == Lang.ar ? 'ar' : 'en',
+      });
 
       final res = await http.get(uri).timeout(const Duration(seconds: 6));
       if (res.statusCode != 200) return const [];
@@ -50,20 +115,22 @@ class PlaceSearch {
       final out = <Place>[];
       for (final f in body['features'] as List) {
         if (f is! Map) continue;
-        final centre = f['center'];
-        if (centre is! List || centre.length < 2) continue;
-        final lon = (centre[0] as num?)?.toDouble();
-        final lat = (centre[1] as num?)?.toDouble();
+        final props = f['properties'];
+        if (props is! Map) continue;
+
+        final coords = props['coordinates'];
+        final lat = coords is Map ? (coords['latitude'] as num?)?.toDouble() : null;
+        final lon = coords is Map ? (coords['longitude'] as num?)?.toDouble() : null;
         if (lat == null || lon == null) continue;
 
-        final name = (f['text'] as String?)?.trim();
-        if (name == null || name.isEmpty) continue;
+        final name = ('${props['name'] ?? ''}').trim();
+        if (name.isEmpty) continue;
 
-        final full = (f['place_name'] as String?)?.trim() ?? '';
-        final rest = full.split(',').map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
-        if (rest.isNotEmpty && rest.first == name) rest.removeAt(0);
+        final full = ('${props['full_address'] ?? props['place_formatted'] ?? ''}').trim();
+        final parts = full.split(',').map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+        if (parts.isNotEmpty && parts.first == name) parts.removeAt(0);
 
-        out.add(Place(name: name, detail: rest.take(2).join(', '), lat: lat, lon: lon));
+        out.add(Place(name: name, detail: parts.take(3).join(', '), lat: lat, lon: lon));
       }
       return out;
     } catch (_) {

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 
 import '../../api/client.dart';
@@ -43,6 +44,7 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
 
   bool _busy = false;
   bool _dirty = false;
+  bool _locating = false;
   String? _error;
 
   static const _fallback = LatLng(36.1901, 44.0091);
@@ -86,6 +88,49 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
     });
     _map.move(at, 17);
     _lookUp(at, force: true);
+  }
+
+  Future<void> _useMyLocation() async {
+    if (_locating) return;
+    setState(() => _locating = true);
+
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        if (mounted) showNote(context, t('home.locationOff'), bad: true);
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (mounted) showNote(context, t('home.locationDenied'), bad: true);
+        return;
+      }
+
+      final fix = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+      if (!mounted) return;
+
+      final at = LatLng(fix.latitude, fix.longitude);
+      setState(() {
+        _pin = at;
+        _dirty = true;
+      });
+      _map.move(at, 18);
+      _lookUp(at, force: true);
+    } catch (e) {
+      debugPrint('home: could not read this phone position: $e');
+      if (mounted) showNote(context, t('home.locationFailed'), bad: true);
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
   }
 
   void _scheduleLookUp(LatLng at) {
@@ -190,6 +235,8 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
                       enabled: _editing,
                       controller: _map,
                       tint: tint,
+                      locating: _locating,
+                      onLocate: _editing ? _useMyLocation : null,
                       onMoved: (c) {
                         setState(() {
                           _pin = c;
@@ -490,7 +537,7 @@ class _PlaceSearchState extends State<_PlaceSearch> {
       return;
     }
     setState(() => _looking = true);
-    _debounce = Timer(const Duration(milliseconds: 400), () => _run(q));
+    _debounce = Timer(const Duration(milliseconds: 700), () => _run(q));
   }
 
   Future<void> _run(String q) async {
@@ -707,7 +754,12 @@ class _MapCard extends StatelessWidget {
     required this.controller,
     required this.tint,
     required this.onMoved,
+    this.onLocate,
+    this.locating = false,
   });
+
+  final VoidCallback? onLocate;
+  final bool locating;
 
   final LatLng pin;
   final bool placed;
@@ -786,6 +838,47 @@ class _MapCard extends StatelessWidget {
                   ),
                 ),
               ),
+
+              if (onLocate != null)
+                PositionedDirectional(
+                  end: 10,
+                  bottom: 10,
+                  child: Material(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    elevation: 2,
+                    shadowColor: Colors.black26,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: locating ? null : onLocate,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (locating)
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: tint),
+                              )
+                            else
+                              Icon(Icons.my_location_rounded, size: 17, color: tint),
+                            const SizedBox(width: 8),
+                            Text(
+                              t('home.useMyLocation'),
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.text,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
 
               PositionedDirectional(
                 start: 8,
