@@ -1359,6 +1359,166 @@ class TripToday {
   }
 }
 
+class RouteSafety {
+  RouteSafety({
+    required this.ridesTheBus,
+    required this.locationHidden,
+    required this.from,
+    required this.to,
+    required this.days,
+    required this.route,
+    required this.child,
+    required this.alerts,
+    required this.reaching,
+  });
+
+  final bool ridesTheBus;
+  final bool locationHidden;
+  final String from;
+  final String to;
+  final int days;
+  final RouteSafetyRoute? route;
+  final RouteSafetyChild? child;
+  final RouteSafetyAlerts? alerts;
+  final RouteSafetyReach? reaching;
+
+  static Map<String, dynamic>? _obj(dynamic v) =>
+      v is Map<String, dynamic> ? v : null;
+
+  factory RouteSafety.fromJson(Map<String, dynamic> j) {
+    final period = _obj(j['period']) ?? const <String, dynamic>{};
+    final route = _obj(j['route']);
+    final child = _obj(j['yourChild']);
+    final alerts = _obj(j['answeredAboutYourChild']);
+    final reaching = _obj(j['reachingYou']);
+    return RouteSafety(
+      ridesTheBus: (j['ridesTheBus'] ?? false) as bool,
+      locationHidden: (j['locationHidden'] ?? false) as bool,
+      from: (period['from'] ?? '') as String,
+      to: (period['to'] ?? '') as String,
+      days: (period['days'] as num?)?.toInt() ?? 0,
+      route: route == null ? null : RouteSafetyRoute.fromJson(route),
+      child: child == null ? null : RouteSafetyChild.fromJson(child),
+      alerts: alerts == null ? null : RouteSafetyAlerts.fromJson(alerts),
+      reaching: reaching == null ? null : RouteSafetyReach.fromJson(reaching),
+    );
+  }
+}
+
+class RouteSafetyRoute {
+  RouteSafetyRoute({
+    required this.name,
+    required this.code,
+    required this.published,
+    required this.tripsMeasured,
+    required this.checksDue,
+    required this.closuresMeasured,
+    required this.onTimeWithinSeconds,
+    required this.minimumRuns,
+    required this.notEnoughRuns,
+    required this.checksCompletedRatePct,
+    required this.everyChildAccountedForRatePct,
+    required this.onTimeRatePct,
+    required this.avgDelayMinutes,
+  });
+
+  final String? name;
+  final String? code;
+  final bool published;
+  final int tripsMeasured;
+  final int checksDue;
+  final int closuresMeasured;
+  final int onTimeWithinSeconds;
+  final int minimumRuns;
+  final bool notEnoughRuns;
+  final double? checksCompletedRatePct;
+  final double? everyChildAccountedForRatePct;
+  final double? onTimeRatePct;
+  final double? avgDelayMinutes;
+
+  static int _i(dynamic v) => (v as num?)?.toInt() ?? 0;
+  static double? _d(dynamic v) => (v as num?)?.toDouble();
+
+  factory RouteSafetyRoute.fromJson(Map<String, dynamic> j) => RouteSafetyRoute(
+        name: j['name'] as String?,
+        code: j['code'] as String?,
+        published: (j['published'] ?? false) as bool,
+        tripsMeasured: _i(j['tripsMeasured']),
+        checksDue: _i(j['checksDue']),
+        closuresMeasured: _i(j['closuresMeasured']),
+        onTimeWithinSeconds: _i(j['onTimeWithinSeconds']),
+        minimumRuns: _i(j['minimumRuns']),
+        notEnoughRuns: (j['notEnoughRuns'] ?? false) as bool,
+        checksCompletedRatePct: _d(j['checksCompletedRatePct']),
+        everyChildAccountedForRatePct: _d(j['everyChildAccountedForRatePct']),
+        onTimeRatePct: _d(j['onTimeRatePct']),
+        avgDelayMinutes: _d(j['avgDelayMinutes']),
+      );
+}
+
+class RouteSafetyChild {
+  RouteSafetyChild({
+    required this.tripsExpected,
+    required this.tripsRidden,
+    required this.noShows,
+    required this.notExpected,
+    required this.wrongPlace,
+  });
+
+  final int tripsExpected;
+  final int tripsRidden;
+  final int noShows;
+  final int notExpected;
+  final int wrongPlace;
+
+  factory RouteSafetyChild.fromJson(Map<String, dynamic> j) => RouteSafetyChild(
+        tripsExpected: RouteSafetyRoute._i(j['tripsExpected']),
+        tripsRidden: RouteSafetyRoute._i(j['tripsRidden']),
+        noShows: RouteSafetyRoute._i(j['noShows']),
+        notExpected: RouteSafetyRoute._i(j['notExpected']),
+        wrongPlace: RouteSafetyRoute._i(j['wrongPlace']),
+      );
+}
+
+class RouteSafetyAlerts {
+  RouteSafetyAlerts({
+    required this.raised,
+    required this.answered,
+    required this.answeredRatePct,
+    required this.typicalAnswerSeconds,
+  });
+
+  final int raised;
+  final int answered;
+  final double? answeredRatePct;
+  final int? typicalAnswerSeconds;
+
+  factory RouteSafetyAlerts.fromJson(Map<String, dynamic> j) => RouteSafetyAlerts(
+        raised: RouteSafetyRoute._i(j['raised']),
+        answered: RouteSafetyRoute._i(j['answered']),
+        answeredRatePct: RouteSafetyRoute._d(j['answeredRatePct']),
+        typicalAnswerSeconds: (j['typicalAnswerSeconds'] as num?)?.toInt(),
+      );
+}
+
+class RouteSafetyReach {
+  RouteSafetyReach({
+    required this.sent,
+    required this.delivered,
+    required this.deliveredRatePct,
+  });
+
+  final int sent;
+  final int delivered;
+  final double? deliveredRatePct;
+
+  factory RouteSafetyReach.fromJson(Map<String, dynamic> j) => RouteSafetyReach(
+        sent: RouteSafetyRoute._i(j['sent']),
+        delivered: RouteSafetyRoute._i(j['delivered']),
+        deliveredRatePct: RouteSafetyRoute._d(j['deliveredRatePct']),
+      );
+}
+
 class HomeArrival {
   HomeArrival({
     required this.studentId,
@@ -1755,6 +1915,12 @@ class ParentApi {
       if (address != null) 'address': address.trim(),
       if (note != null) 'note': note.trim(),
     });
+  }
+
+  Future<RouteSafety> routeSafety(String studentId, {int days = 30}) async {
+    final json = await _api.get('/parent/children/$studentId/safety?days=$days')
+        as Map<String, dynamic>;
+    return RouteSafety.fromJson(json);
   }
 
   Future<List<HomeArrival>> homeArrivals({String? studentId}) async {

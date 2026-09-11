@@ -20,6 +20,7 @@ import '../../ui/map_tiles.dart';
 import '../../ui/screen_kit.dart';
 import 'collection_request_screen.dart';
 import 'contact_school_screen.dart';
+import 'route_safety_screen.dart';
 import 'skip_ride_screen.dart';
 import 'stop_correction_screen.dart';
 import 'track_screen.dart';
@@ -191,6 +192,53 @@ class _BusScreenState extends State<BusScreen> {
                       ),
                       const SizedBox(height: kCardGap),
                       _Tiles(bus: bus, trip: trip),
+                      const SizedBox(height: kCardGap),
+                      Card16(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => RouteSafetyScreen(child: widget.child),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: AppTheme.green.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.health_and_safety_outlined,
+                                size: 20,
+                                color: AppTheme.green,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    t('safety.title'),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.text,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    t('safety.busCardLine'),
+                                    style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded, color: AppTheme.textFaint),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: kCardGap),
                       Card16(
                         onTap: () => Navigator.of(context).push(

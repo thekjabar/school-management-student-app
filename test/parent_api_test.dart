@@ -245,10 +245,12 @@ void main() {
         expect(form.policyVersionId, isNotEmpty, reason: 'the form screen is opened by this id');
         expect(kConsentPurposes, contains(form.purpose));
         if (form.status != null) expect(kConsentStatuses, contains(form.status));
-        // The chip must never say "not answered yet" about a decision the
-        // family made; awaitingAnswer deliberately stays true for WITHDRAWN.
         if (form.status == 'GRANTED' || form.status == 'REFUSED') {
-          expect(form.awaitingAnswer, isFalse);
+          expect(
+            form.awaitingAnswer,
+            isFalse,
+            reason: 'the chip must never say "not answered yet" about a decision the family made',
+          );
         }
         if (form.canWithdraw) {
           expect(form.status, 'GRANTED');
@@ -274,11 +276,7 @@ void main() {
         forms: const [],
       ),
     );
-    if (child.forms.isEmpty) {
-      // No wording is published for this school yet. The list screen says so
-      // in words rather than showing an empty page; there is nothing to open.
-      return;
-    }
+    if (child.forms.isEmpty) return;
 
     final detail = await ParentApi.instance.consentForm(
       policyVersionId: child.forms.first.policyVersionId,
@@ -292,6 +290,83 @@ void main() {
         isNotNull,
         reason: 'the server says wording exists, so the screen must find a body to show',
       );
+    }
+  });
+
+  test('route safety parses, and no rate is ever faked as a zero', () async {
+    final children = await ParentApi.instance.children();
+    expect(children, isNotEmpty);
+
+    var riders = 0;
+    for (final child in children) {
+      final safety = await ParentApi.instance.routeSafety(child.studentId);
+
+      expect(safety.from, isNotEmpty, reason: 'the screen captions every figure with the period');
+      expect(safety.to, isNotEmpty);
+      expect(safety.days, greaterThan(0));
+
+      if (!safety.ridesTheBus) {
+        expect(safety.route, isNull);
+        expect(safety.child, isNull);
+        expect(safety.alerts, isNull);
+        expect(safety.reaching, isNull);
+        continue;
+      }
+      riders++;
+
+      final route = safety.route;
+      final own = safety.child;
+      final alerts = safety.alerts;
+      final reaching = safety.reaching;
+      expect(route, isNotNull, reason: 'the four blocks are null together, never one at a time');
+      expect(own, isNotNull);
+      expect(alerts, isNotNull);
+      expect(reaching, isNotNull);
+
+      for (final rate in <double?>[
+        route!.checksCompletedRatePct,
+        route.everyChildAccountedForRatePct,
+        route.onTimeRatePct,
+      ]) {
+        if (rate != null) expect(rate, inInclusiveRange(0, 100));
+      }
+
+      if (route.notEnoughRuns) {
+        expect(
+          route.checksCompletedRatePct ?? route.everyChildAccountedForRatePct ?? route.onTimeRatePct,
+          isNull,
+          reason: 'a withheld rate must arrive as null, never as a 0% the parent would believe',
+        );
+      }
+      expect(route.minimumRuns, greaterThan(0), reason: 'the withheld message quotes this number');
+      expect(route.onTimeWithinSeconds, greaterThan(0));
+
+      if (safety.locationHidden) {
+        expect(route.name, isNull, reason: 'a restriction order must not leak the route');
+        expect(route.code, isNull);
+        expect(route.avgDelayMinutes, isNull);
+      }
+
+      expect(own!.tripsRidden, lessThanOrEqualTo(own.tripsExpected + own.notExpected));
+      expect(alerts!.answered, lessThanOrEqualTo(alerts.raised));
+      if (alerts.raised == 0) expect(alerts.answeredRatePct, isNull);
+      expect(reaching!.delivered, lessThanOrEqualTo(reaching.sent));
+      if (reaching.sent == 0) expect(reaching.deliveredRatePct, isNull);
+    }
+
+    expect(riders, greaterThan(0), reason: 'no child on this account rides a bus, so nothing was checked');
+  });
+
+  test('home arrivals parse, and the button is only offered once the bus has gone', () async {
+    final rows = await ParentApi.instance.homeArrivals();
+    for (final row in rows) {
+      expect(row.tripId, isNotEmpty, reason: 'this is posted back as tripInstanceId');
+      expect(row.studentId, isNotEmpty);
+      if (row.awaitingConfirmation) {
+        expect(row.offTheBus, isTrue, reason: 'confirming before the drop-off is refused by the server');
+        expect(row.confirmedAt, isNull);
+      }
+      if (row.confirmedAt != null) expect(row.awaitingConfirmation, isFalse);
     }
   });
 
