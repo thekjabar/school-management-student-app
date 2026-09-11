@@ -226,6 +226,75 @@ void main() {
     await ParentApi.instance.cancelLeave(mine.id);
   });
 
+  test('consent forms parse, and every child on the account is in the book', () async {
+    final book = await ParentApi.instance.consents();
+
+    final children = await ParentApi.instance.children();
+    expect(
+      book.children.map((c) => c.studentId).toSet(),
+      containsAll(children.map((c) => c.studentId)),
+      reason: 'a child missing here cannot be signed for at all',
+    );
+
+    var awaiting = 0;
+    for (final child in book.children) {
+      expect(child.name, isNotEmpty);
+      awaiting += child.awaitingCount;
+
+      for (final form in child.forms) {
+        expect(form.policyVersionId, isNotEmpty, reason: 'the form screen is opened by this id');
+        expect(kConsentPurposes, contains(form.purpose));
+        if (form.status != null) expect(kConsentStatuses, contains(form.status));
+        // The chip must never say "not answered yet" about a decision the
+        // family made; awaitingAnswer deliberately stays true for WITHDRAWN.
+        if (form.status == 'GRANTED' || form.status == 'REFUSED') {
+          expect(form.awaitingAnswer, isFalse);
+        }
+        if (form.canWithdraw) {
+          expect(form.status, 'GRANTED');
+          expect(form.consentId, isNotNull, reason: 'withdrawing posts to this id');
+        }
+        for (final language in form.languages) {
+          expect(kConsentBodyLanguages, contains(language));
+        }
+      }
+    }
+    expect(book.awaitingCount, awaiting, reason: 'the badge and the per-child pills must agree');
+  });
+
+  test('a consent form comes back with wording the parent can actually read', () async {
+    final book = await ParentApi.instance.consents();
+    final child = book.children.firstWhere(
+      (c) => c.forms.isNotEmpty,
+      orElse: () => ChildConsents(
+        studentId: '',
+        code: '',
+        name: '',
+        awaitingCount: 0,
+        forms: const [],
+      ),
+    );
+    if (child.forms.isEmpty) {
+      // No wording is published for this school yet. The list screen says so
+      // in words rather than showing an empty page; there is nothing to open.
+      return;
+    }
+
+    final detail = await ParentApi.instance.consentForm(
+      policyVersionId: child.forms.first.policyVersionId,
+      studentId: child.studentId,
+    );
+    expect(detail.studentId, child.studentId);
+    expect(detail.form.policyVersionId, child.forms.first.policyVersionId);
+    if (detail.form.languages.isNotEmpty) {
+      expect(
+        detail.form.wording,
+        isNotNull,
+        reason: 'the server says wording exists, so the screen must find a body to show',
+      );
+    }
+  });
+
   test('a wrong password is reported as one, not as something else', () async {
     try {
       await Session.instance.signIn(phone, 'not-the-password');

@@ -14,6 +14,7 @@ import '../../ui/screen_kit.dart';
 import '../../ui/settings_widgets.dart';
 import '../../ui/sheets.dart';
 import 'children_tab.dart';
+import 'consents_screen.dart';
 import 'fees_screen.dart';
 import 'help_screen.dart';
 import 'personal_info_screen.dart';
@@ -419,6 +420,8 @@ class _Settings extends StatelessWidget {
                     ),
           ),
           Divider(height: 1, color: AppTheme.border),
+          const _ConsentsRow(),
+          Divider(height: 1, color: AppTheme.border),
           _Row(
             icon: Icons.shield_outlined,
             title: t('profile.security'),
@@ -464,12 +467,56 @@ class _Settings extends StatelessWidget {
   }
 }
 
+class _ConsentsRow extends StatefulWidget {
+  const _ConsentsRow();
+
+  @override
+  State<_ConsentsRow> createState() => _ConsentsRowState();
+}
+
+class _ConsentsRowState extends State<_ConsentsRow> {
+  int _awaiting = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _count();
+  }
+
+  Future<void> _count() async {
+    var awaiting = 0;
+    try {
+      awaiting = (await ParentApi.instance.consents()).awaitingCount;
+    } catch (e) {
+      debugPrint('profile: could not count the forms waiting for an answer: $e');
+    }
+    if (mounted && awaiting != _awaiting) setState(() => _awaiting = awaiting);
+  }
+
+  Future<void> _open() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const ConsentsScreen()),
+    );
+    await _count();
+  }
+
+  @override
+  Widget build(BuildContext context) => _Row(
+        icon: Icons.fact_check_outlined,
+        title: t('profile.consents'),
+        sub: t('profile.consentsSub'),
+        badge: _awaiting,
+        onTap: _open,
+      );
+}
+
 class _Row extends StatelessWidget {
   const _Row({
     required this.icon,
     required this.title,
     required this.sub,
     required this.onTap,
+    this.badge = 0,
     this.last = false,
   });
 
@@ -477,6 +524,7 @@ class _Row extends StatelessWidget {
   final String title;
   final String sub;
   final VoidCallback? onTap;
+  final int badge;
   final bool last;
 
   @override
@@ -524,6 +572,10 @@ class _Row extends StatelessWidget {
                 ],
               ),
             ),
+            if (badge > 0) ...[
+              Pill('$badge', color: AppTheme.amber),
+              const SizedBox(width: 6),
+            ],
             Icon(Icons.chevron_right_rounded, size: 19, color: AppTheme.textFaint),
           ],
         ),

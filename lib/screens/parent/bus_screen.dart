@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 
 import '../../api/directions.dart';
@@ -133,6 +134,7 @@ class _BusScreenState extends State<BusScreen> {
                     ParentApi.instance.transport(widget.child.studentId),
                     ParentApi.instance.live(),
                     _assignedStops(),
+                    _homeArrivals(),
                   ]);
                   final buses = r[1] as List<LiveBus>;
                   return _Bus(
@@ -141,6 +143,7 @@ class _BusScreenState extends State<BusScreen> {
                         .where((b) => b.studentId == widget.child.studentId)
                         .firstOrNull,
                     stops: r[2] as AssignedStops?,
+                    homeArrivals: r[3] as List<HomeArrival>,
                   );
                 },
                 builder: (context, bus) {
@@ -182,7 +185,10 @@ class _BusScreenState extends State<BusScreen> {
                     children: [
                       _MapCard(bus: bus, controller: _map, onOpen: _openTrack),
                       const SizedBox(height: kCardGap),
-                      _RouteCard(bus: bus),
+                      _RouteCard(
+                        bus: bus,
+                        onConfirmed: () => _loaderKey.currentState?.reload(),
+                      ),
                       const SizedBox(height: kCardGap),
                       _Tiles(bus: bus, trip: trip),
                       const SizedBox(height: kCardGap),
@@ -366,6 +372,14 @@ class _BusScreenState extends State<BusScreen> {
     return _stops;
   }
 
+  Future<List<HomeArrival>> _homeArrivals() async {
+    try {
+      return await ParentApi.instance.homeArrivals(studentId: widget.child.studentId);
+    } catch (_) {
+      return const <HomeArrival>[];
+    }
+  }
+
   void _frame(_Bus bus) {
     if (!MapTiles.configured) return;
     final points = bus.mapPoints;
@@ -399,12 +413,26 @@ class _BusScreenState extends State<BusScreen> {
 }
 
 class _Bus {
-  _Bus({required this.transport, required this.live, required this.stops});
+  _Bus({
+    required this.transport,
+    required this.live,
+    required this.stops,
+    required this.homeArrivals,
+  });
 
   final TransportInfo transport;
   final LiveBus? live;
 
   final AssignedStops? stops;
+
+  final List<HomeArrival> homeArrivals;
+
+  HomeArrival? homeArrivalFor(String tripId) {
+    for (final row in homeArrivals) {
+      if (row.tripId == tripId) return row;
+    }
+    return null;
+  }
 
   TripToday? get run {
     if (transport.today.isEmpty) return null;
@@ -890,9 +918,11 @@ class _StopPin extends StatelessWidget {
 }
 
 class _RouteCard extends StatelessWidget {
-  const _RouteCard({required this.bus});
+  const _RouteCard({required this.bus, required this.onConfirmed});
 
   final _Bus bus;
+
+  final VoidCallback onConfirmed;
 
   @override
   Widget build(BuildContext context) {
@@ -914,6 +944,9 @@ class _RouteCard extends StatelessWidget {
     final school = Session.instance.me?.schoolName ?? t('driver.school');
     final noShow = trip.resolution == 'NO_SHOW';
     final arrived = noShow ? null : (trip.alightedAt ?? trip.endedAt);
+
+    final home = bus.homeArrivalFor(trip.tripId);
+    final homeConfirmedAt = home?.confirmedAt;
 
     final collectorName = trip.collectorName;
     final relationship = trip.collectorRelationship;
@@ -956,6 +989,17 @@ class _RouteCard extends StatelessWidget {
         arrived,
         noShow ? 3 : (arrived != null ? 2 : 0),
       ),
+      if (!toSchool && !noShow)
+        (
+          homeConfirmedAt != null ? t('bus.home.confirmed') : t('bus.home.step'),
+          homeConfirmedAt != null
+              ? (home!.confirmedByYou
+                  ? t('bus.home.byYou')
+                  : tn('bus.home.byName', home.confirmedByName ?? t('bus.home.aGuardian')))
+              : (arrived != null ? t('bus.home.yourWord') : ''),
+          homeConfirmedAt,
+          homeConfirmedAt != null ? 2 : 0,
+        ),
     ];
 
     return Card16(
@@ -1000,8 +1044,91 @@ class _RouteCard extends StatelessWidget {
               first: i == 0,
               last: i == steps.length - 1,
             ),
+          if (home != null && home.awaitingConfirmation)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 4, 0, 6),
+              child: _ConfirmHome(row: home, onConfirmed: onConfirmed),
+            ),
         ],
       ),
+    );
+  }
+}
+
+class _ConfirmHome extends StatefulWidget {
+  const _ConfirmHome({required this.row, required this.onConfirmed});
+
+  final HomeArrival row;
+  final VoidCallback onConfirmed;
+
+  @override
+  State<_ConfirmHome> createState() => _ConfirmHomeState();
+}
+
+class _ConfirmHomeState extends State<_ConfirmHome> {
+  bool _busy = false;
+
+  Future<({double lat, double lon, int? accuracy})?> _fixIfAlreadyAllowed() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission != LocationPermission.always &&
+          permission != LocationPermission.whileInUse) {
+        return null;
+      }
+      final p = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 4),
+        ),
+      );
+      return (lat: p.latitude, lon: p.longitude, accuracy: p.accuracy.round());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _confirm() async {
+    setState(() => _busy = true);
+    final fix = await _fixIfAlreadyAllowed();
+    try {
+      await ParentApi.instance.confirmHomeArrival(
+        studentId: widget.row.studentId,
+        tripInstanceId: widget.row.tripId,
+        lat: fix?.lat,
+        lon: fix?.lon,
+        gpsAccuracyM: fix?.accuracy,
+      );
+      if (!mounted) return;
+      widget.onConfirmed();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      showNote(context, errorText(e), bad: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (widget.row.studentName ?? '').split(' ').first;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(2, 0, 2, 9),
+          child: Text(
+            name.isEmpty ? t('bus.home.askPlain') : tn('bus.home.ask', name),
+            style: TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.textMuted),
+          ),
+        ),
+        BigButton(
+          label: t('bus.home.confirm'),
+          color: AppTheme.green,
+          busy: _busy,
+          onPressed: _confirm,
+          height: 44,
+        ),
+      ],
     );
   }
 }

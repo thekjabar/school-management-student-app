@@ -1359,6 +1359,71 @@ class TripToday {
   }
 }
 
+class HomeArrival {
+  HomeArrival({
+    required this.studentId,
+    required this.studentName,
+    required this.tripId,
+    required this.droppedOffAt,
+    required this.offTheBus,
+    required this.awaitingConfirmation,
+    required this.confirmedAt,
+    required this.confirmedByYou,
+    required this.confirmedByName,
+  });
+
+  final String studentId;
+  final String? studentName;
+  final String tripId;
+  final DateTime? droppedOffAt;
+  final bool offTheBus;
+  final bool awaitingConfirmation;
+  final DateTime? confirmedAt;
+  final bool confirmedByYou;
+  final String? confirmedByName;
+
+  static DateTime? _at(dynamic v) => v == null ? null : DateTime.parse(v as String).toLocal();
+
+  factory HomeArrival.fromJson(Map<String, dynamic> j) => HomeArrival(
+        studentId: j['studentId'] as String,
+        studentName: j['studentName'] as String?,
+        tripId: j['tripId'] as String,
+        droppedOffAt: _at(j['droppedOffAt']),
+        offTheBus: (j['offTheBus'] ?? false) as bool,
+        awaitingConfirmation: (j['awaitingConfirmation'] ?? false) as bool,
+        confirmedAt: _at(j['confirmedAt']),
+        confirmedByYou: (j['confirmedByYou'] ?? false) as bool,
+        confirmedByName: j['confirmedByName'] as String?,
+      );
+}
+
+class HomeArrivalConfirmed {
+  HomeArrivalConfirmed({
+    required this.studentId,
+    required this.tripId,
+    required this.alreadyConfirmed,
+    required this.confirmedAt,
+    required this.confirmedByYou,
+    required this.confirmedByName,
+  });
+
+  final String studentId;
+  final String tripId;
+  final bool alreadyConfirmed;
+  final DateTime? confirmedAt;
+  final bool confirmedByYou;
+  final String? confirmedByName;
+
+  factory HomeArrivalConfirmed.fromJson(Map<String, dynamic> j) => HomeArrivalConfirmed(
+        studentId: j['studentId'] as String,
+        tripId: j['tripId'] as String,
+        alreadyConfirmed: (j['alreadyConfirmed'] ?? false) as bool,
+        confirmedAt: HomeArrival._at(j['confirmedAt']),
+        confirmedByYou: (j['confirmedByYou'] ?? false) as bool,
+        confirmedByName: j['confirmedByName'] as String?,
+      );
+}
+
 class TransportInfo {
   TransportInfo({
     required this.ridesTheBus,
@@ -1690,6 +1755,33 @@ class ParentApi {
       if (address != null) 'address': address.trim(),
       if (note != null) 'note': note.trim(),
     });
+  }
+
+  Future<List<HomeArrival>> homeArrivals({String? studentId}) async {
+    final query = studentId == null ? '' : '?studentId=$studentId';
+    final json = await _api.get('/parent/home-arrivals$query') as Map<String, dynamic>;
+    final rows = (json['rows'] as List?) ?? const [];
+    return rows
+        .map((r) => HomeArrival.fromJson(r as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<HomeArrivalConfirmed> confirmHomeArrival({
+    required String studentId,
+    required String tripInstanceId,
+    double? lat,
+    double? lon,
+    int? gpsAccuracyM,
+  }) async {
+    final withFix = lat != null && lon != null;
+    final json = await _api.post('/parent/home-arrivals', {
+      'studentId': studentId,
+      'tripInstanceId': tripInstanceId,
+      if (withFix) 'lat': lat,
+      if (withFix) 'lon': lon,
+      if (withFix && gpsAccuracyM != null) 'gpsAccuracyM': gpsAccuracyM,
+    }) as Map<String, dynamic>;
+    return HomeArrivalConfirmed.fromJson(json);
   }
 
   Future<String> submitStopCorrection({
@@ -2064,6 +2156,49 @@ class ParentApi {
 
   Future<void> withdrawPayment(String paymentId) async {
     await _api.post('/parent/payments/$paymentId/withdraw');
+  }
+
+  Future<ConsentBook> consents() async {
+    final json = await _api.get('/parent/consents') as Map<String, dynamic>;
+    return ConsentBook.fromJson(json);
+  }
+
+  Future<ConsentFormDetail> consentForm({
+    required String policyVersionId,
+    required String studentId,
+  }) async {
+    final json = await _api.get(
+      '/parent/consents/$policyVersionId?studentId=${Uri.encodeQueryComponent(studentId)}',
+    ) as Map<String, dynamic>;
+    return ConsentFormDetail.fromJson(json);
+  }
+
+  Future<ConsentForm> signConsent({
+    required String studentId,
+    required String purpose,
+    required String policyVersionId,
+    required String answer,
+    String? signatureMediaId,
+  }) async {
+    final json = await _api.post('/parent/consents/sign', {
+      'studentId': studentId,
+      'purpose': purpose,
+      'policyVersionId': policyVersionId,
+      'answer': answer,
+      'signatureMediaId': ?signatureMediaId,
+    });
+    final form = json is Map<String, dynamic> ? json['form'] : null;
+    if (form is! Map<String, dynamic>) {
+      throw ApiException(t('consent.savedNoEcho'), 502);
+    }
+    return ConsentForm.fromJson(form);
+  }
+
+  Future<void> withdrawConsent({
+    required String consentId,
+    required String reason,
+  }) async {
+    await _api.post('/parent/consents/$consentId/withdraw', {'reason': reason.trim()});
   }
 
   String _dateOnly(DateTime d) =>
@@ -2445,6 +2580,246 @@ class ProfileChange {
       reason: j['reason'] as String?,
       decisionNote: j['decisionNote'] as String?,
       decidedAt: DateTime.tryParse((j['decidedAt'] ?? '') as String)?.toLocal(),
+    );
+  }
+}
+
+const List<String> kConsentPurposes = [
+  'PHOTO',
+  'MEDICAL',
+  'LOCATION',
+  'COMMS',
+  'BIOMETRIC',
+  'OPERATOR_DATA_SHARING',
+  'TRIP_AUDIO_RECORDING',
+  'MARKETING',
+];
+
+const List<String> kConsentStatuses = [
+  'GRANTED',
+  'REFUSED',
+  'WITHDRAWN',
+  'EXPIRED',
+  'SUPERSEDED',
+];
+
+const List<String> kConsentBodyLanguages = ['ckb', 'kmr', 'ar', 'en'];
+
+String consentBodyLanguage() => switch (AppLocale.current.value) {
+      Lang.ckb => 'ckb',
+      Lang.ar => 'ar',
+      Lang.en => 'en',
+    };
+
+class ConsentWording {
+  const ConsentWording({required this.language, required this.text});
+
+  final String language;
+  final String text;
+
+  bool get rightToLeft => language != 'en';
+}
+
+class ConsentForm {
+  ConsentForm({
+    required this.policyVersionId,
+    required this.purpose,
+    required this.key,
+    required this.version,
+    required this.languages,
+    required this.awaitingAnswer,
+    required this.canWithdraw,
+    required this.signed,
+    required this.sharedWith,
+    this.retentionDays,
+    this.status,
+    this.consentId,
+    this.answeredPolicyVersionId,
+    this.channel,
+    this.signedAt,
+    this.grantedAt,
+    this.withdrawnAt,
+    this.withdrawalReason,
+    this.scopeNote,
+    this.effectiveFrom,
+    this.effectiveTo,
+    this.expiresAt,
+    this.bodyCkb,
+    this.bodyKmr,
+    this.bodyAr,
+    this.bodyEn,
+  });
+
+  final String policyVersionId;
+  final String purpose;
+  final String key;
+  final int version;
+
+  final int? retentionDays;
+
+  final List<String> languages;
+
+  final String? status;
+
+  final bool awaitingAnswer;
+  final bool canWithdraw;
+
+  final String? consentId;
+  final String? answeredPolicyVersionId;
+  final String? channel;
+
+  final bool signed;
+  final DateTime? signedAt;
+  final DateTime? grantedAt;
+  final DateTime? withdrawnAt;
+  final String? withdrawalReason;
+
+  final List<String> sharedWith;
+  final String? scopeNote;
+
+  final DateTime? effectiveFrom;
+  final DateTime? effectiveTo;
+  final DateTime? expiresAt;
+
+  final String? bodyCkb;
+  final String? bodyKmr;
+  final String? bodyAr;
+  final String? bodyEn;
+
+  bool get answered => status == 'GRANTED' || status == 'REFUSED';
+
+  bool get granted => status == 'GRANTED';
+
+  bool get recordedElsewhere =>
+      status != null && channel != null && channel != 'MOBILE_APP';
+
+  bool get onOlderWording =>
+      answeredPolicyVersionId != null && answeredPolicyVersionId != policyVersionId;
+
+  ConsentWording? get wording {
+    for (final language in [consentBodyLanguage(), 'en', ...kConsentBodyLanguages]) {
+      final text = bodyIn(language);
+      if (text != null) return ConsentWording(language: language, text: text);
+    }
+    return null;
+  }
+
+  String? bodyIn(String language) {
+    final raw = switch (language) {
+      'ckb' => bodyCkb,
+      'kmr' => bodyKmr,
+      'ar' => bodyAr,
+      'en' => bodyEn,
+      _ => null,
+    };
+    if (raw == null) return null;
+    final text = raw.trim();
+    return text.isEmpty ? null : text;
+  }
+
+  factory ConsentForm.fromJson(Map<String, dynamic> j) => ConsentForm(
+        policyVersionId: (j['policyVersionId'] ?? '') as String,
+        purpose: (j['purpose'] ?? '') as String,
+        key: (j['key'] ?? '') as String,
+        version: (j['version'] as num?)?.toInt() ?? 0,
+        retentionDays: (j['retentionDays'] as num?)?.toInt(),
+        languages: ((j['languages'] as List?) ?? const [])
+            .whereType<String>()
+            .toList(),
+        status: j['status'] as String?,
+        awaitingAnswer: (j['awaitingAnswer'] ?? false) as bool,
+        canWithdraw: (j['canWithdraw'] ?? false) as bool,
+        consentId: j['consentId'] as String?,
+        answeredPolicyVersionId: j['answeredPolicyVersionId'] as String?,
+        channel: j['channel'] as String?,
+        signed: (j['signed'] ?? false) as bool,
+        signedAt: DateTime.tryParse((j['signedAt'] ?? '') as String)?.toLocal(),
+        grantedAt: DateTime.tryParse((j['grantedAt'] ?? '') as String)?.toLocal(),
+        withdrawnAt: DateTime.tryParse((j['withdrawnAt'] ?? '') as String)?.toLocal(),
+        withdrawalReason: j['withdrawalReason'] as String?,
+        sharedWith: ((j['sharedWith'] as List?) ?? const [])
+            .whereType<String>()
+            .toList(),
+        scopeNote: j['scopeNote'] as String?,
+        effectiveFrom: DateTime.tryParse((j['effectiveFrom'] ?? '') as String)?.toLocal(),
+        effectiveTo: DateTime.tryParse((j['effectiveTo'] ?? '') as String)?.toLocal(),
+        expiresAt: DateTime.tryParse((j['expiresAt'] ?? '') as String)?.toLocal(),
+        bodyCkb: j['bodyCkb'] as String?,
+        bodyKmr: j['bodyKmr'] as String?,
+        bodyAr: j['bodyAr'] as String?,
+        bodyEn: j['bodyEn'] as String?,
+      );
+}
+
+class ChildConsents {
+  ChildConsents({
+    required this.studentId,
+    required this.code,
+    required this.name,
+    required this.awaitingCount,
+    required this.forms,
+  });
+
+  final String studentId;
+  final String code;
+  final String name;
+  final int awaitingCount;
+  final List<ConsentForm> forms;
+
+  factory ChildConsents.fromJson(Map<String, dynamic> j) => ChildConsents(
+        studentId: (j['studentId'] ?? '') as String,
+        code: (j['code'] ?? '') as String,
+        name: (j['name'] ?? '') as String,
+        awaitingCount: (j['awaitingCount'] as num?)?.toInt() ?? 0,
+        forms: ((j['forms'] as List?) ?? const [])
+            .map((e) => ConsentForm.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class ConsentBook {
+  ConsentBook({
+    required this.children,
+    required this.awaitingCount,
+    required this.signatureRequiredToAgree,
+  });
+
+  final List<ChildConsents> children;
+  final int awaitingCount;
+  final bool signatureRequiredToAgree;
+
+  factory ConsentBook.fromJson(Map<String, dynamic> j) => ConsentBook(
+        children: ((j['children'] as List?) ?? const [])
+            .map((e) => ChildConsents.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        awaitingCount: (j['awaitingCount'] as num?)?.toInt() ?? 0,
+        signatureRequiredToAgree: (j['signatureRequiredToAgree'] ?? true) as bool,
+      );
+}
+
+class ConsentFormDetail {
+  ConsentFormDetail({
+    required this.studentId,
+    required this.code,
+    required this.name,
+    required this.signatureRequiredToAgree,
+    required this.form,
+  });
+
+  final String studentId;
+  final String code;
+  final String name;
+  final bool signatureRequiredToAgree;
+  final ConsentForm form;
+
+  factory ConsentFormDetail.fromJson(Map<String, dynamic> j) {
+    final child = (j['child'] as Map<String, dynamic>?) ?? const {};
+    return ConsentFormDetail(
+      studentId: (child['studentId'] ?? '') as String,
+      code: (child['code'] ?? '') as String,
+      name: (child['name'] ?? '') as String,
+      signatureRequiredToAgree: (j['signatureRequiredToAgree'] ?? true) as bool,
+      form: ConsentForm.fromJson((j['form'] as Map<String, dynamic>?) ?? const {}),
     );
   }
 }
