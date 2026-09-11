@@ -10,24 +10,6 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 
-/// What the school has told its drivers and attendants.
-///
-/// CrewAnnouncementsController has been a complete API since the day it
-/// shipped — list, attachments, read, read-all, acknowledge — built
-/// specifically because a driver or attendant had no screen anywhere that
-/// could read a notice aimed at them. Nothing in the app called it. This is
-/// that screen, modelled on the teacher app's Messages list for structure: one
-/// list, a read/unread dot, a mark-all-read sweep, and a tap that opens and
-/// reads a notice at once.
-///
-/// It differs from that model in the one place the server does: this
-/// controller carries a real acknowledge endpoint, so a notice the office
-/// marked as requiring one — a changed release procedure, a road closed to
-/// buses — gets an actual "Got it" that reaches the server, the same way the
-/// parent app's does, rather than being satisfied by opening it.
-///
-/// Reached from a button on the driver home header rather than a fifth tab:
-/// see the note on `DriverApp._openAnnouncements` for why.
 class DriverAnnouncements extends StatefulWidget {
   const DriverAnnouncements({super.key});
 
@@ -36,14 +18,8 @@ class DriverAnnouncements extends StatefulWidget {
 }
 
 class _DriverAnnouncementsState extends State<DriverAnnouncements> {
-  /// Notices read on this phone since the list was fetched.
-  ///
-  /// A row's `readAt` is final and comes from the server, so the change a tap
-  /// makes lives here until the next fetch brings it back with a stamp on it —
-  /// the same overlay TeacherMessages keeps for its own list.
   final Set<String> _read = {};
 
-  /// A sweep already in flight. Two of them would race the same revert.
   bool _markingAll = false;
 
   bool _isUnread(CrewAnnouncement a) => a.readAt == null && !_read.contains(a.id);
@@ -96,10 +72,6 @@ class _DriverAnnouncementsState extends State<DriverAnnouncements> {
     );
   }
 
-  /// Opening a notice is reading it.
-  ///
-  /// The mark goes out as the dialog opens rather than when it closes: a
-  /// driver who reads a notice and switches apps has still read it.
   void _open(CrewAnnouncement a) {
     if (_isUnread(a)) _markRead(a);
     showDialog<void>(
@@ -117,9 +89,6 @@ class _DriverAnnouncementsState extends State<DriverAnnouncements> {
     try {
       await CrewApi.instance.markAnnouncementRead(a.id);
     } catch (e) {
-      // Put the dot back. The notice is still unread on the server, and a
-      // list that quietly disagrees with it is worse than one that never
-      // changed.
       if (!mounted) return;
       setState(() => _read.remove(a.id));
       unread.value += 1;
@@ -147,8 +116,6 @@ class _DriverAnnouncementsState extends State<DriverAnnouncements> {
       showNote(context, tn('msg.markedRead', marked));
     } catch (e) {
       if (!mounted) return;
-      // Only the ones this sweep claimed — a notice read by hand a minute
-      // ago stays read.
       setState(() {
         _read.removeAll(ids);
         _markingAll = false;
@@ -170,8 +137,6 @@ class _Notice extends StatelessWidget {
   Widget build(BuildContext context) {
     final urgent = item.priority == 'URGENT' || item.priority == 'HIGH';
     final tint = urgent ? AppTheme.rose : Role.driver.tint;
-    // Owed and not yet given — the one thing this list has that the teacher
-    // screen it is modelled on does not.
     final needsAck = item.requiresAcknowledgement && item.acknowledgedAt == null;
 
     return Card16(
@@ -206,10 +171,6 @@ class _Notice extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 13.5,
-                        // Read notices keep their place in the list and lose
-                        // only their weight — greying one out would say the
-                        // school's notice had expired, which is not what
-                        // having read it means.
                         fontWeight: unread ? FontWeight.w800 : FontWeight.w700,
                         letterSpacing: -0.2,
                         height: 1.3,
@@ -268,7 +229,6 @@ class _Notice extends StatelessWidget {
   }
 }
 
-/// The whole notice, drawn from the same tokens as the card behind it.
 class _NoticeDialog extends StatefulWidget {
   const _NoticeDialog({required this.item});
 
@@ -341,10 +301,6 @@ class _NoticeDialogState extends State<_NoticeDialog> {
                       item.body,
                       style: TextStyle(fontSize: 13.5, height: 1.55, color: AppTheme.textMuted),
                     ),
-                    // The files, where the office attached any. The count has
-                    // always been in the payload and this screen showed it as a
-                    // bare number with nothing behind it — which is a worse
-                    // answer than not mentioning the files at all.
                     if (item.attachmentCount > 0) ...[
                       const SizedBox(height: 16),
                       AttachmentList(
@@ -386,10 +342,6 @@ class _NoticeDialogState extends State<_NoticeDialog> {
     );
   }
 
-  /// "I have read this and I understand it" — sent only on a notice the
-  /// office marked as requiring it. A failure keeps the dialog open rather
-  /// than pretending: closing it either way would leave the office's list of
-  /// who has not answered still carrying this driver's name.
   Future<void> _close(bool needsAck) async {
     if (!needsAck) {
       Navigator.of(context).pop();

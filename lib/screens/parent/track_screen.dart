@@ -3,8 +3,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-// latlong2 exports a generic Path<T> for geodesic paths, which shadows
-// dart:ui's Path and breaks every CustomPainter in the file.
 import 'package:latlong2/latlong.dart' hide Path;
 
 import '../../api/parent_api.dart';
@@ -17,23 +15,6 @@ import '../../ui/kit.dart';
 import '../../ui/map_tiles.dart';
 import '../../ui/screen_kit.dart';
 
-/// Where the child is, on a real map, refreshed while the screen is open.
-///
-/// The distinction this screen is built around: A BUS POSITION IS NOT A CHILD
-/// POSITION. She may have been kept at home, or handed over ten minutes ago. A
-/// moving marker labelled with her name when she is not aboard is not a small
-/// inaccuracy — it is a confident wrong answer to the one question a parent
-/// actually asked, and they will act on it.
-///
-/// So the server sends her custody state alongside the position and the screen
-/// says which of the two it is showing. When she is aboard, the bus marker is
-/// her. When she is not, it is a bus, plainly labelled as one, and the state
-/// line says where she actually is.
-///
-/// The map is Mapbox. Not a decorative diagram: a parent works out
-/// "twenty minutes away" from streets they recognise, and a drawing of an
-/// invented road tells them nothing. Tiles fail closed — the state line above
-/// them is the answer, and it is readable with no map at all.
 class TrackScreen extends StatefulWidget {
   const TrackScreen({super.key, required this.child});
 
@@ -49,17 +30,11 @@ class _TrackScreenState extends State<TrackScreen> {
 
   Timer? _tick;
 
-  /// Set once the map has been moved to the first fix. After that the map is
-  /// the parent's to pan: recentring on every poll would fight a person trying
-  /// to look one street ahead.
   bool _framed = false;
 
   @override
   void initState() {
     super.initState();
-    // Fifteen seconds. The vehicles report about every ten, so anything faster
-    // is a request that returns the same row, on a connection that is usually
-    // somebody's mobile data.
     _tick = Timer.periodic(
       const Duration(seconds: 15),
       (_) => _loader.currentState?.reload(quiet: true),
@@ -109,8 +84,6 @@ class _TrackScreenState extends State<TrackScreen> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Above everything, and deliberately loud. A rehearsal
-                      // that looks like a real bus is worse than no bus at all.
                       if (bus.simulated) ...[
                         const _DemoBand(),
                         const SizedBox(height: kCardGap),
@@ -131,7 +104,6 @@ class _TrackScreenState extends State<TrackScreen> {
     );
   }
 
-  /// Put the bus and the stop both on screen, once.
   void _frame(LiveBus bus, {bool force = false}) {
     if (_framed && !force) return;
 
@@ -149,8 +121,6 @@ class _TrackScreenState extends State<TrackScreen> {
     _map.fitCamera(
       CameraFit.coordinates(
         coordinates: points,
-        // Room for the callouts drawn over the map, and enough that a marker
-        // never sits against the frame's edge where it reads as off-screen.
         padding: const EdgeInsets.fromLTRB(48, 56, 48, 48),
         maxZoom: 16,
       ),
@@ -158,13 +128,6 @@ class _TrackScreenState extends State<TrackScreen> {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Where she is
- * ------------------------------------------------------------------------- */
-
-/// The answer, in one line, above the map.
-///
-/// This card is the feature. The map is how a parent checks it.
 class _StateCard extends StatelessWidget {
   const _StateCard({required this.bus, required this.child});
 
@@ -222,11 +185,6 @@ class _StateCard extends StatelessWidget {
     );
   }
 
-  /// Every branch a parent can actually land on, said in words.
-  ///
-  /// The withheld case (`childState == null`) is deliberately not folded in
-  /// with "not riding": the school has not said she is off the bus, it has
-  /// declined to answer, and those must not read the same.
   static (IconData, Color, String, String) _describe(LiveBus bus, Child child) {
     final name = child.name.split(' ').first;
 
@@ -296,10 +254,6 @@ class _StateCard extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The map
- * ------------------------------------------------------------------------- */
-
 class _MapCard extends StatelessWidget {
   const _MapCard({
     required this.bus,
@@ -316,8 +270,6 @@ class _MapCard extends StatelessWidget {
     final tint = Role.parent.tint;
     final hasStop = bus.stopLat != null && bus.stopLon != null;
 
-    // Nothing to draw. Say so rather than showing an empty map of somewhere,
-    // which a parent will read as "the bus is there".
     if (!bus.hasFix && !hasStop) {
       return Card16(
         padding: const EdgeInsets.fromLTRB(14, 20, 14, 20),
@@ -335,8 +287,6 @@ class _MapCard extends StatelessWidget {
       );
     }
 
-    // Nothing will draw without a token, and a blank map on THIS screen
-    // reads as "the bus is not moving".
     if (!MapTiles.configured) {
       return Card16(
         padding: EdgeInsets.zero,
@@ -366,19 +316,6 @@ class _MapCard extends StatelessWidget {
                   initialZoom: 15,
                   minZoom: 4,
                   maxZoom: 18,
-                  // No rotation. A parent glancing at this needs north to be up
-                  // so the streets match the ones in their head; a map twisted
-                  // by a stray two-finger drag is a map nobody can read.
-                  //
-                  // And no ONE-FINGER drag. This card sits inside the page's
-                  // scrolling list, and flutter_map wins the gesture arena for
-                  // any vertical drag that starts on it, so a thumb on the map
-                  // — the biggest target on the screen — panned the map instead
-                  // of scrolling to the rows underneath, and pull-to-refresh
-                  // did nothing at all. Two fingers pan, and the recentre
-                  // button puts the bus back. One finger belongs to the page,
-                  // as it already did on the driver's map and this one's own
-                  // address screen.
                   interactionOptions: const InteractionOptions(
                     flags: InteractiveFlag.pinchZoom |
                         InteractiveFlag.pinchMove |
@@ -388,9 +325,6 @@ class _MapCard extends StatelessWidget {
                 children: [
                   MapTiles.layer(),
 
-                  // The line from the bus to the stop. Straight, and drawn
-                  // dashed for that reason: it is a distance, not a route, and
-                  // a solid line would be read as the road the bus will take.
                   if (bus.hasFix && hasStop)
                     PolylineLayer(
                       polylines: [
@@ -422,9 +356,6 @@ class _MapCard extends StatelessWidget {
                           height: 46,
                           child: _BusPin(
                             heading: bus.headingDeg,
-                            // Green only when she is actually on it. A grey
-                            // marker for a bus that is not carrying her is the
-                            // point of the whole screen.
                             colour: bus.onBoard ? AppTheme.green : AppTheme.textMuted,
                             stale: bus.stale,
                           ),
@@ -434,9 +365,6 @@ class _MapCard extends StatelessWidget {
                 ],
               ),
 
-              // Freshness, over the map. A stale marker looks exactly like a
-              // live one, and a parent watching a bus that stopped reporting
-              // four minutes ago must be told so.
               PositionedDirectional(
                 start: 10,
                 top: 10,
@@ -479,12 +407,8 @@ class _MapCard extends StatelessWidget {
                 ),
               ),
 
-              // Says so when the tiles will not come, rather than leaving a
-              // grey rectangle that looks like every other reason a map is
-              // blank.
               const MapOffline(),
 
-              // The credit, behind the ⓘ — see MapAttribution.
               PositionedDirectional(
                 start: 8,
                 bottom: 6,
@@ -504,12 +428,6 @@ class _MapCard extends StatelessWidget {
   }
 }
 
-/// Says, unmissably, that this is not a bus on a road.
-///
-/// A stripe rather than a footnote. The platform will only ever send simulated
-/// positions to a tenant marked as a demonstration, but the moment one is on
-/// screen it has to be impossible to read as real — somebody showing this to a
-/// school must not be able to imply otherwise, even by saying nothing.
 class _DemoBand extends StatelessWidget {
   const _DemoBand();
 
@@ -598,9 +516,6 @@ class _BusPin extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // The heading arrow, and only when the bus is actually reporting one
-          // freshly. A stale arrow points where the bus was going four minutes
-          // ago, which is worse than no arrow.
           if (heading != null && !stale)
             Transform.rotate(
               angle: heading! * math.pi / 180,
@@ -655,10 +570,6 @@ class _StopPin extends StatelessWidget {
         child: Icon(Icons.person_pin_circle_outlined, size: 17, color: colour),
       );
 }
-
-/* ---------------------------------------------------------------------------
- * The rest of what is known
- * ------------------------------------------------------------------------- */
 
 class _Details extends StatelessWidget {
   const _Details({required this.bus});

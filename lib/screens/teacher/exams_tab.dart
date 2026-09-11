@@ -13,12 +13,6 @@ import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
 import 'teacher_kit.dart';
 
-/// Exams, and the mark sheet behind each one.
-///
-/// Entering marks and RELEASING them are two separate actions here, because
-/// they are two separate permissions on the server and two genuinely different
-/// decisions. A mark typed wrong is fixed in a minute; a mark released wrong is
-/// on three hundred phones before the teacher has put the pen down.
 class ExamsTab extends StatefulWidget {
   const ExamsTab({super.key});
 
@@ -40,7 +34,6 @@ class _ExamsTabState extends State<ExamsTab> {
         icon: const Icon(Icons.add_rounded),
         label: Text(t('teacher.newTest')),
       ),
-      // Always pushed, never a tab, so it carries its own way back.
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -164,7 +157,6 @@ class _ExamCard extends StatelessWidget {
   }
 }
 
-/// The mark sheet.
 class MarksScreen extends StatefulWidget {
   const MarksScreen({super.key, required this.exam});
 
@@ -181,12 +173,6 @@ class _MarksScreenState extends State<MarksScreen> {
   bool _saving = false;
   bool _published = false;
 
-  /// Whether this teacher may release marks to families.
-  ///
-  /// Entering a mark and releasing it are two permissions on purpose. At most
-  /// schools here the teacher marks and the office releases, once the whole
-  /// year group is in — a class whose marks appear three days before the class
-  /// next door starts a row nobody needs.
   bool get _mayRelease => Session.instance.me?.can('academic.grade.publish') ?? false;
 
   Future<void> _save() async {
@@ -385,8 +371,6 @@ class _MarkEntryState extends State<_MarkEntry> {
               ),
             ),
             const SizedBox(width: 8),
-            // Absent is not a score of zero, and conflating them ruins an
-            // average. It gets its own toggle.
             GestureDetector(
               onTap: () {
                 setState(() {
@@ -431,9 +415,6 @@ class _MarkEntryState extends State<_MarkEntry> {
                 ),
                 onChanged: (value) {
                   final parsed = num.tryParse(value);
-                  // Out-of-range marks are rejected here rather than by the
-                  // server, so a slipped digit is caught while the paper is
-                  // still in front of the teacher.
                   widget.row.score =
                       parsed != null && parsed >= 0 && parsed <= widget.maxScore ? parsed : null;
                   widget.onChanged();
@@ -447,12 +428,6 @@ class _MarkEntryState extends State<_MarkEntry> {
   }
 }
 
-/// What kind of test this is, in the reader's language.
-///
-/// The API speaks in enum names because they are stable across releases, and
-/// humanise only sentence-cases them — which left a Kurdish teacher choosing
-/// between six English words. Falls back to humanise so a kind the server adds
-/// after this release still reads as a word rather than as a missing key.
 String _kindName(String kind) {
   final key = 'teacher.kind.$kind';
   final label = t(key);
@@ -644,9 +619,6 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                 ),
                 const SizedBox(height: 16),
                 Row(
-                  // Top, not centre. Two fields side by side are read as one
-                  // row; centring makes the taller one hang over the shorter at
-                  // both ends and the labels stop lining up.
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(

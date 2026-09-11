@@ -9,11 +9,6 @@ import '../../ui/settings_widgets.dart';
 import '../../ui/sheets.dart';
 import '../login_screen.dart' show LanguagePicker;
 
-/// Appearance, language, notifications, password.
-///
-/// A screen rather than a fifth group in the drawer: these are the four things
-/// a guardian changes once and then never opens again, and a navigation list
-/// that ends in four toggles teaches people to scroll past the bottom of it.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -58,8 +53,6 @@ class SettingsScreen extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         me?.phone ?? '',
-                        // A phone number reads left-to-right even on a Kurdish
-                        // screen; mirroring it makes it unusable.
                         textDirection: TextDirection.ltr,
                         style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                       ),

@@ -12,40 +12,12 @@ import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
 
-/// Giving a child to an adult, and the two things that happen when you cannot.
-///
-/// The platform has had this surface since the beginning — who may collect this
-/// child, record the handover, refuse it, record that nobody came — and the app
-/// had no way in. A driver on the afternoon run was tapping "handed over" on a
-/// list, which wrote a custody row saying a child left the bus and nothing at
-/// all about who took her. That row is the one a school is asked to produce six
-/// months later, and it answered the wrong question.
-///
-/// Three rules run through this screen, and all three are the server's:
-///
-///  - A restriction is never explained to the crew. The handset says "do not
-///    release, call the office" and nothing else, because the man at the kerb
-///    is usually known to the driver and telling the driver WHY is asking him
-///    to hold a conversation nobody has equipped him for.
-///  - An adult who is not on the list is not refused by the driver, they are
-///    referred to the office. The office rings, checks, and issues a one-time
-///    authorisation against this run — which then appears in this list.
-///  - Nobody at the stop is a protocol, not a decision. The child stays on the
-///    bus and each rung of the ladder is written down as it is worked.
-///
-/// Nothing here fires on a single tap. Every write is a deliberate press-and-
-/// hold, because the alternative is a thumb landing on a name while the bus is
-/// still rolling.
 enum HandoverOutcome { handedOver, refused, nobodyAtStop }
 
-/// The one message key the schema ships with, mapped to the sentence the crew
-/// reads. Anything else the office invents falls back to the same instruction
-/// rather than showing a driver a raw key.
 const Map<String, String> _holdMessages = {
   'restriction.crew.do_not_release_call_office': 'handover.holdBody',
 };
 
-/// The ladder, in the order the server accepts it.
 const List<String> _nobodySteps = [
   'WAITED',
   'CALLED_GUARDIAN',
@@ -66,27 +38,13 @@ const List<String> _refusalReasons = [
   'OTHER',
 ];
 
-/* ---------------------------------------------------------------------------
- * Reading the server's answers
- * ------------------------------------------------------------------------- */
-
 DateTime? _at(dynamic v) => v == null ? null : DateTime.tryParse('$v')?.toLocal();
 
-/// The value, if the server's own length rule would accept it back.
-///
-/// These are all optional snapshot fields, so a name the validator would refuse
-/// is dropped rather than trimmed: a 400 at the kerb, on the one call that must
-/// go through, is a far worse outcome than a row without a spare copy of a name
-/// it already holds by id.
 String? _fits(String? raw, int min, int max) {
   final v = raw?.trim() ?? '';
   return v.length >= min && v.length <= max ? v : null;
 }
 
-/// An absolute address for a photograph, or null when there is not one.
-///
-/// Null matters here more than anywhere else in the app: a missing photograph
-/// must look like a missing photograph, never like a face somebody checked.
 String? _photo(dynamic raw) {
   final v = (raw as String?)?.trim() ?? '';
   if (v.isEmpty) return null;
@@ -94,12 +52,6 @@ String? _photo(dynamic raw) {
   return '$kApiBase${v.startsWith('/') ? '' : '/'}$v';
 }
 
-/// FATHER → "Father", in whichever language the app is showing.
-///
-/// Kurdish has four different words where English says "uncle" and "aunt", and
-/// which one it is carries real information at a door — so the enum is
-/// translated rather than tidied up. A label the office typed by hand is shown
-/// exactly as they typed it.
 String relationLabel(String? raw) {
   final v = raw?.trim() ?? '';
   if (v.isEmpty) return '';
@@ -123,9 +75,6 @@ class _Allowed {
   final String refId;
   final String? personId;
 
-  /// Null where the school holds no name. Kept nullable rather than filled with
-  /// a placeholder, because this value is also written to the custody ledger
-  /// and "Name not recorded" is not a person.
   final String? name;
   final String? relationship;
   final String? photoUrl;
@@ -148,7 +97,6 @@ class _Allowed {
   }
 }
 
-/// An authorisation the office issued over the phone, for this run only.
 class _OneTime {
   _OneTime({
     required this.id,
@@ -199,7 +147,6 @@ class _Collectors {
   final List<_Allowed> allowed;
   final List<_OneTime> oneTimes;
 
-  /// "Do not release — call the office." The reason never travels to the phone.
   final bool hold;
   final String? holdMessageKey;
   final String? siblingRule;
@@ -225,7 +172,6 @@ class _Collectors {
   }
 }
 
-/// One row already written to the custody ledger for this child on this run.
 class _Recorded {
   _Recorded({required this.type, required this.at, required this.note, required this.step});
 
@@ -260,8 +206,6 @@ class _Recorded {
       };
 }
 
-/// How far down the ladder the crew already is, read off the ledger rather than
-/// off the driver's memory.
 class _Protocol {
   _Protocol({
     required this.resolved,
@@ -298,8 +242,6 @@ class _Contact {
   final String? relationship;
 }
 
-/// The parts of the trip pack this screen needs: numbers to ring, and the notes
-/// the office wrote about handing this particular child over.
 class _PackNotes {
   _PackNotes({
     required this.officeName,
@@ -355,15 +297,8 @@ class _Door {
   final _Collectors collectors;
   final _Protocol protocol;
 
-  /// Null when the pack could not be fetched. The decision does not depend on
-  /// it — only the phone numbers and the notes do — so a failure here never
-  /// blocks the door.
   final _PackNotes? notes;
 }
-
-/* ---------------------------------------------------------------------------
- * The calls
- * ------------------------------------------------------------------------- */
 
 String _collectorsPath(String tripId, String studentId) =>
     '/crew/handover/trips/$tripId/students/$studentId/collectors';
@@ -375,10 +310,6 @@ Future<_Protocol> _loadProtocol(String tripId, String studentId) async {
   final json = await ApiClient.instance.get(_protocolPath(tripId, studentId));
   return _Protocol.from(json as Map<String, dynamic>);
 }
-
-/* ---------------------------------------------------------------------------
- * The screen
- * ------------------------------------------------------------------------- */
 
 class HandoverScreen extends StatefulWidget {
   const HandoverScreen({
@@ -393,8 +324,6 @@ class HandoverScreen extends StatefulWidget {
   final String tripId;
   final String studentId;
 
-  /// What the roster calls this child. Only used for the sub-screens' titles
-  /// before the collectors call has answered.
   final String studentName;
   final String? stopId;
   final String? stopName;
@@ -406,8 +335,6 @@ class HandoverScreen extends StatefulWidget {
 class _HandoverScreenState extends State<HandoverScreen> {
   final _loaderKey = GlobalKey<LoaderState<_Door>>();
 
-  /// What this visit ended up writing, handed back to the roster so the row
-  /// stops inviting the driver to do it again.
   HandoverOutcome? _outcome;
 
   Future<Map<String, dynamic>?> _pack() async {
@@ -415,8 +342,6 @@ class _HandoverScreenState extends State<HandoverScreen> {
       final json = await ApiClient.instance.get('/crew/trips/${widget.tripId}/pack');
       return json as Map<String, dynamic>;
     } catch (_) {
-      // The pack is forty children deep and this screen wants four phone
-      // numbers out of it. Losing it costs the numbers, not the handover.
       return null;
     }
   }
@@ -523,7 +448,6 @@ class _HandoverScreenState extends State<HandoverScreen> {
   }
 }
 
-/// Everything the driver looks at while an adult is standing at the door.
 class _TheDoor extends StatelessWidget {
   const _TheDoor({
     required this.door,
@@ -557,8 +481,6 @@ class _TheDoor extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // The restriction goes first and goes loud. Anywhere further down the
-        // page it is a footnote, and a footnote is a thing that gets missed.
         if (child.hold) ...[
           _Alarm(
             title: t('handover.holdTitle'),
@@ -685,11 +607,6 @@ class _TheDoor extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Pieces
- * ------------------------------------------------------------------------- */
-
-/// The red card. Deliberately the loudest thing the driver app can draw.
 class _Alarm extends StatelessWidget {
   const _Alarm({required this.title, required this.body, this.phone});
 
@@ -746,7 +663,6 @@ class _Alarm extends StatelessWidget {
   }
 }
 
-/// Who this is about.
 class _ChildCard extends StatelessWidget {
   const _ChildCard({required this.child, required this.stopName});
 
@@ -796,11 +712,6 @@ class _ChildCard extends StatelessWidget {
   }
 }
 
-/// A photograph, or an honest statement that there is not one.
-///
-/// The empty case draws no initials and no silhouette. A grey disc with two
-/// letters in it looks like an identity somebody checked, and nothing on this
-/// screen may look like that when the school holds no photograph.
 class _Face extends StatelessWidget {
   const _Face({required this.url, required this.size});
 
@@ -865,7 +776,6 @@ class _NoteCard extends StatelessWidget {
   }
 }
 
-/// One adult the school says may take this child.
 class _CollectorTile extends StatelessWidget {
   const _CollectorTile({required this.adult, required this.onTap});
 
@@ -940,7 +850,6 @@ class _CollectorTile extends StatelessWidget {
   }
 }
 
-/// The office rang, checked, and issued this against this run only.
 class _OneTimeTile extends StatelessWidget {
   const _OneTimeTile({required this.auth, required this.onTap});
 
@@ -1031,7 +940,6 @@ class _OneTimeTile extends StatelessWidget {
   }
 }
 
-/// The office, and its number, always one tap from being copied.
 class _OfficeCard extends StatelessWidget {
   const _OfficeCard({required this.name, required this.phone, required this.body});
 
@@ -1086,11 +994,6 @@ class _OfficeCard extends StatelessWidget {
   }
 }
 
-/// A number, big enough to read at arm's length, copied by tapping it.
-///
-/// This build has nothing bound to the dialler, so the honest affordance is
-/// "copy" rather than a call button that might do nothing at the one moment
-/// somebody needs it.
 class _CopyNumber extends StatelessWidget {
   const _CopyNumber({required this.label, required this.phone, this.onWhite = false});
 
@@ -1157,7 +1060,6 @@ class _CopyNumber extends StatelessWidget {
   }
 }
 
-/// What has already been written down for this child on this run.
 class _Ledger extends StatelessWidget {
   const _Ledger({required this.events});
 
@@ -1228,11 +1130,6 @@ class _Ledger extends StatelessWidget {
   }
 }
 
-/// The sentence a driver must be shown when a write did not land.
-///
-/// A snackbar is the wrong shape for this: it fades, and "the handover was not
-/// recorded" may not fade while the child is already walking away. It stays on
-/// the sheet until the write succeeds or the driver leaves.
 class _NotRecorded extends StatelessWidget {
   const _NotRecorded({required this.message});
 
@@ -1275,12 +1172,6 @@ class _NotRecorded extends StatelessWidget {
   }
 }
 
-/// Press, and keep pressing.
-///
-/// Every write on this screen goes through one of these. A target big enough
-/// for a gloved hand is also a target big enough to hit by accident while the
-/// bus is moving, and the thing on the other side of it decides whether a child
-/// leaves with a particular adult.
 class _HoldToConfirm extends StatefulWidget {
   const _HoldToConfirm({
     required this.label,
@@ -1309,9 +1200,6 @@ class _HoldToConfirmState extends State<_HoldToConfirm> with SingleTickerProvide
   void _finished(AnimationStatus status) {
     if (status != AnimationStatus.completed) return;
     HapticFeedback.heavyImpact();
-    // Wound back before the call goes out, not after: whatever onConfirmed does
-    // to this subtree — including taking it off the screen — the controller has
-    // already been left in a state nothing else has to touch.
     _hold.value = 0;
     widget.onConfirmed();
   }
@@ -1359,8 +1247,6 @@ class _HoldToConfirmState extends State<_HoldToConfirm> with SingleTickerProvide
             ),
             child: Stack(
               children: [
-                // The fill is the whole of the feedback: it says how much
-                // longer, and it says that letting go undoes it.
                 FractionallySizedBox(
                   widthFactor: _hold.value,
                   child: Container(color: Colors.white.withValues(alpha: 0.30)),
@@ -1407,11 +1293,6 @@ class _HoldToConfirmState extends State<_HoldToConfirm> with SingleTickerProvide
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Recording the handover
- * ------------------------------------------------------------------------- */
-
-/// The last thing between a tap on a name and a child leaving the bus.
 class _ConfirmHandover extends StatefulWidget {
   const _ConfirmHandover({
     required this.tripId,
@@ -1437,22 +1318,13 @@ class _ConfirmHandoverState extends State<_ConfirmHandover> {
   bool _busy = false;
   String? _error;
 
-  /// Minted once, before the first attempt, and reused on every retry. That is
-  /// what makes "try again" free over a connection that drops halfway: the
-  /// server reads the repeat as the same event rather than a second release.
   String? _uuid;
 
   String get _name => widget.adult?.display ?? widget.oneTime?.display ?? '';
   String? get _photoUrl => widget.adult?.photoUrl;
 
-  /// A photo tap where there is a photograph to tap. Where there is not, the
-  /// weaker method with a reason attached — claiming a face was matched against
-  /// a photograph the school never held is the one lie this record could not
-  /// survive.
   String get _method => _photoUrl != null ? 'PHOTO_TAP' : 'MANUAL_WITH_REASON';
 
-  /// Kept in English deliberately: it is written to the custody ledger, which
-  /// the office reads alongside every other crew's rows, not to the screen.
   String? get _reason {
     if (_photoUrl != null) return null;
     if (widget.oneTime != null) {
@@ -1477,9 +1349,6 @@ class _ConfirmHandoverState extends State<_ConfirmHandover> {
     final uuid = _uuid ??= uuidV4();
     final adult = widget.adult;
     final auth = widget.oneTime;
-    // Snapshots, beside the foreign keys rather than instead of them. The
-    // office may edit or remove a collector next term; the row that says who
-    // took this child home has to still say it.
     final name = _fits(adult?.name ?? auth?.name, 2, 120);
     final relation = _fits(adult?.relationship, 2, 60);
     try {
@@ -1514,8 +1383,6 @@ class _ConfirmHandoverState extends State<_ConfirmHandover> {
     final hasPhoto = _photoUrl != null;
 
     return _Sheet(
-      // Not while the write is in the air. A sheet swiped away mid-request
-      // leaves the driver with no idea whether a child was signed for.
       locked: _busy,
       children: [
         Text(
@@ -1617,13 +1484,11 @@ class _ConfirmHandoverState extends State<_ConfirmHandover> {
   }
 }
 
-/// The bottom sheet a confirmation is poured into.
 class _Sheet extends StatelessWidget {
   const _Sheet({required this.children, this.locked = false});
 
   final List<Widget> children;
 
-  /// Holds the sheet open while a write is in flight.
   final bool locked;
 
   @override
@@ -1685,16 +1550,6 @@ class _Sheet extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Refusing
- * ------------------------------------------------------------------------- */
-
-/// The crew declined to release the child.
-///
-/// A first-class outcome with its own row, not the absence of one. A driver who
-/// refused an adult he was not sure about did exactly the right thing, and this
-/// record is what stands behind him when the complaint reaches the office an
-/// hour later.
 class _RefuseScreen extends StatefulWidget {
   const _RefuseScreen({
     required this.tripId,
@@ -1725,8 +1580,6 @@ class _RefuseScreenState extends State<_RefuseScreen> {
     super.dispose();
   }
 
-  /// The server asks for at least four characters, and it is right to: "no" is
-  /// not a record anybody can act on three weeks later.
   bool get _ready => _reason != null && _note.text.trim().length >= 4;
 
   Future<void> _submit() async {
@@ -1849,8 +1702,6 @@ class _RefuseScreenState extends State<_RefuseScreen> {
   }
 }
 
-/// A big single-select row. Nothing on these screens is a radio button — a
-/// radio button is four millimetres wide.
 class _PickRow extends StatelessWidget {
   const _PickRow({
     required this.label,
@@ -1909,17 +1760,6 @@ class _PickRow extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Nobody at the stop
- * ------------------------------------------------------------------------- */
-
-/// The ladder.
-///
-/// The child is never put down on the pavement. The crew works a fixed order —
-/// wait, ring the guardian, ring the alternate, ring the office, carry the
-/// child on — and each rung is written as it happens, because the question
-/// afterwards is always "what did you actually do, and when". One note typed at
-/// the depot forty minutes later cannot answer that.
 class _NobodyScreen extends StatefulWidget {
   const _NobodyScreen({
     required this.tripId,
@@ -1987,10 +1827,6 @@ class _NobodyScreenState extends State<_NobodyScreen> {
       return;
     }
 
-    // The rung is written. Nothing after this line may tell the driver
-    // otherwise — the re-read below is a convenience, and it used to share a
-    // catch with the write, so a refresh that failed on a weak signal reported
-    // "NOT recorded" over a step the server had already accepted.
     final taken = [..._protocol.stepsTaken, step];
     _Protocol? fresh;
     try {
@@ -2009,8 +1845,6 @@ class _NobodyScreenState extends State<_NobodyScreen> {
           );
       _busy = false;
       _wroteSomething = true;
-      // A fresh key for the next rung. This one is written, and must never be
-      // sent again under the same id.
       _uuid = null;
       _step = null;
       _note.clear();

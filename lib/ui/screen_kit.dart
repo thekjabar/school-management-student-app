@@ -4,19 +4,6 @@ import '../theme/app_theme.dart';
 import 'home_kit.dart';
 import 'kit.dart';
 
-/// The furniture every parent screen below the home tab is built from.
-///
-/// Seven pieces, and the reason they live together is that the designs reuse
-/// them verbatim: the same back button on Timetable and Leave, the same child
-/// card under it, the same pill tabs across Attitude, Attendance and
-/// Assignments. Rebuilding each one per screen is how six screens end up with
-/// six slightly different tab strips.
-
-/* ---------------------------------------------------------------------------
- * Titles
- * ------------------------------------------------------------------------- */
-
-/// Back arrow, title, bell — the header on a pushed screen.
 class ScreenHeader extends StatelessWidget {
   const ScreenHeader({
     super.key,
@@ -29,7 +16,6 @@ class ScreenHeader extends StatelessWidget {
 
   final String title;
 
-  /// A quieter second line under the title — which run, which route.
   final String? subtitle;
   final int notificationCount;
   final VoidCallback? onBell;
@@ -62,8 +48,6 @@ class ScreenHeader extends StatelessWidget {
                     color: AppTheme.text,
                   ),
                 ),
-                // Which run, under the word "run". A driver with two routes in
-                // a day needs the answer here, not three cards down.
                 if (subtitle != null && subtitle!.isNotEmpty)
                   Text(
                     subtitle!,
@@ -87,8 +71,6 @@ class ScreenHeader extends StatelessWidget {
   }
 }
 
-/// A big title with something on the right — the shape the tab screens use,
-/// where the header above already names the parent.
 class PageTitle extends StatelessWidget {
   const PageTitle({super.key, required this.title, this.trailing});
 
@@ -121,12 +103,6 @@ class PageTitle extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Which child
- * ------------------------------------------------------------------------- */
-
-/// The child, full width, with a caret — the card that sits under a screen
-/// header and says who everything below is about.
 class ChildCard extends StatelessWidget {
   const ChildCard({
     super.key,
@@ -193,7 +169,6 @@ class ChildCard extends StatelessWidget {
   }
 }
 
-/// The compact version, for the right of a page title.
 class ChildPill extends StatelessWidget {
   const ChildPill({
     super.key,
@@ -260,23 +235,15 @@ class ChildPill extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Tabs
- * ------------------------------------------------------------------------- */
-
 class TabSpec {
   const TabSpec({required this.label, this.icon, this.color});
 
   final String label;
   final IconData? icon;
 
-  /// The designs colour each tab's own icon — amber for Pending, green for
-  /// Approved, rose for Rejected — which is most of what makes the strip
-  /// readable at a glance rather than four identical words.
   final Color? color;
 }
 
-/// The filled-pill strip: one tab is a solid block, the rest sit on the card.
 class PillTabs extends StatelessWidget {
   const PillTabs({
     super.key,
@@ -351,7 +318,6 @@ class PillTabs extends StatelessWidget {
   }
 }
 
-/// The underline strip, for when the tabs sit directly on the page.
 class UnderlineTabs extends StatelessWidget {
   const UnderlineTabs({
     super.key,
@@ -434,11 +400,6 @@ class UnderlineTabs extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Banners and boxes
- * ------------------------------------------------------------------------- */
-
-/// The tinted note at the foot of most of these screens.
 class NoticeBanner extends StatelessWidget {
   const NoticeBanner({
     super.key,
@@ -538,7 +499,6 @@ class NoticeBanner extends StatelessWidget {
   }
 }
 
-/// One of the small bordered figures the designs put in a 2×2 beside a verdict.
 class StatBox extends StatelessWidget {
   const StatBox({
     super.key,
@@ -614,8 +574,6 @@ class StatBox extends StatelessWidget {
   }
 }
 
-/// A short status word on a tinted ground — the design's Present / Absent /
-/// Due Tomorrow / Submitted chips.
 class StatusChip extends StatelessWidget {
   const StatusChip(this.label, {super.key, required this.color});
 

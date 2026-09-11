@@ -4,8 +4,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
-// latlong2 exports a generic Path<T> for geodesic paths, which shadows
-// dart:ui's Path and breaks anything in the file that paints.
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:latlong2/latlong.dart' hide Path;
 
@@ -18,15 +16,6 @@ import '../../ui/home_kit.dart';
 import '../../ui/map_tiles.dart';
 import '../../ui/screen_kit.dart';
 
-/// Whether a stop carries a position this app is allowed to draw.
-///
-/// Null is the ordinary case: a stop the office has not pinned yet. (0, 0) is
-/// not a stop either — it is what a database holds when nobody typed anything,
-/// and it is a spot in the Gulf of Guinea that would drag the camera off the
-/// city and squash the whole run into one pixel.
-///
-/// A stop that fails this is left OFF the map and named underneath it. It is
-/// never drawn at a guessed position: that is a bus sent to the wrong street.
 bool stopIsPlaced(PlannedStop s) {
   final lat = s.lat;
   final lon = s.lon;
@@ -35,31 +24,6 @@ bool stopIsPlaced(PlannedStop s) {
   return lat.abs() <= 90 && lon.abs() <= 180;
 }
 
-/// The run on a real map — Mapbox tiles, one marker per stop, standing
-/// where the stop actually is.
-///
-/// This replaced a CustomPaint that drew a lazy S-curve with dots on it and
-/// captioned itself "not a live map". The apology was the honest half of a
-/// dishonest widget: the coordinates were on every stop the whole time, and the
-/// parent side of this app has been drawing real OSM tiles since it shipped.
-///
-/// What the map does NOT claim:
-///
-///   * The line between two markers is the ORDER the stops are driven, not the
-///     road the bus takes. Road geometry needs a routing service this product
-///     does not have. There is no caption saying so, because a straight line
-///     between two pins is universally read as "these two connect" — the old
-///     caption existed to excuse a drawing, and this is not a drawing.
-///   * The bus is drawn from THIS handset's own fix, and only once there is
-///     one. Before that no bus marker exists at all — an invented one is a bus
-///     on the wrong street, and the whole point of the dot is that it is real.
-///
-/// Built for 06:40 in a yard, one-handed, in gloves: the next stop is the
-/// largest thing on the map, markers are finger-sized, and every pin, line and
-/// number is drawn from data the phone already holds. Tiles are the only part
-/// that needs the network, so when the signal is bad the run still draws over a
-/// plain themed ground instead of a grey void, and nothing blocks the screen
-/// while tiles arrive.
 class RouteMap extends StatefulWidget {
   const RouteMap({
     super.key,
@@ -71,32 +35,16 @@ class RouteMap extends StatefulWidget {
     this.fullScreen = false,
   });
 
-  /// The stops in the order they are driven — the order the plan returned,
-  /// whether that is the office's or nearest-first.
   final List<PlannedStop> stops;
 
   final Color tint;
 
-  /// OUT or RETURN, which decides whether a stop's children are picked up or
-  /// dropped off.
   final String leg;
 
-  /// The campus gate, when the caller knows it.
-  ///
-  /// The plan cannot name it — its stops are built from the manifest and no
-  /// child belongs to the gate — so only a screen that has read the trip pack
-  /// can pass it. Null means "not known", never "not there", and an unknown
-  /// gate is simply drawn as an ordinary stop rather than guessed at.
   final String? terminalStopId;
 
-  /// The small map beside the run's name on the home card: no interaction, no
-  /// callout, smaller markers.
   final bool compact;
 
-  /// Filling a screen of its own, pushed from the corner button of the card
-  /// map. There is no page underneath to scroll, so one finger pans it, and
-  /// the corner button fits the whole run back on screen instead of opening
-  /// another copy.
   final bool fullScreen;
 
   @override
@@ -106,20 +54,10 @@ class RouteMap extends StatefulWidget {
 class _RouteMapState extends State<RouteMap> {
   MapboxMap? _mapbox;
 
-  /// The stop whose marker was last tapped, by id rather than by index so it
-  /// survives the reload that follows every arrive and depart.
   String? _touched;
 
-  /// The run drawn along the roads, once Mapbox has said where they go.
-  ///
-  /// Null until the first answer, and the straight line is drawn meanwhile —
-  /// the order of the stops is the thing the driver needs, and it should not
-  /// wait on a network round trip to appear.
   List<LatLng>? _road;
 
-  /// The stops the shape in [_road] was fetched for, so a run whose stops
-  /// change — a skipped stop, a re-ordered route — asks again rather than
-  /// drawing the old shape through the new pins.
   String? _roadFor;
 
   @override
@@ -127,12 +65,6 @@ class _RouteMapState extends State<RouteMap> {
     super.dispose();
   }
 
-  /// Ask for the driving line, once per distinct set of stops.
-  ///
-  /// Called from build because the stops arrive as a widget property and change
-  /// under it; guarded by [_roadFor] so a rebuild does not re-request. Failure
-  /// is silent by design — Directions hands back the straight line, which is
-  /// what was being drawn before any of this existed.
   void _wantRoad(List<LatLng> points) {
     final key = points
         .map((p) => '${p.latitude.toStringAsFixed(5)},${p.longitude.toStringAsFixed(5)}')
@@ -156,11 +88,6 @@ class _RouteMapState extends State<RouteMap> {
   Widget build(BuildContext context) {
     final pins = _pins();
 
-    // Nothing to place. The list is the run, so say so and let the caller's own
-    // list answer the question — an empty grey square would not.
-    //
-    // Two different nothings, and they must not read the same: a run with no
-    // stops on it at all, and a run whose stops have never been pinned.
     if (pins.isEmpty) {
       return _NoMap(
         compact: widget.compact,
@@ -176,16 +103,11 @@ class _RouteMapState extends State<RouteMap> {
     final points = [for (final p in pins) p.at];
     _wantRoad(points);
 
-    // Every stop at the same spot — one stop, or a route whose pins were all
-    // typed the same. Fitting a camera to a zero-sized box divides by nothing,
-    // so centre on it instead.
     final spread = <String>{
       for (final p in points)
         '${p.latitude.toStringAsFixed(4)},${p.longitude.toStringAsFixed(4)}',
     }.length > 1;
 
-    // No token, no tiles, and a driver looking at a blank rectangle before a
-    // shift cannot tell that from a route that has not loaded.
     if (!MapTiles.configured) {
       return MapNotConfigured(tint: widget.tint);
     }
@@ -204,8 +126,6 @@ class _RouteMapState extends State<RouteMap> {
     );
 
     if (widget.compact) {
-      // Inside a card whose own tap opens the run. A map that swallowed that
-      // tap would break the card.
       return IgnorePointer(
         child: Stack(
           children: [Positioned.fill(child: map), const _Credit(small: true)],
@@ -225,11 +145,6 @@ class _RouteMapState extends State<RouteMap> {
             child: _Callout(pin: _shown(pins), tint: widget.tint, leg: widget.leg),
           ),
         ),
-        // In the card this opens the run full screen; full screen, where the
-        // map already fills the window, it puts the whole run back in view.
-        // The card used to carry the re-fit here too, and with the run already
-        // fitted — which it is, from the first frame — the button did nothing
-        // visible, which reads as broken.
         PositionedDirectional(
           end: 10,
           top: 10,
@@ -259,8 +174,6 @@ class _RouteMapState extends State<RouteMap> {
                   unawaited(_moveTo(points.first, 15.5));
                 }
               },
-              // 44 square. Everything on a driver screen is pressed with a
-              // gloved thumb.
               child: Container(
                 width: 44,
                 height: 44,
@@ -285,13 +198,6 @@ class _RouteMapState extends State<RouteMap> {
             ),
           ),
         ),
-        // Centre on the bus.
-        //
-        // Under the fit-the-run button, because they are the two halves of the
-        // same question — where is the run, and where am I in it — and a driver
-        // who has panned away needs the second one as often as the first. Shown
-        // only in the full-screen map, and only once there is a real fix: a
-        // locate button that answers with nothing is worse than no button.
         if (widget.fullScreen)
           ValueListenableBuilder<geo.Position?>(
             valueListenable: BusLocation.instance.here,
@@ -340,12 +246,6 @@ class _RouteMapState extends State<RouteMap> {
     );
   }
 
-  /// The whole run back on screen.
-  ///
-  /// Room for the callout above, and enough that a marker never sits against
-  /// the frame, where it reads as off-screen. The engine works the camera out
-  /// from the coordinates rather than being told a zoom, so a run down one
-  /// street and a run across the city both fill the frame.
   Future<void> _fitAll(List<LatLng> points) async {
     final map = _mapbox;
     if (map == null || points.isEmpty) return;
@@ -359,8 +259,6 @@ class _RouteMapState extends State<RouteMap> {
       null,
       null,
     );
-    // Close enough to read the street, never so close that two stops on the
-    // same road land on top of each other.
     final zoom = camera.zoom;
     if (zoom != null && zoom > 16.5) camera.zoom = 16.5;
     await map.flyTo(camera, MapAnimationOptions(duration: 600));
@@ -376,11 +274,7 @@ class _RouteMapState extends State<RouteMap> {
     );
   }
 
-  /// The pins, in driving order, skipping every stop with no position.
   List<_Stop> _pins() {
-    // The first stop not yet departed. Not the nearest — a driver following the
-    // route wants the next one in order, and the nearest is the one they just
-    // left as often as it is the one ahead.
     final next = widget.stops.indexWhere((s) => s.departedAt == null);
 
     final out = <_Stop>[];
@@ -389,8 +283,6 @@ class _RouteMapState extends State<RouteMap> {
       if (!stopIsPlaced(s)) continue;
       out.add(_Stop(
         stop: s,
-        // Numbered by where it falls in the run, so the numbers count 1, 2, 3
-        // along the road the bus is actually driving.
         order: i + 1,
         at: LatLng(s.lat!, s.lon!),
         next: i == next,
@@ -400,8 +292,6 @@ class _RouteMapState extends State<RouteMap> {
     return out;
   }
 
-  /// What the callout is about: the marker last tapped, else the next stop,
-  /// else nothing, on a run where every stop is behind.
   _Stop? _shown(List<_Stop> pins) {
     for (final p in pins) {
       if (p.stop.stopId == _touched) return p;
@@ -413,17 +303,6 @@ class _RouteMapState extends State<RouteMap> {
   }
 }
 
-/// The run on a map that fills the screen.
-///
-/// Pushed from the corner button of the card map on the run and route
-/// screens. Same stops, same pins, same tint; the difference is room — the
-/// card is 230 pixels high and a run across half of Erbil is a cluster of
-/// numbers in it — and one-finger panning, which the card cannot allow
-/// because it sits in a scrolling page.
-///
-/// The stops are the list the caller had when the button was pressed. The
-/// screen underneath reloads after every arrive and depart, and the driver is
-/// back on it for those, so a snapshot is the right thing here.
 class RouteMapScreen extends StatelessWidget {
   const RouteMapScreen({
     super.key,
@@ -471,7 +350,6 @@ class RouteMapScreen extends StatelessWidget {
   }
 }
 
-/// One stop, placed.
 class _Stop {
   const _Stop({
     required this.stop,
@@ -483,20 +361,14 @@ class _Stop {
 
   final PlannedStop stop;
 
-  /// Its position in the run, counting from 1.
   final int order;
   final LatLng at;
 
-  /// The one the bus is driving to now.
   final bool next;
 
-  /// The campus gate rather than somebody's street corner.
   final bool school;
 }
 
-/* ---------------------------------------------------------------------------
- * Markers
- * ------------------------------------------------------------------------- */
 class _Callout extends StatelessWidget {
   const _Callout({required this.pin, required this.tint, required this.leg});
 
@@ -522,7 +394,6 @@ class _Callout extends StatelessWidget {
         ],
       ),
       child: p == null
-          // Every stop departed. The run is done, and there is no next one.
           ? Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: Text(
@@ -605,16 +476,12 @@ class _Callout extends StatelessWidget {
       ].join(' · ');
 }
 
-/// Mapbox's licence requires the credit. It is not decoration and it
-/// does not come off.
 class _Credit extends StatelessWidget {
   const _Credit({this.small = false});
 
   final bool small;
 
   @override
-  // The small one sits on the trailing side: on the home card the leading edge
-  // of the map is under a fade, and a credit nobody can reach is not a credit.
   Widget build(BuildContext context) => PositionedDirectional(
         start: small ? null : 8,
         end: small ? 5 : null,
@@ -623,18 +490,12 @@ class _Credit extends StatelessWidget {
       );
 }
 
-/* ---------------------------------------------------------------------------
- * When there is nothing to map
- * ------------------------------------------------------------------------- */
-
-/// Drawn in place of the map when the run has no stop this app may plot.
 class _NoMap extends StatelessWidget {
   const _NoMap({required this.compact, required this.tint, required this.reason});
 
   final bool compact;
   final Color tint;
 
-  /// Which nothing this is, already said in the reader's language.
   final String reason;
 
   @override
@@ -675,15 +536,6 @@ class _NoMap extends StatelessWidget {
   }
 }
 
-/// The stops the map could not show, named.
-///
-/// Sits under the map card. A stop with no coordinates is not drawn at all, so
-/// without this line it would simply be missing — and a driver counting pins
-/// against the list would come up one short with nothing to say why.
-///
-/// Silent when every stop is placed, and silent when NONE is: in that case the
-/// panel where the map would have been has already said so, and repeating the
-/// whole list under it is noise.
 class RouteMapNote extends StatelessWidget {
   const RouteMapNote({super.key, required this.stops});
 
@@ -734,25 +586,6 @@ class RouteMapNote extends StatelessWidget {
   }
 }
 
-/// The run drawn by Mapbox's own engine.
-///
-/// This replaced a raster-tile map. The school's style is a Mapbox Standard
-/// style, and Standard carries no layers of its own — it is an import resolved
-/// at draw time by the GL engine, which is why the raster endpoint answered
-/// every tile with a 235-byte transparent PNG and every map came out blank. The
-/// engine had to change for the style to exist at all.
-///
-/// What that buys beyond the style: real vector rendering, so labels stay crisp
-/// at every zoom instead of being rasterised at one and stretched; no tile
-/// seams; and the platform's own location puck, which draws the accuracy ring
-/// and the heading properly rather than the circle-and-dot this file used to
-/// paint by hand.
-///
-/// What it costs: markers are images, not widgets. This SDK has no
-/// ViewAnnotationManager, so the numbered pins are drawn to PNG once and placed
-/// as point annotations with the number as native label text. The callout, the
-/// buttons and the credit are unaffected — they were always screen-anchored
-/// rather than pinned to a coordinate.
 class _MapboxCanvas extends StatefulWidget {
   const _MapboxCanvas({
     required this.pins,
@@ -767,16 +600,12 @@ class _MapboxCanvas extends StatefulWidget {
 
   final List<_Stop> pins;
 
-  /// The run along the roads, once Directions has said where they go. Null
-  /// until the first answer, and the straight line is drawn meanwhile.
   final List<LatLng>? road;
 
   final Color tint;
   final bool compact;
   final bool fullScreen;
 
-  /// Every stop, so the first frame holds the whole run. Null when they all sit
-  /// at one spot and there is nothing to fit.
   final List<LatLng>? initialFit;
 
   final void Function(MapboxMap map) onReady;
@@ -791,12 +620,8 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
   PointAnnotationManager? _points;
   PolylineAnnotationManager? _lines;
 
-  /// The annotation id of each pin, so a tap can be turned back into the stop
-  /// it belongs to. The SDK hands back its own id and nothing else.
   final Map<String, String> _stopForAnnotation = {};
 
-  /// What the annotations were last drawn from. Redrawing on every rebuild
-  /// would clear and re-add forty images a second while the camera moves.
   String? _drawnFor;
 
   StreamSubscription<geo.Position>? _live;
@@ -813,17 +638,10 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
     _map = map;
     widget.onReady(map);
 
-    // North stays up and the map stays flat. A map twisted by a stray finger on
-    // a phone in a cradle is a map nobody can read, and the streets in a
-    // driver's head are all north-up.
     await map.gestures.updateSettings(
       GesturesSettings(
         rotateEnabled: false,
         pitchEnabled: false,
-        // The card map sits inside a scrolling screen. A map that took
-        // one-finger drags would eat every swipe meant for the stop list under
-        // it — the driver pushes up to reach the next stop and the map slides
-        // away instead.
         scrollEnabled: !widget.compact,
         pinchToZoomEnabled: !widget.compact,
         doubleTapToZoomInEnabled: !widget.compact,
@@ -831,9 +649,6 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
       ),
     );
 
-    // Mapbox's own puck, rather than the dot and circle this file used to paint.
-    // It interpolates between fixes so the bus glides instead of jumping, draws
-    // the accuracy ring to the map's scale, and turns to face the heading.
     await map.location.updateSettings(
       LocationComponentSettings(
         enabled: true,
@@ -866,7 +681,6 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
     await _draw();
   }
 
-  /// Follow the bus, so the leg it is driving can be drawn and redrawn.
   void _watchLive() {
     _live?.cancel();
     _live = null;
@@ -881,10 +695,6 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
     final next = widget.pins.where((p) => p.stop.departedAt == null).firstOrNull;
     if (next == null) return;
 
-    // Snapped to roughly a hundred metres before the road is asked for. The
-    // position updates every few seconds and the directions cache is keyed to
-    // about a metre, so asking on every fix would be several hundred requests
-    // across a morning for lines nobody could tell apart.
     final from = LatLng(
       double.parse(me.latitude.toStringAsFixed(3)),
       double.parse(me.longitude.toStringAsFixed(3)),
@@ -906,9 +716,6 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
     }
   }
 
-  /// Put the run on the map: the route, the leg being driven, and a pin per
-  /// stop. Cleared and redrawn as a set, because a partial update leaves a
-  /// stale pin on a stop that has since been served.
   Future<void> _draw() async {
     final points = _points;
     final lines = _lines;
@@ -927,7 +734,6 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
     await lines.deleteAll();
     _stopForAnnotation.clear();
 
-    // The route first, so the pins sit on top of it.
     final route = widget.road ?? [for (final p in widget.pins) p.at];
     if (route.length >= 2) {
       await lines.create(
@@ -944,9 +750,6 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
       );
     }
 
-    // Then the leg the bus is on, in the location colour rather than the
-    // route's, because it is where the bus is and not where the office said to
-    // drive.
     final leg = _liveLeg;
     if (leg != null && leg.length >= 2) {
       await lines.create(
@@ -970,32 +773,12 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
           geometry: Point(coordinates: Position(pin.at.longitude, pin.at.latitude)),
           image: image,
           iconSize: 1,
-          // The number, the tick and the school icon are all drawn INTO the
-          // image, so a pin is one picture. A native label beside it would sit
-          // at its own offset and drift off the circle as the camera moves.
           iconAnchor: IconAnchor.CENTER,
         ),
       );
       _stopForAnnotation[made.id] = pin.stop.stopId;
     }
   }
-  /// The pin, drawn to PNG exactly as the widget used to draw it.
-  ///
-  /// The first version of this file replaced the pin widget with a plain
-  /// circle and put the number on it as native label text, which quietly threw
-  /// away the design: the school lost its rounded square and its icon, a served
-  /// stop lost its tick and showed a number again, and the next stop lost the
-  /// halo that is the one thing on this map a driver should find without
-  /// looking for it.
-  ///
-  /// None of that was a limit of the map. This Flutter binding does not expose
-  /// Mapbox's view annotations, so a pin cannot BE a widget — but it can be
-  /// drawn, and a canvas draws the same shapes the widget did. Material icons
-  /// are glyphs in a font, so they paint through a TextPainter like any other
-  /// character.
-  ///
-  /// Cached by look rather than by stop: a run of forty stops rasterises four
-  /// or five images, not forty.
   static final Map<String, Uint8List> _images = {};
 
   Future<Uint8List> _pinImage(_Stop pin) async {
@@ -1013,22 +796,11 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
                 : AppTheme.surface;
     final ink = plain ? tint : Colors.white;
 
-    // The number is part of the picture, so the whole pin is one image and the
-    // label can never drift off it as the camera moves.
     final label = pin.school
         ? null
         : done
             ? null
             : '${pin.order}';
-    // Drawn at DEVICE pixels, not logical ones.
-    //
-    // A point annotation's image is placed pixel for pixel on the screen, with
-    // no scaling for the display's density — unlike a widget, which Flutter
-    // lays out in logical points. So a 40-point pin rasterised at 40 pixels
-    // came out at 40 physical pixels, which on a 3x phone is thirteen points:
-    // a third of the size, and far too small to press. It is drawn at
-    // size × ratio and shown at 1:1, which lands at the size it was designed
-    // for and stays sharp on a dense screen into the bargain.
     final dpr = MediaQuery.devicePixelRatioOf(context);
 
     final key = '${fill.toARGB32()}:${ink.toARGB32()}:$size:${pin.school}:$done:'
@@ -1036,15 +808,12 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
     final cached = _images[key];
     if (cached != null) return cached;
 
-    // The halo sits outside the body, so the canvas has to be big enough for it.
     final pad = pin.next ? 10.0 : 6.0;
     final canvasSize = size + pad * 2;
     final centre = Offset(canvasSize / 2, canvasSize / 2);
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    // Everything below is written in logical points; the canvas scales them up
-    // to the display's pixels once, here.
     canvas.scale(dpr);
 
     if (pin.next) {
@@ -1069,8 +838,6 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
       ..color = plain ? tint : Colors.white;
 
     if (pin.school) {
-      // A rounded square, not a circle. The gate is not a stop and must not
-      // read as one.
       final r = RRect.fromRectAndRadius(rect, Radius.circular(size * 0.3));
       canvas.drawRRect(r.shift(const Offset(0, 2)), shadow);
       canvas.drawRRect(r, body);
@@ -1081,7 +848,6 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
       canvas.drawCircle(centre, half - border / 2, stroke);
     }
 
-    // Icons are font glyphs, so they paint as text.
     final icon = pin.school
         ? Icons.school_rounded
         : done

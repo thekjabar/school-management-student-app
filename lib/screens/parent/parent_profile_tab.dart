@@ -19,12 +19,6 @@ import 'help_screen.dart';
 import 'personal_info_screen.dart';
 import 'settings_screen.dart';
 
-/// The guardian's own tab.
-///
-/// Who they are, who their children are, and everything they can change.
-/// Not a settings screen with a name on top: the children come second, above
-/// the settings, because a parent opening this is far likelier to be checking
-/// which of their children is on the account than changing a password.
 class ParentProfileTab extends StatelessWidget {
   const ParentProfileTab({super.key, required this.children, this.onOpenChild});
 
@@ -39,8 +33,6 @@ class ParentProfileTab extends StatelessWidget {
     return Loader<AttitudeSummary?>(
       tint: tint,
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20),
-      // The figures at the foot are about the first child on the account, which
-      // is what the design's "This term" numbers are too.
       load: () async {
         if (children.isEmpty) return null;
         return ParentApi.instance.attitude(children.first.studentId);
@@ -78,10 +70,6 @@ class ParentProfileTab extends StatelessWidget {
     if (context.mounted) Navigator.of(context).popUntil((r) => r.isFirst);
   }
 }
-
-/* ---------------------------------------------------------------------------
- * Who they are
- * ------------------------------------------------------------------------- */
 
 class _Overview extends StatelessWidget {
   const _Overview({required this.me, required this.tint});
@@ -124,10 +112,6 @@ class _Overview extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  // Only what the account actually holds. The design also has
-                  // an email and a home address; the platform stores neither
-                  // for a guardian, and a row reading "—" twice is worse than
-                  // no row.
                   _Fact(
                     icon: Icons.person_outline_rounded,
                     label: t('profile.fullName'),
@@ -240,8 +224,6 @@ class _Fact extends StatelessWidget {
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  // A phone number reads left-to-right even on a Kurdish
-                  // screen; mirroring it makes it unusable.
                   textDirection: ltr ? TextDirection.ltr : null,
                   style: TextStyle(
                     fontSize: 13,
@@ -258,10 +240,6 @@ class _Fact extends StatelessWidget {
     );
   }
 }
-
-/* ---------------------------------------------------------------------------
- * The children
- * ------------------------------------------------------------------------- */
 
 class _Children extends StatelessWidget {
   const _Children({required this.children, required this.onOpen});
@@ -381,10 +359,6 @@ class _ChildRow extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Everything they can change
- * ------------------------------------------------------------------------- */
-
 class _Settings extends StatelessWidget {
   const _Settings({required this.children});
 
@@ -455,10 +429,6 @@ class _Settings extends StatelessWidget {
             ),
           ),
           Divider(height: 1, color: AppTheme.border),
-          // Named for the screen it opens. It was "Notification settings",
-          // which was one quarter of what is behind it — the theme, the
-          // language and the password are in there too, and with the drawer's
-          // Settings row gone this row is the only way to any of them.
           _Row(
             icon: Icons.settings_outlined,
             title: t('settings.title'),
@@ -468,10 +438,6 @@ class _Settings extends StatelessWidget {
             ),
           ),
           Divider(height: 1, color: AppTheme.border),
-          // The screen's own title, not a second name for it. This row used to
-          // say "Payment methods", which promised a wallet the school does not
-          // have — there is no payment API, and the page is a balance, a set of
-          // invoices and three ways to hand over cash.
           _Row(
             icon: Icons.receipt_long_rounded,
             title: t('fees.title'),
@@ -566,10 +532,6 @@ class _Row extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The figures, and the way out
- * ------------------------------------------------------------------------- */
-
 class _Figures extends StatelessWidget {
   const _Figures({required this.children, required this.attitude});
 
@@ -578,9 +540,6 @@ class _Figures extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The design's four are Events, Assignments, Attendance and a teacher
-    // rating. There is no events feed and nobody rates a teacher, so these are
-    // the four the platform can actually answer.
     return Card16(
       padding: const EdgeInsets.fromLTRB(12, 14, 12, 13),
       child: IconFigureStrip(

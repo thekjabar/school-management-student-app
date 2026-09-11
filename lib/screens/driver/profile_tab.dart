@@ -12,11 +12,6 @@ import '../login_screen.dart' show LanguagePicker;
 import '../staff_leave_screen.dart';
 import 'crew_account.dart';
 
-/// The driver's own tab.
-///
-/// This replaced the drawer rather than sitting beside it. Two routes to one
-/// set of settings is one more than anybody hunts for, and the one behind a
-/// hamburger was the one nobody found.
 class DriverProfile extends StatelessWidget {
   const DriverProfile({super.key});
 
@@ -52,8 +47,6 @@ class DriverProfile extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       me?.phone ?? '',
-                      // A phone number reads left-to-right even on a Kurdish
-                      // screen; mirroring it makes it unusable.
                       textDirection: TextDirection.ltr,
                       style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
@@ -80,9 +73,6 @@ class DriverProfile extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const CrewPapersScreen()),
                 ),
               ),
-              // Time off sits with the papers rather than under Account: a
-              // driver looking for his own leave is looking for the same drawer
-              // his licence is in, not for a settings screen.
               StaffLeaveTile(tint: tint),
             ],
           ),

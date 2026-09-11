@@ -10,13 +10,6 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 
-/// Everything the school has sent this family.
-///
-/// One list, filtered by what the message IS: a notice about the whole school,
-/// something for this class, or something urgent. The design draws a second
-/// list of teacher conversations beside it; there is no messaging service
-/// behind this app — announcements travel one way, from the office outward —
-/// so that list would be furniture and a compose box would open onto nothing.
 class MessagesTab extends StatefulWidget {
   const MessagesTab({super.key, required this.onRead});
 
@@ -29,37 +22,18 @@ class MessagesTab extends StatefulWidget {
 class _MessagesTabState extends State<MessagesTab> {
   int _tab = 0;
 
-  /// The notices this screen has marked read since it was opened.
-  ///
-  /// An overlay of ids rather than an edit to the list: [Announcement] is
-  /// immutable and the list belongs to the [Loader], so a set is the smallest
-  /// thing that can be put back when the server refuses a mark.
   final Set<String> _read = <String>{};
 
-  /// The marks still in flight. They count as read on the screen — that is the
-  /// point of marking optimistically — but NOT to the bell, which is told
-  /// nothing until the server has agreed.
   final Set<String> _sending = <String>{};
 
   bool _markingAll = false;
 
-  /// The last list the loader handed us, so the mark handlers can reason about
-  /// every notice rather than about the tab that happens to be open.
   List<Announcement>? _all;
 
-  /// Whether the shell's bell has already been told there is nothing unread.
-  /// Reset the moment something unread turns up again.
   bool _bellCleared = false;
 
   bool _isRead(Announcement a) => a.readAt != null || _read.contains(a.id);
 
-  /// Tell the shell's bell when there is genuinely nothing left unread.
-  ///
-  /// [MessagesTab.onRead] can only say one thing — "zero" — so it is only ever
-  /// said once the SERVER has agreed. Clearing the bell on an optimistic mark
-  /// that then fails would hide a notice nobody has read, and the badge that
-  /// cleared merely because this tab was opened is the fiction this screen now
-  /// exists to end.
   void _syncBell() {
     final all = _all;
     if (all == null) return;
@@ -72,19 +46,11 @@ class _MessagesTabState extends State<MessagesTab> {
     }
     if (_bellCleared) return;
     _bellCleared = true;
-    // After the frame: this runs inside build, and the shell rebuilds itself
-    // when it is told.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) widget.onRead();
     });
   }
 
-  /// Opening a notice is reading it.
-  ///
-  /// The row changes under the finger and the mark goes out behind it. If the
-  /// server refuses, the row goes back to unread and the parent is told —
-  /// a row that says "read" against a server that says otherwise is worse than
-  /// no mark at all, because the badge comes back tomorrow with no explanation.
   Future<void> _markRead(Announcement item) async {
     if (_isRead(item) || _sending.contains(item.id)) return;
     setState(() {
@@ -105,11 +71,6 @@ class _MessagesTabState extends State<MessagesTab> {
     }
   }
 
-  /// Every notice at once, for the family that has been away a fortnight.
-  ///
-  /// Only the ones actually unread are ticked off locally, so a failure puts
-  /// back exactly what this call claimed and leaves an earlier single mark
-  /// alone.
   Future<void> _markAll(List<Announcement> all) async {
     if (_markingAll) return;
     final ids = all.where((a) => !_isRead(a)).map((a) => a.id).toSet();
@@ -127,9 +88,6 @@ class _MessagesTabState extends State<MessagesTab> {
         _markingAll = false;
         _sending.removeAll(ids);
       });
-      // The server's number, not ours: another handset may have read some of
-      // these already, and saying so is the difference between a confirmation
-      // and an echo.
       if (marked > 0) showNote(context, tn('msg.markedRead', marked));
     } catch (e) {
       if (!mounted) return;
@@ -153,8 +111,6 @@ class _MessagesTabState extends State<MessagesTab> {
       builder: (context, all) {
         _all = all;
         _syncBell();
-        // Counted over everything the school has sent, not over the tab in
-        // front of us: the bell counts notices, not the filter.
         final unread = all.where((a) => !_isRead(a)).length;
 
         final rows = all.where((a) {
@@ -173,7 +129,6 @@ class _MessagesTabState extends State<MessagesTab> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title and tabs on one card, as the design has them.
             Card16(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
               child: Column(
@@ -232,13 +187,6 @@ class _MessagesTabState extends State<MessagesTab> {
                 padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
                 child: Column(
                   children: [
-                    // Where the rest of the parent app puts a list's second
-                    // action: in the heading beside the name of the list, in
-                    // the role's colour, rather than as a button competing
-                    // with the notices themselves. It is there only when there
-                    // is something to mark — an action that can do nothing
-                    // should not be on the screen — and goes quiet while the
-                    // call it started is still out.
                     SectionRow(
                       title: t('msg.fromSchool'),
                       actionLabel: unread > 0 ? t('msg.markAllRead') : null,
@@ -263,20 +211,13 @@ class _MessagesTabState extends State<MessagesTab> {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * One message
- * ------------------------------------------------------------------------- */
-
 class _MessageRow extends StatelessWidget {
   const _MessageRow({required this.item, required this.read, required this.onOpen});
 
   final Announcement item;
 
-  /// Read as far as this screen is concerned — the server's `readAt`, or a
-  /// mark this screen has just made and not yet had refused.
   final bool read;
 
-  /// Called as the notice opens. Reading it is what marks it.
   final VoidCallback onOpen;
 
   @override
@@ -294,13 +235,9 @@ class _MessageRow extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
-        // The mark goes with the opening, not with the "Got it" button: a
-        // parent who reads a notice and swipes the dialog away has read it.
         onOpen();
         showDialog<void>(
           context: context,
-          // Dimmed by the app's own scrim rather than Material's near-black,
-          // which sits oddly over a page that is already dark.
           barrierColor: Colors.black.withValues(alpha: AppTheme.dark ? 0.62 : 0.34),
           builder: (context) => _AnnouncementDialog(
             item: item,
@@ -399,8 +336,6 @@ class _MessageRow extends StatelessWidget {
     );
   }
 
-  /// "08:30", "Yesterday", "Mon", then the date — the way a message list reads
-  /// time, which is by how recently rather than by when.
   String _when(DateTime? at) {
     if (at == null) return '—';
     final now = DateTime.now();
@@ -413,12 +348,6 @@ class _MessageRow extends StatelessWidget {
   }
 }
 
-/// One announcement, opened.
-///
-/// Carries the same glyph and the same tint as the row that was tapped, so the
-/// dialog reads as that row expanding rather than as a different screen
-/// arriving. An urgent notice keeps its rose colouring here too — the one place
-/// a parent will actually read the words.
 class _AnnouncementDialog extends StatelessWidget {
   const _AnnouncementDialog({
     required this.item,
@@ -438,9 +367,6 @@ class _AnnouncementDialog extends StatelessWidget {
       insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 40),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
       child: ConstrainedBox(
-        // A long notice scrolls INSIDE the card. Without a ceiling the dialog
-        // grows until the button is off the bottom of the screen, which is the
-        // one control it has.
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.76,
         ),
@@ -480,9 +406,6 @@ class _AnnouncementDialog extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 11),
-                          // A short rule in the notice's own colour, sitting on
-                          // a longer track — the design's way of tying the
-                          // title to the tile beside it.
                           Row(
                             children: [
                               Container(
@@ -509,7 +432,6 @@ class _AnnouncementDialog extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Sized to the finger rather than to the glyph.
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     tooltip: t('common.close'),
@@ -535,9 +457,6 @@ class _AnnouncementDialog extends StatelessWidget {
                         color: AppTheme.text,
                       ),
                     ),
-                    // The files, where there are any. Below the words on
-                    // purpose: the notice usually explains what the form IS,
-                    // and a parent who meets the attachment first has to guess.
                     if (item.attachmentCount > 0) ...[
                       const SizedBox(height: 18),
                       AttachmentList(
@@ -551,8 +470,6 @@ class _AnnouncementDialog extends StatelessWidget {
               ),
             ),
 
-            // No band behind the button. A footer strip separates several
-            // actions from the content above them, and there is one action.
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
               child: Align(
@@ -560,11 +477,6 @@ class _AnnouncementDialog extends StatelessWidget {
                 child: _GotIt(
                   tint: tint,
                   onTap: () async {
-                    // A notice that ASKS for an answer gets one. This used to
-                    // close the dialog and nothing else, so the parent believed
-                    // they had replied while the office list of who had not
-                    // answered still carried their name. A failure keeps the
-                    // dialog open rather than pretending.
                     if (item.requiresAcknowledgement && item.acknowledgedAt == null) {
                       try {
                         await ParentApi.instance.acknowledgeAnnouncement(item.id);

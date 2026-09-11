@@ -13,26 +13,6 @@ import '../../ui/settings_widgets.dart';
 import '../../ui/sheets.dart';
 import 'home_address_screen.dart';
 
-/// The guardian's own details, and the honest truth about which of them they
-/// can change from a phone.
-///
-/// Both entry points to this used to be a toast — "the school office keeps
-/// these details" — over a screen that never opened. A message that fires on
-/// tap and leaves nothing behind reads as a refusal, and the customer said so:
-/// while a parent cannot change them, why put them there at all.
-///
-/// So: the details are shown, because a parent has every reason to check what
-/// the school holds against them; the two things that ARE theirs to change —
-/// their password and where the family lives — are rows that actually go
-/// somewhere; and the office's ownership of the rest is now a request they can
-/// raise here rather than a phone call they have to remember to make.
-///
-/// Nothing here is invented. Every value comes from [Session.instance.me], and
-/// a value the account does not hold is left out rather than drawn as a dash.
-/// The corrections list comes from the server and nothing else; when it cannot
-/// be fetched the screen says so instead of drawing an empty one, because an
-/// empty list and an unreachable server look identical and mean opposite
-/// things to somebody waiting on an answer.
 class PersonalInfoScreen extends StatefulWidget {
   const PersonalInfoScreen({super.key});
 
@@ -41,13 +21,8 @@ class PersonalInfoScreen extends StatefulWidget {
 }
 
 class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
-  /// Null until the first answer arrives — which is not the same as empty, and
-  /// the two are drawn differently on purpose.
   List<ProfileChange>? _requests;
 
-  /// Only used while [_requests] is still null: once there is a list on screen,
-  /// a failed refresh is a note at the bottom rather than a page that empties
-  /// itself.
   Object? _error;
 
   @override
@@ -74,13 +49,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     }
   }
 
-  /// The one the office has not answered yet, if there is one.
-  ///
-  /// The server refuses a second request while one is open, so this is what
-  /// decides whether the banner offers a button at all. While the list is
-  /// still loading — or failed to load — this is null and the button IS
-  /// offered: assuming a request exists would lock a parent out of a form the
-  /// server would have accepted.
   ProfileChange? get _pending {
     for (final r in _requests ?? const <ProfileChange>[]) {
       if (r.pending) return r;
@@ -88,9 +56,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     return null;
   }
 
-  /// Newest first. The API already promises this order; sorting a copy costs
-  /// nothing and means a build that does not keep the promise still reads the
-  /// way a parent expects.
   List<ProfileChange> get _rows {
     final list = [...?_requests];
     list.sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
@@ -117,13 +82,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             icon: Icons.phone_outlined,
             label: t('profile.phone'),
             value: me.phone,
-            // A phone number reads left-to-right even on a Kurdish screen;
-            // mirroring it makes it unusable.
             ltr: true,
             badge: me.phoneVerified
                 ? Pill(t('personal.verified'), color: AppTheme.green)
                 : Pill(t('more.unverified'), color: AppTheme.amber),
-            // Said only when it is true, and only on the row it is about.
             note: me.phoneVerified ? null : t('personal.phoneUnverifiedNote'),
           ),
         if (me.schoolName.trim().isNotEmpty)
@@ -170,9 +132,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       const SizedBox(height: kCardGap),
                     ],
 
-                    // The two that are genuinely the parent's to change, plus
-                    // the way back in for somebody who cannot fill in the
-                    // "current password" box because they have forgotten it.
                     Card16(
                       padding: const EdgeInsets.fromLTRB(14, 14, 14, 2),
                       child: Column(
@@ -189,16 +148,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                               builder: (_) => ChangePasswordSheet(tint: tint),
                             ),
                           ),
-                          // No "forgotten your password" here.
-                          //
-                          // Somebody reading this screen is signed in, so they
-                          // do not need the office to reset anything — the row
-                          // directly above changes it. Asking the office is for
-                          // the person who cannot get in at all, and that is
-                          // offered on the sign-in screen where they are.
-                          // Two doors to the same thing, one of which is not
-                          // needed by anyone standing in front of it, is how a
-                          // simple screen stops being simple.
                           TileRow(
                             icon: Icons.home_outlined,
                             color: tint,
@@ -278,21 +227,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The seam, filled
- * ------------------------------------------------------------------------- */
-
-/// The one line that says who owns the rest of these details — and, now that
-/// the endpoint exists, the button that does something about it.
-///
-/// Once, at the foot — not a caption under every row, and not a toast. The
-/// parent reads it while looking at the values it is about, which is the only
-/// moment it is useful.
-///
-/// While a request is open the button is not drawn and the sentence changes
-/// instead. The server refuses a second request outright, and a form that
-/// takes five boxes of typing before saying so is a worse refusal than one
-/// line read before starting.
 class _OfficeHoldsTheRest extends StatelessWidget {
   const _OfficeHoldsTheRest({required this.pending, required this.onAsk});
 
@@ -312,10 +246,6 @@ class _OfficeHoldsTheRest extends StatelessWidget {
   }
 }
 
-/// The corrections list could not be fetched.
-///
-/// Said out loud rather than left as an absent section: "you have asked for
-/// nothing" and "we could not ask" look the same and mean opposite things.
 class _ListFailed extends StatelessWidget {
   const _ListFailed({required this.error, required this.onRetry});
 
@@ -376,10 +306,6 @@ class _ListFailed extends StatelessWidget {
     );
   }
 }
-
-/* ---------------------------------------------------------------------------
- * One correction the parent has asked for
- * ------------------------------------------------------------------------- */
 
 class _RequestCard extends StatelessWidget {
   const _RequestCard({required this.item, required this.onWithdraw});
@@ -456,7 +382,6 @@ class _RequestCard extends StatelessWidget {
               _Asked(
                 label: _label(f.field),
                 value: f.value,
-                // An address reads left-to-right whatever the screen does.
                 ltr: f.field == 'email',
               ),
 
@@ -477,10 +402,6 @@ class _RequestCard extends StatelessWidget {
             ),
           ],
 
-          // The whole reason a refused request is worth showing at all. It
-          // gets the status colour and a ground of its own rather than being
-          // one more grey line, because "rejected" without the office's own
-          // sentence beside it only tells a parent to ring and ask why.
           if ((item.decisionNote ?? '').isNotEmpty) ...[
             const SizedBox(height: 11),
             Container(
@@ -556,9 +477,6 @@ class _RequestCard extends StatelessWidget {
     );
   }
 
-  /// The same four words in the same four colours as a leave request. A parent
-  /// who has learned what amber means on one screen should not have to learn
-  /// it again on this one.
   static (Color, String) _status(String status) => switch (status) {
         'PENDING' => (AppTheme.amber, t('leave.pending')),
         'APPROVED' => (AppTheme.green, t('leave.approved')),
@@ -573,9 +491,6 @@ class _RequestCard extends StatelessWidget {
         _ => Icons.undo_rounded,
       };
 
-  /// A field the server named. Anything outside the five it documents is
-  /// printed as it came rather than dropped — a line that silently disappears
-  /// is how a parent ends up arguing about a change they cannot see.
   static String _label(String field) => switch (field) {
         'nameGiven' => t('personal.fieldGiven'),
         'nameFather' => t('personal.fieldFather'),
@@ -586,7 +501,6 @@ class _RequestCard extends StatelessWidget {
       };
 }
 
-/// One "you asked for this" line inside a request card.
 class _Asked extends StatelessWidget {
   const _Asked({required this.label, required this.value, required this.ltr});
 
@@ -625,25 +539,9 @@ class _Asked extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Asking for one
- * ------------------------------------------------------------------------- */
-
-/// Four name boxes and an email, and nothing is filled in for you.
-///
-/// FOUR boxes, not one. The office searches on the parts — given, father,
-/// grandfather, family — and a single "full name" box hands them one string to
-/// take apart by guesswork, which is exactly the guesswork this sheet refuses
-/// to do. The app itself only ever holds the joined name, so it prefills
-/// nothing and shows that joined name above the boxes as a reference instead:
-/// splitting it on spaces would put somebody's grandfather in the family box
-/// and send that to the office over the parent's own name.
-///
-/// The phone number is not here.
 class _AskSheet extends StatefulWidget {
   const _AskSheet({required this.heldName});
 
-  /// What the school holds today, joined, shown for comparison only.
   final String heldName;
 
   @override
@@ -674,8 +572,6 @@ class _AskSheetState extends State<_AskSheet> {
     super.dispose();
   }
 
-  /// Enough to catch a typed mistake and no more. The server is the authority
-  /// on what it will accept; this only saves a round trip on "karwan@".
   static bool _looksLikeEmail(String value) {
     final at = value.indexOf('@');
     if (at < 1) return false;
@@ -709,10 +605,6 @@ class _AskSheetState extends State<_AskSheet> {
       _error = null;
     });
     try {
-      // Only what was actually typed. An empty string on this endpoint CLEARS
-      // the field, so a box left alone has to arrive as null rather than as
-      // "" — otherwise opening the sheet to fix one name part would wipe the
-      // other three off the record.
       await ParentApi.instance.askProfileChange(
         nameGiven: given.isEmpty ? null : given,
         nameFather: father.isEmpty ? null : father,
@@ -725,8 +617,6 @@ class _AskSheetState extends State<_AskSheet> {
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      // The server's own sentence, which is the only one that knows why —
-      // "a request is already open", for instance.
       setState(() {
         _error = errorText(e);
         _busy = false;
@@ -780,8 +670,6 @@ class _AskSheetState extends State<_AskSheet> {
               ),
               const SizedBox(height: 16),
 
-              // What the school holds today, so the parent is correcting
-              // something they can see rather than typing from memory.
               if (held.isNotEmpty) ...[
                 Container(
                   width: double.infinity,
@@ -823,8 +711,6 @@ class _AskSheetState extends State<_AskSheet> {
                 const SizedBox(height: 12),
               ],
 
-              // Why there are four boxes and not one, said before the typing
-              // rather than in a validation message after it.
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -912,7 +798,6 @@ class _AskSheetState extends State<_AskSheet> {
   }
 }
 
-/// A labelled box in the sheet.
 class _Field extends StatelessWidget {
   const _Field({
     required this.label,
@@ -927,7 +812,6 @@ class _Field extends StatelessWidget {
   final TextInputType? keyboardType;
   final bool capitalise;
 
-  /// Force left-to-right, for a value that is not words.
   final bool ltr;
 
   @override
@@ -961,11 +845,6 @@ class _Field extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The details themselves
- * ------------------------------------------------------------------------- */
-
-/// One read-only fact about the person signed in.
 class _FactSpec {
   const _FactSpec({
     required this.icon,
@@ -980,13 +859,10 @@ class _FactSpec {
   final String label;
   final String value;
 
-  /// Force left-to-right, for values that are not words.
   final bool ltr;
 
-  /// A status word on the right — whether the office has verified the number.
   final Widget? badge;
 
-  /// A sentence under the value, when the status needs explaining.
   final String? note;
 }
 

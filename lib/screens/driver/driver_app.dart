@@ -18,17 +18,6 @@ import 'route_tab.dart';
 import 'students_tab.dart';
 import 'trip_screen.dart';
 
-/// The driver and attendant app.
-///
-/// Four destinations and one action: what today looks like, the route, the
-/// children on it, and the driver's own account — with Drive in the middle,
-/// which is the only thing on this app anybody presses in a hurry.
-///
-/// No drawer. It held the same settings the Profile tab now does, behind a
-/// gesture people were not making. Everything is sized for a hand on a bus:
-/// rows are tall, the primary action is full width, and nothing important is
-/// behind a menu — a driver reading this is standing in an aisle counting
-/// children, not sitting at a desk.
 class DriverApp extends StatefulWidget {
   const DriverApp({super.key});
 
@@ -39,37 +28,19 @@ class DriverApp extends StatefulWidget {
 class _DriverAppState extends State<DriverApp> {
   int _tab = 0;
 
-  /// Guards the Drive button. Finding the run can take a few seconds on a yard
-  /// connection, and a driver who gets no answer presses again — which used to
-  /// stack two copies of the run on top of each other.
   bool _finding = false;
 
-  /// The dot on the header's notices button. Loaded quietly and failing
-  /// quietly, the same as the teacher shell's own bell: a number on a button
-  /// is not worth an error state on the screen behind it.
   int _unread = 0;
 
   @override
   void initState() {
     super.initState();
     _countUnread();
-    // "This handset is alive", from here on. Started at the shell rather than
-    // at the run screen because a phone that is switched on at 06:20 and does
-    // not reach the run until 06:55 has been alive for that half hour, and a
-    // liveness board that only knows about handsets mid-trip cannot tell a
-    // phone that is off from one that has simply not started yet.
-    //
-    // Fails silently and asks nothing of this screen: if the fleet has bound no
-    // crew phone to this person there is no Device row to beat under, and the
-    // service stops itself on the first attempt.
     unawaited(DeviceHeartbeat.instance.start());
   }
 
   @override
   void dispose() {
-    // The timer lives in the service, but it must not outlive the shell that
-    // armed it — a signed-out handset carrying on a request a minute is exactly
-    // the kind of thing nobody notices until the data bill arrives.
     DeviceHeartbeat.instance.stop();
     super.dispose();
   }
@@ -80,7 +51,6 @@ class _DriverAppState extends State<DriverApp> {
       if (!mounted) return;
       setState(() => _unread = rows.where((a) => a.readAt == null).length);
     } catch (_) {
-      // Leave it at nought.
     }
   }
 
@@ -144,8 +114,6 @@ class _DriverAppState extends State<DriverApp> {
     );
   }
 
-  /// Straight into the run. Not a menu: at 06:40 there is exactly one thing a
-  /// driver wants from a big button in the middle of the screen.
   Future<void> _drive() async {
     if (_finding) return;
     setState(() => _finding = true);
@@ -162,41 +130,20 @@ class _DriverAppState extends State<DriverApp> {
         ),
       );
     } catch (e) {
-      // errorText, never the exception. "SocketException: Failed host lookup"
-      // in front of a driver is a bug report, not a message.
       if (mounted) showNote(context, errorText(e), bad: true);
     } finally {
       if (mounted) setState(() => _finding = false);
     }
   }
 
-  /// The school's notices for drivers and attendants — a screen that did not
-  /// exist until now (see CrewAnnouncementsController's own doc comment).
-  ///
-  /// A fifth tab, or a menu, would be the obvious place; this shell is
-  /// deliberately four destinations and one action, and the doc comment above
-  /// explains why nothing sits behind a drawer here. So this button, not a
-  /// new destination, is what makes the list reachable — the same shape the
-  /// teacher shell already uses for its own bell.
   Future<void> _openAnnouncements() async {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const DriverAnnouncements()),
     );
-    // The count moves by reading notices on that screen, not by anything this
-    // one is told directly — it is a pushed screen, not a tab kept alive
-    // underneath, so the badge is only right again once it is asked afresh.
     if (mounted) _countUnread();
   }
 }
 
-/// The driver's header.
-///
-/// No drawer-menu button — there is nothing behind a drawer on this shell —
-/// but there is now a notices button where the doc comment below used to say
-/// there could never usefully be one. That was true of the bell that jumped
-/// to the Route tab and showed nothing a route needed; it stopped being true
-/// the day CrewAnnouncementsController shipped a real list for this screen to
-/// open.
 class _DriverHeader extends StatelessWidget {
   const _DriverHeader({
     required this.greeting,

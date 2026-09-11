@@ -9,12 +9,6 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 
-/// Every mark the child has been given.
-///
-/// Separate from Reports on purpose. Reports answers "how is the term going" in
-/// four figures; this answers "what did they get for the Unit 3 quiz", which is
-/// the question a parent asks the evening it comes back. Same records, two
-/// different questions, and squeezing both into one screen serves neither.
 class MarksScreen extends StatelessWidget {
   const MarksScreen({super.key, required this.child});
 
@@ -48,7 +42,6 @@ class MarksScreen extends StatelessWidget {
                 builder: (context, d) => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // The one figure a parent came for, before the list.
                     if (d.average != null)
                       Card16(
                         child: Row(
@@ -110,6 +103,9 @@ class MarksScreen extends StatelessWidget {
                                   percent: r.percent?.toDouble(),
                                   absent: r.wasAbsent,
                                   grade: r.gradeLetter,
+                                  classAverage: r.classAverage?.toDouble(),
+                                  classAveragePercent: r.classAveragePercent?.toDouble(),
+                                  classAverageOf: r.classAverageOf,
                                 ),
                               ),
                           ],
@@ -160,8 +156,6 @@ class _Marks {
   final List<ExamResultItem> exams;
   final List<HomeworkItem> homework;
 
-  /// Only work that has actually been marked. Homework that is set but not yet
-  /// returned belongs on the assignments screen, not here.
   List<HomeworkItem> get markedHomework =>
       homework.where((h) => h.score != null && (h.maxScore ?? 0) > 0).toList();
 
@@ -186,6 +180,9 @@ class _MarkRow extends StatelessWidget {
     required this.absent,
     required this.grade,
     this.feedback,
+    this.classAverage,
+    this.classAveragePercent,
+    this.classAverageOf,
   });
 
   final String title;
@@ -196,6 +193,10 @@ class _MarkRow extends StatelessWidget {
   final bool absent;
   final String? grade;
   final String? feedback;
+
+  final double? classAverage;
+  final double? classAveragePercent;
+  final int? classAverageOf;
 
   @override
   Widget build(BuildContext context) {
@@ -241,9 +242,6 @@ class _MarkRow extends StatelessWidget {
             if (absent)
               Pill(t('marks.absent'), color: AppTheme.textMuted)
             else ...[
-              // The raw mark, because "17 out of 20" is what the child came
-              // home saying, and a percentage alone makes a parent do the sum
-              // backwards to check it.
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -271,13 +269,50 @@ class _MarkRow extends StatelessWidget {
           const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: (percent! / 100).clamp(0, 1),
-              minHeight: 6,
-              backgroundColor: AppTheme.border,
-              valueColor: AlwaysStoppedAnimation(colour),
+            child: Stack(
+              children: [
+                LinearProgressIndicator(
+                  value: (percent! / 100).clamp(0, 1),
+                  minHeight: 6,
+                  backgroundColor: AppTheme.border,
+                  valueColor: AlwaysStoppedAnimation(colour),
+                ),
+                if (classAveragePercent != null)
+                  Positioned.fill(
+                    child: Align(
+                      alignment: AlignmentDirectional(
+                        (classAveragePercent!.clamp(0, 100) / 100) * 2 - 1,
+                        0,
+                      ),
+                      child: Container(width: 2, color: AppTheme.text),
+                    ),
+                  ),
+              ],
             ),
           ),
+          if (classAveragePercent != null) ...[
+            const SizedBox(height: 5),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    tv('marks.classAverage', {
+                      'avg': '${_trim(classAverage ?? 0.0)} / ${_trim(outOf)}',
+                      'pct': '${classAveragePercent!.round()}%',
+                    }),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textMuted),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  tn('marks.classAverageFrom', classAverageOf ?? 0),
+                  style: TextStyle(fontSize: 11, color: AppTheme.textFaint),
+                ),
+              ],
+            ),
+          ],
         ],
         if ((feedback ?? '').isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -298,6 +333,5 @@ class _MarkRow extends StatelessWidget {
     );
   }
 
-  /// 17 rather than 17.0 — a mark is written the way a teacher writes it.
   String _trim(double v) => v == v.roundToDouble() ? '${v.round()}' : v.toStringAsFixed(1);
 }

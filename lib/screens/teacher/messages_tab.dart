@@ -11,12 +11,6 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import 'teacher_kit.dart';
 
-/// What the school has told the staff.
-///
-/// The same announcements table the parent app reads, resolved against a
-/// TEACHER's audience instead of a guardian's: the whole school, their campus,
-/// the classes they teach, anything aimed at staff, and anything addressed to
-/// them by name.
 class TeacherMessages extends StatefulWidget {
   const TeacherMessages({super.key});
 
@@ -25,15 +19,8 @@ class TeacherMessages extends StatefulWidget {
 }
 
 class _TeacherMessagesState extends State<TeacherMessages> {
-  /// Notices read on this phone since the list was fetched.
-  ///
-  /// A row's `readAt` is final and comes from the server, so the change a tap
-  /// makes lives here until the next fetch brings it back with a stamp on it.
-  /// Kept across a pull-to-refresh deliberately: if the refresh lands before
-  /// the mark does, dropping the set would flick the dots back on.
   final Set<String> _read = {};
 
-  /// A sweep already in flight. Two of them would race the same revert.
   bool _markingAll = false;
 
   bool _isUnread(Announcement a) => a.readAt == null && !_read.contains(a.id);
@@ -52,10 +39,6 @@ class _TeacherMessagesState extends State<TeacherMessages> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // The heading the teacher's other lists use, with the sweep sitting
-            // where "View all" sits on the home screen. It is dropped entirely
-            // once everything is read: an action that can only tell you it had
-            // nothing to do is furniture.
             SectionRow(
               title: t('msg.fromSchool'),
               actionLabel: unread == 0 ? null : t('msg.markAllRead'),
@@ -77,10 +60,6 @@ class _TeacherMessagesState extends State<TeacherMessages> {
     );
   }
 
-  /// Opening a notice is reading it.
-  ///
-  /// The mark goes out as the dialog opens rather than when it closes: a
-  /// teacher who reads a notice and switches apps has still read it.
   void _open(Announcement a) {
     if (_isUnread(a)) _markRead(a);
     showDialog<void>(
@@ -98,8 +77,6 @@ class _TeacherMessagesState extends State<TeacherMessages> {
     try {
       await TeacherApi.instance.markAnnouncementRead(a.id);
     } catch (e) {
-      // Put the dot back. The notice is still unread on the server, and a list
-      // that quietly disagrees with it is worse than one that never changed.
       if (!mounted) return;
       setState(() => _read.remove(a.id));
       unread.value += 1;
@@ -127,8 +104,6 @@ class _TeacherMessagesState extends State<TeacherMessages> {
       showNote(context, tn('msg.markedRead', marked));
     } catch (e) {
       if (!mounted) return;
-      // Only the ones this sweep claimed — a notice read by hand a minute ago
-      // stays read.
       setState(() {
         _read.removeAll(ids);
         _markingAll = false;
@@ -153,10 +128,6 @@ class _Notice extends StatelessWidget {
 
     return Card16(
       padding: const EdgeInsets.all(14),
-      // The card shows three lines of the notice; the rest of it is in the
-      // dialog. Not an AlertDialog — that arrives with Material's own radius,
-      // its own title size and its own grey button, none of which are this
-      // app's.
       onTap: onOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,10 +158,6 @@ class _Notice extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 13.5,
-                        // Read notices keep their place in the list and lose
-                        // only their weight. Greying them out would say the
-                        // school's notice had expired, which is not what
-                        // having read it means.
                         fontWeight: unread ? FontWeight.w800 : FontWeight.w700,
                         letterSpacing: -0.2,
                         height: 1.3,
@@ -207,8 +174,6 @@ class _Notice extends StatelessWidget {
               ),
               if (unread) ...[
                 const SizedBox(width: 10),
-                // The same dot the shell puts on the Messages tab, at the size
-                // it uses there, so the two plainly mean one thing.
                 Semantics(
                   label: t('msg.unread'),
                   child: Container(
@@ -233,7 +198,6 @@ class _Notice extends StatelessWidget {
   }
 }
 
-/// The whole notice, drawn from the same tokens as the card behind it.
 class _NoticeDialog extends StatelessWidget {
   const _NoticeDialog({required this.item});
 
@@ -309,10 +273,6 @@ class _NoticeDialog extends StatelessWidget {
                 ),
               ),
             ),
-            // A notice that ASKS for an answer gets one. The route has always
-            // existed and nothing called it, so the office's list of who had
-            // not answered carried teachers who had read the notice and had no
-            // way to say so.
             if (item.requiresAcknowledgement && item.acknowledgedAt == null) ...[
               const SizedBox(height: 14),
               SizedBox(
@@ -326,8 +286,6 @@ class _NoticeDialog extends StatelessWidget {
                       await TeacherApi.instance.acknowledgeAnnouncement(item.id);
                       if (context.mounted) Navigator.of(context).pop(true);
                     } catch (e) {
-                      // Kept open rather than pretending. The office list is
-                      // the thing this button exists to change.
                       if (context.mounted) showNote(context, errorText(e), bad: true);
                     }
                   },

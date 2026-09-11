@@ -16,13 +16,6 @@ import 'messages_tab.dart';
 import 'profile_tab.dart';
 import 'teacher_account.dart';
 
-/// The teacher app.
-///
-/// Five slots, four of them destinations: what today looks like, what the
-/// school has said, the week, and the teacher's own account — with the one
-/// thing they DO in the middle. Classes, homework and exams moved off the bar
-/// and onto the home screen's action row: they are things a teacher opens two
-/// or three times a day, not places they live.
 class TeacherApp extends StatefulWidget {
   const TeacherApp({super.key});
 
@@ -40,15 +33,12 @@ class _TeacherAppState extends State<TeacherApp> {
     _countUnread();
   }
 
-  /// The dot on Messages. Loaded quietly and failing quietly: a number on a
-  /// bell is not worth an error state on the screen behind it.
   Future<void> _countUnread() async {
     try {
       final rows = await TeacherApi.instance.announcements();
       if (!mounted) return;
       setState(() => _unread = rows.where((a) => a.readAt == null).length);
     } catch (_) {
-      // Leave it at nought.
     }
   }
 
@@ -91,9 +81,6 @@ class _TeacherAppState extends State<TeacherApp> {
                 children: [
                   TeacherHome(onOpenTab: (i) => setState(() => _tab = i)),
                   const TeacherMessages(),
-                  // The body, not the pushable screen: inside the bar there is
-                  // nothing above this to go back to, and a header with a dead
-                  // back arrow on it is the thing this sweep is removing.
                   const TeacherWeek(),
                   const TeacherProfileTab(),
                 ],
@@ -114,9 +101,6 @@ class _TeacherAppState extends State<TeacherApp> {
     );
   }
 
-  /// The three things a teacher creates, behind the one button that means
-  /// "make something". Set out as a sheet rather than three more tiles because
-  /// each of them opens a form, and a form is not a destination.
   Future<void> _newThing() async {
     final picked = await pickOne<String>(
       context,
@@ -151,12 +135,6 @@ class _TeacherAppState extends State<TeacherApp> {
   }
 }
 
-/// Menu, face, greeting, role, bell.
-///
-/// Unlike the parent's header this names ONE person, so the space the child
-/// switcher took goes to the line under the greeting and the role badge — which
-/// is what tells a teacher at a glance that they are in the staff app and not
-/// the one they use for their own children.
 class _TeacherHeader extends StatelessWidget {
   const _TeacherHeader({
     required this.greeting,
@@ -179,15 +157,6 @@ class _TeacherHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(kGutter, 8, kGutter, 12),
       child: Row(
         children: [
-          // No menu button, and no drawer behind it.
-          //
-          // Every row it held already had a home on the bottom bar: the theme,
-          // the language, the notifications, the password and the way out are
-          // the Profile tab, and "Your week" is the Calendar tab — TeacherWeek
-          // is that same widget without the pushed-route furniture. So the
-          // burger was spending the left third of the header, the widest part
-          // of the app bar, on a second way to reach screens already one tap
-          // away. The face and the greeting start at the gutter instead.
           SizedBox(
             width: 48,
             height: 48,
@@ -218,9 +187,6 @@ class _TeacherHeader extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  // greet.morning is "Good morning," — comma included, because
-                  // in Kurdish and Arabic the punctuation does not sit where an
-                  // English template would put it.
                   '$greeting $first 👋',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

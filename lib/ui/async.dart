@@ -5,37 +5,14 @@ import '../api/client.dart';
 import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
 
-/// The sentence to put in front of a person when a call fails.
-///
-/// Three cases, and the difference between them is the only thing anybody can
-/// act on:
-///
-///   unreachable — our own English sentence, so it is translated here;
-///   answered    — the API writes its messages for the person rather than for
-///                 a log, and every request sends the language the app is
-///                 showing, so it already arrived in the right one;
-///   anything else — a bug rather than a condition, and a stack trace helps
-///                 nobody holding a phone.
 String errorText(Object? e) => e is OfflineException
     ? t('common.offline')
     : e is ApiException
         ? e.message
         : t('common.loadFailed');
 
-/// Lets a [Loader] know when the screen it sits on is uncovered again.
-///
-/// One observer for the whole app, handed to MaterialApp.navigatorObservers.
 final RouteObserver<PageRoute<dynamic>> routeObserver = RouteObserver<PageRoute<dynamic>>();
 
-/// Loads something, and shows the four states it can be in.
-///
-/// Written once because every screen in these three apps needs exactly the same
-/// four — waiting, failed, nothing there, and here it is — and a screen that
-/// forgets the third shows a blank panel that reads as a broken app rather than
-/// as "no homework this week".
-///
-/// Pull-to-refresh comes with it. On a school connection things fail, and a
-/// parent's first instinct with a stale screen is to drag it down.
 class Loader<T> extends StatefulWidget {
   const Loader({
     super.key,
@@ -47,11 +24,9 @@ class Loader<T> extends StatefulWidget {
     this.padding = const EdgeInsets.fromLTRB(16, 4, 16, 28),
   });
 
-  /// Called on first build and on every pull-to-refresh.
   final Future<T> Function() load;
   final Widget Function(BuildContext context, T data) builder;
 
-  /// What to say when the load succeeded and there is nothing in it.
   final String? empty;
   final bool Function(T data)? isEmpty;
 
@@ -70,11 +45,6 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
   void initState() {
     super.initState();
     _future = widget.load();
-    // The server answers in whatever language the app is showing, so the data
-    // on screen belongs to the language it was fetched in. Changing language
-    // has to refetch — otherwise the labels flip and the content stays in the
-    // old language until the parent thinks to pull down, which reads as the
-    // setting not having worked.
     AppLocale.current.addListener(_languageChanged);
   }
 
@@ -92,8 +62,6 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
     if (route is PageRoute) routeObserver.subscribe(this, route);
   }
 
-  /// Coming back to a screen that was covered by another one. A parent who
-  /// submits a leave request and presses back expects to see it listed.
   @override
   void didPopNext() => reload();
 
@@ -104,16 +72,6 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
     reload();
   }
 
-  /// Re-runs the load. Called by pull-to-refresh, and by screens that have just
-  /// changed something on the server and need the list to catch up.
-  ///
-  /// [quiet] is for a screen on a timer. The ordinary reload replaces the
-  /// future, so the builder drops back to a spinner for the length of the
-  /// request — on a fifteen-second poll that means a live map that blinks out
-  /// four times a minute. A quiet reload fetches first and swaps the data in
-  /// only once it has arrived, and on failure keeps what is already on screen:
-  /// a bus position from thirty seconds ago, which the screen already labels as
-  /// stale, beats an error page while a parent is watching for their child.
   Future<void> reload({bool quiet = false}) async {
     if (!mounted) return;
     _loadedIn = AppLocale.current.value;
@@ -123,30 +81,13 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
         final value = await widget.load();
         if (!mounted) return;
         setState(() {
-          // A SYNCHRONOUS future, not `Future.value`. Handing FutureBuilder a
-          // future it has not seen before makes it drop to
-          // ConnectionState.waiting and only come back on the next microtask —
-          // so even an already-completed `Future.value` costs one frame of the
-          // grey skeleton, which is the exact blink `quiet` exists to avoid.
-          // Worse than the flicker: that frame tears down the whole content
-          // subtree and builds it again, so every entrance animation on the
-          // screen replays on every poll. SynchronousFuture resolves inside
-          // FutureBuilder's own subscribe — the case its source calls out by
-          // name — so the data swaps in place, the elements survive, and
-          // nothing re-enters.
           _future = SynchronousFuture<T>(value);
         });
       } catch (_) {
-        // Deliberately swallowed. See above.
       }
       return;
     }
 
-    // A BLOCK body, not an arrow. `() => _future = widget.load()` returns the
-    // assignment's value — a Future — and Flutter rejects a setState callback
-    // that returns one, as a guard against async work inside setState. It threw
-    // silently every time, so the refetch happened and the rebuild never did:
-    // pull-to-refresh fetched new data and then showed the old.
     setState(() {
       _future = widget.load();
     });
@@ -163,15 +104,6 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
       child: FutureBuilder<T>(
         future: _future,
         builder: (context, snap) {
-          // The skeleton belongs to a screen with nothing on it yet. Once
-          // there is something to look at, a refresh leaves it alone and swaps
-          // the values in when they arrive — the RefreshIndicator's own spinner
-          // is what says "working".
-          //
-          // Dropping to the skeleton on every pull also tore down the content
-          // subtree, which replayed every entrance animation under it: a
-          // cascade of eleven tiles and a ring counting up from zero, on a
-          // gesture that means "I am already here".
           if (snap.connectionState == ConnectionState.waiting) {
             if (!snap.hasData) return _scrollable(const _Waiting());
           }
@@ -203,8 +135,6 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
     );
   }
 
-  /// Even the failure and empty states must scroll, or pull-to-refresh — the
-  /// only way out of them — does not work.
   Widget _scrollable(Widget child) => ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: widget.padding,
@@ -217,8 +147,6 @@ class _Waiting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Grey blocks in the shape of the content, not a spinner. On a slow cell
-    // a spinner says "wait"; this says "something is coming, and roughly what".
     return Column(
       children: List.generate(
         4,
@@ -305,8 +233,6 @@ class _Empty extends StatelessWidget {
   }
 }
 
-/// A short message at the bottom of the screen. Errors linger; a message that
-/// vanishes before it is read is not a message.
 void showNote(BuildContext context, String text, {bool bad = false}) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()

@@ -9,12 +9,6 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 
-/// The week, one day at a time.
-///
-/// A table rather than a list of cards, because a timetable is read by
-/// scanning DOWN a column — what time, then what subject — and cards force the
-/// eye to zig-zag. The rail down the left is what makes the gaps visible, and
-/// the gaps are where the breaks are.
 class TimetableScreen extends StatelessWidget {
   const TimetableScreen({super.key, required this.child});
 
@@ -37,7 +31,6 @@ class TimetableScreen extends StatelessWidget {
   }
 }
 
-/// The body, so the shell can host it as a tab as well as a pushed screen.
 class TimetableTab extends StatefulWidget {
   const TimetableTab({super.key, required this.child, this.showChildCard = false});
 
@@ -60,7 +53,6 @@ class _TimetableTabState extends State<TimetableTab> {
       padding: EdgeInsets.zero,
       load: () => ParentApi.instance.timetable(widget.child.studentId),
       builder: (context, week) {
-        // The school's own week, in the order it runs — Sunday first here.
         const order = [
           'SUNDAY',
           'MONDAY',
@@ -97,18 +89,10 @@ class _TimetableTabState extends State<TimetableTab> {
           ..sort((a, b) => (a.startMinute ?? 0).compareTo(b.startMinute ?? 0));
         final firstBell = lessons.isEmpty ? null : lessons.first.startMinute;
 
-        // A Column, not a ListView: Loader already scrolls what it is given,
-        // and a viewport inside a viewport has no height to expand into.
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // The wash and the illustration behind the top of the page, exactly
-            // as the design has them: the child card sits ON the tint, not on
-            // a white band above it.
             if (widget.showChildCard)
-              // The card on the left, the calendar on the right, in a block
-              // tall enough to hold the whole illustration — no negative
-              // offsets, so nothing is clipped and both scroll together.
               SizedBox(
                 height: 124,
                 child: Stack(
@@ -117,8 +101,6 @@ class _TimetableTabState extends State<TimetableTab> {
                     PositionedDirectional(
                       end: -6,
                       top: -4,
-                      // A transparent cut-out, so there is no crop rectangle to
-                      // hide and it can sit as large as the design has it.
                       child: Image.asset('assets/art/calendar_scene.png', width: 162),
                     ),
                     PositionedDirectional(
@@ -127,9 +109,6 @@ class _TimetableTabState extends State<TimetableTab> {
                       top: 8,
                       child: ChildCard(
                         name: widget.child.name,
-                        // Just the code. The card is half the page here, and
-                        // "Student ID:" is four syllables of label on a line
-                        // with room for the label or the value, not both.
                         line: '${widget.child.className}  •  ${widget.child.code}',
                         tint: tint,
                       ),
@@ -185,10 +164,6 @@ class _TimetableTabState extends State<TimetableTab> {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The days
- * ------------------------------------------------------------------------- */
-
 class _DayStrip extends StatelessWidget {
   const _DayStrip({
     required this.days,
@@ -206,8 +181,6 @@ class _DayStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final tint = Role.parent.tint;
 
-    // The date each weekday falls on THIS week, so the strip reads "Tue 29 Aug"
-    // rather than asking a parent to work it out.
     final now = DateTime.now();
     DateTime dateFor(String weekday) {
       const map = {
@@ -219,9 +192,6 @@ class _DayStrip extends StatelessWidget {
         'SATURDAY': 6,
         'SUNDAY': 7,
       };
-      // Forward from today, never back: computing inside the current ISO week
-      // put Monday five days in the PAST beside a Sunday one day ahead, which
-      // is a timetable nobody can use.
       final target = map[weekday] ?? now.weekday;
       final delta = (target - now.weekday + 7) % 7;
       return now.add(Duration(days: delta));
@@ -314,10 +284,6 @@ class _DayStrip extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The day
- * ------------------------------------------------------------------------- */
-
 class _Table extends StatelessWidget {
   const _Table({required this.lessons});
 
@@ -337,26 +303,9 @@ class _Table extends StatelessWidget {
       );
     }
 
-    // Where the day stops for a while. Anything over ten minutes between the
-    // end of one lesson and the start of the next is a break a child would
-    // notice, and the design gives it a row of its own.
     final rows = <Widget>[];
     for (var i = 0; i < lessons.length; i++) {
       final l = lessons[i];
-      /*
-       * The end the school set, not one made up from the start.
-       *
-       * This was `(l.startMinute ?? 0) + 45`, which invented a length no
-       * timetable had agreed to — and did something worse on an ordinary slot.
-       * startMinute and endMinute are only set when a slot DEVIATES from the
-       * school's period grid; a normal lesson has both null and takes its times
-       * from the bell schedule. So the row read "—" for the start and "00:45"
-       * for the end: nought minutes past midnight, plus forty-five.
-       *
-       * The server sends endMinute and it was never read. Where both are null
-       * there is no honest time to show, so the row shows none rather than a
-       * number that looks like one.
-       */
       final ends = l.endMinute;
       rows.add(_LessonRow(lesson: l, endMinute: ends, first: i == 0, last: i == lessons.length - 1));
 
@@ -419,8 +368,6 @@ class _LessonRow extends StatelessWidget {
   });
 
   final Lesson lesson;
-  /// Null when the school has not set one - an ordinary slot takes its times
-  /// from the period grid, and inventing start+45 printed a time nobody agreed.
   final int? endMinute;
   final bool first;
   final bool last;
@@ -449,8 +396,6 @@ class _LessonRow extends StatelessWidget {
                         color: AppTheme.text,
                       ),
                     ),
-                    // No dash and no second time when the school has not set
-                    // an end: a lone '—' under the start reads as a fault.
                     if (endMinute != null)
                       Text('–', style: TextStyle(fontSize: 10, color: AppTheme.textFaint)),
                     if (endMinute != null)
@@ -466,7 +411,6 @@ class _LessonRow extends StatelessWidget {
                 ),
               ),
             ),
-            // The rail: a dot per lesson on a line that runs the whole day.
             SizedBox(
               width: 14,
               child: Column(
@@ -517,9 +461,6 @@ class _LessonRow extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Shrunk to fit rather than wrapped: "Mathematics"
-                          // broken across two lines as "Mathematic / s" is
-                          // worse than the same word one point smaller.
                           Align(
                             alignment: AlignmentDirectional.centerStart,
                             child: FittedBox(
@@ -538,10 +479,6 @@ class _LessonRow extends StatelessWidget {
                               ),
                             ),
                           ),
-                          // The teacher's full name, as the design has it. The
-                          // column to the right carries the short form beside
-                          // their face; the room is already a pill two columns
-                          // over and printing it here as well said nothing.
                           if ((lesson.teacher ?? '').isNotEmpty)
                             Text(
                               lesson.teacher!,
@@ -605,16 +542,12 @@ class _LessonRow extends StatelessWidget {
     );
   }
 
-  /// "101" out of "Room 101". The column is a pill the width of a thumb and
-  /// the word "Room" is already the heading above it.
   String _room(String? room) {
     if (room == null || room.trim().isEmpty) return '—';
     final parts = room.trim().split(RegExp(r'\s+'));
     return parts.last;
   }
 
-  /// "Ms. Rojin" out of "Rojin Ahmed Barzani" — the column is 4/13ths of a
-  /// phone and a full Kurdish name is three words long.
   String _short(String? full) {
     if (full == null || full.trim().isEmpty) return '—';
     return full.trim().split(RegExp(r'\s+')).first;

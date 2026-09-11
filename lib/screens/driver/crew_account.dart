@@ -10,21 +10,11 @@ import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import 'credentials_screen.dart';
 
-/// The crew member's own record: who they are, and the papers that let them
-/// drive.
-///
-/// The credentials list is the working part. A licence or a vetting check that
-/// has lapsed does not produce a warning — the compliance gate REFUSES the run
-/// at check-in — so finding out here, a week early, is the whole point.
 class CrewPapersScreen extends StatelessWidget {
   const CrewPapersScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // A Scaffold and a header. This screen was pushed as a bare Loader: no
-    // background of its own, and no back button — the only way off it was the
-    // phone's own gesture, which on a handset in a cradle is not a way off it
-    // at all.
     return Scaffold(
       backgroundColor: AppTheme.canvas,
       body: SafeArea(
@@ -57,9 +47,6 @@ class CrewPapersScreen extends StatelessWidget {
             Panel(
               child: Row(
                 children: [
-                  // The kit's initials, tinted. The hand-rolled square took the
-                  // first character of the name and nothing else, so two of the
-                  // three crew on a bus showed the same letter.
                   CircleInitials(
                     label: (person['fullName'] ?? me?.name ?? '') as String,
                     tint: Role.driver.tint,
@@ -111,18 +98,6 @@ class CrewPapersScreen extends StatelessWidget {
               ),
             ],
             SectionHead(t('driver.papers')),
-            // Fetched separately from /crew/me/credentials rather than read out
-            // of the payload above, because only that route computes the two
-            // things a driver actually needs: `derivedStatus`, which applies
-            // the dates to the office's status so a VERIFIED licence that
-            // expired last week stops reading as verified, and
-            // `daysUntilRosterBlock` — the countdown to the day he stops being
-            // given runs, which is EARLIER than the expiry on the paper by the
-            // lead days the office set, and is the number that matters.
-            //
-            // The old section read `credential['expiresAt']` while the server
-            // has always sent `expiresOn`, so the date was null on every row
-            // and the day count under it never appeared at all.
             const CredentialsPanel(),
           ],
         );

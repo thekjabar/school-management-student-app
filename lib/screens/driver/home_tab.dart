@@ -13,19 +13,10 @@ import 'credentials_screen.dart';
 import 'route_map.dart';
 import 'trip_screen.dart';
 
-/// The run every driver screen is about.
-///
-/// Today's, if there is one. Otherwise the next one scheduled — because the
-/// weekend here is Friday and Saturday, and a driver opening the app on Friday
-/// evening was met with "no runs assigned to you today" and nothing else. The
-/// next run IS the answer to what they opened the app for.
 Future<CrewTrip?> loadDutyTrip() async {
   final today = pickLiveTrip(await CrewApi.instance.today());
   if (today != null) return today;
 
-  // Forward, one day at a time. `days=N` is a HISTORY window on the server —
-  // it answers "the last N days", so asking it for what is coming returned
-  // last week and nothing else. Dates have to be asked for by name.
   final from = DateTime.now();
   for (var i = 1; i <= 7; i++) {
     final day = DateTime(from.year, from.month, from.day + i);
@@ -39,42 +30,19 @@ Future<CrewTrip?> loadDutyTrip() async {
   return null;
 }
 
-/// The run that answers "what am I doing now": the one under way, else the next
-/// one due out.
-///
-/// The filter here used to drop `ENDED`, which is not a TripStatus — the real
-/// ones are PLANNED, ROSTERED, BLOCKED, BOARDING, IN_PROGRESS, ARRIVED,
-/// SWEEP_PENDING, SWEEP_OVERDUE, COMPLETED, CANCELLED, ABANDONED and VOID. A
-/// comparison against a value nothing ever holds does not fail; it excludes
-/// nothing. So a COMPLETED morning run stayed in the list, and because the list
-/// is sorted by departure time the run that finished at half past seven beat
-/// the afternoon run that had not left yet. A driver opening the app after
-/// lunch was shown this morning, with "Start / Resume" on it, and the afternoon
-/// run was nowhere.
-///
-/// A run under way outranks a run due out. Within that, the ones that have
-/// stopped carrying children but still owe something come first — a bus that
-/// has arrived with an unconfirmed cabin sweep is the most dangerous state in
-/// the system, and it must not be pushed off the screen by the next departure.
 CrewTrip? pickLiveTrip(List<CrewTrip> trips) {
   if (trips.isEmpty) return null;
 
   final busy = trips.where((t) => t.underway).toList()..sort(_byUrgency);
   if (busy.isNotEmpty) return busy.first;
 
-  // Everything still owed today, earliest first. BLOCKED stays in: the bus is
-  // stopped, the driver has to be told so, and hiding the run does not unblock
-  // it.
   final ahead = trips.where((t) => t.live).toList()
     ..sort((a, b) => (a.scheduledDepartureAt ?? DateTime(2100))
         .compareTo(b.scheduledDepartureAt ?? DateTime(2100)));
 
-  // Nothing left. Null rather than a finished run, so the caller goes looking
-  // for the next day instead of offering to start something that is over.
   return ahead.isNotEmpty ? ahead.first : null;
 }
 
-/// Sweep overdue first, then sweep pending, then the bus on the road.
 int _byUrgency(CrewTrip a, CrewTrip b) => _urgency(a).compareTo(_urgency(b));
 
 int _urgency(CrewTrip t) => switch (t.status) {
@@ -85,11 +53,6 @@ int _urgency(CrewTrip t) => switch (t.status) {
       _ => 4,
     };
 
-/// What a driver sees at 06:40 with cold hands.
-///
-/// One question first — which run, and can I start it — then the four numbers
-/// that decide whether they are ahead or behind, then the stop they are
-/// actually driving to. Everything below that is reference.
 class DriverHome extends StatefulWidget {
   const DriverHome({super.key, required this.onOpenTab});
 
@@ -105,12 +68,6 @@ class _DriverHomeState extends State<DriverHome> {
 
   void Function(int tab) get onOpenTab => widget.onOpenTab;
 
-  /// Arriving at a stop, and leaving it.
-  ///
-  /// Both were buttons on this card that only opened the run screen. They are
-  /// the two calls the platform actually offers, they are what the driver is
-  /// pressing the card for, and doing them here saves four taps at the one
-  /// moment nobody has four taps to spare.
   Future<void> _stopAction(Future<void> Function() call, String label) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -133,8 +90,6 @@ class _DriverHomeState extends State<DriverHome> {
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
       load: () async {
         final live = await loadDutyTrip();
-        // The bus's own position, so the card can say how far the next stop
-        // is. Without it the server has nothing to measure from.
         final me = BusLocation.instance.here.value;
         final plan = live == null
             ? null
@@ -144,10 +99,6 @@ class _DriverHomeState extends State<DriverHome> {
       builder: (context, duty) {
         final trip = duty.trip;
         if (trip == null) {
-          // Still shown on a day with no run — in fact ESPECIALLY then. A
-          // driver whose licence has already blocked him has no duty today
-          // BECAUSE of it, and "no runs today" on its own is the least useful
-          // possible explanation of that.
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -171,10 +122,6 @@ class _DriverHomeState extends State<DriverHome> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Above the run, because a driver who is about to be stopped needs
-            // to know before he plans his morning around it — not at the depot
-            // gate when the tap fails. Draws nothing when the paperwork is in
-            // order, so it costs a compliant driver no space at all.
             const CredentialWarning(),
             _DutyCard(trip: trip, plan: duty.plan, onOpen: () => _open(context, trip)),
             const SizedBox(height: kCardGap),
@@ -218,15 +165,11 @@ class _DriverHomeState extends State<DriverHome> {
               const SizedBox(height: kCardGap),
             ],
 
-            // ---- The stop they are driving to -----------------------------
             _NextStopCard(
               stop: next,
               leg: trip.leg,
               busy: _busy,
               onOpen: () => _open(context, trip),
-              // Only while the run is actually under way. Recording an arrival
-              // at a stop on a run nobody has started is a call the server is
-              // right to refuse, and offering it invites the refusal.
               onStopAction: next == null || !trip.running
                   ? null
                   : () => next.arrivedAt == null
@@ -243,12 +186,6 @@ class _DriverHomeState extends State<DriverHome> {
             ),
             const SizedBox(height: kCardGap),
 
-            // ---- The four things they DO ----------------------------------
-            //
-            // Four tiles, four different places. Attendance used to open the
-            // Profile tab — tab three, counted from a list that had changed —
-            // and Notifications opened the run, because this app keeps no
-            // notifications at all.
             Row(
               children: [
                 Expanded(
@@ -296,7 +233,6 @@ class _DriverHomeState extends State<DriverHome> {
             ),
             const SizedBox(height: kCardGap),
 
-            // ---- Reference -------------------------------------------------
             IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -337,9 +273,6 @@ class _Duty {
   final CrewTrip? trip;
   final TripPlan? plan;
 
-  /// The first stop not yet departed. Not "the nearest" — a driver following
-  /// the route wants the next one in order, and the nearest is the one they
-  /// just left as often as it is the one ahead.
   PlannedStop? get nextStop {
     final stops = plan?.stops ?? const <PlannedStop>[];
     for (final s in stops) {
@@ -348,10 +281,6 @@ class _Duty {
     return null;
   }
 }
-
-/* ---------------------------------------------------------------------------
- * The run
- * ------------------------------------------------------------------------- */
 
 class _DutyCard extends StatelessWidget {
   const _DutyCard({required this.trip, required this.plan, required this.onOpen});
@@ -363,9 +292,6 @@ class _DutyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tint = Role.driver.tint;
-    // On duty from the walk-around to the cabin sweep, not only while the wheels
-    // are turning. A driver who has checked in and is loading children was
-    // being told "No run under way".
     final live = trip.underway;
     final school = Session.instance.me?.schoolName ?? '';
 
@@ -376,9 +302,6 @@ class _DutyCard extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, box) => Stack(
             children: [
-              // The run, on the real map. Small, still, and not interactive —
-              // the whole point of this panel is that it is glanced at, and the
-              // card's own button is what a thumb lands on.
               PositionedDirectional(
                 end: 0,
                 top: 0,
@@ -391,10 +314,6 @@ class _DutyCard extends StatelessWidget {
                   compact: true,
                 ),
               ),
-              // The map runs under the last of the text. A fade off its leading
-              // edge keeps a street name from competing with the route's own
-              // name, and softens what would otherwise be a hard rectangle down
-              // the middle of the card.
               PositionedDirectional(
                 end: 0,
                 top: 0,
@@ -410,9 +329,6 @@ class _DutyCard extends StatelessWidget {
                           AppTheme.surface,
                           AppTheme.surface.withValues(alpha: 0),
                         ],
-                        // Short. Just enough to cover the tail of the text
-                        // column — any further and it starts rubbing out the
-                        // stops the map is there to show.
                         stops: const [0.0, 0.26],
                       ),
                     ),
@@ -502,8 +418,6 @@ class _DutyCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 13),
-                      // 46 high. The primary action on the driver's first
-                      // screen was a 39 dp pill.
                       GestureDetector(
                         onTap: onOpen,
                         behavior: HitTestBehavior.opaque,
@@ -602,10 +516,6 @@ class _Fact extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The next stop
- * ------------------------------------------------------------------------- */
-
 class _NextStopCard extends StatelessWidget {
   const _NextStopCard({
     required this.stop,
@@ -620,8 +530,6 @@ class _NextStopCard extends StatelessWidget {
   final bool busy;
   final VoidCallback onOpen;
 
-  /// Arrive, or move on — whichever the stop is owed. Null when there is no
-  /// stop left to act on.
   final VoidCallback? onStopAction;
 
   @override
@@ -692,10 +600,6 @@ class _NextStopCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
                             ),
-                            // The landmark. In much of the Region this is the
-                            // only usable address, and it was on the run screen
-                            // three taps away instead of on the card naming the
-                            // stop the driver is heading for.
                             if (s.landmark != null && s.landmark!.isNotEmpty) ...[
                               const SizedBox(height: 2),
                               Text(
@@ -705,9 +609,6 @@ class _NextStopCard extends StatelessWidget {
                                 style: TextStyle(fontSize: 11, color: AppTheme.textFaint),
                               ),
                             ],
-                            // When the bus is due at it. The card names the
-                            // stop the driver is heading for, and the time was
-                            // three taps away on the run screen.
                             if (s.etaAt != null) ...[
                               const SizedBox(height: 4),
                               StopEta(stop: s),
@@ -741,12 +642,7 @@ class _NextStopCard extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        // Records the arrival, or the departure once the bus is
-                        // there. It used to open the run screen and record
-                        // nothing, under a label that said it had.
                         child: _Button(
-                          // Nothing directional: an east arrow points the wrong
-                          // way on a Kurdish or Arabic screen.
                           icon: s.arrivedAt == null
                               ? Icons.check_circle_outline_rounded
                               : Icons.directions_bus_rounded,
@@ -760,10 +656,6 @@ class _NextStopCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        // Was "Navigate", and opened the same run screen. There
-                        // is no navigation in this build — no maps app is
-                        // launched from anywhere — so the button now says what
-                        // it does.
                         child: _Button(
                           icon: Icons.list_alt_rounded,
                           label: t('driver.openRun'),
@@ -782,11 +674,6 @@ class _NextStopCard extends StatelessWidget {
   }
 }
 
-/// One of the two buttons under the next stop.
-///
-/// 48 high, because a bus is not a desk. The pair used to be 40, which is under
-/// every platform's floor and well under what a gloved thumb hits at the first
-/// attempt.
 class _Button extends StatelessWidget {
   const _Button({
     required this.icon,
@@ -853,10 +740,6 @@ class _Button extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The four tiles
- * ------------------------------------------------------------------------- */
-
 class _ActionTile extends StatelessWidget {
   const _ActionTile({
     required this.icon,
@@ -915,10 +798,6 @@ class _ActionTile extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Reference
- * ------------------------------------------------------------------------- */
-
 class _ProgressCard extends StatelessWidget {
   const _ProgressCard({required this.trip, required this.plan, required this.onOpen});
 
@@ -932,8 +811,6 @@ class _ProgressCard extends StatelessWidget {
     final done = counts?.stopsDone ?? 0;
     final total = counts?.stopsTotal ?? 0;
 
-    // Which of the four milestones the run has reached. Derived from the trip
-    // and the stop tally rather than stored, because nothing writes a "stage".
     final stage = trip.endedAt != null
         ? 3
         : total > 0 && done >= total
@@ -944,8 +821,6 @@ class _ProgressCard extends StatelessWidget {
 
     return Card16(
       padding: const EdgeInsets.all(12),
-      // The whole card, not only the ten-point "Full route" link in its
-      // corner. That link is the smallest thing on the driver's home screen.
       onTap: onOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1079,10 +954,6 @@ class _VehicleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // What the platform actually knows about the bus. The design shows fuel,
-    // tyres and engine; nothing reports those, and a green "Engine: Good" that
-    // is a constant is worse than no gauge at all on a vehicle a driver is
-    // about to take out with children in it.
     final sweepDue = trip.sweepRequired && trip.sweepConfirmedAt == null;
 
     return Card16(

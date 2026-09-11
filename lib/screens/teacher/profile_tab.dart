@@ -13,12 +13,6 @@ import '../../ui/sheets.dart';
 import '../login_screen.dart' show LanguagePicker;
 import '../staff_leave_screen.dart';
 
-/// The teacher's own tab.
-///
-/// It exists because the design gives the bottom bar a Profile slot, and
-/// because everything that used to live only behind the drawer — the theme, the
-/// language, the password, the way out — was reachable by exactly one gesture
-/// that several people never found.
 class TeacherProfileTab extends StatelessWidget {
   const TeacherProfileTab({super.key});
 
@@ -59,8 +53,6 @@ class TeacherProfileTab extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                             profile.phone,
-                            // A phone number reads left-to-right even on a
-                            // Kurdish screen; mirroring it makes it unusable.
                             textDirection: TextDirection.ltr,
                             style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                           ),

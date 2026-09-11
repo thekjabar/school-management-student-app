@@ -9,16 +9,6 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 
-/// What the school has written down about one child.
-///
-/// This screen exists because the answer used to be a telephone call to the
-/// office. A parent who wants to check the spelling on a certificate, or which
-/// room their daughter is in, or whether the school still has last year's
-/// emergency number, should not have to ring anybody.
-///
-/// It shows only facts the record actually holds. Nothing here is computed,
-/// scored or inferred — a field the school never filled in is simply absent,
-/// which is itself worth knowing.
 class StudentInfoScreen extends StatelessWidget {
   const StudentInfoScreen({super.key, required this.child});
 
@@ -46,10 +36,6 @@ class StudentInfoScreen extends StatelessWidget {
                     _IdentityCard(profile: p, tint: tint),
                     const SizedBox(height: kCardGap),
 
-                    // Each row carries its own mark. Seven labels in a column
-                    // are seven identical greys to scan; seven marks are seven
-                    // different shapes, and the eye finds "Room" without
-                    // reading the other six.
                     _Section(
                       title: t('info.atSchool'),
                       icon: Icons.school_outlined,
@@ -119,10 +105,6 @@ class StudentInfoScreen extends StatelessWidget {
                     ],
 
                     const SizedBox(height: 12),
-                    // The office keeps the record; the app only reads it. Say
-                    // so, so that a parent who spots a wrong birth date knows
-                    // where to take it instead of hunting for an edit button
-                    // that will never be there.
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Text(
@@ -147,11 +129,6 @@ class StudentInfoScreen extends StatelessWidget {
   static String? _grade(int? level) => level == null ? null : tv('grade.n', {'n': '$level'});
 }
 
-/* ---------------------------------------------------------------------------
- * Who they are
- * ------------------------------------------------------------------------- */
-
-/// The face, the name, and the two things everyone asks for first.
 class _IdentityCard extends StatelessWidget {
   const _IdentityCard({required this.profile, required this.tint});
 
@@ -162,18 +139,12 @@ class _IdentityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = profile;
 
-    // Born, Gender and Nationality — whichever of the three the record holds.
-    // Built as a list rather than as three `if`s in a Row so the hairline
-    // rules fall BETWEEN whatever survives, instead of leaving a rule standing
-    // against an empty column.
     final facts = <_FactData>[
       if (p.dob != null)
         _FactData(
           icon: Icons.cake_outlined,
           label: t('info.born'),
           value: shortDate(p.dob),
-          // The age is the part a parent reads; the date is the part they
-          // check.
           caption: p.ageYears == null
               ? null
               : tv('info.yearsOld', {'n': '${p.ageYears}'}),
@@ -198,12 +169,6 @@ class _IdentityCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(kCardRadius),
         child: Stack(
           children: [
-            // The school, at the end of the card, as a wash rather than as a
-            // picture. The illustration is twice as wide as it is tall, so at
-            // any size where it reads as a drawing it eats the width the
-            // child's full name needs — and the name is the one thing on this
-            // card that cannot afford to wrap to three lines. Behind and
-            // faint, it still does the job it was there to do.
             PositionedDirectional(
               end: -18,
               bottom: -16,
@@ -227,9 +192,6 @@ class _IdentityCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const SizedBox(height: 2),
-                            // The full enrolled name, because the reason to
-                            // look is usually to check a spelling against a
-                            // document.
                             Text(
                               p.fullName,
                               style: TextStyle(
@@ -318,9 +280,6 @@ class _Avatar extends StatelessWidget {
   Widget build(BuildContext context) {
     const size = 96.0;
 
-    // No photograph is the norm rather than the exception here: plenty of
-    // families do not consent to one, and the record honours that. Initials
-    // are not a placeholder for a missing image, they are the answer.
     Widget fallback() => Center(
           child: Text(
             _initials(name),
@@ -359,7 +318,6 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-/// A tinted pill with a mark in it — the class and the student code.
 class _MarkChip extends StatelessWidget {
   const _MarkChip({required this.icon, required this.label, required this.color});
 
@@ -477,11 +435,6 @@ class _Fact extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The record
- * ------------------------------------------------------------------------- */
-
-/// A mark, a label and a value. Null values are dropped by [_Section].
 class _Row {
   const _Row(this.icon, this.label, this.value);
 
@@ -505,9 +458,6 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // A field the school never filled in is not shown as an empty row. An
-    // interface full of dashes reads as broken; a shorter card reads as
-    // "that is everything we have", which is the truth.
     final shown = rows.where((r) => r.value != null && r.value!.trim().isNotEmpty).toList();
     if (shown.isEmpty) return const SizedBox.shrink();
 
@@ -525,7 +475,6 @@ class _Section extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    // Nudged onto the text's baseline rather than its box.
                     padding: const EdgeInsets.only(top: 1),
                     child: Icon(shown[i].icon, size: 16, color: color),
                   ),
@@ -660,8 +609,6 @@ class _Guardians extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // Who the office rings first. Worth being explicit about,
-                  // because families frequently believe it is the other parent.
                   if (guardians[i].isPrimary) ...[
                     const SizedBox(width: 10),
                     StatusChip(t('info.mainContact'), color: tint),
@@ -732,8 +679,6 @@ class _Medical extends StatelessWidget {
             ),
           if (m.needsReview) ...[
             const SizedBox(height: 12),
-            // Stale medical information is more dangerous than none, because
-            // everyone assumes it is current.
             NoticeBanner(
               icon: Icons.update_rounded,
               title: t('info.medicalStale'),
@@ -799,8 +744,6 @@ class _Support extends StatelessWidget {
   }
 }
 
-/// A sentence with its own leading mark — the same row shape [_Section] uses,
-/// for the facts that are a phrase rather than a label and a value.
 class _Line extends StatelessWidget {
   const _Line({required this.icon, required this.text, required this.color});
 

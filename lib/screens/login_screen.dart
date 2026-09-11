@@ -12,13 +12,6 @@ import '../ui/async.dart';
 import '../ui/kit.dart';
 import '../ui/sheets.dart';
 
-/// One screen: the language, the picture, and the form.
-///
-/// Not a welcome page with a sheet behind it. A parent opening this app has one
-/// thing to do, and putting a "Get started" button in front of it costs a tap
-/// and teaches nothing. The language pills come first, above everything that
-/// needs reading — somebody who cannot read the form cannot find the setting
-/// that would let them read it.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
@@ -30,11 +23,6 @@ class LoginScreen extends StatefulWidget {
   final Role role;
   final void Function(Me me) onSignedIn;
 
-  /// Start-up could not reach the platform at all.
-  ///
-  /// Not the same as being signed out, and the screen says so before anybody
-  /// types anything. Without it the first thing a person did on a dead
-  /// connection was enter a password, wait, and be told something vague.
   final bool offline;
 
   @override
@@ -48,7 +36,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _confirm = TextEditingController();
   final _passwordFocus = FocusNode();
 
-  /// 0750 000 0000. Every network here issues eleven digits.
   static const _phoneDigits = 11;
 
   bool _busy = false;
@@ -59,12 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    // Named up front rather than discovered by failing.
     if (widget.offline) _error = t('common.offline');
-    // Boot sent them back here because the server refuses everything on an
-    // office-issued password until it is changed, and the change-password step
-    // needs the two fields on this form. Say so, and consume the flag so it
-    // does not reappear on the next visit to this screen.
     if (Session.passwordChangeRequired) {
       Session.passwordChangeRequired = false;
       _error = t('login.mustChangeAgain');
@@ -82,8 +64,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  /// A local number, as the school holds it. Eleven digits starting 07 is what
-  /// every network here issues, and the tick appears the moment it is one.
   bool get _phoneLooksRight {
     final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
     return digits.length == _phoneDigits && digits.startsWith('0');
@@ -109,9 +89,6 @@ class _LoginScreenState extends State<LoginScreen> {
       widget.onSignedIn(result.me);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
-      // Only wipe the field when the server actually rejected it. Clearing it
-      // after a dropped connection makes somebody retype a password that was
-      // right, which is how they end up believing it is wrong.
       if (e.status == 401) _password.clear();
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -133,8 +110,6 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     try {
       await Session.instance.changePassword(_password.text, _next.text);
-      // Changing a password ends every session it opened, this one included, so
-      // the only honest next step is to sign in again with the new one.
       final again = await Session.instance.signIn(_phone.text, _next.text);
       if (!mounted) return;
       unawaited(Push.askPermission());
@@ -146,18 +121,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  /// "Forgot password?" — which here means asking the school office, not
-  /// following a link in an email.
-  ///
-  /// Nobody in this system holds an email address to send a reset to, and the
-  /// office is the only place that can hand a password to a person it has
-  /// recognised. So the tap sends the office a note and then says what happens
-  /// next, which is the whole of what this app can honestly promise.
-  ///
-  /// The number already in the form travels with it. Somebody who got their
-  /// password wrong has almost always typed their phone right, and asking for
-  /// it again two centimetres below where they just typed it reads as an app
-  /// that was not paying attention.
   Future<void> _forgot() => showAppSheet<void>(
         context,
         builder: (_) => _ForgotSheet(tint: widget.role.tint, phone: _phone.text),
@@ -173,7 +136,6 @@ class _LoginScreenState extends State<LoginScreen> {
         color: role.wash,
         child: Stack(
           children: [
-            // The hills along the foot of the page, under everything.
             PositionedDirectional(
               start: 0,
               end: 0,
@@ -183,13 +145,6 @@ class _LoginScreenState extends State<LoginScreen> {
             SafeArea(
               child: LayoutBuilder(
                 builder: (context, box) {
-                  // ONE tree, always. Swapping between a scrolling layout and a
-                  // fixed one when the keyboard opened rebuilt the text fields
-                  // as new elements mid-tap: the field lost focus the instant
-                  // it gained it, and the focus fell through to the next one.
-                  // So the layout never changes shape — only the picture's
-                  // height, which is derived from the viewport so the page
-                  // lands on one screen without scrolling.
                   final art = (box.maxHeight * 0.26).clamp(120.0, 208.0);
 
                   return SingleChildScrollView(
@@ -197,10 +152,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Language on the left, theme on the right, and
-                        // NOT AlignmentDirectional — that mirrors with the
-                        // text direction, so choosing Kurdish threw the chip
-                        // you had just tapped to the far side of the screen.
                         Row(
                           textDirection: TextDirection.ltr,
                           children: [
@@ -231,36 +182,23 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// The picture above the card.
-  ///
-  /// One per audience: a driver signing in wants to see a driver, and the
-  /// family illustration on a crew phone reads as the wrong app. Falls back to
-  /// the family scene for roles with no artwork of their own yet.
   static String _scene(Role role) => switch (role) {
         Role.driver => 'assets/art/driver_scene.png',
         Role.teacher => 'assets/art/teacher_scene.png',
         _ => 'assets/art/login_family.png',
       };
 
-  /// The line under the greeting.
-  ///
-  /// Each audience opens this screen for a different reason, and saying so is
-  /// most of what makes an app feel like it was built for you rather than
-  /// configured for you.
   static String _subtitle(Role role) => switch (role) {
         Role.parent => 'login.subtitle',
         Role.teacher => 'login.subTeacher',
         _ => 'login.signInToContinue',
       };
 
-  /// The hills along the foot of the page, in that audience's colour.
   static String _wave(Role role) => switch (role) {
         Role.driver => 'assets/art/driver_wave.png',
         Role.teacher => 'assets/art/teacher_wave.png',
         _ => 'assets/art/login_wave.png',
       };
-
-  /* --- The form ---------------------------------------------------------- */
 
   Widget _signInForm(Role role) {
     return Column(
@@ -303,11 +241,6 @@ class _LoginScreenState extends State<LoginScreen> {
             controller: _phone,
             keyboardType: TextInputType.phone,
             textInputAction: TextInputAction.next,
-            // Digits only, and eleven of them. Every other character a phone
-            // keypad offers is one the server will reject, and finding that
-            // out after typing is worse than not being able to type it. The
-            // limit is the shape of a number here — 0750 000 0000 — so a
-            // twelfth keystroke is a mistake, not a longer number.
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(_phoneDigits),
@@ -551,11 +484,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The pieces
- * ------------------------------------------------------------------------- */
-
-/// The white panel the form sits on.
 class _Card extends StatelessWidget {
   const _Card({required this.child});
 
@@ -580,11 +508,6 @@ class _Card extends StatelessWidget {
   }
 }
 
-/// A field with its own icon chip, and the label INSIDE the box.
-///
-/// The design puts the label above the value inside the same bordered box
-/// rather than above the box, which is what lets the phone number be typed at
-/// the size it is read back at.
 class _Field extends StatelessWidget {
   const _Field({
     required this.icon,
@@ -602,11 +525,6 @@ class _Field extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Left to right whatever the app is showing. A phone number and a password
-    // are sequences whose order IS the value; mirroring them is not a
-    // translation, it is a different string. This also keeps the icon on the
-    // left and the eye on the right in all three languages, which is where
-    // every keypad and every bank app puts them.
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Container(
@@ -678,7 +596,6 @@ class _ErrorLine extends StatelessWidget {
   }
 }
 
-/// Kurdish, Arabic, English — one pill each, the chosen one filled.
 class LanguagePicker extends StatelessWidget {
   const LanguagePicker({super.key, this.tint});
 
@@ -703,8 +620,6 @@ class LanguagePicker extends StatelessWidget {
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
-          // Fixed order. Inside an RTL page the three chips reversed, so the
-          // one under your finger became a different language on the way up.
           textDirection: TextDirection.ltr,
           children: [
             for (final lang in Lang.values)
@@ -734,19 +649,6 @@ class LanguagePicker extends StatelessWidget {
   }
 }
 
-/// Light or dark, before anybody has signed in.
-///
-/// The setting used to live behind the profile screen, which needs an account —
-/// so the one moment a person is most likely to notice the app is the wrong
-/// brightness for the room, they could do nothing about it.
-///
-/// ONE button, not two. A sun while the app is light and a moon while it is
-/// dark, each showing what tapping will give you. A pair of buttons asks
-/// somebody to answer a question they were not asking.
-///
-/// Tapping resolves "follow the system" into a real choice first: if the phone
-/// is dark and the app is following it, the first tap gives light rather than
-/// appearing to do nothing.
 class ThemeToggle extends StatelessWidget {
   const ThemeToggle({super.key, this.tint});
 
@@ -788,26 +690,11 @@ class ThemeToggle extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Forgotten password
- * ------------------------------------------------------------------------- */
-
-/// Asks the school office to issue a new password.
-///
-/// It never says whether the number is known, and it must not. The endpoint
-/// answers identically for a registered number and an unregistered one — that
-/// is deliberate, so somebody working through numbers cannot learn which
-/// families are on the system. "We found your account" would hand exactly that
-/// back. "If that number is registered" is the same sentence for everybody, and
-/// it is also the true one.
 class _ForgotSheet extends StatefulWidget {
   const _ForgotSheet({required this.tint, required this.phone});
 
-  /// The colour of whichever app this is — parent, teacher or driver. One login
-  /// screen serves all three, so nothing here may assume the parent violet.
   final Color tint;
 
-  /// Whatever was already typed into the login form's number field.
   final String phone;
 
   @override
@@ -819,9 +706,6 @@ class _ForgotSheetState extends State<_ForgotSheet> {
 
   bool _busy = false;
 
-  /// Sent. The sheet then shows what to expect rather than closing — a snack
-  /// bar that slides away in three seconds is not where you put "ring the
-  /// office", which is a thing somebody has to act on later.
   bool _sent = false;
 
   String? _error;
@@ -830,8 +714,6 @@ class _ForgotSheetState extends State<_ForgotSheet> {
   void initState() {
     super.initState();
     _phone.text = widget.phone;
-    // The tick beside the field follows what is typed, so the sheet rebuilds
-    // on every keystroke.
     _phone.addListener(() => setState(() {}));
   }
 
@@ -841,15 +723,12 @@ class _ForgotSheetState extends State<_ForgotSheet> {
     super.dispose();
   }
 
-  /// The same shape the sign-in form insists on: eleven digits starting 07.
   bool get _looksRight {
     final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
     return digits.length == _LoginScreenState._phoneDigits && digits.startsWith('0');
   }
 
   Future<void> _send() async {
-    // Checked here rather than by grabbing the button out of reach. A dead
-    // button is a question nobody can answer; this one names what is wrong.
     if (!_looksRight) {
       setState(() => _error = t('login.phoneNeeded'));
       return;
@@ -859,7 +738,6 @@ class _ForgotSheetState extends State<_ForgotSheet> {
       _error = null;
     });
     try {
-      // Unauthenticated and throttled, and it answers the same either way.
       await ApiClient.instance.post(
         '/auth/password/reset-request',
         {'phone': _phone.text.trim()},
@@ -869,9 +747,6 @@ class _ForgotSheetState extends State<_ForgotSheet> {
       setState(() => _sent = true);
     } catch (e) {
       if (!mounted) return;
-      // errorText rather than the object: a phone with no signal and a server
-      // that answered are different problems, and only one of them is worth
-      // trying again in the same second.
       setState(() => _error = errorText(e));
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -947,9 +822,6 @@ class _ForgotSheetState extends State<_ForgotSheet> {
             controller: _phone,
             keyboardType: TextInputType.phone,
             textInputAction: TextInputAction.done,
-            // Only when there is nothing to carry over. Throwing the keyboard
-            // up over a number already filled in hides the line that says what
-            // happens next, which is the part worth reading.
             autofocus: widget.phone.isEmpty,
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
@@ -994,11 +866,6 @@ class _ForgotSheetState extends State<_ForgotSheet> {
         ),
       ];
 
-  /// What was actually done, and what to do now.
-  ///
-  /// Not "we have found you", and not "check your messages" either — the office
-  /// rings people or hands them a password across the counter, and this is the
-  /// only screen that will ever say so.
   List<Widget> _afterwards() => [
         Center(
           child: Container(

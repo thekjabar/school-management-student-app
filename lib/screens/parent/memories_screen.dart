@@ -8,16 +8,6 @@ import '../../ui/async.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 
-/// Photographs and clips of one child at school.
-///
-/// Grouped by the day rather than served as a wall of images: a family looking
-/// at these is looking at a day — the sports day, the trip to the museum — and
-/// the title and the date are most of what makes them worth keeping.
-///
-/// Every frame here has already passed the consent check on the server. The
-/// child is in it, and so is nobody whose family declined. Nothing is filtered
-/// again on this side, because a rule enforced in two places is a rule that
-/// eventually disagrees with itself.
 class MemoriesScreen extends StatelessWidget {
   const MemoriesScreen({super.key, required this.child});
 
@@ -33,12 +23,6 @@ class MemoriesScreen extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
-            // The heading carries the back arrow itself rather than sitting
-            // under a ScreenHeader that says the same two words a second time.
-            // It is outside the Loader on purpose: it stays put over the
-            // waiting blocks, over the failure panel and over "nothing yet",
-            // which is the one state where a parent most needs telling which
-            // page they are on.
             const _Heading(),
             Expanded(
               child: Loader<List<MemoryAlbum>>(
@@ -65,11 +49,6 @@ class MemoriesScreen extends StatelessWidget {
   }
 }
 
-/// Back, the page's name, and the school.
-///
-/// The illustration is the same building that fronts the profile tab, at a
-/// size where it reads as a mark beside the title rather than as a picture
-/// competing with the photographs below it.
 class _Heading extends StatelessWidget {
   const _Heading();
 
@@ -122,7 +101,6 @@ class _Heading extends StatelessWidget {
   }
 }
 
-/// One day, on one card.
 class _Album extends StatelessWidget {
   const _Album({required this.album, required this.tint});
 
@@ -151,8 +129,6 @@ class _Album extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // No date block at all when the server sent no date, rather than
-              // a tinted box with three dashes in it.
               if (album.happenedOn != null) ...[
                 _DateBlock(date: album.happenedOn!, tint: tint),
                 const SizedBox(width: 11),
@@ -223,10 +199,6 @@ class _Album extends StatelessWidget {
             _Grid(album: album, onOpen: (i) => _open(context, i)),
             const SizedBox(height: 11),
             Divider(height: 1, color: AppTheme.border),
-            // A heart and a like count sit on the left of this row in the
-            // design. Neither exists on this platform — no field on the album,
-            // no endpoint, nowhere to record a tap — so the footer carries only
-            // the half of it that goes somewhere real.
             Align(
               alignment: AlignmentDirectional.centerEnd,
               child: GestureDetector(
@@ -259,10 +231,6 @@ class _Album extends StatelessWidget {
   }
 }
 
-/// The day, stacked: 20, SEP, 2026.
-///
-/// A date said this way is read at a glance and takes a fifth of the width of
-/// "Thursday 20 September 2026", which is width the title needs more.
 class _DateBlock extends StatelessWidget {
   const _DateBlock({required this.date, required this.tint});
 
@@ -294,8 +262,6 @@ class _DateBlock extends StatelessWidget {
           ),
           const SizedBox(height: 1),
           Text(
-            // A chip the width of the day number under it, so the short
-            // phrase rather than the whole month name.
             t('monthShort.${date.month}').toUpperCase(),
             maxLines: 1,
             style: TextStyle(
@@ -322,7 +288,6 @@ class _DateBlock extends StatelessWidget {
   }
 }
 
-/// How many frames the album holds.
 class _CountChip extends StatelessWidget {
   const _CountChip({required this.count, required this.tint});
 
@@ -353,11 +318,6 @@ class _CountChip extends StatelessWidget {
   }
 }
 
-/// Three across, square.
-///
-/// Not a staggered layout: the pictures come from a dozen different handsets in
-/// portrait and landscape, and a grid that reflows around them turns a page of
-/// memories into a puzzle. Square thumbnails, real proportions when opened.
 class _Grid extends StatelessWidget {
   const _Grid({required this.album, required this.onOpen});
 
@@ -411,8 +371,6 @@ class _Thumb extends StatelessWidget {
             else
               const _Placeholder(),
 
-            // A clip needs to say so before it is tapped, or a parent on a
-            // school connection waits on a still that was never going to move.
             if (item.isVideo)
               Center(
                 child: Container(
@@ -437,19 +395,12 @@ class _Placeholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ColoredBox(
-        // The theme's own neutral, not a hardcoded grey: a light grey block
-        // behind every unloaded thumbnail is a near-white hole on the dark
-        // canvas.
         color: AppTheme.neutralSoft,
         child: Center(
           child: Icon(Icons.image_outlined, size: 22, color: AppTheme.textFaint),
         ),
       );
 }
-
-/* ---------------------------------------------------------------------------
- * Full screen
- * ------------------------------------------------------------------------- */
 
 class _Viewer extends StatefulWidget {
   const _Viewer({required this.album, required this.index});
@@ -475,8 +426,6 @@ class _ViewerState extends State<_Viewer> {
   Widget build(BuildContext context) {
     final item = widget.album.items[_current];
 
-    // Black, whatever the app theme is. A photograph is the thing on screen and
-    // a pale surround changes how it reads.
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(

@@ -7,15 +7,6 @@ import '../theme/app_theme.dart';
 import 'async.dart';
 import 'kit.dart';
 
-/// The settings rows every app's account drawer needs.
-///
-/// Shared rather than copied three times: these are the controls a person
-/// hunts for when something is wrong — "why am I not being told anything",
-/// "how do I read this in Kurdish" — and three drifting copies is how one app
-/// ends up with a working notification toggle and another with a stale one.
-/// Each takes the role's tint so it still looks like the app it is in.
-
-/// Light, dark, or follow the phone.
 class ThemePicker extends StatelessWidget {
   const ThemePicker({super.key, required this.tint});
 
@@ -88,11 +79,6 @@ class ThemePicker extends StatelessWidget {
   }
 }
 
-/// Whether this phone will actually be told anything.
-///
-/// Worth a row of its own in every app: when somebody says "nobody told me",
-/// the first question is whether this was ever on, and neither they nor the
-/// office can answer that from inside Android's settings.
 class PushRow extends StatefulWidget {
   const PushRow({super.key, required this.tint});
 
@@ -119,9 +105,6 @@ class _PushRowState extends State<PushRow> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Permission can be revoked in Android settings while the app is in the
-    // background, so this re-reads on the way back rather than trusting what
-    // it learned on build.
     if (state == AppLifecycleState.resumed && mounted) {
       setState(() => _granted = Push.granted);
     }
@@ -132,9 +115,6 @@ class _PushRowState extends State<PushRow> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() => _granted = ok);
     if (!ok) {
-      // Android shows its dialog once. After that the only way back is the
-      // system settings screen, and saying so is more use than a toast reading
-      // "permission denied".
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(t('more.pushBlocked'))),
       );
@@ -155,8 +135,6 @@ class _PushRowState extends State<PushRow> with WidgetsBindingObserver {
   }
 }
 
-/// Changing a password ends every other session, which is the point: somebody
-/// who thinks a relative has their phone needs this two taps away, not five.
 class ChangePasswordSheet extends StatefulWidget {
   const ChangePasswordSheet({super.key, required this.tint});
 
@@ -279,9 +257,6 @@ class _Field extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Left to right in every language: a password is a sequence whose order IS
-    // the value, and mirroring it is how somebody ends up certain they typed it
-    // right and being told they did not.
     return TextField(
       controller: controller,
       obscureText: true,

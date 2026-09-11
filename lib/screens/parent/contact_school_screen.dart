@@ -10,20 +10,6 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 
-/// A way to reach the school, which this app did not have.
-///
-/// Everything else here travels one way. Announcements are outward only — the
-/// messages tab says so in its own docstring — and crew feedback is a record
-/// about a driver's conduct, which is the wrong place to put "the bus is forty
-/// minutes late and my daughter is not home". So the honest answer to every
-/// urgent question a family had was a telephone call, to an office that might
-/// not be open, and if nobody picked up there was nothing else at all.
-///
-/// What this is NOT is a chat. It lands on the dispatch board the office
-/// already watches, next to the late buses and the unaccounted children, and it
-/// is answered by TELEPHONE. The screen says that plainly, because a family who
-/// believes a message has been read will wait for a reply instead of ringing —
-/// and waiting is the wrong thing to do on the one morning this exists for.
 class ContactSchoolScreen extends StatefulWidget {
   const ContactSchoolScreen({super.key, required this.child});
 
@@ -37,10 +23,6 @@ class _ContactSchoolScreenState extends State<ContactSchoolScreen> {
   final _loaderKey = GlobalKey<LoaderState<List<ConcernStatus>>>();
 
   static const _topics = <(String, IconData, bool)>[
-    // The bool is whether this topic is urgent by nature. A child who is not
-    // home is never a "question", and asking a frightened parent to classify it
-    // themselves is asking them to do the office's triage under the worst
-    // possible conditions.
     ('CHILD_NOT_HOME', Icons.report_problem_rounded, true),
     ('BUS_LATE', Icons.schedule_rounded, true),
     ('PICKUP_ARRANGEMENT', Icons.directions_car_rounded, false),
@@ -64,9 +46,6 @@ class _ContactSchoolScreenState extends State<ContactSchoolScreen> {
       final times = (res['timesRaised'] as num?)?.toInt() ?? 1;
       showNote(
         context,
-        // Told honestly the second time. A parent who has raised the same thing
-        // twice should know the office has it twice — not be shown the same
-        // reassuring line and left wondering whether the first one went.
         times > 1 ? tn('contact.sentAgain', times) : t('contact.sent'),
       );
       _loaderKey.currentState?.reload();
@@ -110,8 +89,6 @@ class _ContactSchoolScreenState extends State<ContactSchoolScreen> {
                         ),
                         const SizedBox(height: kCardGap),
                       ],
-                      // Said once, at the foot of the choices, where somebody
-                      // deciding what to tap will read it.
                       const SizedBox(height: 6),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,9 +151,6 @@ class _TopicCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Urgent topics carry the alarm colour, the quiet ones the parent tint.
-    // A form where every choice looks equally serious is one where the serious
-    // choice is not findable.
     final colour = urgent ? AppTheme.rose : Role.parent.tint;
 
     return Card16(
@@ -268,8 +242,6 @@ class _ConcernCard extends StatelessWidget {
   }
 }
 
-/// The one question worth asking before something lands on a dispatch board:
-/// what would you like to tell them?
 class _MessageDialog extends StatefulWidget {
   const _MessageDialog({required this.topic, required this.urgent});
 
@@ -352,10 +324,6 @@ class _MessageDialogState extends State<_MessageDialog> {
                 ),
                 const SizedBox(width: 6),
                 FilledButton(
-                  // Sendable with nothing typed, deliberately. "The bus is
-                  // late" is a complete message on its own, and a required
-                  // field is one more thing between a worried parent and the
-                  // office.
                   onPressed: _busy
                       ? null
                       : () {

@@ -18,12 +18,6 @@ import 'reports_screen.dart';
 import 'settings_screen.dart';
 import 'timetable_screen.dart';
 
-/// Everywhere the parent app goes, in one list.
-///
-/// The bottom bar carries the four things opened daily; this carries the rest.
-/// Grouped under three headings rather than run together, because a flat list
-/// of eleven rows is scanned by reading all eleven — and a parent hunting for
-/// fees should be able to skip two whole groups without reading them.
 class ProfileDrawer extends StatelessWidget {
   const ProfileDrawer({
     super.key,
@@ -217,10 +211,6 @@ class ProfileDrawer extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The head
- * ------------------------------------------------------------------------- */
-
 class _Head extends StatelessWidget {
   const _Head({
     required this.child,
@@ -240,8 +230,6 @@ class _Head extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
-          // The ring is the one thing in the app that says "everything behind
-          // me is about this child".
           Container(
             padding: const EdgeInsets.all(2.5),
             decoration: BoxDecoration(
@@ -366,10 +354,6 @@ class _SchoolRow extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Rows and groups
- * ------------------------------------------------------------------------- */
-
 class _GroupLabel extends StatelessWidget {
   const _GroupLabel(this.text);
 
@@ -418,7 +402,6 @@ class _Row extends StatelessWidget {
 
   final IconData icon;
 
-  /// For the one mark that is not in the Material set.
   final Widget Function(Color colour, double size)? glyph;
   final String label;
   final Color tint;
@@ -436,9 +419,6 @@ class _Row extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 2),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          // The current destination is a filled pill, not merely a coloured
-          // label — a list where "you are here" is only a text colour is one
-          // people re-read to find themselves in.
           color: active ? tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.10) : Colors.transparent,
           borderRadius: BorderRadius.circular(14),
           border: active && AppTheme.dark
@@ -506,14 +486,6 @@ class _Row extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Notifications prompt
- * ------------------------------------------------------------------------- */
-
-/// Shown only while notifications are off.
-///
-/// A card asking somebody to switch on a thing they already switched on is the
-/// fastest way to teach them to ignore every card in the app.
 class _NotificationsCard extends StatefulWidget {
   const _NotificationsCard();
 
@@ -557,9 +529,6 @@ class _NotificationsCardState extends State<_NotificationsCard> with WidgetsBind
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // The rendered bell rather than the outline one: this card is the
-          // only place in the app asking for something, and the illustration is
-          // what stops it reading as another row in the list above it.
           Image.asset('assets/art/bell.png', width: 40, height: 40),
           const SizedBox(width: 12),
           Expanded(

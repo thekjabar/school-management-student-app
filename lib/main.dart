@@ -19,33 +19,8 @@ import 'screens/parent/parent_app.dart';
 import 'screens/teacher/teacher_app.dart';
 import 'theme/app_theme.dart';
 
-/// Which audience this build is for.
-///
-/// Set at build time —
-///
-///     flutter build apk --flavor parent --dart-define=APP_ROLE=parent
-///
-/// — so one codebase produces three apps. Each Android flavour also carries its
-/// own applicationId, so a teacher whose own child rides the bus can have both
-/// the teacher app and the parent app on one phone.
-///
-/// There is deliberately NO default.
-///
-/// The Android flavour and this define are separate inputs to the build, and
-/// nothing makes them agree. A build run as `flutter build apk --flavor driver`
-/// without the define produced an APK with the driver's applicationId, the
-/// driver's name and the driver's icon, running the PARENT app — because the
-/// default was 'parent'. It shipped. The driver installed it, signed in, and
-/// was told his account was for the web console: a DRIVER membership does not
-/// pass the parent app's gate, and the gate was right.
-///
-/// A default made that failure invisible for exactly one of the three roles and
-/// silent for the other two. Without one, a build missing the define is broken
-/// for all three, loudly, on the first screen — before it reaches anybody.
-/// tool/build_apks.sh always passes it; nothing else should be building these.
 const String kRole = String.fromEnvironment('APP_ROLE');
 
-/// The three apps this codebase builds.
 const List<String> kRoles = ['parent', 'teacher', 'driver'];
 
 bool get _roleIsValid => kRoles.contains(kRole);
@@ -65,27 +40,12 @@ String get _title => switch (kRole) {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(AppTheme.systemOverlay);
-  // The map engine is told its token once, here, before any map is built.
-  //
-  // The raster map this replaced carried the token in every tile URL, so there
-  // was nothing to set up: a map either had a URL or drew nothing. The GL
-  // engine authenticates itself instead, and with no token it does not fail —
-  // it loads an empty style and renders a white rectangle, with no error on the
-  // widget, in the log, or anywhere else. Which is exactly what it did.
   if (MapTiles.configured) {
     MapboxOptions.setAccessToken(MapTiles.token);
   }
-  // Read before the first frame. Restoring the language afterwards means the
-  // app opens in English and redraws itself in Kurdish a moment later, which
-  // looks like a fault.
   await AppLocale.restore();
-  // Every later change of language now also reaches the account, because that
-  // is what decides the language of the notifications. Registered here rather
-  // than inside the setting so that i18n stays at the bottom of the stack.
   AppLocale.onChanged = Session.instance.setLocale;
   await AppThemeSetting.restore();
-  // Started here, but deliberately not asked for permission here — see Push.
-  // Failing to start push must not stop the app, so this never throws.
   await Push.start();
   runApp(const KspApp());
 }
@@ -97,27 +57,9 @@ class KspApp extends StatefulWidget {
   State<KspApp> createState() => _KspAppState();
 }
 
-/// Stateful only so it can hear the phone change brightness.
-///
-/// On "follow the system" the app has to repaint when the handset flips, which
-/// on most phones happens on a schedule nobody thinks about — an app that only
-/// read the setting at launch stays light all evening.
 class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
-  /// The brightness the tree was last actually PAINTED with.
-  ///
-  /// Compared against the newly resolved one to notice a change, because the
-  /// widgets that need telling cannot notice it themselves — see
-  /// [_repaintEverything].
   bool? _painted;
 
-  /// And the language it was last painted in, for exactly the same reason.
-  ///
-  /// `t()` is a plain function call, not an InheritedWidget lookup, so a widget
-  /// that does not rebuild keeps whatever words it was built with. Rebuilding
-  /// from the root reaches most of the app, but not a subtree Flutter is
-  /// entitled to skip — which is why the settings page, the page the language
-  /// is changed ON, was the one page that stayed in the old language until it
-  /// was navigated away from and back.
   Lang? _paintedLang;
 
   @override
@@ -139,13 +81,6 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // Listening here rather than at each screen: changing language rebuilds the
-    // whole app, which is what has to happen — the text direction flips and
-    // every row in every list is laid out the other way round.
-    // Both listened to here rather than at each screen: either one rebuilds
-    // the whole app, which is what has to happen. A language change flips the
-    // text direction and re-lays every row; a theme change repaints every
-    // surface.
     return ValueListenableBuilder<Lang>(
       valueListenable: AppLocale.current,
       builder: (context, lang, _) => ValueListenableBuilder<AppThemeMode>(
@@ -155,34 +90,16 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
     );
   }
 
-  /// Mark every mounted element dirty, so all of them rebuild next frame.
-  ///
-  /// Unusual, and deliberate. The ordinary way to make a value reactive is an
-  /// InheritedWidget, and every reader calls `of(context)` so Flutter knows to
-  /// rebuild it. This app reads its palette through 1,112 static getters across
-  /// 49 files; converting them all is a large change with a lot of places to
-  /// get one wrong, and a single missed call site is an invisible bug that only
-  /// shows up in the theme somebody uses less.
-  ///
-  /// Marking the tree dirty gets the same result — every widget rebuilds and
-  /// re-reads the palette — while unmounting nothing, so all State survives.
-  /// It costs one traversal on a gesture that happens rarely.
   void _repaintEverything() {
     void mark(Element el) {
       el.markNeedsBuild();
       el.visitChildren(mark);
     }
 
-    // From the root down, so pushed routes and hidden tabs are included: they
-    // are mounted elements too, and they are exactly the pages that used to
-    // come back in the wrong colours.
     context.visitChildElements(mark);
   }
 
   Widget _app(Lang lang, AppThemeMode mode) {
-    // The palette reads one global flag, so it has to be set BEFORE the
-    // ThemeData and the widgets below are built — not from inside a builder
-    // that runs after them.
     final platformDark =
         WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
     AppTheme.dark = switch (mode) {
@@ -192,22 +109,6 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
     };
     SystemChrome.setSystemUIOverlayStyle(AppTheme.systemOverlay);
 
-    // The palette is static getters over the flag set just above, read during
-    // build — so a widget picks up a new colour only when it rebuilds, and
-    // Flutter SKIPS rebuilding a child whose widget is identical to the mounted
-    // one. Every `const Something()` is canonicalised to a single instance and
-    // is therefore always identical, so those widgets kept the old colours
-    // until something unrelated forced them to rebuild. That is why a page used
-    // to look right only after navigating away and coming back.
-    //
-    // Marked dirty in place, once, after this frame — rather than by replacing
-    // the tree, which unmounts the running app, replays the splash clip and
-    // drops the person somewhere they were not.
-    //
-    // The language is carried through the same door. It is not a colour, but it
-    // reaches the widgets the same way — a bare function call rather than a
-    // lookup Flutter tracks — so a subtree that does not rebuild keeps the old
-    // words just as it kept the old palette.
     if ((_painted != null && _painted != AppTheme.dark) ||
         (_paintedLang != null && _paintedLang != lang)) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _repaintEverything());
@@ -220,23 +121,11 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
       debugShowCheckedModeBanner: false,
       locale: Locale(lang.code),
       supportedLocales: Lang.values.map((l) => Locale(l.code)),
-      // Kurdish is not one of Flutter's 78 locales, so this list carries three
-      // delegates that claim 'ku' and hand back Arabic's framework strings.
-      // Without them a date picker or a text field throws on build. See
-      // i18n/delegates.dart — the widget tests mount this same list.
       localizationsDelegates: appLocalizationsDelegates,
-      // Lets every Loader refetch when the screen it sits on is uncovered —
-      // press back from a leave request and the list already includes it.
       navigatorObservers: [routeObserver],
-      // One ThemeData, built from the flag above. Handing MaterialApp separate
-      // light/dark themes would let IT choose, and the palette getters would
-      // then disagree with whatever it picked.
       theme: AppTheme.build(tint: _role.tint),
       themeMode: ThemeMode.light,
       builder: (context, child) {
-        // The phone's font scale is honoured but capped. A driver's manifest at
-        // 200% text becomes one name per screen, which is worse for them than
-        // slightly smaller type.
         final media = MediaQuery.of(context);
         return Directionality(
           textDirection: lang.direction,
@@ -248,15 +137,6 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
           ),
         );
       },
-      // NOT const, and that matters. A const widget is canonicalised to a
-      // single instance, and Flutter's updateChild skips a subtree whose widget
-      // is identical to the one already mounted — so the language changed and
-      // nothing below this line redrew until a new route was pushed. The same
-      // applies to the three role apps below.
-      // The clip plays OVER the app rather than before it, so the sign-in
-      // check happens underneath instead of after — and `ready` holds the
-      // curtain until the work started at boot has finished, so the clip is
-      // never followed by a second loading screen.
       home: SplashGate(
         tint: _role.tint,
         ready: Boot.instance.start(),
@@ -266,12 +146,6 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
   }
 }
 
-/// Decides between the sign-in screen and the app.
-///
-/// A saved token is CONFIRMED against the server before the app is drawn around
-/// it, rather than trusted. A driver whose account was stood down last night
-/// must not open a manifest this morning, and the only thing that knows is the
-/// server.
 class _Gate extends StatefulWidget {
   const _Gate();
 
@@ -283,8 +157,6 @@ class _GateState extends State<_Gate> {
   Me? _me;
   bool _ready = false;
 
-  /// Start-up could not reach the platform. Carried through to the sign-in
-  /// screen so it can say so instead of waiting for a password to fail.
   bool _offline = false;
 
   StreamSubscription<void>? _signedOut;
@@ -293,8 +165,6 @@ class _GateState extends State<_Gate> {
   void initState() {
     super.initState();
     _restore();
-    // Fired when a refresh fails for good. Handled here, once, rather than by
-    // every screen checking after every call.
     _signedOut = ApiClient.instance.onSignedOut.listen((_) {
       if (mounted) setState(() => _me = null);
     });
@@ -306,11 +176,6 @@ class _GateState extends State<_Gate> {
     super.dispose();
   }
 
-  /// Reads the work started when the app booted, rather than starting its own.
-  ///
-  /// Boot.start() is called from build(), the instant the splash is created, so
-  /// by the time this runs the request is usually already in flight. Awaiting
-  /// the same future joins it instead of firing a second one.
   Future<void> _restore() async {
     final boot = await Boot.instance.start();
     if (!mounted) return;
@@ -323,22 +188,9 @@ class _GateState extends State<_Gate> {
 
   @override
   Widget build(BuildContext context) {
-    // Before anything else, and before any account is involved: this build does
-    // not know which of the three apps it is. Everything past here would be a
-    // guess, and the guess is what shipped the parent app inside KSP Driver.
     if (!_roleIsValid) return const _BrokenBuild();
 
     if (!_ready) {
-      // Deliberately bare of CONTENT — the wordmark and spinner that used to
-      // live here read as a second splash screen the moment the clip lifted,
-      // which is the part that felt slow, because by then a person is waiting
-      // rather than watching.
-      //
-      // But in the ROLE'S OWN COLOUR, not the page white. Almost always this is
-      // covered by the splash and nobody sees it. When it is not — a fresh
-      // install on a network that connects and never answers, where start-up
-      // waits out its timeout — white was a screen that looked broken. The
-      // tint just looks like the clip has not finished.
       return Scaffold(backgroundColor: _role.tint, body: const SizedBox.expand());
     }
 
@@ -350,17 +202,6 @@ class _GateState extends State<_Gate> {
       );
     }
 
-    // The BUILD decides which app this is, not the account.
-    //
-    // It used to be the other way round: whatever role the signed-in person
-    // held chose the screens. That reads sensibly until three separately named
-    // and separately installed apps exist — then signing into KSP Teacher
-    // with a parent account silently showed the parent app in teacher blue,
-    // and the three APKs became one app wearing three colours.
-    //
-    // A person can hold more than one role — a teacher whose own child attends
-    // the school is common — so the check is whether they hold the role THIS
-    // app serves, not whether their first membership happens to match.
     final membership = _membershipForThisApp();
     if (membership == null) {
       return _WrongApp(
@@ -379,11 +220,6 @@ class _GateState extends State<_Gate> {
     };
   }
 
-  /// The membership that entitles this person to use this build, or null.
-  ///
-  /// Returning the membership rather than a bool because a person with two
-  /// roles at two schools needs the right one made active before any screen
-  /// asks the server for anything.
   Membership? _membershipForThisApp() {
     final wanted = switch (kRole) {
       'driver' => const ['DRIVER', 'ATTENDANT'],
@@ -393,18 +229,10 @@ class _GateState extends State<_Gate> {
     for (final m in _me!.memberships) {
       if (wanted.contains(m.role)) return m;
     }
-    // The active membership may not be listed separately on some accounts.
     return wanted.contains(_me!.role) ? _me!.active : null;
   }
 }
 
-/// The build itself is wrong, and no account can fix it.
-///
-/// Deliberately in English only and deliberately ugly. It is not a message for
-/// a driver or a parent — if one ever sees it, the APK should never have been
-/// handed out, and it says so in the words the person who built it needs. The
-/// alternative is what happened before: a build that looks perfect, installs
-/// under the right name, and quietly runs the wrong app.
 class _BrokenBuild extends StatelessWidget {
   const _BrokenBuild();
 
@@ -455,11 +283,6 @@ class _BrokenBuild extends StatelessWidget {
   }
 }
 
-/// Signed in, but with a role none of these three apps serves.
-///
-/// Office staff, principals and platform administrators use the web console.
-/// Saying so is kinder than showing them an empty app and letting them conclude
-/// the account is broken.
 class _WrongApp extends StatelessWidget {
   const _WrongApp({required this.role, required this.onSignOut});
 

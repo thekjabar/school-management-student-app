@@ -11,12 +11,6 @@ import '../../ui/pickers.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
 
-/// Work set, and the form for setting more.
-///
-/// Draft and published are shown apart, because they are different things to a
-/// family: a draft is invisible to them, and a teacher who believes they have
-/// set homework when they have only drafted it will be told otherwise on
-/// Monday morning by thirty children.
 class HomeworkTab extends StatefulWidget {
   const HomeworkTab({super.key});
 
@@ -38,9 +32,6 @@ class _HomeworkTabState extends State<HomeworkTab> {
         icon: const Icon(Icons.add_rounded),
         label: Text(t('teacher.setHomework')),
       ),
-      // This screen is always pushed — from the home actions, from a lesson,
-      // from the plus button — so it carries its own way back. Without the
-      // header the only way off it was the system gesture.
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -340,9 +331,6 @@ class _SetSheetState extends State<_SetSheet> {
                   ),
                 ),
                 Row(
-                  // Top, for the same reason as the exam sheet: two fields side
-                  // by side are one row, and centring the taller against the
-                  // shorter stops their labels lining up.
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(

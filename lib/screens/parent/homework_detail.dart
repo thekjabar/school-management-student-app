@@ -8,21 +8,6 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 
-/// One piece of homework, in full.
-///
-/// The list could only ever show a title and a date, so the sentence that says
-/// what to actually do — the part a parent needs at seven in the evening — was
-/// truncated or missing. Worse, the API has been returning whether the work was
-/// handed in, the mark and the teacher's comment all along, and none of it was
-/// shown anywhere: a parent could see that homework existed and never learn
-/// what became of it.
-///
-/// The design draws two buttons at the foot of this screen — "View attachment"
-/// and "Mark as done" — and neither is built. The parent homework route is a
-/// GET whose response carries no attachment field, so the first would open
-/// nothing; there is no parent write endpoint at all, so the second would be a
-/// button that silently does nothing, which is worse than no button. What sits
-/// there instead is the submission state, which is data that genuinely exists.
 class HomeworkDetail extends StatelessWidget {
   const HomeworkDetail({super.key, required this.item, required this.childName});
 
@@ -56,9 +41,6 @@ class HomeworkDetail extends StatelessWidget {
                   children: [
                     _Hero(item: item, tint: tint),
 
-                    // Only when the teacher wrote something. An empty "What to
-                    // do" card under every piece of homework teaches a parent
-                    // that the section is never worth reading.
                     if (description.isNotEmpty) ...[
                       _BlockHeading(
                         icon: Icons.edit_note_rounded,
@@ -87,14 +69,6 @@ class HomeworkDetail extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The hero
- * ------------------------------------------------------------------------- */
-
-/// The title, the subject, and the two facts a parent came for.
-///
-/// Tinted in the subject's own colour, so a screen opened from a list of eight
-/// assignments is recognisably the maths one before a word is read.
 class _Hero extends StatelessWidget {
   const _Hero({required this.item, required this.tint});
 
@@ -106,9 +80,6 @@ class _Hero extends StatelessWidget {
     final days = item.daysLeft;
     final past = days < 0;
 
-    // Rose is for a deadline that has been missed — not for one that passed
-    // after the work went in. A family whose child handed the work in should
-    // not be shown a red panel about it.
     final missed = past && !item.handedIn;
 
     return Card16(
@@ -156,9 +127,6 @@ class _Hero extends StatelessWidget {
           ),
           const SizedBox(height: 14),
 
-          // The deadline said as a state, not only as a date. "Two days
-          // overdue" is the thing a parent acts on; "12 September" is the thing
-          // they would have to work it out from.
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -173,16 +141,12 @@ class _Hero extends StatelessWidget {
                     child: _Half(
                       icon: past ? Icons.event_busy_rounded : Icons.event_rounded,
                       colour: missed ? AppTheme.rose : tint,
-                      // Value first, label under: the state is what is read at
-                      // a glance and the date is what confirms it.
                       strong: _dueHeadline(days, item.handedIn),
                       strongColour: missed ? AppTheme.rose : AppTheme.text,
                       muted: longDate(item.dueDate),
                       mutedFirst: false,
                     ),
                   ),
-                  // Dropped whole when the teacher gave no estimate, rather
-                  // than left as a column with a dash in it.
                   if (item.estimatedMinutes != null) ...[
                     const SizedBox(width: 10),
                     Container(width: 1, color: AppTheme.border),
@@ -208,7 +172,6 @@ class _Hero extends StatelessWidget {
   }
 }
 
-/// One side of the hero's sub-card: a chip, a bold line and a muted one.
 class _Half extends StatelessWidget {
   const _Half({
     required this.icon,
@@ -225,7 +188,6 @@ class _Half extends StatelessWidget {
   final Color strongColour;
   final String muted;
 
-  /// The label above the value, or the value above the label.
   final bool mutedFirst;
 
   @override
@@ -269,11 +231,8 @@ class _Half extends StatelessWidget {
   }
 }
 
-/// "Due in 4 days", "Due today", "3 days overdue" — never "in -3 days".
 String _dueHeadline(int days, bool handedIn) {
   if (days < 0) {
-    // Handed in after the fact is not a red flag, it is history. The date under
-    // this line says when the deadline was.
     if (handedIn) return t('hw.wasDue');
     return days < -1 ? tn('due.overdue', -days) : t('hw.overdue');
   }
@@ -282,11 +241,6 @@ String _dueHeadline(int days, bool handedIn) {
   return tn('hw.dueIn', days);
 }
 
-/* ---------------------------------------------------------------------------
- * The sections
- * ------------------------------------------------------------------------- */
-
-/// A small glyph and a heading, above a card.
 class _BlockHeading extends StatelessWidget {
   const _BlockHeading({required this.icon, required this.title, required this.color});
 
@@ -322,8 +276,6 @@ class _BlockHeading extends StatelessWidget {
   }
 }
 
-/// What the teacher actually asked for, with the subject's colour down the
-/// leading edge so the paragraph is anchored to the work rather than floating.
 class _Description extends StatelessWidget {
   const _Description({required this.text, required this.tint});
 
@@ -359,8 +311,6 @@ class _Description extends StatelessWidget {
   }
 }
 
-/// Subject, teacher, dates — the facts, each dropped when the API did not send
-/// one rather than shown as a dash.
 class _Facts extends StatelessWidget {
   const _Facts({required this.item, required this.tint});
 
@@ -369,10 +319,6 @@ class _Facts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Only what the hero has NOT already said. The subject is the chip at the
-    // top of it, the estimated effort is the right half of its panel, and the
-    // total is the denominator of the mark below — repeating all three here
-    // made three of five rows an echo.
     final rows = <Widget>[
       if ((item.teacher ?? '').trim().isNotEmpty)
         _Fact(
@@ -387,8 +333,6 @@ class _Facts extends StatelessWidget {
         label: t('hw.assignedOn'),
         value: longDate(item.assignedOn),
       ),
-      // What it is worth, but only while there is no mark yet — once a mark
-      // exists it is shown as "18 / 20" and the total is already in it.
       if (item.maxScore != null && item.score == null)
         _Fact(
           icon: Icons.star_rounded,
@@ -462,16 +406,6 @@ class _Fact extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * What became of it
- * ------------------------------------------------------------------------- */
-
-/// The submission, the mark and the teacher's words.
-///
-/// This is what stands where the design draws its two buttons. A parent cannot
-/// hand work in through this app, and cannot open an attachment the API does
-/// not send — but they can be told, plainly, whether the school has the work
-/// and what it was given.
 class _Submission extends StatelessWidget {
   const _Submission({required this.item});
 
@@ -512,10 +446,6 @@ class _Submission extends StatelessWidget {
                 ],
               )
             else
-              // Not "your child has not done it" — the app does not know that.
-              // All it knows is that the school has recorded nothing yet, and
-              // claiming more than that from a GET is a guess a parent would
-              // act on.
               Row(
                 children: [
                   Icon(Icons.schedule_outlined, size: 18, color: AppTheme.textFaint),
@@ -533,15 +463,6 @@ class _Submission extends StatelessWidget {
                   ),
                 ],
               ),
-            // The mark, whenever both halves of it exist — and deliberately NOT
-            // nested inside the handed-in branch.
-            //
-            // The grading endpoint writes score and feedback and never touches
-            // submittedAt; submission rows are pre-seeded for a whole class
-            // with it null. So work marked from paper leaves a child with a
-            // score and no recorded hand-in, and hiding the mark there had the
-            // screen assert that the school had recorded nothing while holding
-            // the teacher's comment on that very work.
             if (scored) ...[
               const SizedBox(height: 13),
               Divider(height: 1, color: AppTheme.border),
@@ -561,7 +482,6 @@ class _Submission extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    // "18" on its own is not a mark, it is a number.
                     '${_plain(item.score!)} / ${_plain(item.maxScore!)}',
                     style: TextStyle(
                       fontSize: 18,
@@ -601,6 +521,5 @@ class _Submission extends StatelessWidget {
   }
 }
 
-/// A mark without the decimal point the JSON put on it: 18, not 18.0.
 String _plain(num value) =>
     value % 1 == 0 ? value.toInt().toString() : value.toString();

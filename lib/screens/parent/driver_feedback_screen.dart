@@ -11,17 +11,6 @@ import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
 
-/// What a family says about the person driving their child.
-///
-/// This conversation happens today by telephone to the transport contractor,
-/// and the school hears about it late or never. Praise never gets recorded at
-/// all, which matters: a record that only ever fills with complaints is one no
-/// operator will trust and no driver will accept being judged by. So praise is
-/// the first of the two choices, not an afterthought.
-///
-/// The screen says plainly what this is not. Anything about a child being hurt
-/// or frightened needs the school on the telephone now, not a form that reaches
-/// an inbox somebody opens on Sunday.
 class DriverFeedbackScreen extends StatefulWidget {
   const DriverFeedbackScreen({super.key, required this.child});
 
@@ -57,8 +46,6 @@ class _DriverFeedbackScreenState extends State<DriverFeedbackScreen> {
                     _Intro(tint: tint, onTap: _compose),
                     const SizedBox(height: kCardGap),
 
-                    // The line that keeps this form out of the way of a real
-                    // safeguarding concern.
                     NoticeBanner(
                       icon: Icons.phone_in_talk_outlined,
                       title: t('crew.seriousTitle'),
@@ -227,7 +214,6 @@ class _FeedbackRow extends StatelessWidget {
   }
 }
 
-/// Where the office has got to, and nothing about what it decided.
 class _StatusChipFor extends StatelessWidget {
   const _StatusChipFor({required this.item});
 
@@ -244,10 +230,6 @@ class _StatusChipFor extends StatelessWidget {
     return StatusChip(t('crew.status.${item.status}'), color: colour);
   }
 }
-
-/* ---------------------------------------------------------------------------
- * Writing one
- * ------------------------------------------------------------------------- */
 
 const _topics = [
   'DRIVING',
@@ -285,8 +267,6 @@ class _ComposeSheetState extends State<_ComposeSheet> {
   @override
   void initState() {
     super.initState();
-    // Best effort. A parent must still be able to send this when the lookup
-    // fails — the server resolves the driver from the journey anyway.
     ParentApi.instance
         .recentCrew(widget.child.studentId)
         .then((c) => mounted ? setState(() => _crew = c) : null)
@@ -339,9 +319,6 @@ class _ComposeSheetState extends State<_ComposeSheet> {
               ),
               const SizedBox(height: 14),
 
-              // Praise first. A driver is far more likely to be doing the job
-              // well than badly, and a form that opens on "complaint" collects
-              // only complaints.
               Row(
                 children: [
                   Expanded(
@@ -498,8 +475,6 @@ class _ComposeSheetState extends State<_ComposeSheet> {
     );
   }
 
-  /// A concern with no detail cannot be looked into, so the button waits for
-  /// one rather than letting the server refuse after the fact.
   bool get _canSend =>
       !_busy && (_sentiment == 'PRAISE' || _comment.text.trim().length >= 2);
 
@@ -508,8 +483,6 @@ class _ComposeSheetState extends State<_ComposeSheet> {
     final picked = await showDatePicker(
       context: context,
       initialDate: _day,
-      // Sixty days, the window the server accepts — beyond it the telemetry and
-      // manifest the office would check against have aged out.
       firstDate: now.subtract(const Duration(days: 60)),
       lastDate: now,
     );

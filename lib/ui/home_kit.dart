@@ -6,29 +6,10 @@ import '../theme/app_theme.dart';
 import 'kit.dart';
 import 'motion.dart';
 
-/// The pieces the parent home screen is made of.
-///
-/// Every measurement here was taken off the design rather than chosen: the card
-/// gutter, the tile size, the rail offset, the ring weight. Where the two
-/// disagree it is because the mockup is a picture — its type is drawn far
-/// smaller relative to the screen than anything legible in the hand — so the
-/// LAYOUT is the design's and the type is scaled up to the smallest size that
-/// still reads at arm's length.
-
-/// The page gutter, and the gap between two cards. 14 and 8 in the design.
 const kGutter = 14.0;
 const kCardGap = 9.0;
 const kCardRadius = 18.0;
 
-/* ---------------------------------------------------------------------------
- * The header
- * ------------------------------------------------------------------------- */
-
-/// The name and class of whichever child the screen is about.
-///
-/// A tiny record rather than the full Child model so this widget can live in
-/// the kit without importing the API layer — the header should not know how a
-/// child is fetched.
 class ChildBrief {
   const ChildBrief({required this.name, required this.className});
 
@@ -36,13 +17,6 @@ class ChildBrief {
   final String className;
 }
 
-/// Menu, the child, the greeting, the bell.
-///
-/// The only header in the product that identifies TWO people at once: the
-/// parent it greets and the child everything below it is about. The child is
-/// the face; the parent is the name. Getting that the wrong way round — which
-/// is the obvious way to build it — leaves a guardian of three children with no
-/// way of telling which child's homework they are looking at.
 class ParentHeader extends StatelessWidget {
   const ParentHeader({
     super.key,
@@ -113,9 +87,6 @@ class ParentHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                // School, then class — an emoji rather than an icon because the
-                // design's glyph is a rendered building, and a flat Material
-                // outline beside it reads as a different app.
                 Row(
                   children: [
                     const Text('🏫', style: TextStyle(fontSize: 11.5)),
@@ -155,7 +126,6 @@ class ParentHeader extends StatelessWidget {
   }
 }
 
-/// The child's face, ringed, with the switcher on it.
 class _Face extends StatelessWidget {
   const _Face({required this.label, required this.tint, required this.canSwitch, this.onTap});
 
@@ -210,7 +180,6 @@ class _Face extends StatelessWidget {
   }
 }
 
-/// The rounded square either side of the header.
 class SquareButton extends StatelessWidget {
   const SquareButton({super.key, required this.icon, required this.onTap, this.badge = 0});
 
@@ -270,10 +239,6 @@ class SquareButton extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Today's schedule
- * ------------------------------------------------------------------------- */
-
 class ScheduleEntry {
   const ScheduleEntry({
     required this.time,
@@ -290,11 +255,6 @@ class ScheduleEntry {
   final Color color;
 }
 
-/// The day as a rail with the times down one side.
-///
-/// A timetable read as rows of "period 3, Maths, room 100" is a table nobody
-/// scans. The rail exists so the shape of the day is visible before a single
-/// word is read — which is the only reason to show a parent a timetable at all.
 class ScheduleTimeline extends StatelessWidget {
   const ScheduleTimeline({
     super.key,
@@ -306,9 +266,6 @@ class ScheduleTimeline extends StatelessWidget {
   final List<ScheduleEntry> entries;
   final void Function(int index)? onTap;
 
-  /// A chevron on the parent's screen — the row opens the timetable — and a
-  /// vertical ellipsis on the teacher's, where it opens what they can DO with
-  /// that lesson. Same row, two different promises.
   final IconData trailingIcon;
 
   @override
@@ -362,11 +319,6 @@ class ScheduleTimeline extends StatelessWidget {
   }
 }
 
-/// The vertical line with one dot on it.
-///
-/// Drawn as three pieces rather than one line behind the dots so the run above
-/// the first dot and below the last one can simply not exist — a rail that
-/// overshoots the day looks like the list has been cut off.
 class _Rail extends StatelessWidget {
   const _Rail({required this.colour, required this.first, required this.last});
 
@@ -461,12 +413,6 @@ class _Lesson extends StatelessWidget {
   }
 }
 
-/// A glyph for a subject, so the timetable is scannable by shape.
-///
-/// Matched against the Kurdish and Arabic names as well as the English, because
-/// the API returns whatever the school typed in whichever language the phone
-/// asked for — and a screen that only recognises "Mathematics" shows a book
-/// beside every lesson for most of its users.
 IconData subjectIcon(String subject) {
   final s = subject.toLowerCase();
   bool has(List<String> words) => words.any(s.contains);
@@ -487,21 +433,6 @@ IconData subjectIcon(String subject) {
   return Icons.menu_book_rounded;
 }
 
-/* ---------------------------------------------------------------------------
- * The ring
- * ------------------------------------------------------------------------- */
-
-/// A percentage as a ring rather than a number.
-///
-/// The number is in the middle regardless — the ring is there so a glance says
-/// "nearly full" without reading it, which is what a parent checking on the way
-/// out of the door actually needs.
-///
-/// The arc sweeps up to its figure over about 900ms, and the number in the
-/// middle is read off the SAME animated value rather than counted separately,
-/// so the two cannot disagree on any frame — a ring three-quarters drawn under
-/// the words "92%" is worse than no animation at all. When the figure changes
-/// it sweeps from the old one to the new one, not back down to zero first.
 class PercentRing extends StatelessWidget {
   const PercentRing({
     super.key,
@@ -590,7 +521,6 @@ class _RingPainter extends CustomPainter {
     );
 
     if (percent <= 0) return;
-    // From the top, clockwise — the direction a dial is read.
     canvas.drawArc(
       rect,
       -math.pi / 2,
@@ -609,10 +539,6 @@ class _RingPainter extends CustomPainter {
       old.percent != percent || old.color != color || old.track != track;
 }
 
-/* ---------------------------------------------------------------------------
- * A figure in a strip, with an icon
- * ------------------------------------------------------------------------- */
-
 class IconFigure {
   const IconFigure({
     required this.icon,
@@ -629,16 +555,6 @@ class IconFigure {
   final Color color;
 }
 
-/// Four figures across the bottom of the child card.
-///
-/// Every line is scaled down to fit rather than wrapped or clipped: "Average
-/// Marks" is a third longer than "Attitude" and in four columns on a narrow
-/// phone something has to give. A shrunk label still answers the question; a
-/// label reading "Average Mar…" does not.
-///
-/// They arrive left to right a twentieth of a second apart, hairlines included,
-/// so the strip reads as four figures rather than as one block that appeared.
-/// The last of the four is settled inside 600ms.
 class IconFigureStrip extends StatelessWidget {
   const IconFigureStrip({super.key, required this.figures});
 
@@ -679,14 +595,10 @@ class _Figure extends StatelessWidget {
   final IconFigure figure;
   final bool first;
 
-  /// Position in the strip, so the glyph lands just after its own column.
   final int index;
 
   @override
   Widget build(BuildContext context) {
-    // Fixed sizes, not scale-to-fit. Sizing each line to its own text made
-    // "Assignments" visibly smaller than "Attendance" in the column beside it,
-    // which reads as a rendering fault rather than as a strip of four figures.
     Widget line(String text, TextStyle style) => Text(
           text,
           maxLines: 1,
@@ -758,10 +670,6 @@ class _Figure extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The updates feed
- * ------------------------------------------------------------------------- */
-
 class UpdateEntry {
   const UpdateEntry({
     required this.icon,
@@ -783,8 +691,6 @@ class UpdateEntry {
 class UpdatesFeed extends StatelessWidget {
   const UpdatesFeed({super.key, required this.entries, this.dense = false});
 
-  /// Half-width, beside the attendance card. Drops the chevron and tightens the
-  /// type — the same row at full width would wrap every title to three lines.
   final bool dense;
 
   final List<UpdateEntry> entries;
@@ -870,10 +776,6 @@ class UpdatesFeed extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * A section heading with an action on the right
- * ------------------------------------------------------------------------- */
-
 class SectionRow extends StatelessWidget {
   const SectionRow({
     super.key,
@@ -889,9 +791,6 @@ class SectionRow extends StatelessWidget {
   final VoidCallback? onAction;
   final bool dense;
 
-  /// What follows the action word. A chevron for "go there"; a caret for
-  /// "change this" — the attendance card's period is a choice, not a link, and
-  /// pointing it sideways would promise a screen that does not exist.
   final IconData? actionIcon;
 
   @override
@@ -914,9 +813,6 @@ class SectionRow extends StatelessWidget {
             ),
           ),
           if (actionLabel != null)
-            // The role's colour, not a fixed violet. This heading is on the
-            // teacher's screens too, where every other accent is green and a
-            // violet "View all" was the only violet on the page.
             GestureDetector(
               onTap: onAction,
               behavior: HitTestBehavior.opaque,

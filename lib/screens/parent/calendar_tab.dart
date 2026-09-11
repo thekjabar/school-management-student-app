@@ -12,11 +12,6 @@ import 'assignments_screen.dart';
 import 'homework_detail.dart';
 import 'timetable_screen.dart';
 
-/// The child's month, and one day of it in full.
-///
-/// Every dot is something the school actually put in the diary — a lesson, a
-/// piece of work due, an exam, a notice. The grid answers "is there anything
-/// this week"; the list under it answers "what, and when".
 class CalendarTab extends StatefulWidget {
   const CalendarTab({super.key, required this.child});
 
@@ -127,17 +122,6 @@ class _CalendarTabState extends State<CalendarTab> {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * What is in the diary
- * ------------------------------------------------------------------------- */
-
-/// What a dot on the grid can stand for.
-///
-/// [exam] is a date the school has SET and a family has to plan around;
-/// [result] is a mark published for an exam already sat. They shared a bucket
-/// until exams could be fetched at all, which meant a dot on the 14th could
-/// equally be "she sits maths" or "her maths mark is out", with nothing on the
-/// screen to tell a parent which.
 enum EventKind { lesson, assignment, exam, result, notice }
 
 class DiaryEvent {
@@ -168,8 +152,6 @@ class DiaryEvent {
       switch (kind) {
         EventKind.lesson => AppTheme.violet,
         EventKind.assignment => AppTheme.blue,
-        // The one colour left over goes to the one entry a family has to act
-        // on. The marks keep the amber they have always had.
         EventKind.exam => AppTheme.rose,
         EventKind.result => AppTheme.amber,
         EventKind.notice => AppTheme.green,
@@ -204,12 +186,9 @@ class _Diary {
   final List<DayOfLessons> week;
   final List<HomeworkItem> homework;
 
-  /// Marks the school has published — behind us.
   final List<ExamResultItem> results;
   final List<Announcement> notices;
 
-  /// Exams the school has scheduled — ahead of us. A separate route, a separate
-  /// shape, and deliberately a separate list: see [EventKind].
   final List<UpcomingExam> exams;
 
   static const _weekdays = {
@@ -225,7 +204,6 @@ class _Diary {
   static bool _same(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
-  /// Everything happening on one day, in the order it happens.
   List<DiaryEvent> on(DateTime day) {
     final events = <DiaryEvent>[];
 
@@ -238,9 +216,6 @@ class _Diary {
           subtitle: [l.teacher, l.room].whereType<String>().join('  •  '),
           at: day,
           startMinute: l.startMinute,
-          // The end the school set. start+45 invented a length no timetable
-          // agreed to, and on an ordinary slot - where both are null because
-          // the times come from the bell schedule - it printed 00:45.
           endMinute: l.endMinute,
           where: l.room,
           colour: parseHex(l.colorHex, AppTheme.violet),
@@ -258,16 +233,9 @@ class _Diary {
       ));
     }
 
-    // The server's "still to come" cut is UTC midnight and Erbil is three
-    // hours ahead of it, so for the first three hours of the day yesterday's
-    // exam is still in the answer. Nothing is filtered out here: an exam is
-    // drawn on its own date, which is where a reader goes looking for it, and
-    // yesterday's belongs on yesterday.
     for (final e in exams.where((e) => _same(e.date, day))) {
       events.add(DiaryEvent(
         kind: EventKind.exam,
-        // Nullable on the server, and the translation overlay can only replace
-        // a title, never invent one. The subject is the truthful fallback.
         title: e.title ?? e.subject,
         subtitle: [
           if (e.title != null) e.subject,
@@ -276,8 +244,6 @@ class _Diary {
         ].join('  •  '),
         at: e.date,
         startMinute: e.startMinute,
-        // Only when the school said both. start + a guess is a length no
-        // timetable agreed to.
         endMinute: e.startMinute == null || e.durationMin == null
             ? null
             : e.startMinute! + e.durationMin!,
@@ -307,8 +273,6 @@ class _Diary {
     return events;
   }
 
-  /// The dots under a date: one per KIND, not one per event, or a busy
-  /// Wednesday becomes an unreadable smear.
   List<Color> dots(DateTime day) {
     final kinds = <EventKind>{for (final e in on(day)) e.kind};
     return [
@@ -324,7 +288,6 @@ class _Diary {
     ];
   }
 
-  /// The next notice the school marked as a closure or a holiday.
   Announcement? get nextHoliday {
     final now = DateTime.now();
     final rows = notices
@@ -337,10 +300,6 @@ class _Diary {
     return rows.isEmpty ? null : rows.first;
   }
 }
-
-/* ---------------------------------------------------------------------------
- * The month
- * ------------------------------------------------------------------------- */
 
 class _TodayButton extends StatelessWidget {
   const _TodayButton({required this.onTap});
@@ -403,7 +362,6 @@ class _MonthCard extends StatelessWidget {
     final now = DateTime.now();
     final first = DateTime(month.year, month.month);
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-    // Sunday first: the school week starts on Sunday here.
     final lead = (first.weekday - DateTime.sunday + 7) % 7;
 
     return Card16(
@@ -482,9 +440,6 @@ class _MonthCard extends StatelessWidget {
               color: AppTheme.canvas,
               borderRadius: BorderRadius.circular(11),
             ),
-            // A Wrap, not a Row: five keys where there were four, and the
-            // longest word in the set is a different word in each language.
-            // A legend that overflows is worse than one on two lines.
             child: Wrap(
               alignment: WrapAlignment.spaceEvenly,
               spacing: 10,
@@ -569,7 +524,6 @@ class _Cell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Friday and Saturday are the weekend here, and the design marks them red.
     final weekend = date.weekday == DateTime.friday || date.weekday == DateTime.saturday;
 
     return GestureDetector(
@@ -631,10 +585,6 @@ class _Cell extends StatelessWidget {
     );
   }
 }
-
-/* ---------------------------------------------------------------------------
- * The day
- * ------------------------------------------------------------------------- */
 
 class _DayCard extends StatelessWidget {
   const _DayCard({required this.day, required this.events, required this.child});
@@ -721,10 +671,6 @@ class _EventRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colour = event.tint;
 
-    // An exam, a mark and a notice lead nowhere. There is no exam a guardian
-    // may open — the only detail route is permission-guarded and the guardian
-    // role holds no permissions — so the row carries everything the school
-    // said, and does not offer a chevron it cannot honour.
     final opens = event.kind == EventKind.lesson || event.kind == EventKind.assignment;
 
     return GestureDetector(
@@ -736,8 +682,6 @@ class _EventRow extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // The coloured spine, which is what makes a day of six things
-              // read as five kinds at a glance.
               Container(
                 width: 3.5,
                 decoration: BoxDecoration(
@@ -821,10 +765,6 @@ class _EventRow extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The other two views
- * ------------------------------------------------------------------------- */
-
 class _WeekCard extends StatelessWidget {
   const _WeekCard({
     required this.day,
@@ -840,7 +780,6 @@ class _WeekCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The seven days around the chosen one, Sunday first.
     final start = day.subtract(Duration(days: (day.weekday - DateTime.sunday + 7) % 7));
 
     return Column(
@@ -867,8 +806,6 @@ class _AgendaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The next fortnight, skipping the days with nothing in them — which is
-    // what an agenda is FOR.
     final now = DateTime.now();
     final days = <DateTime>[];
     for (var i = 0; i < 14; i++) {

@@ -15,13 +15,6 @@ import 'leave_screen.dart';
 import 'messages_tab.dart';
 import 'parent_profile_tab.dart';
 
-/// The parent app.
-///
-/// Four tabs, and a child picker that sits inside the header above all of them.
-/// Almost every question a guardian has is about ONE child — where is she, what
-/// is her homework, has she been marked absent — and a family with three at the
-/// school should answer it by tapping a name once rather than by finding the
-/// right list on every screen.
 class ParentApp extends StatefulWidget {
   const ParentApp({super.key});
 
@@ -30,21 +23,6 @@ class ParentApp extends StatefulWidget {
 }
 
 class _ParentAppState extends State<ParentApp> {
-  /// One per destination, so each tab remembers where it was and the back
-  /// gesture unwinds the tab rather than the app.
-  /// One navigator per tab, replaced wholesale when the child changes.
-  ///
-  /// A tab's content lives inside a Navigator, and Navigator generates its
-  /// FIRST route once — closing over the HomeTab widget alive at that moment.
-  /// Rebuilding the shell therefore repainted the header and nothing else: the
-  /// parent picked the other sibling, the name at the top changed, and Home and
-  /// Calendar went on showing the first child's bus, timetable, attendance and
-  /// marks underneath it. Meanwhile the centre button DID use the new child, so
-  /// a parent could file leave for the child whose data was not on the screen.
-  ///
-  /// Fresh keys force fresh navigators, which is also the right behaviour on
-  /// its own account: a homework detail pushed for one sibling should not stay
-  /// on screen after switching to the other.
   List<GlobalKey<NavigatorState>> _navKeys = List.generate(4, (_) => GlobalKey<NavigatorState>());
 
   int _tab = 0;
@@ -82,14 +60,11 @@ class _ParentAppState extends State<ParentApp> {
       setState(() => _error = errorText(e));
     }
 
-    // The bell's count. Loaded after the children because it is the least
-    // important thing on the screen and must not hold the rest up.
     try {
       final notices = await ParentApi.instance.announcements();
       if (!mounted) return;
       setState(() => _unread = notices.where((n) => n.readAt == null).length);
     } catch (_) {
-      // A number on a bell is not worth an error state.
     }
   }
 
@@ -99,12 +74,6 @@ class _ParentAppState extends State<ParentApp> {
     return children.firstWhere((c) => c.studentId == _selectedId, orElse: () => children.first);
   }
 
-
-  /// Which child this screen is about.
-  ///
-  /// A sheet rather than a row of chips under the header: a family with four
-  /// children had four chips competing with the greeting for the top of the
-  /// screen, and the switch is something they do rarely and deliberately.
   Future<void> _pickChild(List<Child> children) async {
     final picked = await pickOne<String>(
       context,
@@ -123,18 +92,11 @@ class _ParentAppState extends State<ParentApp> {
     if (picked != null && mounted) _switchTo(picked);
   }
 
-  /// Change which child every tab is about.
-  ///
-  /// Both ways in go through here - the header picker and the child rows on
-  /// the Profile tab - because the second one used to set the id alone and
-  /// leave the tabs showing the other sibling.
   void _switchTo(String id) {
     if (id == _selectedId) return;
     setState(() {
       _selectedId = id;
       _navKeys = List.generate(4, (_) => GlobalKey<NavigatorState>());
-      // Back to the root of each tab. The pages pushed inside them belong to
-      // the child who was open a moment ago.
       _tab = 0;
     });
   }
@@ -168,11 +130,6 @@ class _ParentAppState extends State<ParentApp> {
       },
       child: Scaffold(
       backgroundColor: AppTheme.canvas,
-      // No drawer. Everything the old one listed is reachable without it — the
-      // account rows from the Profile tab, the child's screens from the Home
-      // tab's quick actions, Home and Messages from the bottom bar — so the
-      // menu button it hung from was spending the best 52pt in the header on a
-      // second copy of the app's navigation.
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -186,27 +143,13 @@ class _ParentAppState extends State<ParentApp> {
               tint: role.tint,
               onBell: () => setState(() => _tab = 1),
               notificationCount: _unread,
-              // Only a family with more than one child gets the switcher.
               canSwitchChild: children != null && children.length > 1,
               onSwitchChild: () => _pickChild(children ?? const []),
             ),
             Expanded(
               child: children == null
-                  // Nothing yet — either still coming, or it failed and we know
-                  // why. Both belong HERE, in the space the content would have
-                  // filled, with the header and the bottom bar still above and
-                  // below them.
-                  //
-                  // The failure used to replace the whole app with a centred
-                  // error page. A parent who could not reach the school lost
-                  // the entire interface, which reads as "the app is broken"
-                  // rather than "this list did not arrive".
                   ? (_error != null
                       ? _CannotReach(message: _error!, tint: role.tint, onRetry: _load)
-                      // Not a spinner. The header and the bottom bar are
-                      // already drawn by this point, so a spinner in the middle
-                      // of them reads as one broken panel; blocks in the shape
-                      // of the content read as the rest of it arriving.
                       : const _HomeSkeleton())
                   : child == null
                       ? const _NoChildren()
@@ -252,21 +195,10 @@ class _ParentAppState extends State<ParentApp> {
             setState(() => _tab = i);
           }
         },
-        // The one thing a parent DOES on this app rather than reads. Asking for
-        // leave is the only action they initiate, so it is the only thing that
-        // earns the raised button.
         centerIcon: Icons.add_rounded,
-        // Labelled, like the driver's. A bare plus in the middle of a bar of
-        // named tabs reads as decoration, and a parent who cannot guess what it
-        // does never finds the one thing this app lets them actually DO. The
-        // word is what makes it a button rather than an ornament.
         centerLabel: t('nav.askLeave'),
         onCenter: () {
           if (child == null) {
-            // Was a silent return. A button that does nothing, says nothing and
-            // looks enabled is indistinguishable from a broken one — and this
-            // is the state on a cold start, before the children have loaded,
-            // which is exactly when somebody presses it.
             showNote(
               context,
               _error ?? t('common.noChildren'),
@@ -285,18 +217,6 @@ class _ParentAppState extends State<ParentApp> {
   }
 }
 
-
-/* ---------------------------------------------------------------------------
- * The header
- * ------------------------------------------------------------------------- */
-
-/// Who this screen is about, and the bell.
-///
-/// The leading menu button is gone with the drawer it opened, and the 52pt it
-/// held has gone to the child: a bigger ring on the face, and a text column
-/// wide enough that a real school name and a real class stop ellipsing on a
-/// small handset. The face is the child switcher — the chevron on it is the
-/// only affordance in the header now, so it is the only one that has to read.
 class _Header extends StatelessWidget {
   const _Header({
     required this.greeting,
@@ -364,19 +284,6 @@ class _Header extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                // School, then the child's name and class — an emoji rather
-                // than an icon because the design's glyph is a rendered
-                // building, and a flat Material outline beside it reads as a
-                // different app.
-                // One paragraph rather than a row of competing boxes.
-                //
-                // As a Row the school and the class each took half the width
-                // and both were cut, so "Rebaz Basic School — Erbil" showed as
-                // "Rebaz Basic Sch…". A school's name is not decoration: it is
-                // the one line that says which school this account belongs to,
-                // and a parent with children at two of them reads it. Wrapping
-                // to a second line costs nothing here and abbreviating it
-                // costs the only thing the line is for.
                 Text.rich(
                   TextSpan(
                     children: [
@@ -417,7 +324,6 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// The child's face, ringed, with the switcher on it.
 class _Face extends StatelessWidget {
   const _Face({required this.label, required this.tint, required this.canSwitch, this.onTap});
 
@@ -501,17 +407,6 @@ class _NoChildren extends StatelessWidget {
   }
 }
 
-
-/// The home screen's shape, before it has anything to put in it.
-///
-/// Deliberately the same geometry as the real thing — a wide bus card, a row of
-/// tiles, two columns — so nothing moves sideways when the data lands. A
-/// skeleton whose blocks are in different places from the content it becomes is
-/// worse than a spinner, because the screen jumps at the exact moment somebody
-/// starts reading it.
-/// Shown in the content area when the first load failed and there is still
-/// nothing to show. Sits inside the shell, so the header and the bottom bar
-/// stay where they are.
 class _CannotReach extends StatelessWidget {
   const _CannotReach({required this.message, required this.tint, required this.onRetry});
 
@@ -578,9 +473,6 @@ class _HomeSkeleton extends StatelessWidget {
   }
 }
 
-/// One grey block. No shimmer: a sweep across five blocks on a cheap handset
-/// costs a repaint of the whole column every frame, for a screen that is on
-/// its way out.
 class _Block extends StatelessWidget {
   const _Block({this.width, required this.height});
 

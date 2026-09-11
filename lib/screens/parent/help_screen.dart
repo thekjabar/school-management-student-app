@@ -11,24 +11,9 @@ import '../../ui/screen_kit.dart';
 import 'driver_feedback_screen.dart';
 import 'leave_screen.dart';
 
-/// What a guardian can find out on their own, and what they cannot.
-///
-/// There is no support desk behind this app and no telephone number in anything
-/// the handset holds — a membership carries a school's name and nothing else to
-/// reach it by — so this screen does not pretend to put anybody through to
-/// anyone. What it can honestly do is two things: say plainly that the office
-/// owns every record shown here and is the only place a wrong one gets fixed,
-/// and answer the five questions that otherwise become five telephone calls to
-/// that office. The bus dot and the empty register account for most of them.
-///
-/// The two rows at the foot are the only things a parent can actually SEND from
-/// this app, so they are the only actions offered. Both need a child to be
-/// about; with none on the account the card is left out rather than shown dead.
 class HelpScreen extends StatelessWidget {
   const HelpScreen({super.key, this.child});
 
-  /// Which child the two send-something actions would be about. Null is a real
-  /// case — an account whose children have not loaded — and drops the actions.
   final Child? child;
 
   @override
@@ -124,8 +109,6 @@ class HelpScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // The two things this app can actually send. Nothing else on
-                  // the parent side travels back to the school.
                   if (kid != null) ...[
                     Heading(t('help.doTitle')),
                     Card16(
@@ -160,11 +143,6 @@ class HelpScreen extends StatelessWidget {
                     ),
                   ],
 
-                  // The school's name, and nothing beside it. A version number
-                  // belongs here too, but the only honest source of one is the
-                  // installed package and this app does not read it — a number
-                  // typed in by hand goes stale on the first release nobody
-                  // remembers to edit, which is worse than no number at all.
                   if (school.isNotEmpty) ...[
                     const SizedBox(height: 26),
                     Text(
@@ -187,11 +165,6 @@ class HelpScreen extends StatelessWidget {
   }
 }
 
-/// One question, and the answer folded under it.
-///
-/// Closed by default and independent of its neighbours: a parent arrives here
-/// with one question, and an accordion that shuts the answer they are reading
-/// because they tapped the next heading is a puzzle rather than a page.
 class _Question extends StatefulWidget {
   const _Question({
     required this.icon,
@@ -265,9 +238,6 @@ class _QuestionState extends State<_Question> {
           crossFadeState: _open ? CrossFadeState.showSecond : CrossFadeState.showFirst,
           firstChild: const SizedBox(width: double.infinity),
           secondChild: Padding(
-            // Indented past the chip so the answer hangs under the words of
-            // the question rather than under its icon. Directional, so it
-            // indents from the right in Kurdish and Arabic.
             padding: const EdgeInsetsDirectional.fromSTEB(47, 0, 0, 13),
             child: SizedBox(
               width: double.infinity,

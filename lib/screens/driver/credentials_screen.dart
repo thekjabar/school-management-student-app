@@ -12,27 +12,6 @@ import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
 import 'crew_account.dart';
 
-/// A driver's own paperwork, and the date it stops him driving.
-///
-/// fleet-service has served this since credentials were built, and its own
-/// docstring says exactly why: "knowing that his licence stops counting on the
-/// 16th rather than the 30th is the entire reason the lead time exists". The
-/// app never asked for it.
-///
-/// So the sequence was this. A licence passes its block date. The roster
-/// controller sets the trip to BLOCKED. At twenty to seven the driver taps
-/// "start the run" and gets "This bus is blocked: crew credential expired",
-/// with forty children arriving at a stop nobody is driving to — about a date
-/// the server had known for weeks and had a warning window built to announce.
-///
-/// He also could not do anything about it from here. `POST /crew/me/credentials`
-/// has always accepted a photograph of the renewed document; there was no kind
-/// of file a crew handset was allowed to produce that could BE that photograph,
-/// so the renewal meant a trip to the depot with a piece of paper.
-///
-/// Lives inside the papers screen rather than as a screen of its own: a driver
-/// looking for his licence expiry looks under "my papers", and two places
-/// showing the same documents is how they come to disagree.
 class CredentialsPanel extends StatefulWidget {
   const CredentialsPanel({super.key});
 
@@ -41,10 +20,6 @@ class CredentialsPanel extends StatefulWidget {
 }
 
 class _CredentialsPanelState extends State<CredentialsPanel> {
-  // Loaded into state rather than through a Loader, because this sits inside
-  // the papers screen's own Loader — and Loader renders an unbounded ListView,
-  // so nesting one inside a Column would throw on layout rather than merely
-  // look wrong.
   List<Credential>? _rows;
   bool _failed = false;
   bool _busy = false;
@@ -95,9 +70,6 @@ class _CredentialsPanelState extends State<CredentialsPanel> {
       final bytes = await shot.readAsBytes();
       final assetId = await CrewApi.instance.uploadCredentialPhoto(
         bytes: bytes,
-        // image_picker re-encodes to JPEG whenever imageQuality is set, so the
-        // name and the type must say JPEG whatever the original was — the
-        // upload route checks the part's content type against the kind.
         filename: 'document.jpg',
         mime: 'image/jpeg',
       );
@@ -159,9 +131,6 @@ class _CredentialsPanelState extends State<CredentialsPanel> {
       );
     }
 
-    // Whatever is stopping him driving goes first, then whatever is about to.
-    // A list in filing order is one where the row that matters is third, under
-    // two that do not.
     final sorted = [...rows]..sort((a, b) {
         int rank(Credential c) => c.blocking ? 0 : (c.expiringSoon ? 1 : 2);
         final r = rank(a).compareTo(rank(b));
@@ -255,9 +224,6 @@ class _CredentialCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          // The date that actually matters, said as a countdown rather than as
-          // a date. "Stops counting in 9 days" is something a person acts on;
-          // "rosterBlockFrom: 16 March" is something they file away.
           if (days != null)
             Text(
               days <= 0
@@ -318,12 +284,6 @@ class _CredentialCard extends StatelessWidget {
       };
 }
 
-/// The line on the home screen that stops a driver finding out at the depot.
-///
-/// Deliberately on the FIRST screen of the app rather than behind the profile
-/// tab: the whole point is that he sees it on an ordinary morning, days before
-/// it bites, without having gone looking for it. Renders nothing at all when
-/// there is nothing to say, so it costs a compliant driver no space.
 class CredentialWarning extends StatefulWidget {
   const CredentialWarning({super.key});
 
@@ -345,9 +305,6 @@ class _CredentialWarningState extends State<CredentialWarning> {
       final rows = await CrewApi.instance.myCredentials();
       if (mounted) setState(() => _rows = rows);
     } catch (_) {
-      // Silent. This is a warning that sits above the run, and a driver whose
-      // paperwork is in order must never be shown an error about it — the run
-      // itself is what this screen is for.
     }
   }
 

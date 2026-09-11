@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-// latlong2 exports a generic Path<T>, which shadows dart:ui's Path.
 import 'package:latlong2/latlong.dart' hide Path;
 
 import '../../api/client.dart';
@@ -16,26 +15,6 @@ import '../../ui/kit.dart';
 import '../../ui/map_tiles.dart';
 import '../../ui/screen_kit.dart';
 
-/// Where the family lives, told to the school by the family.
-///
-/// Until now nobody could say. The address on file was whatever somebody typed
-/// at enrolment, and when a family moved house the school found out because a
-/// child was standing at the wrong corner.
-///
-/// TWO THINGS THIS SCREEN IS CAREFUL ABOUT, and both are about not promising
-/// more than the platform does.
-///
-/// Dropping a pin does NOT move a bus stop. A route is planned, sequenced and
-/// timed; a family that could move a stop by dragging would break the run for
-/// every other child on it. The office reads this and decides which stop each
-/// child uses — so the screen says that plainly, and shows the stops currently
-/// assigned underneath, which is the honest answer to "did that do anything".
-///
-/// The WRITTEN NOTE outranks the pin. Addressing here is landmark-based rather
-/// than street-based: "the blue gate opposite the bakery, second turning after
-/// the mosque" is how a driver actually finds somebody, and coordinates are for
-/// the planner. So the note is a full-width field with a real example in it,
-/// not an afterthought under the map.
 class HomeAddressScreen extends StatefulWidget {
   const HomeAddressScreen({super.key});
 
@@ -49,35 +28,15 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
   final _address = TextEditingController();
   final _note = TextEditingController();
 
-  /// Where the pin is now. The map moves under a fixed centre marker rather
-  /// than the marker being dragged: on a phone a dragged pin spends most of
-  /// its time under the thumb that is dragging it.
   LatLng? _pin;
 
-  /// Reverse geocoding, held back until the map stops moving.
-  ///
-  /// Dragging a map produces a position on every frame. Asking for an address
-  /// on each of those would be both useless and, on a shared public geocoder,
-  /// rude enough to get the app blocked.
   Timer? _finding;
   bool _looking = false;
 
-  /// The last address this screen wrote into the box by itself.
-  ///
-  /// Kept so a parent's own words are never overwritten. Once they have typed
-  /// something, the pin stops filling the field and only their edit stands —
-  /// the point of the box is the part a map cannot know, like which door.
   String? _autoFilled;
 
-  /// Nothing on this screen moves until Edit is pressed.
-  ///
-  /// The map is full-bleed in the middle of a scrolling form, so trying to
-  /// scroll past it dragged the pin instead — and the pin is what the office
-  /// reads to decide which stop a child rides from. It moved silently, and Save
-  /// could not tell an accident from an intention.
   bool _editing = false;
 
-  /// What was on screen when editing started, to put back on Cancel.
   String _wasAddress = '';
   String _wasNote = '';
   LatLng? _wasPin;
@@ -86,8 +45,6 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
   bool _dirty = false;
   String? _error;
 
-  /// Erbil, so a family with nothing on file starts somewhere they recognise
-  /// rather than in the Atlantic.
   static const _fallback = LatLng(36.1901, 44.0091);
 
   @override
@@ -107,7 +64,6 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
     });
   }
 
-  /// Put everything back the way it was found.
   void _cancelEditing() {
     _finding?.cancel();
     setState(() {
@@ -122,12 +78,6 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
     if (_wasPin != null) _map.move(_wasPin!, _map.camera.zoom);
   }
 
-  /// Move to a place the search offered, and take the pin with you.
-  ///
-  /// Zoom 17 rather than the map's current level: somebody who searched for a
-  /// quarter wants to see the streets in it to place the pin on their own
-  /// house, and arriving zoomed out to the whole city means dragging anyway,
-  /// which is what the search was meant to save.
   void _goTo(Place p) {
     final at = LatLng(p.lat, p.lon);
     setState(() {
@@ -135,35 +85,15 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
       _dirty = true;
     });
     _map.move(at, 17);
-    // The address box follows the pin, exactly as it does after a drag. The
-    // place name from the search is where the family is looking, not
-    // necessarily what the office should read as the address.
     _lookUp(at, force: true);
   }
 
-  /// Ask for the address once the map has been still for a moment.
   void _scheduleLookUp(LatLng at) {
     _finding?.cancel();
-    // force: the parent moved the pin. That is an instruction to re-read the
-    // address, not a suggestion to fill it in if it happens to be empty.
     _finding = Timer(const Duration(milliseconds: 900), () => _lookUp(at, force: true));
   }
 
-  /// Fill the box in from the pin, without ever taking words off a parent.
-  ///
-  /// The box is only written to while it is empty or still holds exactly what
-  /// this screen last put there. The moment somebody types their own — which is
-  /// the whole point of the field, since a map does not know which door or
-  /// which floor — the pin stops touching it.
   Future<void> _lookUp(LatLng at, {bool force = false}) async {
-    // Without force, only an empty box — or one still holding exactly what this
-    // screen last wrote — is touched. That is the quiet fill on open, and it
-    // must never talk over words somebody typed.
-    //
-    // With force, the pin has just been dragged, in edit mode, on purpose. The
-    // address that belongs to the old position is no longer the answer to
-    // anything, so it is replaced. This is the whole reason the box and the map
-    // are on the same screen.
     if (!force) {
       final typed = _address.text.trim();
       if (typed.isNotEmpty && typed != _autoFilled) return;
@@ -177,7 +107,6 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
       _looking = false;
       if (found == null) return;
       if (!force) {
-        // The parent may have started typing while we were asking.
         final now = _address.text.trim();
         if (now.isNotEmpty && now != _autoFilled) return;
       }
@@ -205,15 +134,11 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
                 padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 28),
                 load: () async {
                   final h = await ParentApi.instance.homeLocation();
-                  // Only on the FIRST load. Refilling these after a save would
-                  // wipe an edit somebody is halfway through typing.
                   if (!_dirty) {
                     _address.text = h.address ?? '';
                     _note.text = h.note ?? '';
                     _pin = h.hasPin ? LatLng(h.lat!, h.lon!) : null;
 
-                    // A pin already saved, but no words against it — which is
-                    // every family who dropped the pin before this existed.
                     if (_pin != null && _address.text.trim().isEmpty) {
                       _lookUp(_pin!);
                     }
@@ -248,10 +173,6 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
                     ),
                     const SizedBox(height: 10),
 
-                    // Only while editing. A search box on a screen that is
-                    // showing a settled address is a control that cannot do
-                    // anything, and it would sit above the map competing with
-                    // the one line that matters.
                     if (_editing) ...[
                       _PlaceSearch(
                         tint: tint,
@@ -395,16 +316,6 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
         note: _note.text,
       );
       if (!mounted) return;
-      // Editing is over, and what is on screen IS what was saved.
-      //
-      // Leaving _editing true left the toggle reading "Cancel" over a snapshot
-      // taken BEFORE the edit — and that toggle is the only control on the
-      // screen that leaves edit mode, so a parent who saved and then wanted to
-      // stop editing had nothing else to press. Pressing it restored the old
-      // address and jumped the map back to the old house, while the office held
-      // the new one. A parent would reasonably conclude the save had been
-      // undone. For a family with no previous pin it was worse: _wasPin is null
-      // there, so Cancel unplaced the pin they had just set.
       setState(() {
         _editing = false;
         _dirty = false;
@@ -422,7 +333,6 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
   }
 }
 
-/// What this does, and what it does not.
 class _Explainer extends StatelessWidget {
   const _Explainer({required this.tint});
 
@@ -472,19 +382,6 @@ class _Explainer extends StatelessWidget {
   }
 }
 
-/// The map, with a pin fixed at the centre and the map moving under it.
-/// Edit, and then Cancel. Small, because it sits beside a line of guidance
-/// rather than under it.
-/// Find a place by name instead of dragging the map to it.
-///
-/// Shown only while editing. Dragging is fine once you can see roughly where
-/// you are; it is a poor way to reach Bakhtiyari from a map of the whole city,
-/// and worse one-handed, which is how this screen is usually filled in.
-///
-/// It does not touch the pin by itself. Choosing a result moves the map and the
-/// pin together, and the address box is then filled the same way a drag fills
-/// it — so what the office reads is always the address under the pin, never a
-/// search term somebody typed.
 class _PlaceSearch extends StatefulWidget {
   const _PlaceSearch({
     required this.tint,
@@ -518,8 +415,6 @@ class _PlaceSearchState extends State<_PlaceSearch> {
     super.dispose();
   }
 
-  /// One request per pause in typing, not one per letter. A geocoder is charged
-  /// per call and "Bakhtiyari" is eleven of them.
   void _typed(String q) {
     _debounce?.cancel();
     if (q.trim().length < 2) {
@@ -537,7 +432,6 @@ class _PlaceSearchState extends State<_PlaceSearch> {
   Future<void> _run(String q) async {
     final found = await PlaceSearch.suggest(q, nearLat: widget.nearLat, nearLon: widget.nearLon);
     if (!mounted) return;
-    // A slower answer to an older query must not overwrite a newer one.
     if (_field.text.trim() != q.trim()) return;
     setState(() {
       _results = found;
@@ -558,8 +452,6 @@ class _PlaceSearchState extends State<_PlaceSearch> {
 
   @override
   Widget build(BuildContext context) {
-    // No token, no search. The map already says it is not set up; a box that
-    // answers nothing would be a second, quieter way of saying the same thing.
     if (!PlaceSearch.available) return const SizedBox.shrink();
 
     return Column(
@@ -631,8 +523,6 @@ class _PlaceSearchState extends State<_PlaceSearch> {
                     onTap: () {
                       _focus.unfocus();
                       widget.onPicked(_results[i]);
-                      // The list goes as soon as it has been used. Leaving it up
-                      // would hide the map the choice just moved.
                       _clear();
                     },
                     child: Padding(
@@ -720,13 +610,6 @@ class _EditToggle extends StatelessWidget {
   }
 }
 
-/// Shown in place of a map when the build carries no Mapbox token.
-///
-/// Without one the tile URL ends "?access_token=", Mapbox answers 401, and
-/// flutter_map leaves the background showing with the pin and the credit drawn
-/// neatly on top — indistinguishable from a map that is still loading. Every
-/// build made outside tool/build_apks.sh has no token, and tool/mapbox.token is
-/// gitignored, so a fresh clone builds exactly that.
 class _NoMap extends StatelessWidget {
   const _NoMap({required this.height});
 
@@ -758,7 +641,6 @@ class _MapCard extends StatelessWidget {
   final LatLng pin;
   final bool placed;
 
-  /// Whether a finger on this map moves the pin or scrolls the page past it.
   final bool enabled;
   final MapController controller;
   final Color tint;
@@ -782,10 +664,6 @@ class _MapCard extends StatelessWidget {
                   initialZoom: placed ? 17 : 13,
                   minZoom: 4,
                   maxZoom: 19,
-                  // No rotation. North stays up so the streets match the ones
-                  // in somebody's head.
-                  // Nothing until Edit. Otherwise a finger meant for the page
-                  // drags the pin, silently, and the page does not scroll.
                   interactionOptions: InteractionOptions(
                     flags: enabled
                         ? InteractiveFlag.pinchZoom |
@@ -793,8 +671,6 @@ class _MapCard extends StatelessWidget {
                             InteractiveFlag.doubleTapZoom
                         : InteractiveFlag.none,
                   ),
-                  // The pin IS the centre. Reported as the map settles rather
-                  // than on every frame of a drag.
                   onPositionChanged: (camera, hasGesture) {
                     if (hasGesture) onMoved(camera.center);
                   },
@@ -804,14 +680,9 @@ class _MapCard extends StatelessWidget {
                 ],
               ),
 
-              // Drawn OVER the map at dead centre, not as a marker on it: a pin
-              // you drag with a finger spends the whole drag underneath that
-              // finger, which is the one moment you need to see where it is.
               IgnorePointer(
                 child: Center(
                   child: Padding(
-                    // Lifted by half its own height so the point sits on the
-                    // centre rather than the middle of the teardrop.
                     padding: const EdgeInsets.only(bottom: 34),
                     child: Icon(
                       Icons.location_on,
@@ -845,7 +716,6 @@ class _MapCard extends StatelessWidget {
                 ),
               ),
 
-              // The credit, behind the ⓘ — see MapAttribution.
               PositionedDirectional(
                 start: 8,
                 bottom: 6,
@@ -859,7 +729,6 @@ class _MapCard extends StatelessWidget {
   }
 }
 
-/// The stops one child actually rides between — what the address led to.
 class _ChildStops extends StatelessWidget {
   const _ChildStops({required this.child, required this.tint});
 
@@ -936,8 +805,6 @@ class _StopLine extends StatelessWidget {
               ),
               const SizedBox(height: 1),
               Text(
-                // No stop yet is a real state, not an error: a child can be
-                // enrolled before the office has placed them on a route.
                 stop?.name ?? t('home.noStopYet'),
                 style: TextStyle(
                   fontSize: 13.5,

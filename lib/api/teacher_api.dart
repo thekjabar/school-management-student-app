@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show ValueNotifier;
+import 'package:flutter/foundation.dart' show Uint8List, ValueNotifier;
 
 import 'attachments.dart';
 import 'client.dart';
@@ -38,7 +38,6 @@ class TeacherProfile {
   }
 }
 
-/// A class-and-subject a teacher is assigned to.
 class TeachingSlot {
   TeachingSlot({
     required this.assignmentId,
@@ -143,7 +142,13 @@ class ClassStudent {
       );
 }
 
-/// One child's mark on the register for a day.
+String? _photoAddress(dynamic raw) {
+  final v = (raw as String?)?.trim() ?? '';
+  if (v.isEmpty) return null;
+  if (v.startsWith('http://') || v.startsWith('https://')) return v;
+  return '$kApiBase${v.startsWith('/') ? '' : '/'}$v';
+}
+
 class RegisterMark {
   RegisterMark({
     required this.studentId,
@@ -152,6 +157,7 @@ class RegisterMark {
     required this.rollNumber,
     required this.status,
     required this.minutesLate,
+    this.photoUrl,
   });
 
   final String studentId;
@@ -161,14 +167,14 @@ class RegisterMark {
   String status;
   int? minutesLate;
 
+  final String? photoUrl;
+
   factory RegisterMark.fromJson(Map<String, dynamic> j) => RegisterMark(
         studentId: (j['studentId'] ?? '') as String,
         name: (j['name'] ?? 'Student') as String,
         code: (j['code'] ?? '') as String,
         rollNumber: j['rollNumber'] as String?,
-        // Null means nobody has marked this child today. Defaulting to PRESENT
-        // here would silently mark a full register the moment the screen opens,
-        // which is precisely the mistake the register exists to prevent.
+        photoUrl: _photoAddress(j['photoUrl']),
         status: (j['status'] ?? 'PRESENT') as String,
         minutesLate: (j['minutesLate'] as num?)?.toInt(),
       );
@@ -267,7 +273,6 @@ class TeacherExam {
   }
 }
 
-/// A mark sheet row: one child, with whatever score has been entered.
 class MarkRow {
   MarkRow({
     required this.studentId,
@@ -287,15 +292,8 @@ class MarkRow {
   bool wasAbsent;
   final DateTime? publishedAt;
 
-  /// What this row said when the screen opened it.
-  ///
-  /// score and wasAbsent are edited in place, so without this there is no way
-  /// to tell a mark the teacher CLEARED from one they never touched — and that
-  /// distinction is the whole difference between "leave this student alone" and
-  /// "take the old mark off".
   final (num?, bool) _openedWith;
 
-  /// Whether the teacher changed this row.
   bool get changed => score != _openedWith.$1 || wasAbsent != _openedWith.$2;
 
   factory MarkRow.fromJson(Map<String, dynamic> j) => MarkRow(
@@ -309,31 +307,12 @@ class MarkRow {
       );
 }
 
-/// Everything the teacher app asks the platform for.
 class TeacherApi {
   TeacherApi._();
 
   static final TeacherApi instance = TeacherApi._();
   final ApiClient _api = ApiClient.instance;
 
-  /// Write down what a child did — a merit or a concern.
-  ///
-  /// Every piece of this has existed except the way in. Teachers hold
-  /// `academic.behavior.write` in their own role template, school-work-service
-  /// has served the full behaviour surface since it was built, the console has
-  /// a Behaviour page, and the PARENT app already reads and displays these
-  /// records on its attitude screen. The teacher app had no way to create one —
-  /// so the screen a family checks was fed by records the person best placed to
-  /// write them could not write from the phone in their hand.
-  ///
-  /// [visibleToGuardian] is the consequential argument, and it is why the sheet
-  /// asks rather than assuming. It defaults to false server-side; when true the
-  /// record is published to the family immediately, and the server then REFUSES
-  /// to let it be edited — "the parent has read it; quietly changing the wording
-  /// afterwards is how a behaviour log stops being evidence of anything".
-  ///
-  /// [points] is signed on purpose: positive for a merit, negative for a
-  /// demerit. A house total that cannot go down is not a points system.
   Future<void> recordBehaviour({
     required String studentId,
     required String kind,
@@ -354,22 +333,11 @@ class TeacherApi {
     });
   }
 
-  /// How many notices this teacher has not opened yet.
-  ///
-  /// The dot on Messages is drawn from a count the shell takes once, at
-  /// start-up, from [announcements] — so nothing a teacher does afterwards can
-  /// move it. This is that same number kept live: seeded by every fetch, and
-  /// moved by the messages tab as notices are read. Anything drawing the dot
-  /// should listen to this rather than count rows itself.
   final ValueNotifier<int> unreadAnnouncements = ValueNotifier<int>(0);
 
   Future<TeacherProfile> me() async =>
       TeacherProfile.fromJson(await _api.get('/teacher/me') as Map<String, dynamic>);
 
-  /// What the office has sent that this teacher should see.
-  ///
-  /// Resolved server-side against their classes, their campus and anything
-  /// aimed at staff — the client cannot work that out and should not try.
   Future<List<Announcement>> announcements() async {
     final json = await _api.get('/teacher/announcements?pageSize=50');
     final rows = Paged.from<Announcement>(json, Announcement.fromJson).rows;
@@ -377,31 +345,16 @@ class TeacherApi {
     return rows;
   }
 
-  /// This teacher has read one notice.
-  ///
-  /// Scoped to the caller by the server — a teacher marks their own reading,
-  /// never a colleague's — and idempotent, so a notice opened twice is not an
-  /// error and the app need not remember what it has already sent.
   Future<void> markAnnouncementRead(String id) =>
       _api.post('/teacher/announcements/$id/read');
 
-  /// This teacher has read everything they can see. Returns how many rows the
-  /// server actually stamped, which is not always what was on screen: the list
-  /// is one page long, and the sweep covers the lot.
   Future<int> markAllAnnouncementsRead() async {
     final json = await _api.post('/teacher/announcements/read-all');
     return ((json as Map<String, dynamic>?)?['marked'] as num?)?.toInt() ?? 0;
   }
-  /// "I have seen this and I am acting on it."
-  ///
-  /// A notice that ASKS for an answer gets one. The route has always been
-  /// there and the app never called it, so the office list of who had not
-  /// answered carried the names of teachers who had read the notice and had
-  /// no way to say so.
   Future<void> acknowledgeAnnouncement(String id) =>
       _api.post('/teacher/announcements/$id/acknowledge', const <String, dynamic>{});
 
-  /// The files attached to a notice — the circular, the timetable, the form.
   Future<List<AttachedFile>> announcementAttachments(String id) async {
     final json = await _api.get('/teacher/announcements/$id/attachments?pageSize=50');
     return Paged.from<AttachedFile>(json, AttachedFile.fromJson).rows;
@@ -424,12 +377,6 @@ class TeacherApi {
         .toList();
   }
 
-  /// The register for a day, with whatever has already been marked on it.
-  ///
-  /// [q] asks the server for only the children whose name or code contains
-  /// it; the matching is done there, on the folded form the search columns
-  /// use, so case and letter variants do not matter. It does not transliterate:
-  /// a name stored in Latin is found by typing it in Latin.
   Future<({bool alreadyTaken, List<RegisterMark> marks})> register(
     String classId, {
     String? date,
@@ -450,11 +397,6 @@ class TeacherApi {
     );
   }
 
-  /// Save the whole register in one call.
-  ///
-  /// Batched deliberately. A register is thirty decisions taken in ninety
-  /// seconds; thirty requests over a school's connection is thirty chances for
-  /// one to fail and leave a child unmarked with nobody the wiser.
   Future<void> saveRegister({
     required String classId,
     required String date,
@@ -535,9 +477,6 @@ class TeacherApi {
     );
   }
 
-  /// The term marks are entered against. Every exam belongs to one, and the
-  /// app must not invent it — a mark filed under the wrong term lands in the
-  /// wrong report card.
   Future<String?> currentTermId() async {
     final json = await _api.get('/school/terms?pageSize=10');
     final rows = Paged.from<Map<String, dynamic>>(json, (m) => m).rows;
@@ -547,18 +486,6 @@ class TeacherApi {
     return rows.isEmpty ? null : rows.first['id'] as String?;
   }
 
-  /// Save the marks the teacher actually changed.
-  ///
-  /// The filter used to be `score != null || wasAbsent`, which silently dropped
-  /// the one case that matters most: a mark the teacher had just CLEARED, or a
-  /// student they had just un-flagged as absent. Neither reached the server, so
-  /// it kept the old value while the screen said "Marks saved" — a correction
-  /// that looked made and was not, on the numbers a family is sent.
-  ///
-  /// Only changed rows go, so a save cannot quietly wipe the marks of students
-  /// nobody touched. `score` is OMITTED rather than sent null when a mark is
-  /// cleared, because that is how the server clears one: an absent `score`
-  /// writes null, which is exactly what "no mark" means.
   Future<void> saveMarks(String examId, List<MarkRow> rows) async {
     final changed = rows.where((r) => r.changed).toList();
     if (changed.isEmpty) return;
@@ -573,13 +500,141 @@ class TeacherApi {
     });
   }
 
-  /// Release marks to families.
-  ///
-  /// A separate permission from entering them, and a separate button here, for
-  /// the same reason: a mark typed wrong is fixed in a minute, a mark released
-  /// wrong is on three hundred phones.
   Future<void> publishMarks(String examId) => _api.post('/teacher/exams/$examId/publish');
 
   String _dateOnly(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  static const String _bankBase = '/teacher/mark-bank';
+
+  Future<void> bankMark({
+    required String studentId,
+    required num points,
+    required String reason,
+    String? classId,
+    String? subjectId,
+    String? termId,
+    String? evidenceMediaId,
+  }) async {
+    await _api.post(_bankBase, {
+      'studentId': studentId,
+      'points': points,
+      'reason': reason.trim(),
+      'classId': ?classId,
+      'subjectId': ?subjectId,
+      'termId': ?termId,
+      'evidenceMediaId': ?evidenceMediaId,
+    });
+  }
+
+  Future<List<MarkBankEntry>> markBank({String? state}) async {
+    final query = state == null ? '?pageSize=200' : '?state=$state&pageSize=200';
+    final json = await _api.get('$_bankBase$query');
+    return Paged.from<MarkBankEntry>(json, MarkBankEntry.fromJson).rows;
+  }
+
+  Future<void> redeemMarks({
+    required List<String> entryIds,
+    required String redeemedAs,
+  }) async {
+    await _api.post('$_bankBase/redeem', {
+      'entryIds': entryIds,
+      'redeemedAs': redeemedAs,
+    });
+  }
+
+  Future<void> voidMark(String id, String reason) =>
+      _api.post('$_bankBase/$id/void', {'reason': reason.trim()});
+
+  Future<String> uploadMarkEvidence({
+    required Uint8List bytes,
+    required String filename,
+    required String mime,
+    String? studentId,
+  }) async {
+    final json = await _api.upload(
+      '/school/uploads/direct',
+      field: 'file',
+      bytes: bytes,
+      filename: filename,
+      mime: mime,
+      fields: {
+        'kind': 'HOMEWORK_ATTACHMENT',
+        'subjectStudentId': ?studentId,
+        'capturedAt': DateTime.now().toUtc().toIso8601String(),
+      },
+    );
+    final id = json is Map ? json['id'] : null;
+    if (id is! String || id.isEmpty) {
+      throw ApiException('The school could not store that photo.', 500);
+    }
+    return id;
+  }
+}
+
+class MarkBankEntry {
+  MarkBankEntry({
+    required this.id,
+    required this.studentId,
+    required this.studentName,
+    required this.points,
+    required this.reason,
+    required this.occurredAt,
+    required this.state,
+    this.className,
+    this.subjectName,
+    this.termId,
+    this.termName,
+    this.evidenceMediaId,
+    this.redeemedAt,
+    this.redeemedAs,
+  });
+
+  final String id;
+  final String studentId;
+  final String studentName;
+
+  final num points;
+  final String reason;
+  final DateTime? occurredAt;
+
+  final String state;
+
+  final String? className;
+  final String? subjectName;
+  final String? termId;
+  final String? termName;
+  final String? evidenceMediaId;
+  final DateTime? redeemedAt;
+
+  final String? redeemedAs;
+
+  bool get isBanked => state == 'BANKED';
+
+  static String? _name(Map<String, dynamic> j, String flat, String nested) {
+    final direct = j[flat];
+    if (direct is String && direct.isNotEmpty) return direct;
+    final child = j[nested];
+    if (child is Map && child['name'] is String) return child['name'] as String;
+    return null;
+  }
+
+  factory MarkBankEntry.fromJson(Map<String, dynamic> j) => MarkBankEntry(
+        id: (j['id'] ?? '') as String,
+        studentId: (j['studentId'] ?? '') as String,
+        studentName: _name(j, 'studentName', 'student') ?? '—',
+        points: (j['points'] as num?) ??
+            num.tryParse('${j['points'] ?? ''}') ??
+            0,
+        reason: (j['reason'] ?? '') as String,
+        occurredAt: DateTime.tryParse((j['occurredAt'] ?? '') as String)?.toLocal(),
+        state: (j['state'] ?? 'BANKED') as String,
+        className: _name(j, 'className', 'class'),
+        subjectName: _name(j, 'subjectName', 'subject'),
+        termId: j['termId'] as String?,
+        termName: _name(j, 'termName', 'term'),
+        evidenceMediaId: j['evidenceMediaId'] as String?,
+        redeemedAt: DateTime.tryParse((j['redeemedAt'] ?? '') as String)?.toLocal(),
+        redeemedAs: j['redeemedAs'] as String?,
+      );
 }

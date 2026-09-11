@@ -4,7 +4,6 @@ import '../i18n/strings.dart';
 import 'attachments.dart';
 import 'client.dart';
 
-/// One child on this guardian's account.
 class Child {
   Child({
     required this.studentId,
@@ -38,11 +37,6 @@ class Child {
       );
 }
 
-/// Everything the school has written down about one child.
-///
-/// The office answers this on the telephone a dozen times a term. This is that
-/// answer, in the app: her names as enrolled, her class, who teaches her, who
-/// else is on the account, and what the medical card says.
 class ChildProfile {
   ChildProfile({
     required this.studentId,
@@ -139,7 +133,6 @@ class ChildProfile {
       v is String ? DateTime.tryParse(v)?.toLocal() : null;
 }
 
-/// One of the adults the school will ring.
 class GuardianOnAccount {
   GuardianOnAccount({
     required this.name,
@@ -152,7 +145,6 @@ class GuardianOnAccount {
   final String relationship;
   final bool isPrimary;
 
-  /// So the list reads as "you and her mother", not two strangers.
   final bool isYou;
 
   factory GuardianOnAccount.fromJson(Map<String, dynamic> j) => GuardianOnAccount(
@@ -163,7 +155,6 @@ class GuardianOnAccount {
       );
 }
 
-/// The medical card, shown back to the family who supplied it.
 class MedicalSummary {
   MedicalSummary({
     required this.flags,
@@ -181,8 +172,6 @@ class MedicalSummary {
   final List<String> emergencyContacts;
   final DateTime? reviewDueAt;
 
-  /// Medical information ages badly, and a card nobody has looked at since
-  /// year one is worse than no card, because everyone assumes it is current.
   bool get needsReview =>
       reviewDueAt != null && reviewDueAt!.isBefore(DateTime.now());
 
@@ -203,7 +192,6 @@ class MedicalSummary {
       );
 }
 
-/// What the school has arranged for this child on the bus and at the door.
 class SupportSummary {
   SupportSummary({
     required this.escortRequired,
@@ -215,8 +203,6 @@ class SupportSummary {
   final bool escortRequired;
   final bool wheelchairVehicleRequired;
 
-  /// The seat label where there is one, `true` for "a fixed seat, unnamed",
-  /// null for no such arrangement.
   final Object? fixedSeat;
   final bool doNotReleaseAlone;
 
@@ -234,11 +220,6 @@ class SupportSummary {
       );
 }
 
-/// One of the crew who actually carried this child recently.
-///
-/// Offered in the feedback form so a parent can pick a name instead of
-/// describing a man. Drawn from the journeys the child was manifested on, not
-/// from the roster — the roster says who was supposed to drive.
 class RecentCrew {
   RecentCrew({
     required this.personId,
@@ -250,11 +231,8 @@ class RecentCrew {
   final String personId;
   final String name;
 
-  /// `DRIVER` or `ATTENDANT`.
   final String role;
 
-  /// The last day this person carried the child, which is what a parent
-  /// recognises them by.
   final DateTime? lastRodeOn;
 
   factory RecentCrew.fromJson(Map<String, dynamic> j) => RecentCrew(
@@ -265,7 +243,6 @@ class RecentCrew {
       );
 }
 
-/// Something a family has said about the crew, and where it got to.
 class CrewFeedbackItem {
   CrewFeedbackItem({
     required this.id,
@@ -281,24 +258,19 @@ class CrewFeedbackItem {
 
   final String id;
 
-  /// `PRAISE` or `CONCERN`.
   final String sentiment;
   final List<String> topics;
   final String? comment;
   final DateTime? occurredOn;
 
-  /// `MORNING`, `AFTERNOON` or `UNSPECIFIED`.
   final String direction;
 
-  /// `NEW`, `UNDER_REVIEW`, `RESOLVED`, `ESCALATED` or `CLOSED_NO_ACTION`.
   final String status;
   final DateTime? submittedAt;
   final String? crewName;
 
   bool get isPraise => sentiment == 'PRAISE';
 
-  /// The office has finished with it, whatever it decided. What it decided is
-  /// deliberately not sent to the family.
   bool get isClosed =>
       status == 'RESOLVED' || status == 'CLOSED_NO_ACTION' || status == 'ESCALATED';
 
@@ -315,7 +287,6 @@ class CrewFeedbackItem {
       );
 }
 
-/// A day at school the family can look at, and the pictures from it.
 class MemoryAlbum {
   MemoryAlbum({
     required this.id,
@@ -345,7 +316,6 @@ class MemoryAlbum {
       );
 }
 
-/// One photograph or clip the child is in.
 class MemoryItem {
   MemoryItem({
     required this.id,
@@ -369,8 +339,6 @@ class MemoryItem {
   final int? durationMs;
   final DateTime? takenAt;
 
-  /// For laying the grid out before the image has loaded. Falls back to square,
-  /// which is wrong for nothing badly.
   double get aspect =>
       (width != null && height != null && height! > 0) ? width! / height! : 1;
 
@@ -387,12 +355,6 @@ class MemoryItem {
       );
 }
 
-/// Where the family lives, as the school holds it.
-///
-/// The note matters more than the pin. Addressing here is landmark-based
-/// rather than street-based — "the blue gate opposite the bakery" is how
-/// somebody is actually found, and it is what a driver reads. The coordinates
-/// are for the planner choosing which stop the child uses.
 class HomeLocation {
   HomeLocation({
     required this.address,
@@ -407,7 +369,6 @@ class HomeLocation {
   final double? lat;
   final double? lon;
 
-  /// What the address led to: the stop each child is actually assigned.
   final List<AssignedStops> children;
 
   bool get hasPin => lat != null && lon != null;
@@ -423,7 +384,6 @@ class HomeLocation {
       );
 }
 
-/// The stops one child rides between.
 class AssignedStops {
   AssignedStops({
     required this.studentId,
@@ -449,7 +409,6 @@ class AssignedStops {
       );
 }
 
-/// A planned stop, with the description the crew actually navigates by.
 class StopPoint {
   StopPoint({required this.name, required this.lat, required this.lon, required this.landmark});
 
@@ -466,7 +425,6 @@ class StopPoint {
       );
 }
 
-/// A lesson in the week.
 class Lesson {
   Lesson({
     required this.period,
@@ -491,8 +449,6 @@ class Lesson {
   factory Lesson.fromJson(Map<String, dynamic> j) {
     return Lesson(
       period: (j['period'] as num?)?.toInt() ?? 0,
-      // The server sends this already resolved. The Map branch is the old
-      // shape, kept so a not-yet-updated handset keeps working for one release.
       subject: _subjectOf(j, fallback: j['kind'] as String?),
       colorHex: _colorOf(j),
       teacher: j['teacherName'] as String?,
@@ -518,11 +474,6 @@ class DayOfLessons {
       );
 }
 
-/// What the school has said about how a child conducts themselves.
-///
-/// Merits and concerns arrive together and are shown together. A family given
-/// only the concerns is handed a record of a difficult child; given only the
-/// merits, they are handed nothing they can act on.
 class AttitudeNote {
   AttitudeNote({
     required this.id,
@@ -538,7 +489,6 @@ class AttitudeNote {
 
   final String id;
 
-  /// MERIT, CONCERN or INCIDENT.
   final String kind;
   final String category;
   final int points;
@@ -567,8 +517,6 @@ class AttitudeNote {
       );
 }
 
-/// The standing tally, computed over every record rather than the page in hand
-/// — a parent scrolling to page two should not watch the totals change.
 class AttitudeSummary {
   AttitudeSummary({
     required this.merits,
@@ -584,9 +532,6 @@ class AttitudeSummary {
   final int points;
   final List<AttitudeNote> notes;
 
-  /// One word for the whole picture, for the figure strip on the home screen.
-  /// Deliberately generous at the top: a child with a handful of merits and no
-  /// concerns is doing well, and saying so is the point of showing it.
   String get verdict {
     if (concerns + incidents == 0 && merits > 0) return 'excellent';
     if (concerns + incidents == 0) return 'settled';
@@ -636,10 +581,6 @@ class HomeworkItem {
   final String? teacher;
   final int? estimatedMinutes;
 
-  /// The mark side of a piece of homework, which the list never showed.
-  ///
-  /// The API has been returning these all along; the model dropped them, so a
-  /// parent could see that work existed and never what became of it.
   final DateTime? submittedAt;
   final num? score;
   final num? maxScore;
@@ -647,7 +588,6 @@ class HomeworkItem {
 
   bool get handedIn => submittedAt != null;
 
-  /// Negative when it is late. The screens render the word, not the number.
   int get daysLeft {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -661,8 +601,6 @@ class HomeworkItem {
       description: j['description'] as String?,
       assignedOn: DateTime.parse(j['assignedOn'] as String).toLocal(),
       dueDate: DateTime.parse(j['dueDate'] as String).toLocal(),
-      // The server sends this already resolved. The Map branch is the old
-      // shape, kept so a not-yet-updated handset keeps working for one release.
       subject: _subjectOf(j),
       colorHex: _colorOf(j),
       teacher: j['teacherName'] as String?,
@@ -688,12 +626,20 @@ class ExamResultItem {
     required this.subject,
     required this.colorHex,
     required this.date,
+    this.classAverage,
+    this.classAveragePercent,
+    this.classAverageOf,
   });
 
   final String id;
   final num? score;
   final num maxScore;
   final num? percent;
+
+  final num? classAverage;
+  final num? classAveragePercent;
+
+  final int? classAverageOf;
   final String? gradeLetter;
   final bool? isPass;
   final bool wasAbsent;
@@ -709,12 +655,13 @@ class ExamResultItem {
       score: j['score'] as num?,
       maxScore: (j['maxScore'] as num?) ?? 100,
       percent: j['percent'] as num?,
+      classAverage: j['classAverage'] as num?,
+      classAveragePercent: j['classAveragePercent'] as num?,
+      classAverageOf: (j['classAverageOf'] as num?)?.toInt(),
       gradeLetter: j['gradeLetter'] as String?,
       isPass: j['isPass'] as bool?,
       wasAbsent: (j['wasAbsent'] ?? false) as bool,
       examTitle: (exam['title'] ?? 'Test') as String,
-      // Under `exam`, not at the top level: a result row has no subject of
-      // its own, it inherits the exam's.
       subject: _subjectOf(exam),
       colorHex: _colorOf(exam),
       date: DateTime.parse((exam['date'] ?? DateTime.now().toIso8601String()) as String).toLocal(),
@@ -722,13 +669,6 @@ class ExamResultItem {
   }
 }
 
-/// One report card the school has published, as it appears in the list.
-///
-/// A DOCUMENT rather than a live view: the figures were frozen when the school
-/// generated it, and a correction arrives as a new [version] rather than as an
-/// edit to this one. Almost every figure on it is separately nullable, because
-/// a school prints what it prints — a card with a rank and no class size, or
-/// attendance and no GPA, is ordinary.
 class ReportCardSummary {
   ReportCardSummary({
     required this.id,
@@ -757,21 +697,17 @@ class ReportCardSummary {
   final String id;
   final int version;
 
-  /// Null on the whole-year document. [wholeYear] says so outright.
   final String? termId;
   final String? termName;
   final bool wholeYear;
 
   final String academicYearName;
 
-  /// Nullable: a card need not name the class it was written for.
   final String? className;
   final int subjectCount;
 
   final num? overallScore;
 
-  /// The word the school printed — 'B+', or a Kurdish word. Not translated,
-  /// not derived from [overallScore], and never rewritten here.
   final String? overallGrade;
   final num? gpa;
   final int? classRank;
@@ -781,19 +717,12 @@ class ReportCardSummary {
   final int? daysLate;
   final int? daysExcused;
 
-  /// THREE states. null is 'the school printed no promotion decision', which
-  /// is not 'not promoted' and must never be shown as it.
   final bool? promoted;
 
   final DateTime publishedAt;
 
-  /// Null until this family first opens the card. It is the flag the office
-  /// checks before telephoning a family who says the report never arrived.
   final DateTime? openedAt;
 
-  /// The school attached a rendered document. It is NOT a promise that anyone
-  /// can fetch it: there is no parent-facing route that serves a report-card
-  /// PDF, and the address on the detail can be null even when this is true.
   final bool hasPdf;
 
   factory ReportCardSummary.fromJson(Map<String, dynamic> j) {
@@ -828,7 +757,6 @@ class ReportCardSummary {
   }
 }
 
-/// One line of a report card: what the child got in one subject.
 class ReportCardLine {
   ReportCardLine({
     required this.id,
@@ -847,22 +775,16 @@ class ReportCardLine {
 
   final String id;
 
-  /// Already in the reader's language, and on a card it is the label FROZEN
-  /// onto the line when the document was generated — which wins over the
-  /// subject's name today, so a subject renamed in March does not rewrite a
-  /// report a family printed in January. Never passed through t().
   final String subject;
   final String subjectId;
   final String? colorHex;
 
-  /// null is 'no mark'; 0 is a mark of nothing. They are different answers.
   final num? score;
   final num maxScore;
   final num? percent;
   final String? gradeLetter;
   final num? gradePoint;
 
-  /// THREE states, as on [ReportCardSummary.promoted].
   final bool? isPass;
   final int? classRank;
   final String? teacherComment;
@@ -883,12 +805,6 @@ class ReportCardLine {
       );
 }
 
-/// One report card with every subject line on it.
-///
-/// Not an upgraded [ReportCardSummary] — the two shapes are different answers.
-/// The list has a subject count and no lines; this has the lines, the two
-/// written comments, and an opened-at that is never null, because asking for
-/// this is what sets it.
 class ReportCardDetail {
   ReportCardDetail({
     required this.id,
@@ -934,21 +850,13 @@ class ReportCardDetail {
   final int? daysExcused;
   final bool? promoted;
 
-  /// Written by the class teacher and by the principal, in whatever language
-  /// they typed. School text: shown verbatim.
   final String? homeroomComment;
   final String? principalComment;
 
   final DateTime publishedAt;
 
-  /// Never null here: the server answers with the moment it stamped.
   final DateTime openedAt;
 
-  /// The object-store address of the rendered document, when there is one.
-  /// Nothing in the app fetches it: no parent-facing route serves a report-card
-  /// PDF, and the asset's own schema says the document must not be publicly
-  /// fetchable. Carried so the shape matches the server, not so it can be
-  /// opened.
   final String? pdfUrl;
 
   final List<ReportCardLine> lines;
@@ -987,7 +895,6 @@ class ReportCardDetail {
   }
 }
 
-/// The grade the school released for one subject in one term.
 class TermSubjectGrade {
   TermSubjectGrade({
     required this.id,
@@ -1007,7 +914,6 @@ class TermSubjectGrade {
 
   final String id;
 
-  /// Translated by the server, in the language the request asked for.
   final String subject;
   final String subjectId;
   final String? colorHex;
@@ -1038,14 +944,6 @@ class TermSubjectGrade {
       );
 }
 
-/// One term of released grades, grouped by the server.
-///
-/// The grouping is not the app's: 'her second term' is the unit a family
-/// thinks in, and forty subject rows across three terms is a list nobody
-/// reads. The counts and the average come with it, so nothing here has to be
-/// worked out from the subjects — and must not be. Subjects appear as the
-/// school releases them, so four of nine is a correct answer and the five that
-/// are absent are not failures.
 class TermGradeGroup {
   TermGradeGroup({
     required this.termId,
@@ -1066,9 +964,6 @@ class TermGradeGroup {
   final String termName;
   final int sequence;
 
-  /// Plain calendar days, kept in UTC on purpose. These are date columns and
-  /// arrive as UTC midnight; moving them to the phone's zone would slide the
-  /// first and last day of a term across a date boundary west of Greenwich.
   final DateTime startsOn;
   final DateTime endsOn;
 
@@ -1076,13 +971,9 @@ class TermGradeGroup {
   final String className;
   final int subjectCount;
 
-  /// Passed plus failed need NOT be [subjectCount]: a subject the school left
-  /// unjudged is in neither.
   final int subjectsPassed;
   final int subjectsFailed;
 
-  /// The school's own mean of the released percentages. Null when no subject
-  /// in the term carries one.
   final num? averagePercent;
 
   final List<TermSubjectGrade> subjects;
@@ -1110,14 +1001,6 @@ class TermGradeGroup {
   }
 }
 
-/// One exam the school has already put in the diary for the child's class.
-///
-/// The opposite end of [ExamResultItem]: this is a date still to come, that is
-/// a mark already published for one already sat. The two arrive from different
-/// routes and mean different things to a family, and nothing here merges them.
-///
-/// It belongs to the CLASS rather than to the child, so every subject the class
-/// is scheduled to sit comes back — including any this child does not.
 class UpcomingExam {
   UpcomingExam({
     required this.id,
@@ -1134,24 +1017,13 @@ class UpcomingExam {
 
   final String id;
 
-  /// QUIZ, MONTHLY, MIDTERM, FINAL, NATIONAL, PRACTICAL, ORAL or MAKEUP.
   final String kind;
 
-  /// Genuinely absent on plenty of rows: the column is nullable and the
-  /// translation overlay can only REPLACE a title, never invent one.
-  ///
-  /// It used to be defaulted to the English word 'Test', which put an
-  /// untranslated string on a Kurdish screen every time a teacher scheduled an
-  /// exam without naming it. A screen falls back to [subject] instead, which is
-  /// what the school would have called it anyway.
   final String? title;
 
-  /// Flat and already in the reader's language on this route.
   final String subject;
   final String? colorHex;
 
-  /// The day of the exam. The server sends a plain date at UTC midnight, so
-  /// only the day part means anything.
   final DateTime date;
 
   final int? startMinute;
@@ -1159,12 +1031,6 @@ class UpcomingExam {
   final String? room;
   final num maxScore;
 
-  /// The kind of exam as an i18n key, so the screen says it in the parent's
-  /// language rather than in the API's vocabulary.
-  ///
-  /// Null for a kind this build has no word for. A ninth kind added to the
-  /// server later must not reach a phone as a raw MAKEUP-shaped enum; the row
-  /// simply says less.
   String? get kindKey => _kinds.contains(kind) ? 'exam.kind.$kind' : null;
 
   static const _kinds = {
@@ -1280,7 +1146,6 @@ class LeaveRequestItem {
       );
 }
 
-/// One of today's two runs, from the child's point of view.
 class TripToday {
   TripToday({
     required this.tripId,
@@ -1319,18 +1184,10 @@ class TripToday {
   final DateTime? boardedAt;
   final DateTime? alightedAt;
 
-  /// Who actually took her at the door. Null until an alighting or hand-over
-  /// event is actually on the ledger for this run — never guessed at while
-  /// she is still riding.
   final String? collectorName;
 
-  /// How that adult relates to her, in the office's own words — set only
-  /// when [collectorName] came from an authorised collector on file, not from
-  /// a guardian on the account or a one-time code.
   final String? collectorRelationship;
 
-  /// A photograph of that adult, when the office holds one. Not yet shown
-  /// anywhere in this app.
   final String? collectorPhotoUrl;
 
   static DateTime? _at(dynamic v) => v == null ? null : DateTime.parse(v as String).toLocal();
@@ -1356,8 +1213,6 @@ class TripToday {
         collectorPhotoUrl: j['collectorPhotoUrl'] as String?,
       );
 
-  /// What actually happened to this child on this run — as an i18n key, so
-  /// the screen says it in the parent's language rather than in English.
   String get childLineKey {
     if (boardedAt != null && alightedAt != null) {
       return leg == 'OUT' ? 'bus.child.arrivedSchool' : 'bus.child.droppedOff';
@@ -1370,7 +1225,6 @@ class TripToday {
   }
 }
 
-/// A child's bus arrangement plus today's two runs.
 class TransportInfo {
   TransportInfo({
     required this.ridesTheBus,
@@ -1392,10 +1246,6 @@ class TransportInfo {
   final String? routeColorHex;
   final String? seatNumber;
 
-  /// The registry id of the stop, which is what a correction is filed against.
-  ///
-  /// Null under a location order, and null for a child with no arrangement —
-  /// both of which are states where there is nothing to correct.
   final String? pickupStopId;
   final String? pickupStopName;
   final String? pickupLandmark;
@@ -1404,15 +1254,6 @@ class TransportInfo {
   final String? dropoffLandmark;
   final List<TripToday> today;
 
-  /// A court or safeguarding order stops THIS adult seeing where this child is.
-  ///
-  /// The server nulls the stops, the landmarks, the boarding and setting-down
-  /// times and the collector rather than refusing the whole call, so without
-  /// reading this the screen simply draws itself empty — which looks like a
-  /// fault, sends the parent to the school to report a broken app, and tells
-  /// them nothing. The flag is what lets the screen say the school is holding
-  /// this information and who to speak to. It says nothing about WHY, and it
-  /// must not: the reason is the safeguarding case.
   final bool locationHidden;
 
   factory TransportInfo.fromJson(Map<String, dynamic> j) {
@@ -1438,7 +1279,6 @@ class TransportInfo {
   }
 }
 
-/// Where the bus is right now — or an honest reason why not.
 class LiveBus {
   LiveBus({
     required this.studentId,
@@ -1475,22 +1315,13 @@ class LiveBus {
   final String? stopName;
   final int? etaMinutes;
 
-  /// Where the stop is, so the map can draw it. Null on a stop the office has
-  /// not placed yet, which is ordinary in a first term.
   final double? stopLat;
   final double? stopLon;
 
-  /// Where the CHILD is, which is not the same question as where the bus is.
-  ///
-  /// `WAITING`, `ON_BOARD`, `ARRIVED` or `NOT_RIDING`. Null when the server is
-  /// WITHHOLDING the answer rather than answering "no" — a guardian without
-  /// location permission is being told nothing, not being told she is off the
-  /// bus, and the screen must not render those the same way.
   final String? childState;
   final DateTime? boardedAt;
   final DateTime? alightedAt;
 
-  /// Which way the bus is pointing, for the marker.
   final double? headingDeg;
   final double? speedKph;
 
@@ -1498,31 +1329,12 @@ class LiveBus {
   final String? plate;
   final String? driverName;
 
-  /// This position was GENERATED, not reported by a bus on a road.
-  ///
-  /// Only ever true on a tenant the platform marks as a demonstration; a real
-  /// school never receives a simulated position at all. It must be rendered as
-  /// something nobody can miss — the entire reason for carrying the flag is
-  /// that a person must not mistake a rehearsal for their child.
   final bool simulated;
 
-  /// She is aboard right now. The only state in which the bus marker is also
-  /// the child marker.
   bool get onBoard => childState == 'ON_BOARD';
 
-  /// The bus has a position worth drawing.
   bool get hasFix => visible && lat != null && lon != null;
 
-  /// The reasons, in words a parent should read rather than an enum.
-  ///
-  /// These were hard-coded English on a screen that exists in three languages,
-  /// and — worse — half of them were names the server has never sent. It
-  /// answers window_not_open_yet, trip_ended, already_alighted, no_fix_yet,
-  /// no_bus_assigned, no_schedule, trip_cancelled and simulated_feed_withheld;
-  /// this switch was matching outside_window, trip_not_started,
-  /// already_handed_over and no_position_yet. Every one of those fell past the
-  /// cases to "The map is closed at the moment", which tells a parent nothing
-  /// about a child on a bus.
   String get reasonText {
     switch (reason) {
       case 'no_trip_today':
@@ -1584,7 +1396,6 @@ class LiveBus {
   }
 }
 
-/// One thing this family has raised with the school, and where it has got to.
 class ConcernStatus {
   ConcernStatus({
     required this.id,
@@ -1599,19 +1410,9 @@ class ConcernStatus {
   final String id;
   final String title;
 
-  /// BUS_LATE, CHILD_NOT_HOME, PICKUP_ARRANGEMENT or SOMETHING_ELSE — null on
-  /// a row whose key the server could not read a known topic out of.
-  ///
-  /// It matters because these rows are shown on two screens that mean different
-  /// things by them. The collection screen says "Closed on the office board.
-  /// That is not the school giving permission" against every row it draws, and
-  /// printing that against "the bus is late" tells a family something about a
-  /// collection that was never asked for.
   final String? topic;
   final bool urgent;
 
-  /// SENT, SEEN or CLOSED. Three words because that is all a family can act on:
-  /// we have it, we are on it, it is done.
   final String state;
   final DateTime? raisedAt;
   final int timesRaised;
@@ -1627,12 +1428,6 @@ class ConcernStatus {
       );
 }
 
-/// Whether each of today's legs can still be skipped.
-///
-/// The cut-off sits a fixed number of minutes before each departure, because a
-/// request that lands after the bus has gone cannot suppress an alarm that has
-/// already fired. The server decides it; this is only what the screen needs to
-/// avoid offering a button that would do nothing.
 class SkipLegEligibility {
   SkipLegEligibility({
     required this.leg,
@@ -1641,7 +1436,6 @@ class SkipLegEligibility {
     required this.cutoffAt,
   });
 
-  /// 'OUT' (home to school) or 'RETURN' (school to home).
   final String leg;
   final bool open;
   final DateTime? scheduledDepartureAt;
@@ -1662,9 +1456,6 @@ class SkipEligibility {
   final String serviceDate;
   final List<SkipLegEligibility> legs;
 
-  /// True when at least one leg of the day can still be skipped. A day with
-  /// both legs closed is one where the honest thing is to say the buses have
-  /// gone, not to take a request that will suppress nothing.
   bool get anyOpen => legs.any((l) => l.open);
 
   SkipLegEligibility? leg(String leg) {
@@ -1682,7 +1473,6 @@ class SkipEligibility {
       );
 }
 
-/// One approved alternative address for a child.
 class DropoffOption {
   DropoffOption({required this.id, required this.label, required this.stopName, required this.landmark});
 
@@ -1702,11 +1492,6 @@ class DropoffOption {
   }
 }
 
-/// Everything the parent app asks the platform for.
-///
-/// One class rather than a call scattered across widgets, so that when an
-/// endpoint moves there is exactly one place to change — and so the screens
-/// read as screens rather than as HTTP.
 class ParentApi {
   ParentApi._();
 
@@ -1718,8 +1503,6 @@ class ParentApi {
     return (json as List).map((e) => Child.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  /// Who has actually carried this child lately, so the feedback form can
-  /// offer a name rather than a text box.
   Future<List<RecentCrew>> recentCrew(String studentId) async {
     final json = await _api.get('/parent/children/$studentId/recent-crew');
     return (json as List)
@@ -1727,17 +1510,11 @@ class ParentApi {
         .toList();
   }
 
-  /// What this parent has already said about the crew, and where it got to.
   Future<List<CrewFeedbackItem>> crewFeedback(String studentId) async {
     final json = await _api.get('/parent/children/$studentId/crew-feedback?pageSize=50');
     return Paged.from<CrewFeedbackItem>(json, CrewFeedbackItem.fromJson).rows;
   }
 
-  /// Send praise or a concern to the school office.
-  ///
-  /// [topics] may be empty and [comment] may be null against praise; the server
-  /// insists on a comment for a concern, since the office cannot look into
-  /// "he was rude" without knowing what happened.
   Future<void> sendCrewFeedback({
     required String studentId,
     required String sentiment,
@@ -1757,23 +1534,16 @@ class ParentApi {
     });
   }
 
-  /// Photographs of this child at school, newest day first.
   Future<List<MemoryAlbum>> memories(String studentId) async {
     final json = await _api.get('/parent/children/$studentId/memories?pageSize=24');
     return Paged.from<MemoryAlbum>(json, MemoryAlbum.fromJson).rows;
   }
 
-  /// Where the school thinks this family lives, and the stops that produced.
   Future<HomeLocation> homeLocation() async {
     final json = await _api.get('/parent/home') as Map<String, dynamic>;
     return HomeLocation.fromJson(json);
   }
 
-  /// Tell the school where home is.
-  ///
-  /// This does NOT move a child's bus stop — a route is planned and sequenced,
-  /// and the office decides which stop each child uses. It is what they read
-  /// when deciding.
   Future<void> saveHomeLocation({
     double? lat,
     double? lon,
@@ -1788,22 +1558,6 @@ class ParentApi {
     });
   }
 
-  /// Tell the office the bus stop's pin is in the wrong place.
-  ///
-  /// A REQUEST, not a change. Nothing about the stop moves when this returns:
-  /// the office reads it, and either accepts the pin or turns it down. What the
-  /// server does immediately is mark the stop as under review so the next driver
-  /// is warned — which is why the reason has to be worth reading, and why the
-  /// screen that calls this must never say the stop has moved.
-  ///
-  /// The pin is optional. A parent who can only say "it is on the wrong side of
-  /// the road" has still told the office something they did not know.
-  ///
-  /// Only a stop one of this guardian's own children actually rides is
-  /// accepted; anything else comes back 403 with the office's phone number in
-  /// the sentence.
-  ///
-  /// Returns the server's own word for where the report now sits.
   Future<String> submitStopCorrection({
     required String stopId,
     required String reason,
@@ -1819,7 +1573,6 @@ class ParentApi {
         'AWAITING_REVIEW';
   }
 
-  /// The child's own record, as the school holds it.
   Future<ChildProfile> profile(String studentId) async {
     final json = await _api.get('/parent/children/$studentId/profile') as Map<String, dynamic>;
     return ChildProfile.fromJson(json);
@@ -1837,16 +1590,6 @@ class ParentApi {
     return Paged.from<HomeworkItem>(json, HomeworkItem.fromJson).rows;
   }
 
-  /// The exams already scheduled for the child's class, soonest first.
-  ///
-  /// No query string, because the endpoint declares none: no page size, no date
-  /// window, no way to ask for a fifty-first row. Whatever the school has put in
-  /// the diary arrives capped at fifty, and there is no "show more" a screen
-  /// could honestly offer.
-  ///
-  /// Draft exams never appear, and a cancelled one stops appearing rather than
-  /// arriving flagged — so an exam a family saw yesterday can simply be gone,
-  /// with nothing for the app to hang an explanation on.
   Future<List<UpcomingExam>> upcomingExams(String studentId) async {
     final json = await _api.get('/parent/children/$studentId/exams');
     if (json is List) {
@@ -1863,14 +1606,6 @@ class ParentApi {
     return Paged.from<ExamResultItem>(json, ExamResultItem.fromJson).rows;
   }
 
-  /// The report cards the school has actually published for this child.
-  ///
-  /// Published ones only. A card the office is withholding, one that a newer
-  /// version has replaced, and one that was never generated all arrive the same
-  /// way — absent — so nothing above this may say the school produced none.
-  ///
-  /// No paging: the server takes forty and reads no page parameter. Forty
-  /// published cards is most of a childhood.
   Future<List<ReportCardSummary>> reportCards(String studentId) async {
     final json = await _api.get('/parent/children/$studentId/report-cards');
     return (json as List)
@@ -1878,38 +1613,12 @@ class ParentApi {
         .toList();
   }
 
-  /// One card, with every subject line on it.
-  ///
-  /// Calling this IS the receipt. The server stamps the moment the family first
-  /// opened the card as a side effect of answering, once and never again, and
-  /// there is no acknowledgement to send afterwards. So it is called when a
-  /// parent opens a card and at no other time: filling a list from it, or
-  /// fetching a card ahead of a tap, would sign for a report nobody read.
-  ///
-  /// Retrying is safe — the stamp is written only while it is still empty, so a
-  /// second read cannot move the date the office quotes back to a family.
-  ///
-  /// 404 'That report card is not available.' answers every reason at once: no
-  /// such card, another child's, withheld, superseded, unpublished. The caller
-  /// must not guess which.
   Future<ReportCardDetail> reportCard(String studentId, String id) async {
     final json = await _api.get('/parent/children/$studentId/report-cards/$id')
         as Map<String, dynamic>;
     return ReportCardDetail.fromJson(json);
   }
 
-  /// The term grades the school has released, grouped by term.
-  ///
-  /// The row the school stands behind: it survives a re-mark and carries the
-  /// weighting that produced it, which is what makes it worth showing instead
-  /// of an average of exam marks worked out on the phone.
-  ///
-  /// [termId] filters server-side. It is worth knowing that a term id the
-  /// server does not recognise is not an error there — it answers with an empty
-  /// list — and that nothing in the API lists a family's terms, so a screen
-  /// offering a term picker has to build it from the terms in an unfiltered
-  /// answer. An empty string is dropped rather than sent, since the server
-  /// would read it as no filter at all.
   Future<List<TermGradeGroup>> termGrades(String studentId, {String? termId}) async {
     final filter = (termId == null || termId.isEmpty) ? '' : '?termId=$termId';
     final json = await _api.get('/parent/children/$studentId/term-grades$filter');
@@ -1918,22 +1627,15 @@ class ParentApi {
         .toList();
   }
 
-/// What the school has published about this child's conduct.
   Future<AttitudeSummary> attitude(String studentId) async {
     final json = await _api.get('/parent/children/$studentId/attitude') as Map<String, dynamic>;
     return AttitudeSummary.fromJson(json);
   }
 
-  /// "I have seen this." Recorded so the office knows whether a concern
-  /// actually reached the family before they telephone about it.
   Future<void> markAttitudeSeen(String id) async {
     await _api.post('/parent/attitude/$id/seen');
   }
 
-  /// The register for a window, or for the term when none is given.
-  ///
-  /// from and to are what the endpoint has always accepted; nothing asked for
-  /// them until the home card's period picker did.
   Future<AttendanceSummary> attendance(String studentId, {DateTime? from, DateTime? to}) async {
     final q = <String>[
       if (from != null) 'from=${_day(from)}',
@@ -1945,9 +1647,6 @@ class ParentApi {
     return AttendanceSummary.fromJson(json);
   }
 
-  /// Plain calendar days. The server is comparing against a date column, so an
-  /// instant with a time on it would drop the first or last day depending on
-  /// which side of midnight the phone happens to be.
   static String _day(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
@@ -1972,9 +1671,6 @@ class ParentApi {
     required DateTime from,
     required DateTime to,
     required String reason,
-    /// The doctor's note, already uploaded through [uploadFile]. The schema has
-    /// carried `doctorNoteAssetId` and the DTO has accepted it all along; the
-    /// app simply never sent one, so every note came in on paper.
     String? doctorNoteAssetId,
   }) async {
     final why = reason.trim();
@@ -1984,51 +1680,21 @@ class ParentApi {
       'fromDate': _dateOnly(from),
       'toDate': _dateOnly(to),
       'doctorNoteAssetId': ?doctorNoteAssetId,
-      // Left out when blank, never sent empty. The sheet labels the reason
-      // optional and the DTO agrees - but it is @Length(2, 500) WHEN PRESENT,
-      // so an empty string was refused and a parent who simply had nothing to
-      // add could not report their child away at all.
       'reason': ?(why.isEmpty ? null : why),
     });
   }
 
   Future<void> cancelLeave(String id) => _api.post('/parent/leave-requests/$id/cancel');
 
-  /// Say the notice has been read and understood.
-  ///
-  /// Some of these decide who may collect a child, which is why the server
-  /// takes the person from the token and offers no field to name somebody else.
-  /// The app had the button and never made the call: "Got it" closed the sheet
-  /// and nothing else, so a parent believed they had replied and the office's
-  /// list of who had not answered still had their name on it.
-  ///
-  /// Acknowledging twice is a success on the server, so a second tap after a
-  /// dropped connection is safe.
   Future<void> acknowledgeAnnouncement(String id) =>
       _api.post('/parent/announcements/$id/acknowledge', const <String, dynamic>{});
 
-  // ---- Asking the office to correct your own details ----------------------
-  //
-  // Under /auth, not /parent: the gateway sends /api/auth/ to identity-service,
-  // which owns people, and /api/parent/ to students-service, which does not.
-  // The same path under the wrong prefix is a 404 in production and works
-  // perfectly against a laptop.
-
-  /// The corrections this person has asked for, newest first.
   Future<List<ProfileChange>> profileChanges() async {
     final json = await _api.get('/auth/profile/change-requests');
     final rows = json is Map ? (json['rows'] as List?) ?? const [] : (json as List?) ?? const [];
     return rows.map((e) => ProfileChange.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  /// Ask the office to correct one or more of your own details.
-  ///
-  /// Every argument is optional and only what is passed is asked for. An empty
-  /// string clears a field; leaving it null means "not changing this one".
-  ///
-  /// The phone number is deliberately absent. It is how a person signs in and
-  /// how the school knows who may collect their child, so it has its own
-  /// request with a confirmation code, and the server refuses it here by name.
   Future<void> askProfileChange({
     String? nameGiven,
     String? nameFather,
@@ -2046,11 +1712,8 @@ class ParentApi {
         if (reason != null && reason.isNotEmpty) 'reason': reason,
       });
 
-  /// Withdraw a correction the office has not answered yet.
   Future<void> cancelProfileChange(String id) =>
       _api.post('/auth/profile/change-requests/$id/cancel');
-
-
 
   Future<({String? usualStop, List<DropoffOption> options, String note})> dropoffOptions(
     String studentId,
@@ -2078,27 +1741,11 @@ class ParentApi {
     });
   }
 
-  /// Days the child will not be riding — the transport half of a leave request,
-  /// and separately requestable for the days a family drives them in themselves.
   Future<List<Map<String, dynamic>>> skipRides() async {
     final json = await _api.get('/parent/skip-rides?pageSize=50');
     return Paged.from<Map<String, dynamic>>(json, (m) => m).rows;
   }
 
-  /// Send the school a file — the doctor's note, the signed consent form.
-  ///
-  /// There were three upload routes in the product and every one of them
-  /// required a permission no guardian holds, so a note behind a leave request
-  /// arrived on paper, at the gate, in the morning, and a clerk photographed
-  /// it. identity-service built `/parent/uploads` for exactly this and the app
-  /// never called it.
-  ///
-  /// What authorises a parent here is not a permission — they have none — but a
-  /// live guardian link to the child the file is about, checked server-side
-  /// against the tenant this request is acting in.
-  ///
-  /// Returns the asset id, which is what a leave request then carries as its
-  /// `doctorNoteAssetId`.
   Future<String> uploadFile({
     required Uint8List bytes,
     required String filename,
@@ -2128,20 +1775,6 @@ class ParentApi {
     return id;
   }
 
-  /// Tell the school something is wrong, or ask them something.
-  ///
-  /// The app has never had a way to do this. Announcements travel one way, and
-  /// crew feedback is a record about a driver's conduct — the wrong place to
-  /// put "the bus is forty minutes late and my daughter is not home". So the
-  /// only route was a telephone call to an office that might not be open.
-  ///
-  /// This lands on the dispatch board the office already watches all day,
-  /// beside the late buses and the unaccounted children, and it is answered by
-  /// TELEPHONE. There is no reply channel; the app says so rather than implying
-  /// a conversation nobody is staffed to have.
-  ///
-  /// [urgency] is 'URGENT' or 'QUESTION'. [topic] is one of BUS_LATE,
-  /// CHILD_NOT_HOME, PICKUP_ARRANGEMENT, SOMETHING_ELSE.
   Future<Map<String, dynamic>> raiseConcern({
     required String studentId,
     required String urgency,
@@ -2157,18 +1790,6 @@ class ParentApi {
     return (json as Map).cast<String, dynamic>();
   }
 
-  /// What this family has raised and whether the office has picked it up.
-  ///
-  /// State only — never the office's own notes. A dispatcher writing "mother
-  /// sounds distressed, ringing back" is writing for colleagues, and a family
-  /// reading that verbatim would be the last time anybody wrote anything
-  /// useful there.
-  ///
-  /// [topic] narrows it to one of BUS_LATE, CHILD_NOT_HOME,
-  /// PICKUP_ARRANGEMENT, SOMETHING_ELSE. The server does the narrowing, not
-  /// this list: it answers with the thirty most recent rows, so a family with
-  /// thirty fresh "the bus is late" rows would otherwise have their collection
-  /// requests filtered off the end of a page that never arrived.
   Future<List<ConcernStatus>> concerns({String? studentId, String? topic}) async {
     final params = <String>[
       if (studentId != null) 'studentId=$studentId',
@@ -2181,13 +1802,6 @@ class ParentApi {
         .toList();
   }
 
-  /// Whether today's runs can still be skipped, per leg.
-  ///
-  /// Asked BEFORE the form is drawn so a parent is told "the bus has already
-  /// left" instead of being allowed to file something that will silently
-  /// suppress nothing. The cut-off is the server's to decide and it stores the
-  /// one it used, so a timetable edited next week cannot rewrite whether this
-  /// morning's request was in time.
   Future<SkipEligibility> skipRideEligibility(String studentId, {DateTime? on}) async {
     final date = on == null ? '' : '&date=${_day(on)}';
     final json = await _api.get('/parent/skip-rides/eligibility?studentId=$studentId$date')
@@ -2195,17 +1809,6 @@ class ParentApi {
     return SkipEligibility.fromJson(json);
   }
 
-  /// "She is not riding today."
-  ///
-  /// This is not a convenience feature, and the server's own docstring says so:
-  /// it SUPPRESSES A FALSE NO-SHOW ALARM. A child driven to school by her
-  /// mother all week is otherwise recorded as a no-show three mornings running,
-  /// the office is alerted three times, and an office that learns no-show
-  /// alerts are noise will ignore the one in November that means a seven year
-  /// old is standing on the wrong road in the dark.
-  ///
-  /// [idempotencyKey] is minted by the caller before the first attempt, so a
-  /// parent tapping twice on a bad connection files one skip rather than two.
   Future<Map<String, dynamic>> createSkipRide({
     required String studentId,
     required DateTime from,
@@ -2227,9 +1830,6 @@ class ParentApi {
     return (json as Map).cast<String, dynamic>();
   }
 
-  /// Withdraw a skip that has not been consumed yet — the child is riding after
-  /// all. The server puts the suppressed lines back on the manifest, which is
-  /// what makes the crew expect her again.
   Future<void> cancelSkipRide(String id, {String? note}) async {
     await _api.post('/parent/skip-rides/$id/cancel', {
       if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
@@ -2241,32 +1841,15 @@ class ParentApi {
     return Paged.from<Announcement>(json, Announcement.fromJson).rows;
   }
 
-  /// "I have read this one."
-  ///
-  /// Scoped to the caller by the server: a guardian marks their own reading,
-  /// never the other parent's. Idempotent, so a second tap on a notice already
-  /// read is a success rather than an error — which is what lets the screen
-  /// fire this on every open without first checking.
   Future<void> markAnnouncementRead(String id) async {
     await _api.post('/parent/announcements/$id/read');
   }
 
-  /// The files attached to one notice.
-  ///
-  /// Fetched only when a parent asks to see them: the list route already says
-  /// HOW MANY there are, which is all that is needed to decide whether to offer
-  /// the button, and pulling every attachment of every announcement on every
-  /// open would be a great deal of work for the few that are ever tapped.
   Future<List<AttachedFile>> announcementAttachments(String id) async {
     final json = await _api.get('/parent/announcements/$id/attachments?pageSize=50');
     return Paged.from<AttachedFile>(json, AttachedFile.fromJson).rows;
   }
 
-  /// Mark every notice this guardian can see as read.
-  ///
-  /// Answers with how many rows actually CHANGED — the ones already read are
-  /// not counted again — so the screen can say something true afterwards
-  /// instead of repeating the number it optimistically ticked off itself.
   Future<int> markAllAnnouncementsRead() async {
     final json = await _api.post('/parent/announcements/read-all');
     return json is Map ? ((json['marked'] as num?)?.toInt() ?? 0) : 0;
@@ -2277,100 +1860,36 @@ class ParentApi {
     return FeeSummary.fromJson(json);
   }
 
-  /// What this school will accept as a payment notice, and where to send the
-  /// money. Asked BEFORE any form is drawn, because a school that has switched
-  /// self-declaration off should be shown its own bank details and a telephone
-  /// number, not a send button.
-  ///
-  /// Null means this platform does not answer the parent money routes at all.
-  /// The gateway forwards `/parent/fees` to the money service by name and
-  /// sends everything else under `/parent/` to the students service, which has
-  /// no such handler and answers 404 — so `/parent/payments`, `/parent/receipts`
-  /// and `/parent/invoices` are unreachable until three lines are added to it.
-  /// Rather than let a parent meet three tabs of dead controls, the screen asks
-  /// this one question first and draws only what the platform in front of it
-  /// can actually answer. The day the gateway learns those paths, the rest of
-  /// the screen appears without an app release.
   Future<PaymentOptions?> paymentOptions() async {
     try {
       final json = await _api.get('/parent/payments/options') as Map<String, dynamic>;
       return PaymentOptions.fromJson(json);
     } on ApiException catch (e) {
-      // Only a 404 means "nothing here". A 403, a 502 or a timeout is a real
-      // answer about a route that exists, and belongs on screen as one.
       if (e.status == 404) return null;
       rethrow;
     }
   }
 
-  /// Every payment recorded against this household — the ones the office
-  /// entered as well as the ones the family declared.
-  ///
-  /// Deliberately unfiltered. The route understands only `pending` and
-  /// `confirmed`; any other value is ignored and the whole list comes back
-  /// anyway, so a "Rejected" filter sent to the server would look as though it
-  /// had worked and quietly show everything. Whatever the screen narrows, it
-  /// narrows here on the phone.
-  ///
-  /// Fifty is the server's ceiling, not a preference: asking for a hundred
-  /// silently yields fifty, so the count is asked for honestly and the screen
-  /// says when there is more than it is showing.
   Future<Paged<DeclaredPayment>> payments({int pageSize = 50}) async {
     final json = await _api.get('/parent/payments?pageSize=$pageSize');
     return Paged.from<DeclaredPayment>(json, DeclaredPayment.fromJson);
   }
 
-  /// The family's own receipts.
-  ///
-  /// Cancelled ones are left out by the server, which is what makes every row
-  /// here openable. The stubs hanging off a payment are not filtered that way,
-  /// so those are checked one by one instead.
   Future<Paged<PaymentReceipt>> receipts({int pageSize = 50}) async {
     final json = await _api.get('/parent/receipts?pageSize=$pageSize');
     return Paged.from<PaymentReceipt>(json, PaymentReceipt.fromJson);
   }
 
-  /// A link to the receipt as the office would print it.
-  ///
-  /// The first open renders the PDF and stores it, so it can be slow; the link
-  /// it answers with lives ten minutes, so it is fetched on every open and
-  /// never kept.
   Future<StoredDocument> receiptPdf(String receiptId) async {
     final json = await _api.get('/parent/receipts/$receiptId/pdf') as Map<String, dynamic>;
     return StoredDocument.fromJson(json);
   }
 
-  /// The same for a bill. A draft has never been issued and has no PDF, so the
-  /// screen does not offer this on one.
   Future<StoredDocument> invoicePdf(String invoiceId) async {
     final json = await _api.get('/parent/invoices/$invoiceId/pdf') as Map<String, dynamic>;
     return StoredDocument.fromJson(json);
   }
 
-  /// Tell the school a payment has been made.
-  ///
-  /// A notice, not a payment. It lands awaiting confirmation and moves no
-  /// balance until somebody at the office says so — which is the whole point:
-  /// an unverified screenshot must not settle a bill, and a family that cannot
-  /// see what it has already told the school pays twice.
-  ///
-  /// Exactly one of [invoiceId] and [studentId] is sent, and one of them always
-  /// is. A guardian whose children are in two households — after a separation,
-  /// or a remarriage — is refused outright when neither is named, because the
-  /// office cannot tell which household the money is for either. Sending both
-  /// risks the server's "that bill belongs to a different household".
-  ///
-  /// [idempotencyKey] is made once when the form opens rather than once per
-  /// tap: that is what turns a second tap on a bad connection into a replay
-  /// instead of a second claim the office has to unpick. A 409 means two
-  /// identical claims raced each other past the server's own replay lookup —
-  /// the same good outcome through a different door, so it is not an error.
-  ///
-  /// [proofAssetId] is the photograph of the transfer slip, already uploaded
-  /// through [uploadFile] — the server takes an id here, never a file, so a
-  /// failed upload costs a retry rather than a lost payment notice. Required
-  /// by money-service for BANK_TRANSFER wherever the school sets
-  /// requireProofForTransfer, which is the default.
   Future<void> declarePayment({
     required int amountIqd,
     required String method,
@@ -2389,14 +1908,10 @@ class ParentApi {
         'amountIqd': amountIqd,
         'method': method,
         'idempotencyKey': idempotencyKey,
-        // An empty string fails every one of these validators, so a field the
-        // parent did not fill in is left out of the body rather than sent
-        // blank. The server has its own defaults for all of them.
         if (invoiceId != null && invoiceId.isNotEmpty) 'invoiceId': invoiceId,
         if (studentId != null && studentId.isNotEmpty) 'studentId': studentId,
         if (paidAt != null) 'paidAt': paidAt.toUtc().toIso8601String(),
         if (ref.isNotEmpty) 'reference': ref,
-        // Two characters is the server's floor for a note; one is refused.
         if (note.length >= 2) 'notes': note,
         if (proofAssetId != null && proofAssetId.isNotEmpty) 'proofAssetId': proofAssetId,
       });
@@ -2406,15 +1921,6 @@ class ParentApi {
     }
   }
 
-  /// Take a declared payment back.
-  ///
-  /// Offered only while the payment is still awaiting confirmation: once the
-  /// office has dealt with it the server refuses, and a control that cannot
-  /// succeed should not be on screen.
-  ///
-  /// No reason is sent. The route takes an optional one of three characters or
-  /// more, and a confirmation dialog is not a place to type; the office sees
-  /// who withdrew it either way.
   Future<void> withdrawPayment(String paymentId) async {
     await _api.post('/parent/payments/$paymentId/withdraw');
   }
@@ -2423,7 +1929,6 @@ class ParentApi {
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 }
 
-/// A notice from the school office.
 class Announcement {
   Announcement({
     required this.id,
@@ -2449,21 +1954,10 @@ class Announcement {
   final bool pinned;
   final bool requiresAcknowledgement;
 
-  /// When this parent said they had read it, if they have.
-  ///
-  /// The server has always sent it; nothing read it, so the Got it button had
-  /// no way to know whether it still had anything to do.
   final DateTime? acknowledgedAt;
   final String authorName;
   final DateTime? readAt;
 
-  /// How many files the school attached — the scanned circular, the trip
-  /// consent form, the term timetable.
-  ///
-  /// The office has been able to attach these since the first version of the
-  /// screen and the list has always carried this number. Nothing read it, so a
-  /// school could publish a consent form and no family had any way to know it
-  /// was there, let alone open it.
   final int attachmentCount;
 
   factory Announcement.fromJson(Map<String, dynamic> j) => Announcement(
@@ -2484,7 +1978,6 @@ class Announcement {
       );
 }
 
-/// One month's bill.
 class InvoiceLine2 {
   InvoiceLine2({required this.description, required this.amountIqd, required this.studentName});
 
@@ -2543,7 +2036,6 @@ class Invoice2 {
       );
 }
 
-/// What the household owes, and when.
 class FeeSummary {
   FeeSummary({
     required this.outstandingIqd,
@@ -2570,16 +2062,12 @@ class FeeSummary {
       );
 }
 
-
-
-/// A person's name as the money service sends it, or null when there is none.
 String? _twoPartName(Map<String, dynamic>? j) {
   if (j == null) return null;
   final name = '${j['nameGiven'] ?? ''} ${j['nameFamily'] ?? ''}'.trim();
   return name.isEmpty ? null : name;
 }
 
-/// What this school will take, and how it wants to be told about it.
 class PaymentOptions {
   PaymentOptions({
     required this.allowSelfDeclare,
@@ -2589,50 +2077,22 @@ class PaymentOptions {
     required this.instructions,
   });
 
-  /// Whether this school takes payment notices through the app at all. Off, and
-  /// there is no form — only [instructions].
   final bool allowSelfDeclare;
 
-  /// Whether a bank transfer must carry a photograph of the slip.
-  ///
-  /// There is no parent upload route anywhere on the platform, so while this is
-  /// true a bank transfer declared from a phone is refused every time and the
-  /// form does not offer it. Kept as a field rather than buried in the screen
-  /// because this is the flag that turns it back on the day an upload route
-  /// exists.
   final bool requireProofForTransfer;
 
-  /// The methods the server will accept. Read from here rather than written out
-  /// in the app: CARD is a real payment method in the schema and is deliberately
-  /// not one a parent may claim, and that list is the server's to change.
   final List<String> methods;
 
   final String currencyCode;
 
-  /// The school's own words — which bank, which account, who to ring.
   final String? instructions;
 
-  /// The methods a parent can actually get accepted from this app today.
-  ///
-  /// This used to drop BANK_TRANSFER whenever [requireProofForTransfer] was
-  /// set — which is the default — and so hid the commonest way to pay in this
-  /// market from every family in it. Not out of policy: the app simply had no
-  /// way to send the slip the server would demand, so offering the method
-  /// would only have produced a 400 nobody could act on.
-  ///
-  /// It can now. The form uploads the photograph first and passes the id to
-  /// declarePayment, so the whole list is offered and the proof is asked for
-  /// where it is needed. Nothing is filtered here any more; the field is still
-  /// read, but by the form, to decide whether the slip is required or optional.
   List<String> get usableMethods => methods;
 
   factory PaymentOptions.fromJson(Map<String, dynamic> j) {
     final written = (j['paymentInstructions'] as String?)?.trim() ?? '';
     return PaymentOptions(
       allowSelfDeclare: (j['allowParentSelfDeclare'] ?? false) as bool,
-      // The server's own default, repeated here so a field missing from an
-      // older deployment errs towards refusing the transfer form rather than
-      // towards showing one that always fails.
       requireProofForTransfer: (j['requireProofForTransfer'] ?? true) as bool,
       methods: ((j['methods'] as List?) ?? const []).map((e) => '$e').toList(),
       currencyCode: (j['currencyCode'] ?? 'IQD') as String,
@@ -2641,13 +2101,6 @@ class PaymentOptions {
   }
 }
 
-/// A receipt, in the two shapes the platform sends it.
-///
-/// The list route sends the whole thing — serial, amount, method, the bill and
-/// the child it names — and never sends a cancelled one. The stub hanging off a
-/// payment carries only enough to open it, plus the one field the list cannot
-/// have: [voidedAt]. A cancelled receipt has no PDF to open, so the control is
-/// drawn from [open] rather than from an id being present.
 class PaymentReceipt {
   PaymentReceipt({
     required this.id,
@@ -2686,7 +2139,6 @@ class PaymentReceipt {
       );
 }
 
-/// One payment against this household, and what the office made of it.
 class DeclaredPayment {
   DeclaredPayment({
     required this.id,
@@ -2710,7 +2162,6 @@ class DeclaredPayment {
   final String currencyCode;
   final String method;
 
-  /// PENDING_CONFIRMATION, CONFIRMED, REJECTED, REVERSED, FAILED or WITHDRAWN.
   final String status;
 
   final DateTime? paidAt;
@@ -2726,20 +2177,11 @@ class DeclaredPayment {
   bool get awaiting => status == 'PENDING_CONFIRMATION';
   bool get confirmed => status == 'CONFIRMED';
 
-  /// What the withdraw route writes in front of the family's own reason.
   static const _withdrawnMark = 'Withdrawn by the family';
 
-  /// The family took this back themselves.
-  ///
-  /// The schema has a WITHDRAWN state and the withdraw route does not use it —
-  /// it writes REJECTED with this marker on the reason. Printing the raw status
-  /// would tell a parent the school had refused a payment they cancelled
-  /// themselves, so the marker, not the status, is what the screen branches on.
   bool get withdrawnByFamily =>
       status == 'REJECTED' && (rejectedReason ?? '').startsWith(_withdrawnMark);
 
-  /// Why it was refused, in the office's words — with the withdraw marker taken
-  /// off, because the screen already says who cancelled it.
   String? get refusal {
     final reason = rejectedReason?.trim() ?? '';
     if (reason.isEmpty) return null;
@@ -2749,17 +2191,8 @@ class DeclaredPayment {
     return rest.isEmpty ? null : rest;
   }
 
-  /// When the money moved, as far as anybody knows.
-  ///
-  /// Both of the server's dates are nullable and an office-entered row often
-  /// carries neither, so this falls back to when the row was written rather
-  /// than printing a dash where a date belongs.
   DateTime get when => paidAt ?? receivedAt ?? createdAt;
 
-  /// The receipt worth offering, if there is one.
-  ///
-  /// Cancelled ones are skipped: the PDF route refuses them, and nothing that
-  /// is not yet confirmed has a receipt at all.
   PaymentReceipt? get receipt {
     for (final r in receipts) {
       if (r.open) return r;
@@ -2790,17 +2223,12 @@ class DeclaredPayment {
   }
 }
 
-/// A PDF the platform rendered and stored, and a link to it that dies in ten
-/// minutes.
 class StoredDocument {
   StoredDocument({required this.url, required this.filename, required this.latinOnly});
 
   final String url;
   final String filename;
 
-  /// True when this deployment has no Arabic-capable font, so a Kurdish or
-  /// Arabic document has come out in Latin letters. Worth saying out loud
-  /// rather than letting a parent think the school printed it wrong.
   final bool latinOnly;
 
   factory StoredDocument.fromJson(Map<String, dynamic> j) => StoredDocument(
@@ -2809,17 +2237,6 @@ class StoredDocument {
         latinOnly: (j['latinOnly'] ?? false) as bool,
       );
 }
-
-/* ---------------------------------------------------------------------------
- * Subject naming
- *
- * The API resolves a subject's name server-side from the X-Lang header and
- * sends one finished string. These helpers exist only to keep a handset that
- * has not updated yet working against the new server for one release — the Map
- * branch reads the old {name, nameEn, ...} shape.
- *
- * Delete both once the old APK is out of circulation.
- * ------------------------------------------------------------------------- */
 
 String _subjectOf(Map<String, dynamic> j, {String? fallback}) {
   final raw = j['subject'];
@@ -2836,7 +2253,6 @@ String? _colorOf(Map<String, dynamic> j) {
   return null;
 }
 
-/// A correction a parent has asked the office to make to their own record.
 class ProfileChange {
   ProfileChange({
     required this.id,
@@ -2850,20 +2266,13 @@ class ProfileChange {
 
   final String id;
 
-  /// PENDING, APPROVED, REJECTED or CANCELLED — the same four the office's
-  /// screen shows, and the same four a leave request has.
   final String status;
   final DateTime requestedAt;
 
-  /// What was asked for, as label and value, ready to print. Built from
-  /// whichever of the name parts and the email the request actually carried,
-  /// so a correction to one field does not render four empty rows.
   final List<({String field, String value})> fields;
 
   final String? reason;
 
-  /// Why the office refused, in their words. The reason a rejection is worth
-  /// showing at all.
   final String? decisionNote;
   final DateTime? decidedAt;
 
@@ -2876,8 +2285,6 @@ class ProfileChange {
       if (v is String) asked.add((field: key, value: v));
     }
 
-    // The server may send the proposal flat or under a 'proposed' object;
-    // both shapes are read rather than guessing which one this build talks to.
     final flat = (j['proposed'] as Map<String, dynamic>?) ?? j;
     for (final key in const ['nameGiven', 'nameFather', 'nameGrandfather', 'nameFamily', 'email']) {
       final v = flat[key];

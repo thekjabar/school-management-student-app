@@ -14,12 +14,6 @@ import '../../ui/pickers.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
 
-/// Every day off the family has asked the office for.
-///
-/// The list is the point, not the form: a parent opens this far more often to
-/// check whether Tuesday was approved than to ask for a new day. So the request
-/// button floats over the list rather than sitting at the top of it, and the
-/// tabs are the four answers the office can give.
 class LeaveScreen extends StatefulWidget {
   const LeaveScreen({super.key, required this.child});
 
@@ -87,10 +81,6 @@ class _LeaveScreenState extends State<LeaveScreen> {
                     padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 90),
                     load: () async {
                       final all = await ParentApi.instance.leaveRequests();
-                      // The API returns every child on the account; this screen
-                      // is about one of them, and mixing siblings here has
-                      // caused a parent to think a request was approved when it
-                      // was their other child's.
                       return all
                           .where((r) =>
                               r.studentId == null || r.studentId == widget.child.studentId)
@@ -128,8 +118,6 @@ class _LeaveScreenState extends State<LeaveScreen> {
   List<LeaveRequestItem> _visible(List<LeaveRequestItem> rows) {
     final want = _states[_tab];
     final list = want == null ? [...rows] : rows.where((r) => r.status == want).toList();
-    // Newest first: a decision on last week's request is the thing being
-    // looked for, not the summer holiday six weeks ago.
     list.sort((a, b) => b.fromDate.compareTo(a.fromDate));
     return list;
   }
@@ -146,7 +134,6 @@ class _LeaveScreenState extends State<LeaveScreen> {
   }
 }
 
-/// The one thing this screen is FOR, floating over the one thing it shows.
 class _AskButton extends StatelessWidget {
   const _AskButton({required this.onTap});
 
@@ -191,10 +178,6 @@ class _AskButton extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * One request
- * ------------------------------------------------------------------------- */
-
 class _RequestCard extends StatelessWidget {
   const _RequestCard({required this.item, required this.onCancelled});
 
@@ -205,9 +188,6 @@ class _RequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final days = item.toDate.difference(item.fromDate).inDays + 1;
     final (statusColour, statusWord) = _status(item.status);
-    // The circle is coloured by the REASON — a plane is always amber, a doctor
-    // always green — because that is what makes a list of six scannable. A
-    // refusal overrides it, because that is the one row a parent must not miss.
     final tint = item.status == 'REJECTED' ? AppTheme.rose : _tintFor(item.kind);
 
     return Card16(
@@ -217,8 +197,6 @@ class _RequestCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Level with the title, not floating in the middle of a card
-            // whose height depends on how long the reason ran.
             Column(
               children: [
                 Container(
@@ -304,11 +282,6 @@ class _RequestCard extends StatelessWidget {
   }
 
   Future<void> _open(BuildContext context) async {
-    // Leave is accepted the moment it is reported, so gating this on PENDING
-    // meant a family who mistyped a date could never take it back — the state
-    // they were waiting for had stopped happening. A day that has already
-    // finished stays put: the register for it is a record of what happened, not
-    // a plan. The server enforces the same two rules.
     if (item.status != 'PENDING' && item.status != 'APPROVED') return;
     final DateTime today = DateTime.now();
     if (item.toDate.isBefore(DateTime(today.year, today.month, today.day))) return;
@@ -392,9 +365,6 @@ class _AskSheet extends StatefulWidget {
 }
 
 class _AskSheetState extends State<_AskSheet> {
-  /// The seven reasons a child misses school here, in the order a parent is
-  /// likeliest to need them. Cards rather than a dropdown: choosing why is the
-  /// whole form, and a list you have to open is a list nobody reads.
   List<(String, String, IconData)> get _kinds => [
         ('SICK', t('leave.sick'), Icons.sick_rounded),
         ('MEDICAL_APPOINTMENT', t('leave.medical'), Icons.medical_services_rounded),
@@ -414,18 +384,9 @@ class _AskSheetState extends State<_AskSheet> {
   bool _busy = false;
   String? _error;
 
-  /// The uploaded note, if the family attached one. Uploaded BEFORE the request
-  /// is filed, because the server takes an asset id rather than a file — so a
-  /// failed upload costs a retry rather than a lost leave request.
   String? _noteAssetId;
   bool _uploading = false;
 
-  /// Take a photograph of the note, or pick one already on the phone.
-  ///
-  /// Compressed on the way out. A modern handset camera produces four or five
-  /// megabytes, most families here are on mobile data, and a doctor's note is
-  /// legible at a fraction of that — an upload that takes two minutes on the
-  /// school run is one nobody finishes.
   Future<void> _attachNote() async {
     final source = await pickOne<ImageSource>(
       context,
@@ -460,10 +421,6 @@ class _AskSheetState extends State<_AskSheet> {
       final bytes = await shot.readAsBytes();
       final id = await ParentApi.instance.uploadFile(
         bytes: bytes,
-        // image_picker re-encodes to JPEG whenever imageQuality is set, so the
-        // name and the type must say JPEG whatever the original was — the
-        // upload route checks the part's content type against the kind it was
-        // told to expect and refuses a mismatch.
         filename: 'note.jpg',
         mime: 'image/jpeg',
         kind: 'MEDICAL_DOCUMENT',
@@ -518,10 +475,6 @@ class _AskSheetState extends State<_AskSheet> {
       _error = null;
     });
     try {
-      // Prove it is the guardian holding the phone, not whoever picked it up.
-      // A leave request takes a child off the register and tells the driver
-      // not to wait, so it is the one thing in this app that acts on the
-      // school on the child's behalf.
       final ok = await Biometrics.confirm(reason: Biometrics.leaveReason);
       if (!ok) {
         if (mounted) setState(() => _error = t('leave.notConfirmed'));
@@ -592,9 +545,6 @@ class _AskSheetState extends State<_AskSheet> {
               const SizedBox(height: 9),
               LayoutBuilder(
                 builder: (context, box) {
-                  // Three across, as the design lays them out. A Wrap would
-                  // reflow into ragged rows the moment a translation is one
-                  // word longer, and this grid is the form's backbone.
                   const gap = 8.0;
                   final w = (box.maxWidth - gap * 2) / 3;
                   return Wrap(
@@ -665,14 +615,6 @@ class _AskSheetState extends State<_AskSheet> {
                 ),
               ),
 
-              // The doctor's note.
-              //
-              // The schema has carried `doctorNoteAssetId` and the DTO has
-              // accepted it since leave requests shipped, and identity-service
-              // built `/parent/uploads` specifically because a guardian holds
-              // no upload permission and therefore could not send one. Nothing
-              // ever called either, so every note arrived on paper at the gate
-              // and a clerk photographed it.
               const SizedBox(height: 14),
               _NoteAttachment(
                 studentId: widget.child.studentId,
@@ -787,8 +729,6 @@ class _Label extends StatelessWidget {
   }
 }
 
-/// One reason, with a tick on the chosen one.
-/// The label box is fixed at this many lines so every tile is the same height.
 const int _labelLines = 2;
 const double _labelSize = 11.5;
 const double _labelHeight = 1.3;
@@ -814,14 +754,6 @@ class _ReasonCard extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Stack(
-        // passthrough, not the default loose.
-        //
-        // The Stack is exactly one column wide, because the grid wraps it in a
-        // SizedBox. Loose constraints let the Container inside shrink-wrap to
-        // its own label instead — so "Unwell" came out narrow, "Doctor or
-        // dentist" came out wide, no two columns lined up, and the tick, which
-        // is positioned against the STACK's edge, floated out in the gap a
-        // hundred pixels from the tile it marks.
         fit: StackFit.passthrough,
         clipBehavior: Clip.none,
         children: [
@@ -843,12 +775,6 @@ class _ReasonCard extends StatelessWidget {
               children: [
                 Icon(icon, size: 19, color: on ? tint : AppTheme.textMuted),
                 const SizedBox(height: 8),
-                // Both lines are reserved whether or not this label needs them.
-                //
-                // Otherwise a label that wraps makes its tile taller than the
-                // ones beside it and the row sits crooked — which is what the
-                // longer translations do, not just the English. Reserving the
-                // second line costs the height the two-line tile already had.
                 SizedBox(
                   height: _labelSize * _labelHeight * _labelLines,
                   width: double.infinity,
@@ -930,12 +856,6 @@ class _DateField extends StatelessWidget {
   }
 }
 
-/// The doctor's note control on the request sheet.
-///
-/// Three states and no more: nothing attached, uploading, attached. There is
-/// deliberately no preview of the file — it is a photograph of a medical
-/// document, the parent has just this second taken it, and rendering it back at
-/// them in a sheet that a clerk may be standing over adds nothing.
 class _NoteAttachment extends StatelessWidget {
   const _NoteAttachment({
     required this.studentId,

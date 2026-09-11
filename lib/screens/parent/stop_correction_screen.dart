@@ -2,8 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-// latlong2 exports a generic Path<T> for geodesic paths, which shadows
-// dart:ui's Path.
 import 'package:latlong2/latlong.dart' hide Path;
 
 import '../../api/client.dart';
@@ -15,11 +13,6 @@ import '../../ui/kit.dart';
 import '../../ui/map_tiles.dart';
 import '../../ui/screen_kit.dart';
 
-/// One of the stops a child actually uses, in the shape this screen needs.
-///
-/// The id comes from /parent/children/:id/transport, which is the only parent
-/// endpoint that returns one — /parent/home gives the name and the pin but no
-/// id, so the two are paired by their leg rather than by name.
 class StopToFix {
   const StopToFix({
     required this.id,
@@ -33,40 +26,16 @@ class StopToFix {
   final String name;
   final String? landmark;
 
-  /// Where the school has the pin, when the office has placed one at all.
   final LatLng? at;
 
-  /// The morning stop, as opposed to the afternoon one.
   final bool pickup;
 }
 
-/// "My stop is on the wrong side of the road."
-///
-/// The one thing a guardian may write about the stop registry, and until now
-/// nothing in any app had ever called it. A family that could see the pin was in
-/// the next street had exactly one way to say so: telephone an office that might
-/// not be open, and hope somebody wrote it down.
-///
-/// WHAT THIS IS NOT. It is not a change. The parent's pin does not move the
-/// stop, the manifest, the route or the bus — the office reads the report,
-/// stands somewhere or telephones somebody, and then accepts or rejects it. Any
-/// wording here that reads as "done" would be a lie that a family plans a
-/// morning around: they would send this at nine and put their child on a corner
-/// the bus is not coming to at seven the next day. So the screen says request
-/// before it says anything else, says it again on the receipt, and never shows
-/// the stop as moved.
-///
-/// The pin is optional, because the server makes it optional. A parent who can
-/// only say "it is across the main road" has still told the office the one thing
-/// it could not know, and demanding coordinates from somebody standing in the
-/// street with a child on each hand would lose that report altogether.
 class StopCorrectionScreen extends StatefulWidget {
   const StopCorrectionScreen({super.key, required this.child, required this.stops});
 
   final Child child;
 
-  /// Never empty — the card that opens this is only drawn when the child has a
-  /// stop with an id.
   final List<StopToFix> stops;
 
   @override
@@ -76,20 +45,13 @@ class StopCorrectionScreen extends StatefulWidget {
 class _StopCorrectionScreenState extends State<StopCorrectionScreen> {
   final _reason = TextEditingController();
 
-  /// Which of the child's stops this report is about. Almost always the only
-  /// one: most families are collected and set down on the same corner.
   int _chosen = 0;
 
-  /// Where the parent says the bus should stop. Null until they place it, and
-  /// null is a perfectly good report.
   LatLng? _proposed;
 
   bool _busy = false;
   String? _error;
 
-  /// Set once the office has it. The form is replaced by the receipt rather than
-  /// left on screen, so nobody sends the same correction three times while
-  /// wondering whether the first went.
   bool _sent = false;
 
   StopToFix get _stop => widget.stops[_chosen];
@@ -142,9 +104,6 @@ class _StopCorrectionScreenState extends State<StopCorrectionScreen> {
         _Explainer(tint: tint),
         const SizedBox(height: kCardGap),
 
-        // Only when the child is collected at one corner and set down at
-        // another. Where they are the same stop there is nothing to choose, and
-        // a chooser with one answer is a question that should not be asked.
         if (widget.stops.length > 1) ...[
           _Label(t('stopfix.whichStop')),
           const SizedBox(height: 7),
@@ -162,9 +121,6 @@ class _StopCorrectionScreenState extends State<StopCorrectionScreen> {
                     tint: tint,
                     onTap: () => setState(() {
                       _chosen = i;
-                      // The pin belonged to the other stop. Keeping it would
-                      // send the office a correction pointing at a corner the
-                      // parent never looked at.
                       _proposed = null;
                     }),
                   ),
@@ -264,10 +220,6 @@ class _StopCorrectionScreenState extends State<StopCorrectionScreen> {
 
         _Label(t('stopfix.reason')),
         const SizedBox(height: 8),
-        // The four sentences the office actually receives, as one tap each.
-        // They fill the box rather than sending on their own: what a parent adds
-        // after the tap — which gate, which side, which turning — is the part
-        // that tells a reviewer where to look.
         Wrap(
           spacing: 7,
           runSpacing: 7,
@@ -297,9 +249,6 @@ class _StopCorrectionScreenState extends State<StopCorrectionScreen> {
             controller: _reason,
             maxLines: 5,
             minLines: 3,
-            // The server refuses anything over 500 characters, so the box
-            // refuses it first rather than letting somebody write a page and
-            // lose it to a validation error.
             maxLength: 500,
             textCapitalization: TextCapitalization.sentences,
             style: const TextStyle(fontSize: 14.5, height: 1.4),
@@ -344,7 +293,6 @@ class _StopCorrectionScreenState extends State<StopCorrectionScreen> {
     );
   }
 
-  /// Put a suggested sentence in the box without ever taking words off a parent.
   void _useSuggestion(String phrase) {
     final typed = _reason.text.trim();
     setState(() {
@@ -354,13 +302,6 @@ class _StopCorrectionScreenState extends State<StopCorrectionScreen> {
     });
   }
 
-  /// The big map, on its own screen.
-  ///
-  /// Not inline: this page scrolls, and a draggable map inside a scrolling page
-  /// eats the drag meant for the page — silently, which is how a pin gets moved
-  /// by somebody who was only trying to reach the button. Full screen also gives
-  /// the zoom that "the other side of the road" actually needs; that difference
-  /// is fifteen metres.
   Future<void> _pickPin() async {
     final stop = _stop;
     final picked = await Navigator.of(context).push<LatLng>(
@@ -377,9 +318,6 @@ class _StopCorrectionScreenState extends State<StopCorrectionScreen> {
 
   Future<void> _send() async {
     final reason = _reason.text.trim();
-    // The server's own floor is four characters. Checking it here means the
-    // parent is told what to do about it instead of being handed a validation
-    // error from a framework.
     if (reason.length < 4) {
       setState(() => _error = t('stopfix.reasonShort'));
       return;
@@ -399,8 +337,6 @@ class _StopCorrectionScreenState extends State<StopCorrectionScreen> {
       if (!mounted) return;
       setState(() => _sent = true);
     } on ApiException catch (e) {
-      // Includes the 403 a guardian gets for a stop none of their children
-      // ride, which arrives from the server with the office's own wording.
       if (mounted) setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -408,8 +344,6 @@ class _StopCorrectionScreenState extends State<StopCorrectionScreen> {
   }
 }
 
-/// Metres between two pins — the same haversine the office's queue uses to show
-/// a reviewer whether this is a nudge or a different street.
 int _metresBetween(LatLng a, LatLng b) {
   const r = 6371000.0;
   double rad(double d) => d * math.pi / 180;
@@ -421,10 +355,6 @@ int _metresBetween(LatLng a, LatLng b) {
           math.pow(math.sin(dLon / 2), 2);
   return (2 * r * math.asin(math.min(1, math.sqrt(h)))).round();
 }
-
-/* ---------------------------------------------------------------------------
- * What this does, and what it does not
- * ------------------------------------------------------------------------- */
 
 class _Explainer extends StatelessWidget {
   const _Explainer({required this.tint});
@@ -474,10 +404,6 @@ class _Explainer extends StatelessWidget {
   }
 }
 
-/// The receipt.
-///
-/// It says the office has it and that nothing has moved, in that order, because
-/// the second half is the part a family will otherwise assume the other way.
 class _Receipt extends StatelessWidget {
   const _Receipt({required this.tint});
 
@@ -551,15 +477,6 @@ class _Receipt extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The pin
- * ------------------------------------------------------------------------- */
-
-/// The still picture of both pins, and the way into the picker.
-///
-/// Deliberately not interactive. It shows where the school has the stop and,
-/// once one is placed, where the parent says it should be — with a dotted line
-/// between them, which is a distance and not a walk.
 class _PinPreview extends StatelessWidget {
   const _PinPreview({
     required this.current,
@@ -599,18 +516,9 @@ class _PinPreview extends StatelessWidget {
             children: [
               Positioned.fill(
                 child: FlutterMap(
-                  // A new camera whenever the pins change: the preview is
-                  // rebuilt, not panned, and there is no view of anybody's to
-                  // preserve on a map they cannot touch.
                   key: ValueKey('${centre.latitude},${centre.longitude},${points.length}'),
                   options: MapOptions(
                     initialCenter: centre,
-                    // With nothing pinned at all, [centre] is the [_erbil]
-                    // fallback and belongs to no family. Opening tight on it
-                    // would draw one city's streets under "Where should the bus
-                    // stop?" — a neighbourhood the parent has no reason to
-                    // recognise, presented as theirs. The region instead, for
-                    // the same reason [_regionZoom] exists in the picker.
                     initialZoom: points.isEmpty
                         ? _regionZoom
                         : points.length > 1
@@ -667,8 +575,6 @@ class _PinPreview extends StatelessWidget {
                 ),
               ),
 
-              // Which pin is which. Two identical dots on a map is a puzzle, and
-              // the whole point here is the difference between them.
               PositionedDirectional(
                 start: 10,
                 top: 10,
@@ -784,46 +690,19 @@ class _Dot extends StatelessWidget {
       );
 }
 
-/// Erbil, so a family whose stop has never been pinned starts somewhere they
-/// recognise rather than in the Atlantic.
-///
-/// It is a place to open the map, never an answer. A stop that has never been
-/// pinned is the exact case this screen was written for, so this fallback is on
-/// the busiest path through it, and a green button over an untouched map turns
-/// it into a proposal: a family in Sulaymaniyah taps once and the office
-/// receives a considered-looking pin a hundred kilometres from the child.
-/// [_PinPickerState._canUse] is what stops that.
 const _erbil = LatLng(36.1901, 44.0091);
 
-/// The opening zoom when there is a pin to open on — close enough to read the
-/// two sides of a road apart, which is what most of these reports are about.
 const _stopZoom = 17.5;
 
-/// The opening zoom when there is not. The whole region rather than one city:
-/// a parent in Sulaymaniyah or Duhok has to be able to SEE their town before
-/// they can drag to it, and a map that opens tight on Erbil quietly invites the
-/// button to be pressed on Erbil.
 const _regionZoom = 7.0;
 
-/// No pin may be sent from further out than this. At zoom 15 a phone screen is
-/// a kilometre and a half of city and one pixel is about four metres; at 16 it
-/// is a block or two. Below that, coordinates carry six decimal places of a
-/// precision the parent never had.
 const _streetZoom = 16.0;
 
-/// The full-screen picker: drag the map, the pin stays in the middle.
-///
-/// The pin is drawn over the map at dead centre rather than as a marker on it —
-/// a pin you drag with a finger spends the whole drag underneath that finger,
-/// which is the one moment you need to see where it is.
 class _PinPicker extends StatefulWidget {
   const _PinPicker({required this.start, required this.current});
 
-  /// Where the map opens: the pin already placed, or the school's own.
   final LatLng? start;
 
-  /// The school's pin, drawn as a marker so the parent can see what they are
-  /// moving away from.
   final LatLng? current;
 
   @override
@@ -831,38 +710,15 @@ class _PinPicker extends StatefulWidget {
 }
 
 class _PinPickerState extends State<_PinPicker> {
-  /// A pin somebody actually chose — the parent's own, or the school's. Null is
-  /// the dangerous case: the map still has to open somewhere, and that
-  /// somewhere belongs to no family.
   late final LatLng? _anchor = widget.start ?? widget.current;
 
   late LatLng _at = _anchor ?? _erbil;
   late double _zoom = _anchor != null ? _stopZoom : _regionZoom;
 
-  /// Has the parent moved the map's CENTRE — not merely zoomed it? Only
-  /// load-bearing when there was no anchor, where the centre is [_erbil] and
-  /// belongs to no family.
-  ///
-  /// Zoom deliberately does not count. Pinching or double-tapping on the middle
-  /// of the screen leaves the pin exactly where the map opened it, so a map
-  /// taken from the whole region down to one street without ever being dragged
-  /// is still offering the Erbil citadel. Counting a zoom as "moved" would also
-  /// flip [_hint] to "zoom in" on the parent's first pinch and then light the
-  /// button for them — telling somebody in Duhok to keep doing the one thing
-  /// that cannot make the pin theirs.
   bool _panned = false;
 
-  /// May this pin be sent to the office?
-  ///
-  /// Not a permission — a question about whether the coordinates mean anything.
-  /// A pin has to be somewhere the parent went (an untouched fallback is not),
-  /// and it has to have been chosen from close enough in to see which side of
-  /// the road it is on, because that is the report. The button is dead until
-  /// both hold, so the one thing a parent cannot do here is send the place the
-  /// map happened to open on.
   bool get _canUse => (_anchor != null || _panned) && _zoom >= _streetZoom;
 
-  /// Why the button is dead, phrased as the thing to do about it.
   String get _hint => _anchor == null && !_panned
       ? t('stopfix.startNotYours')
       : t('stopfix.zoomIn');
@@ -891,24 +747,14 @@ class _PinPickerState extends State<_PinPicker> {
                               initialZoom: _zoom,
                               minZoom: 4,
                               maxZoom: 19,
-                              // North stays up, so the streets match the ones in
-                              // somebody's head.
                               interactionOptions: const InteractionOptions(
                                 flags: InteractiveFlag.pinchZoom |
                                     InteractiveFlag.drag |
                                     InteractiveFlag.doubleTapZoom,
                               ),
-                              // Gesture-only, so the camera the framework
-                              // settles on during the first layout cannot count
-                              // as the parent having chosen anything. Drag,
-                              // pinch and double-tap all arrive here with
-                              // hasGesture true.
                               onPositionChanged: (camera, hasGesture) {
                                 if (!hasGesture) return;
                                 setState(() {
-                                  // Compared before _at is replaced, and latched
-                                  // once true: a drag that wanders back to where
-                                  // it started was still a drag.
                                   _panned = _panned ||
                                       camera.center.latitude != _at.latitude ||
                                       camera.center.longitude != _at.longitude;
@@ -940,9 +786,6 @@ class _PinPickerState extends State<_PinPicker> {
                         IgnorePointer(
                           child: Center(
                             child: Padding(
-                              // Lifted by half its own height so the point sits
-                              // on the centre rather than the middle of the
-                              // teardrop.
                               padding: const EdgeInsets.only(bottom: 34),
                               child: Icon(
                                 Icons.location_on,
@@ -992,8 +835,6 @@ class _PinPickerState extends State<_PinPicker> {
                     ),
             ),
             if (MapTiles.configured) ...[
-              // Said beside the dead button rather than only on the map, so the
-              // answer is where the finger already is.
               if (!_canUse)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(kGutter, 10, kGutter, 0),
@@ -1027,10 +868,6 @@ class _PinPickerState extends State<_PinPicker> {
     );
   }
 }
-
-/* ---------------------------------------------------------------------------
- * Small parts
- * ------------------------------------------------------------------------- */
 
 class _LegChoice extends StatelessWidget {
   const _LegChoice({

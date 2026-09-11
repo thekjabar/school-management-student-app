@@ -6,18 +6,6 @@ import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
 import 'async.dart';
 
-/// The files the school attached to a notice.
-///
-/// One widget, three audiences. The office has been able to attach a scanned
-/// circular, a consent form or a term timetable since announcements were built,
-/// and every list route has always carried the COUNT — but nothing in any of
-/// the three apps ever fetched the files, so a school could publish a form that
-/// no parent, teacher or driver had any way to open.
-///
-/// Loaded when the notice is opened rather than with the list, because the
-/// count is all that is needed to decide whether to draw this at all, and
-/// pulling every attachment of every announcement on every open would be a
-/// great deal of work for the few that are ever tapped.
 class AttachmentList extends StatefulWidget {
   const AttachmentList({
     super.key,
@@ -26,7 +14,6 @@ class AttachmentList extends StatefulWidget {
     required this.tint,
   });
 
-  /// From the list route, so the caller knows whether to draw this at all.
   final int count;
   final Future<List<AttachedFile>> Function() load;
   final Color tint;
@@ -51,9 +38,6 @@ class _AttachmentListState extends State<AttachmentList> {
       final files = await widget.load();
       if (mounted) setState(() => _files = files);
     } catch (_) {
-      // The notice itself is the thing that matters and it is already on
-      // screen. A failed attachment list says so and offers to try again,
-      // rather than taking the words down with it.
       if (mounted) setState(() => _failed = true);
     }
   }
@@ -84,8 +68,6 @@ class _AttachmentListState extends State<AttachmentList> {
     return Icons.insert_drive_file_rounded;
   }
 
-  /// Sizes as a family reads them, because "2.4 MB" is the difference between
-  /// tapping now and waiting for wifi.
   static String _size(int? bytes) {
     if (bytes == null || bytes <= 0) return '';
     if (bytes < 1024) return '$bytes B';

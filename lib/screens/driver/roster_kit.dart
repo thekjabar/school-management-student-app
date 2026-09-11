@@ -5,23 +5,8 @@ import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/format.dart';
 
-/// The pieces both driver screens use to draw a child on a stop.
-///
-/// The run screen and the home screen ask the same question of the same rows —
-/// who is here, what has become of them, what can I do about it — and they used
-/// to answer it in two different hands. That drift is not cosmetic: the dwell
-/// hold once existed on one screen only, which made the other screen the way
-/// round it. Anything true of a rider row belongs here, once.
-
-/// Which children a roster is showing.
 enum RosterFilter { all, toPickUp, aboard, done }
 
-/// What has become of this child, said in the reader's language.
-///
-/// The place words matter and are not interchangeable. On the morning run a
-/// child is only "at school" once the bus has actually reached the gate —
-/// [schoolReached] — otherwise they were set down early, which is an amber
-/// state and a safeguarding question, not a completed journey.
 ({String text, Color tone}) riderStatus(
   RiderOnStop r, {
   required String leg,
@@ -48,13 +33,9 @@ enum RosterFilter { all, toPickUp, aboard, done }
   if (r.notTravelling) {
     return (text: t('driver.notRiding'), tone: AppTheme.rose);
   }
-  // Said out loud rather than left blank. A row with nothing under the name
-  // reads as a row the app has no opinion about, when in fact it is the only
-  // kind of row still owed something.
   return (text: t('driver.waitingAtStop'), tone: AppTheme.textMuted);
 }
 
-/// The colour a child's seat chip takes, matching [riderStatus].
 Color riderTone(RiderOnStop r) {
   if (r.alightedAt != null) return AppTheme.green;
   if (r.boardedAt != null) return AppTheme.blue;
@@ -62,7 +43,6 @@ Color riderTone(RiderOnStop r) {
   return AppTheme.textMuted;
 }
 
-/// The soft version of the same, for the chip's ground.
 Color riderWash(RiderOnStop r) {
   if (r.alightedAt != null) return AppTheme.greenSoft;
   if (r.boardedAt != null) return AppTheme.blueSoft;
@@ -70,7 +50,6 @@ Color riderWash(RiderOnStop r) {
   return AppTheme.neutralSoft;
 }
 
-/// The seat number, or a dash when the school does not number seats.
 class SeatChip extends StatelessWidget {
   const SeatChip({super.key, required this.rider, this.size = 38});
 
@@ -100,7 +79,6 @@ class SeatChip extends StatelessWidget {
   }
 }
 
-/// One filter above a roster.
 class RosterChip extends StatelessWidget {
   const RosterChip({
     super.key,
@@ -145,7 +123,6 @@ class RosterChip extends StatelessWidget {
   }
 }
 
-/// The whole filter row, with the counts worked out from the roster itself.
 class RosterFilters extends StatelessWidget {
   const RosterFilters({
     super.key,
@@ -210,14 +187,6 @@ class RosterFilters extends StatelessWidget {
   }
 }
 
-/// A labelled action on a rider's row.
-///
-/// 44 high and captioned with a word rather than an icon alone. These are
-/// pressed one-handed, standing in an aisle, by somebody who has just looked up
-/// from the road — and a green arrow beside a red cross is two guesses rather
-/// than two answers. A null [onTap] draws it plainly dead: the server would
-/// refuse the record anyway, and a live-looking button that fails teaches the
-/// driver the app is broken rather than that a step is missing.
 class WordButton extends StatelessWidget {
   const WordButton({
     super.key,
@@ -229,8 +198,6 @@ class WordButton extends StatelessWidget {
 
   final String label;
 
-  /// A glyph beside the word. The word carries the meaning; the icon is what
-  /// the eye finds first when it comes back from the road.
   final IconData? icon;
   final Color colour;
   final VoidCallback? onTap;

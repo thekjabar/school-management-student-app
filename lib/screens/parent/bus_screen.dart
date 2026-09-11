@@ -3,9 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
-// latlong2 exports a generic Path<T> for geodesic paths, which shadows
-// dart:ui's Path. Nothing here paints one any more, but nothing here should
-// ever pick up the wrong one by accident either.
 import 'package:latlong2/latlong.dart' hide Path;
 
 import '../../api/directions.dart';
@@ -26,11 +23,6 @@ import 'skip_ride_screen.dart';
 import 'stop_correction_screen.dart';
 import 'track_screen.dart';
 
-/// Where the bus is, and when it gets there.
-///
-/// One question, asked at 07:40 with a coat half on. The ETA is the largest
-/// thing on the screen; everything under it is what a parent reads once and
-/// then never again — the driver's name, the plate, the number to ring.
 class BusScreen extends StatefulWidget {
   const BusScreen({super.key, required this.child});
 
@@ -46,19 +38,11 @@ class _BusScreenState extends State<BusScreen> {
   Timer? _tick;
   bool _dismissedAlerts = false;
 
-  /// The arrangement's stops, fetched once. They do not move between polls,
-  /// and a lookup that fails must not take the bus down with it.
   AssignedStops? _stops;
 
   @override
   void initState() {
     super.initState();
-    // A live position that does not move is not live. Half a minute is often
-    // enough to see the bus turn into the street.
-    //
-    // Quiet, because an ordinary reload drops the screen to a spinner for the
-    // length of the request — and now that there is a real map on it, that is
-    // a map that blinks out and fetches its tiles again twice a minute.
     _tick = Timer.periodic(
       const Duration(seconds: 30),
       (_) => _loaderKey.currentState?.reload(quiet: true),
@@ -72,18 +56,6 @@ class _BusScreenState extends State<BusScreen> {
     super.dispose();
   }
 
-  /// "My brother is collecting her today."
-  ///
-  /// Drawn on BOTH branches of this screen, and that is the point of it being a
-  /// method. A one-off collection authorisation is most wanted by the families
-  /// whose child does not ride a bus at all — they are collected at the gate
-  /// every afternoon, and "somebody else is coming for her" is the only
-  /// transport question they ever have. This screen returns on `ridesTheBus`
-  /// long before the card below, so for exactly those families there was no
-  /// route to the feature from anywhere in the app.
-  ///
-  /// [rides] travels through to the form, which drops its "which run?" question
-  /// when there is no run to meet.
   Widget _collectCard(BuildContext context, {required bool rides}) {
     return Card16(
       onTap: () => Navigator.of(context).push(
@@ -173,13 +145,6 @@ class _BusScreenState extends State<BusScreen> {
                 },
                 builder: (context, bus) {
                   if (!bus.transport.ridesTheBus) {
-                    // Not a dead end. This child is walked to the gate and
-                    // collected there, which is precisely when a family needs
-                    // to tell the office that somebody else is coming for them
-                    // — and until this card was here, saying so had no route in
-                    // the app at all for exactly these children: the bus card
-                    // on Home is not tappable when a child does not ride, and
-                    // this screen returned before ever drawing the card below.
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -196,18 +161,6 @@ class _BusScreenState extends State<BusScreen> {
                     );
                   }
 
-                  // A safeguarding or court order stops THIS adult seeing where
-                  // this child is. The server has already nulled the stops, the
-                  // times and the collector, so drawing the normal screen would
-                  // show a map with nothing on it and a route card full of
-                  // blanks — which reads as a broken app and sends somebody to
-                  // the office to report a fault instead of telling them
-                  // anything true.
-                  //
-                  // Say that the school is holding it, and stop. Never why, and
-                  // never who asked for it: that belongs to the safeguarding
-                  // case, and this screen is open in front of the person the
-                  // order is about.
                   if (bus.transport.locationHidden) {
                     return Padding(
                       padding: const EdgeInsets.only(top: 50),
@@ -233,12 +186,6 @@ class _BusScreenState extends State<BusScreen> {
                       const SizedBox(height: kCardGap),
                       _Tiles(bus: bus, trip: trip),
                       const SizedBox(height: kCardGap),
-                      // Put where a parent already is when the thought occurs.
-                      // "She is going with her grandmother today" is something
-                      // you realise while looking at the bus, not while hunting
-                      // through a menu — and telling the school is what stops
-                      // her being recorded as a no-show and the office ringing
-                      // round to find her.
                       Card16(
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
@@ -281,15 +228,6 @@ class _BusScreenState extends State<BusScreen> {
                           ],
                         ),
                       ),
-                      // "That pin is on the wrong side of the road."
-                      //
-                      // Directly under the map that just drew the pin, because
-                      // that is the moment a parent sees it is wrong — not on a
-                      // settings page they would have to go looking for, and
-                      // not in the address screen, which is about where the
-                      // family lives rather than where the bus halts. Only when
-                      // the office has actually given the child a stop: with no
-                      // stop there is nothing to correct.
                       if (bus.correctableStops.isNotEmpty) ...[
                         const SizedBox(height: kCardGap),
                         Card16(
@@ -344,25 +282,8 @@ class _BusScreenState extends State<BusScreen> {
                         ),
                       ],
                       const SizedBox(height: kCardGap),
-                      // "My brother is collecting her today."
-                      //
-                      // Next to the skip card because it is the same thought
-                      // arriving a second later — she is not going home on the
-                      // bus, somebody is coming for her — and because a family
-                      // who taps the skip card when they meant this one has
-                      // told the school she is not travelling and told nobody
-                      // that a man they have never heard of is coming to the
-                      // gate. The screen it opens is careful to say, three
-                      // times, that asking is not being allowed.
                       _collectCard(context, rides: true),
                       const SizedBox(height: kCardGap),
-                      // The way out when something is wrong.
-                      //
-                      // On this screen and not buried in a menu, because the
-                      // moment it is needed is the moment a parent is staring
-                      // at this map wondering why the bus has not come. Until
-                      // now the only answer was a telephone call to an office
-                      // that might not be open.
                       Card16(
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
@@ -433,12 +354,6 @@ class _BusScreenState extends State<BusScreen> {
     );
   }
 
-  /// Where the arrangement puts this child's stops.
-  ///
-  /// For the days the live feed has nothing to say — a weekend, a holiday, an
-  /// account the school has not granted location to — the map can still show
-  /// where the bus collects her. /parent/home is what the home-address screen
-  /// already reads: the family's own arrangement, and never a position.
   Future<AssignedStops?> _assignedStops() async {
     if (_stops != null) return _stops;
     try {
@@ -447,21 +362,11 @@ class _BusScreenState extends State<BusScreen> {
           .where((c) => c.studentId == widget.child.studentId)
           .firstOrNull;
     } catch (_) {
-      // Then the map draws what the live feed gives it, which may be nothing.
-      // That is said on the card; an error page here would hide the driver's
-      // number behind a lookup the parent never asked for.
     }
     return _stops;
   }
 
-  /// Put everything known on screen.
-  ///
-  /// Every time, not once: nobody can pan this map, so there is no view of
-  /// theirs to preserve, and a bus that drives out of the frame between two
-  /// polls is a bus that has vanished.
   void _frame(_Bus bus) {
-    // The same test the card makes before it builds a map at all. The
-    // controller is only attached while one exists.
     if (!MapTiles.configured) return;
     final points = bus.mapPoints;
     if (points.isEmpty) return;
@@ -473,8 +378,6 @@ class _BusScreenState extends State<BusScreen> {
     _map.fitCamera(
       CameraFit.coordinates(
         coordinates: points,
-        // Room for the callouts drawn over the map, and enough that a marker
-        // never sits against the frame's edge where it reads as off-screen.
         padding: const EdgeInsets.fromLTRB(44, 76, 44, 66),
         maxZoom: 16,
       ),
@@ -501,11 +404,8 @@ class _Bus {
   final TransportInfo transport;
   final LiveBus? live;
 
-  /// The arrangement's stops, when the home lookup answered.
   final AssignedStops? stops;
 
-  /// The run this screen is about: the afternoon one once it is under way, the
-  /// morning one until then.
   TripToday? get run {
     if (transport.today.isEmpty) return null;
     final back = transport.today.where((t) => t.leg == 'RETURN').toList();
@@ -518,19 +418,13 @@ class _Bus {
 
   bool get moving => run?.status == 'IN_PROGRESS';
 
-  /// Which way this run goes. The morning leg is home → school, the afternoon
-  /// school → home; no run at all reads as the morning one.
   bool get toSchool => run == null || run!.leg != 'RETURN';
 
-  /// The bus, where the live feed has a position it is allowed to show.
   LatLng? get busAt {
     final l = live;
     return l != null && l.hasFix ? LatLng(l.lat!, l.lon!) : null;
   }
 
-  /// The child's stop for this run: the pickup going out, the drop-off coming
-  /// home. The live feed's placement first, since that is the stop on the trip
-  /// the feed is actually about; the arrangement's when the feed has none.
   LatLng? get stopAt {
     final l = live;
     if (l != null && l.stopLat != null && l.stopLon != null) {
@@ -541,24 +435,8 @@ class _Bus {
     return null;
   }
 
-  /// Everything the map has to show.
-  ///
-  /// The school is not among them. No parent endpoint returns a campus
-  /// position, and a pin placed by guess is a wrong answer drawn confidently.
   List<LatLng> get mapPoints => [?busAt, ?stopAt];
 
-  /// The stops this child stands at, in the shape a correction is filed
-  /// against.
-  ///
-  /// The id comes from the transport call and the pin from the home call: no
-  /// single parent endpoint returns both, so the two are paired by their leg.
-  /// A stop with no id cannot be reported — /parent/stops/:id/correction has
-  /// nowhere to send it — and under a location order the server sends neither,
-  /// which is the right answer for a screen that must not name the corner.
-  ///
-  /// One entry, not two, when a child is collected and set down at the same
-  /// corner. That is most families, and asking them to pick between two
-  /// identical stops is asking a question with one answer.
   List<StopToFix> get correctableStops {
     final out = <StopToFix>[];
     final pickupId = transport.pickupStopId;
@@ -588,22 +466,6 @@ class _Bus {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The map
- * ------------------------------------------------------------------------- */
-
-/// A real map, framed for the parent.
-///
-/// It used to be a drawing: a dashed curve between a house and a school, with
-/// the bus dot placed by the trip's status. A parent read it as where their
-/// child was. This is Mapbox, the same tiles as the full tracking screen, with
-/// only what the platform actually knows about drawn on it — the bus when it is
-/// reporting and may be shown, the child's stop when the office has placed it,
-/// and a dotted line between the two that is a distance, not a route.
-///
-/// It cannot be panned. It sits in the page's scrolling list, where a drag
-/// would fight the scroll, and the framing is done for the parent on every
-/// poll. Anyone who wants to look around taps it and gets the full screen.
 class _MapCard extends StatelessWidget {
   const _MapCard({
     required this.bus,
@@ -626,8 +488,6 @@ class _MapCard extends StatelessWidget {
     final points = bus.mapPoints;
     final drawn = points.isNotEmpty && MapTiles.configured;
 
-    // Where this run is headed. Origin and destination trade places between
-    // the morning and the afternoon leg.
     final toSchool = bus.toSchool;
     final school = Session.instance.me?.schoolName ?? t('driver.school');
     final originName =
@@ -649,25 +509,11 @@ class _MapCard extends StatelessWidget {
           minZoom: 4,
           maxZoom: 18,
           interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
-          // A tap anywhere on the map is a request for the big one. Only when
-          // there is a live row to open it on; without one the full screen
-          // says "no bus", which is a door that opens onto a wall.
           onTap: live == null ? null : (_, _) => onOpen(),
         ),
         children: [
           MapTiles.layer(),
 
-          // How far the bus still has to come — along the roads it will take
-          // when Mapbox can say, and dotted-straight while it cannot.
-          //
-          // Dotted was the honest form when there was no routing at all: a
-          // solid straight line reads as a road, and this one crossed blocks
-          // no bus can drive through. Now the road is drawn solid, because it
-          // IS the road, and only the fallback stays dotted.
-          //
-          // The bus coordinate is rounded to about a hundred metres before it
-          // is asked about, so a bus creeping up a street reuses one answer
-          // instead of spending a request and a parent's data on every tick.
           if (busAt != null && stopAt != null)
             Builder(
               builder: (_) {
@@ -705,9 +551,6 @@ class _MapCard extends StatelessWidget {
                   width: 34,
                   height: 34,
                   child: _BusPin(
-                    // Green only when she is actually on it, as on the full
-                    // tracking screen. A bus that is not carrying her is a
-                    // bus, and it is drawn as one.
                     colour: live!.onBoard ? AppTheme.green : AppTheme.textMuted,
                   ),
                 ),
@@ -818,8 +661,6 @@ class _MapCard extends StatelessWidget {
                 ),
               ),
 
-              // Origin to destination, by leg: home → school in the morning,
-              // school → home in the afternoon.
               PositionedDirectional(
                 start: 10,
                 bottom: 10,
@@ -879,15 +720,8 @@ class _MapCard extends StatelessWidget {
                   ),
                 ),
 
-              // Says so when the tiles will not come, rather than leaving a
-              // grey rectangle that looks like every other reason a map is
-              // blank.
               const MapOffline(),
 
-              // Mapbox's licence requires the credit, and it still carries it —
-              // behind the ⓘ, which is where Mapbox allows a mobile app to keep
-              // it. Off the picture, and complete: the pill that used to sit
-              // here named two of the three parties and left out the third.
               if (drawn)
                 PositionedDirectional(
                   end: 8,
@@ -902,7 +736,6 @@ class _MapCard extends StatelessWidget {
   }
 }
 
-/// One end of the run: an icon, the place, and when the bus left it.
 class _Place extends StatelessWidget {
   const _Place({
     required this.icon,
@@ -959,10 +792,6 @@ class _Place extends StatelessWidget {
   }
 }
 
-/// Drawn where the map would be when there is nothing to put on one.
-///
-/// Said in words rather than shown as an empty map of somewhere, which a parent
-/// would read as "the bus is there".
 class _NothingToMap extends StatelessWidget {
   const _NothingToMap();
 
@@ -972,7 +801,6 @@ class _NothingToMap extends StatelessWidget {
       color: AppTheme.neutralSoft,
       child: Center(
         child: Padding(
-          // Clear of the callouts in the top and bottom corners.
           padding: const EdgeInsets.fromLTRB(24, 64, 24, 58),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1061,10 +889,6 @@ class _StopPin extends StatelessWidget {
       );
 }
 
-/* ---------------------------------------------------------------------------
- * The run
- * ------------------------------------------------------------------------- */
-
 class _RouteCard extends StatelessWidget {
   const _RouteCard({required this.bus});
 
@@ -1086,31 +910,11 @@ class _RouteCard extends StatelessWidget {
       );
     }
 
-    // Four milestones, each either behind, happening, or ahead — derived from
-    // the trip's own timestamps rather than stored as a stage. The words
-    // follow the leg: the morning runs home → school, the afternoon runs
-    // school → home, and "Arrive at school" on the ride home would be a lie.
     final toSchool = trip.leg != 'RETURN';
     final school = Session.instance.me?.schoolName ?? t('driver.school');
-    /*
-     * Whether THIS CHILD arrived — not whether the bus finished its run.
-     *
-     * This was `trip.alightedAt ?? trip.endedAt`, and endedAt belongs to the
-     * BUS. A child recorded as a no-show has no alightedAt at all, so the
-     * moment the bus finished its round the timeline ticked "Arrive at school"
-     * green, with a time, for a child who was never picked up. The one screen a
-     * parent opens to ask "did my child get there" answered yes about a child
-     * standing at home.
-     *
-     * A no-show is a finished journey that did not happen, so the last two
-     * steps are neither pending nor complete: they are shown as not taken.
-     */
     final noShow = trip.resolution == 'NO_SHOW';
     final arrived = noShow ? null : (trip.alightedAt ?? trip.endedAt);
 
-    // Who actually took her at the door, once she has actually arrived. Never
-    // shown for a run still under way — [arrived] is null until then — and
-    // never invented: it is exactly what the office recorded, or nothing.
     final collectorName = trip.collectorName;
     final relationship = trip.collectorRelationship;
     final handedToLine = (arrived != null && collectorName != null && collectorName.isNotEmpty)
@@ -1216,7 +1020,6 @@ class _Step extends StatelessWidget {
   final String sub;
   final DateTime? at;
 
-  /// 0 ahead, 1 happening, 2 behind.
   final int state;
 
   final bool first;
@@ -1226,8 +1029,6 @@ class _Step extends StatelessWidget {
   Widget build(BuildContext context) {
     final tint = Role.parent.tint;
     final (colour, chip) = switch (state) {
-      // 3: the journey is over and did not happen. Not green, because nothing
-      // was completed, and not grey-pending, because nothing is coming.
       3 => (AppTheme.textMuted, t('bus.child.noShow')),
       2 => (AppTheme.green, t('bus.completed')),
       1 => (tint, t('bus.liveNow')),
@@ -1307,9 +1108,6 @@ class _Step extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          // Stop names go inside titles here, and "Arrived at
-                          // Zanko — st…" is not a place. Two lines before an
-                          // ellipsis is ever allowed.
                           title,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -1367,10 +1165,6 @@ class _Step extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Who is driving
- * ------------------------------------------------------------------------- */
-
 class _Tiles extends StatelessWidget {
   const _Tiles({required this.bus, required this.trip});
 
@@ -1421,11 +1215,6 @@ class _Tiles extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Expanded(
-          // The design puts "Safety — Verified — Background checked" here.
-          // Nothing in the platform records a driver's vetting, so that tile
-          // would be a reassurance the app invented about the person a child
-          // gets into a vehicle with. The seat is a real fact about this child
-          // on this bus, and it is what a parent asks the office about.
           child: _Tile(
             icon: Icons.event_seat_rounded,
             colour: AppTheme.rose,

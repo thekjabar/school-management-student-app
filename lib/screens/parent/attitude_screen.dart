@@ -9,12 +9,6 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 
-/// What the school has said about how a child is getting on.
-///
-/// A verdict first, in a word, because that is what a parent came for — and
-/// then the records it was drawn from, because a verdict nobody can check is
-/// a verdict nobody believes. Everything here is a note a teacher wrote and
-/// deliberately shared; nothing is inferred.
 class AttitudeScreen extends StatefulWidget {
   const AttitudeScreen({super.key, required this.child});
 
@@ -120,16 +114,9 @@ class _AttitudeScreenState extends State<AttitudeScreen> {
     try {
       await ParentApi.instance.markAttitudeSeen(note.id);
     } catch (_) {
-      // The tick is a courtesy to the school, not a transaction. Leaving it
-      // ticked locally is better than bouncing it back under the parent's
-      // finger because the connection dropped in a school car park.
     }
   }
 }
-
-/* ---------------------------------------------------------------------------
- * The verdict
- * ------------------------------------------------------------------------- */
 
 class _VerdictCard extends StatelessWidget {
   const _VerdictCard({required this.summary, required this.name});
@@ -148,9 +135,6 @@ class _VerdictCard extends StatelessWidget {
       _ => (AppTheme.rose, '😟'),
     };
 
-    // Five stars' worth of standing, from the records themselves: every merit
-    // pulls up, every concern pulls down, and the scale is the same one the
-    // school's own points use.
     final total = summary.merits + summary.concerns;
     final score = total == 0 ? 0.0 : (summary.merits / total) * 5;
 
@@ -251,10 +235,6 @@ class _VerdictCard extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Where the records fall
- * ------------------------------------------------------------------------- */
-
 class _AreasCard extends StatelessWidget {
   const _AreasCard({required this.notes});
 
@@ -262,8 +242,6 @@ class _AreasCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Grouped by what the school filed them under, biggest first — which is
-    // the answer to "what is he actually being noticed for".
     final by = <String, List<AttitudeNote>>{};
     for (final n in notes) {
       (by[n.category] ??= []).add(n);
@@ -339,8 +317,6 @@ class _TrendCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Points per month, oldest first. Six months is as far back as a term
-    // stretches, and further back is somebody else's teacher.
     final now = DateTime.now();
     final months = <DateTime, int>{};
     for (var i = 5; i >= 0; i--) {
@@ -408,10 +384,6 @@ class _TrendCard extends StatelessWidget {
     );
   }
 }
-
-/* ---------------------------------------------------------------------------
- * One record
- * ------------------------------------------------------------------------- */
 
 class _NoteRow extends StatelessWidget {
   const _NoteRow({required this.note, required this.seen, required this.onSeen});

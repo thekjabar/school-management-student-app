@@ -1,12 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// The four bottom-bar marks, drawn rather than borrowed.
-///
-/// Material's outlined set is a different drawing altogether — its bubble is a
-/// square with no tail, its calendar has no dots, its person is a filled bust.
-/// Close enough to name, not close enough to look like the design, and the
-/// bottom bar is the one thing on screen the whole time. So these four are
-/// paths, on the same 24-unit grid the design's icons are drawn on.
 enum NavGlyph { home, messages, calendar, profile, route, students }
 
 class NavGlyphIcon extends StatelessWidget {
@@ -21,8 +14,6 @@ class NavGlyphIcon extends StatelessWidget {
   final NavGlyph glyph;
   final Color color;
 
-  /// The active tab is solid; the rest are strokes. One filled shape in a row
-  /// of outlines is how "you are here" reads before the colour does.
   final bool filled;
 
   final double size;
@@ -46,13 +37,10 @@ class _GlyphPainter extends CustomPainter {
   final Color color;
   final bool filled;
 
-  /// The weight the design draws these at, in grid units.
   static const _weight = 2.1;
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Everything below is written against a 24×24 grid and scaled once here,
-    // so a coordinate in this file means the same thing as in the design file.
     canvas.save();
     canvas.scale(size.width / 24);
 
@@ -84,12 +72,6 @@ class _GlyphPainter extends CustomPainter {
     canvas.restore();
   }
 
-  /// A house with a doorway cut out of the bottom.
-  ///
-  /// Painted as a sharp polygon, filled AND stroked with a round join: that is
-  /// what softens every corner at once, including the two inside the doorway.
-  /// Rounding nine corners by hand with arcs is the same picture and four times
-  /// the arithmetic.
   void _home(Canvas canvas, Paint stroke, Paint solid) {
     final path = Path()
       ..moveTo(12, 3.7)
@@ -107,13 +89,10 @@ class _GlyphPainter extends CustomPainter {
       canvas.drawPath(path, solid);
       canvas.drawPath(path, stroke..strokeWidth = _weight);
     } else {
-      // The outline version is the same silhouette, one weight thinner so it
-      // sits beside the stroked marks rather than shouting over them.
       canvas.drawPath(path, stroke..strokeWidth = _weight);
     }
   }
 
-  /// A round bubble with a tail at the lower left and three dots inside.
   void _messages(Canvas canvas, Paint stroke, Paint solid) {
     final bubble = Path()
       ..addRRect(RRect.fromLTRBR(4.3, 3.5, 19.7, 16.6, const Radius.circular(6.6)));
@@ -134,7 +113,6 @@ class _GlyphPainter extends CustomPainter {
     }
   }
 
-  /// A calendar: two tabs, a rule under them, two dots in the page.
   void _calendar(Canvas canvas, Paint stroke, Paint solid) {
     final body = RRect.fromLTRBR(3.2, 5.3, 20.8, 21.0, const Radius.circular(3.4));
     if (filled) {
@@ -160,12 +138,9 @@ class _GlyphPainter extends CustomPainter {
     canvas.drawCircle(const Offset(13.8, 14.6), 1.05, dot);
   }
 
-  /// A head and a pair of shoulders.
   void _profile(Canvas canvas, Paint stroke, Paint solid) {
     canvas.drawCircle(const Offset(12, 7.9), 4.0, filled ? solid : stroke);
 
-    // Vertical ends into a wide bowl: the design's shoulders stop dead rather
-    // than curling back in, which is what stops it reading as a coffee cup.
     final shoulders = Path()
       ..moveTo(4.8, 21.0)
       ..lineTo(4.8, 19.6)
@@ -185,7 +160,6 @@ class _GlyphPainter extends CustomPainter {
     );
   }
 
-  /// A folded map: three panels, the creases alternating up and down.
   void _route(Canvas canvas, Paint stroke, Paint solid) {
     final outline = Path()
       ..moveTo(2.6, 6.2)
@@ -208,11 +182,7 @@ class _GlyphPainter extends CustomPainter {
     canvas.drawLine(const Offset(15.3, 6.6), const Offset(15.3, 20.6), crease);
   }
 
-  /// Two people, the near one in front. The bar's Students tab is a list of
-  /// children, not a single profile, and one head reads as "me".
   void _students(Canvas canvas, Paint stroke, Paint solid) {
-    // The one behind, drawn first and clipped by nothing — it sits higher and
-    // to the side, which is all the depth a 21-pixel glyph can carry.
     final back = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = _weight
@@ -259,11 +229,6 @@ class _GlyphPainter extends CustomPainter {
       old.glyph != glyph || old.color != color || old.filled != filled;
 }
 
-/// A figure whose head is a heart — the design's Attitude mark.
-///
-/// Material has a heart and it has a person; it does not have this, and the
-/// nearest stand-ins (a plain heart, a smiling face) say something else. It is
-/// six curves, so it is drawn.
 class HeartPersonIcon extends StatelessWidget {
   const HeartPersonIcon({super.key, required this.color, this.size = 22});
 
@@ -297,7 +262,6 @@ class _HeartPersonPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..color = color;
 
-    // The heart, where a head would be: two arcs meeting at a point.
     final heart = Path()
       ..moveTo(12, 10.6)
       ..cubicTo(12, 10.6, 7.4, 7.9, 7.4, 5.2)
@@ -309,7 +273,6 @@ class _HeartPersonPainter extends CustomPainter {
       ..close();
     canvas.drawPath(heart, stroke);
 
-    // And the shoulders under it.
     final body = Path()
       ..moveTo(4.6, 21.2)
       ..lineTo(4.6, 19.4)

@@ -1,18 +1,9 @@
 import 'package:flutter/material.dart';
 
-// Panel and SectionHead at the foot of this file are now spellings of the
-// kit's Card16 and SectionRow. The kit reads AppTheme's statics and imports no
-// widget from here, so leaning on it this way does not make a cycle.
 import '../ui/home_kit.dart';
 import '../ui/kit.dart';
 import 'package:flutter/services.dart';
 
-/// Who is holding the phone.
-///
-/// Each audience gets one hue, used for the header wash, the active tab and the
-/// primary action — and nowhere else. It is how somebody glancing at a phone
-/// across a staff room knows whose app is open, and it is the only thing that
-/// differs between the five home screens.
 enum Role {
   parent('Parent', Color(0xFF6D3FF7), Color(0xFFF2EEFD)),
   student('Student', Color(0xFF22C55E), Color(0xFFE7F8EE)),
@@ -25,77 +16,30 @@ enum Role {
   final String label;
   final Color tint;
 
-  /// The pale tint used behind headers in the light theme.
   final Color _lightWash;
 
-  /// The wash behind a header, in whichever theme is drawing.
-  ///
-  /// The light value is a pale tint that reads as "almost white, with a hint of
-  /// who you are". Reused unchanged on a dark canvas it becomes a bright band
-  /// across the top of every screen — the app's darkest surface directly under
-  /// its lightest. So in the dark it is the same hue mixed INTO the canvas
-  /// instead: dark enough to belong, tinted enough to still say parent or
-  /// driver at a glance.
   Color get wash => AppTheme.dark
       ? Color.lerp(AppTheme.canvas, tint, 0.14)!
       : _lightWash;
 }
 
-/// KSP — the visual language, shared by all five roles.
-///
-/// One idea holds every screen together: a soft tinted wash behind the header,
-/// and everything below it a white card floating on near-white. Nothing shouts.
-/// Colour is reserved for the three places it means something — a figure that
-/// is good, a deadline that is close, and the one thing happening right now.
 class AppTheme {
-  /// Whether the app is currently drawing dark.
-  ///
-  /// Set by the widget that owns ThemeMode, before the frame is built. Every
-  /// colour below reads it, so one assignment repaints the entire app.
   static bool dark = false;
 
   static Color _pick(Color light, Color night) => dark ? night : light;
 
-  // ---- Surfaces ------------------------------------------------------------
-  //
-  // Dark is not the light palette inverted. Cards sit ABOVE the canvas in both
-  // themes, so in the dark the canvas is the darkest surface and cards are
-  // lifted off it — inverting would put the card behind its own page.
-  //
-  // Both palettes are sampled from the design rather than chosen: the page, the
-  // card and the border are three values apart in the light theme and the
-  // separation comes from the shadow, and the dark theme is navy rather than
-  // the near-black the app used to draw — which is the single change that made
-  // the dark screens stop looking like a different product from the mockup.
   static Color get canvas => _pick(const Color(0xFFFCFCFE), const Color(0xFF0A1324));
   static Color get surface => _pick(const Color(0xFFFFFFFF), const Color(0xFF121A29));
   static Color get border => _pick(const Color(0xFFEEEFF4), const Color(0xFF212A3D));
 
-  // ---- Text ----------------------------------------------------------------
-  //
-  // Not pure white on dark: #F2F1F6 against #12111A is about 15:1, well past
-  // AA, without the halo pure white produces on an OLED at night — which is
-  // most of the phones this runs on.
   static Color get text => _pick(const Color(0xFF111827), const Color(0xFFF2F4F8));
   static Color get textMuted => _pick(const Color(0xFF6B7280), const Color(0xFF97A1B4));
   static Color get textFaint => _pick(const Color(0xFF9CA3AF), const Color(0xFF6B7688));
 
-  // ---- Accents content uses ------------------------------------------------
-  //
-  // The hues hold across both themes; only the SOFT backings change. A soft
-  // tint that works on white is nearly white itself, and on a dark canvas it
-  // becomes a glowing block — so in the dark they are deep, desaturated
-  // versions of the same hue instead.
   static Color get violet => _pick(const Color(0xFF6D3FF7), const Color(0xFF8B6BFF));
   static Color get violetSoft => _pick(const Color(0xFFF2EEFD), const Color(0xFF20213C));
-  // A shade under the design's #16A34A, which came out at 2.96:1 on its own
-  // soft backing — under the 3:1 floor the theme test enforces, and visibly so
-  // for the 8pt captions in the figure strip.
   static Color get green => _pick(const Color(0xFF149447), const Color(0xFF22C55E));
   static Color get greenSoft => _pick(const Color(0xFFEAF6EC), const Color(0xFF172629));
-  // Two shades under the design's #F97316, for the same reason as green: the
-  // bright orange is 2.5:1 on its own backing, and this colour carries text —
-  // an overdue date, a late tally — not just icons.
   static Color get amber => _pick(const Color(0xFFDF5F09), const Color(0xFFFB8C3A));
   static Color get amberSoft => _pick(const Color(0xFFFEF0E6), const Color(0xFF252225));
   static Color get blue => _pick(const Color(0xFF2E7DF6), const Color(0xFF4D97FF));
@@ -103,38 +47,16 @@ class AppTheme {
   static Color get rose => _pick(const Color(0xFFF43F5E), const Color(0xFFFF6B84));
   static Color get roseSoft => _pick(const Color(0xFFFDECF0), const Color(0xFF251D2E));
 
-  /// The ground for something that carries no meaning at all — a placeholder
-  /// while an image loads, a chip for a fact with no status attached.
-  ///
-  /// Several screens hardcoded #F1F3F6 for this. It is a light grey, so on the
-  /// dark theme those became near-white blocks on navy, and the one element on
-  /// the screen that meant nothing in particular was the loudest thing on it.
   static Color get neutralSoft => _pick(const Color(0xFFF1F3F6), const Color(0xFF1B2434));
 
-  /// The deep green the teacher design uses for the one thing it wants read
-  /// first — the lesson count and the button under it. Not [Role.teacher.tint]:
-  /// that is the hue of the app, and a headline in it disappears into the six
-  /// other green things on the screen.
   static const teacherDeep = Color(0xFF0B503C);
 
-  /// The brand violet, at full strength in both themes.
-  ///
-  /// [violet] lightens in the dark so text drawn in it stays legible; the raised
-  /// action in the bottom bar is a FILLED shape, so it wants the one value the
-  /// design uses for it on both canvases.
   static const brand = Color(0xFF6D3FF7);
 
   static const radius = 18.0;
   static const radiusSm = 14.0;
   static const gutter = 16.0;
 
-  /// Soft enough to read as depth rather than as a border. Cards are separated
-  /// by light, not by lines.
-  /// Cards are separated by light, not by lines.
-  ///
-  /// In the dark a drop shadow is invisible — there is nothing darker to cast
-  /// onto — so the separation comes from the card being lighter than the
-  /// canvas, and the shadow only deepens the edge.
   static List<BoxShadow> get lift => [
         BoxShadow(
           color: dark
@@ -145,8 +67,6 @@ class AppTheme {
         ),
       ];
 
-  /// The status and navigation bars. Icon brightness is the OPPOSITE of the
-  /// theme: dark icons on a light bar, light icons on a dark one.
   static SystemUiOverlayStyle get systemOverlay => SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
@@ -156,8 +76,6 @@ class AppTheme {
       );
 
   static ThemeData build({Color? tint}) {
-    // Nullable now that the palette is a set of getters: a getter cannot be a
-    // default parameter value.
     final accent = tint ?? violet;
     return ThemeData(
       useMaterial3: true,
@@ -172,20 +90,6 @@ class AppTheme {
       ),
       splashFactory: InkSparkle.splashFactory,
 
-      /// Text fields, once, for the whole app.
-      ///
-      /// Without this every TextField falls back to Material's underline, its
-      /// own padding and its own radius — which is why the sign-in screen used
-      /// to look like a different product from the one behind it. A form is
-      /// the most-touched surface in these apps and the easiest to leave
-      /// looking unfinished.
-      /// The date picker, once, for the whole app.
-      ///
-      /// Left alone it arrives as stock Material: square-ish corners, its own
-      /// blue, its own type — which is why the leave form looked like it had
-      /// been lifted out of a different product the moment a parent tapped a
-      /// date. It is also the one surface in these apps that Flutter builds
-      /// rather than us, so it is the easiest to forget.
       datePickerTheme: DatePickerThemeData(
         backgroundColor: surface,
         surfaceTintColor: Colors.transparent,
@@ -193,8 +97,6 @@ class AppTheme {
         headerForegroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
         dayStyle: const TextStyle(fontWeight: FontWeight.w600),
-        // The selected day is the accent; today is outlined in it. Two
-        // different jobs, so they must not look the same.
         todayBorder: BorderSide(color: accent, width: 1.4),
         todayForegroundColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected) ? Colors.white : accent,
@@ -223,7 +125,6 @@ class AppTheme {
         confirmButtonStyle: TextButton.styleFrom(foregroundColor: accent),
       ),
 
-      /// The same for time, so the two never disagree.
       timePickerTheme: TimePickerThemeData(
         backgroundColor: surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
@@ -239,8 +140,6 @@ class AppTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
         hintStyle: TextStyle(color: textFaint, fontSize: 14, fontWeight: FontWeight.w400),
         labelStyle: TextStyle(color: textMuted, fontSize: 13),
-        // A counter under every maxLength field is noise nobody reads; the
-        // limit is enforced regardless.
         counterStyle: const TextStyle(height: 0, fontSize: 0),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(13),
@@ -278,8 +177,6 @@ class AppTheme {
         ),
       ),
 
-      // Sheets and dialogs carry the same corner radius as the cards, so a
-      // form that slides up belongs to the screen it came from.
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
@@ -325,8 +222,6 @@ class AppTheme {
         ),
       ),
       textTheme: TextTheme(
-        // The stat-strip figures. Tabular so a changing number does not nudge
-        // the column beside it.
         displayLarge: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w700,
@@ -349,20 +244,6 @@ class AppTheme {
   }
 }
 
-/// The white card everything sits in.
-/// The card, as it was named before the redesign.
-///
-/// Now nothing more than a spelling of [Card16], and that is the point. Twenty
-/// call sites use it — every one of them in the teacher or driver app, none in
-/// the parent app, which is exactly why those two looked a generation behind.
-///
-/// Its real fault was not that it looked slightly different. It lifted on a
-/// shadow in BOTH themes, and nothing casts a shadow on navy: in dark mode its
-/// cards had no visible edge at all, so a page of them read as one flat
-/// surface. Card16 draws a border there instead.
-///
-/// New code should say Card16. This exists so the screens written before that
-/// name got fixed rather than left behind.
 class Panel extends StatelessWidget {
   const Panel({
     super.key,
@@ -382,9 +263,6 @@ class Panel extends StatelessWidget {
       Card16(padding: padding, onTap: onTap, color: color, child: child);
 }
 
-/// A section title with an optional action on the right, as it was named
-/// before the redesign. Now a spelling of [SectionRow], so the six screens
-/// still calling it match the twenty-five that do not.
 class SectionHead extends StatelessWidget {
   const SectionHead(this.title, {super.key, this.action, this.tint, this.onAction});
 
@@ -398,7 +276,6 @@ class SectionHead extends StatelessWidget {
       SectionRow(title: title, actionLabel: action, onAction: onAction);
 }
 
-/// A small status word: Pending, High Priority, Excellent.
 class Tag extends StatelessWidget {
   const Tag(this.label, {super.key, required this.color, required this.background});
 
@@ -419,7 +296,6 @@ class Tag extends StatelessWidget {
   }
 }
 
-/// The rounded tinted square that fronts every list row.
 class IconChip extends StatelessWidget {
   const IconChip({
     super.key,

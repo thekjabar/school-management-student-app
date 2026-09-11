@@ -13,20 +13,6 @@ import '../../ui/pickers.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
 
-/// "She is not riding today."
-///
-/// The most frequent thing a family has to tell a school about transport, and
-/// until now the one thing this app could not say. The server has answered
-/// POST /parent/skip-rides, an eligibility check and a cancel since the feature
-/// was built; the app only ever read the list back. So the actual instruction —
-/// my daughter is going with her grandmother this morning — was a telephone
-/// call, made by a parent at 06:50, to an office that may not be open yet.
-///
-/// It matters more than convenience, and the server's own docstring says why:
-/// this SUPPRESSES A FALSE NO-SHOW ALARM. A child driven in by her mother all
-/// week is otherwise recorded as a no-show three mornings running, and an
-/// office that learns no-show alerts are noise will ignore the one in November
-/// that means a seven year old is standing on the wrong road in the dark.
 class SkipRideScreen extends StatefulWidget {
   const SkipRideScreen({super.key, required this.child});
 
@@ -39,8 +25,6 @@ class SkipRideScreen extends StatefulWidget {
 class _SkipRideScreenState extends State<SkipRideScreen> {
   final _loaderKey = GlobalKey<LoaderState<List<Map<String, dynamic>>>>();
 
-  /// The list route answers for every child this guardian has; this screen is
-  /// about one of them.
   List<Map<String, dynamic>> _mine(List<Map<String, dynamic>> rows) =>
       rows.where((r) => (r['studentId'] ?? '') == widget.child.studentId).toList();
 
@@ -62,8 +46,6 @@ class _SkipRideScreenState extends State<SkipRideScreen> {
       body: t('skip.cancelBody'),
       confirmLabel: t('skip.cancelConfirm'),
       confirmIcon: Icons.check_rounded,
-      // Not the danger red. Putting a child back ON the bus is the safe
-      // direction of this control — the alarming one was taking her off it.
       tone: Role.parent.tint,
     );
     if (!sure) return;
@@ -104,9 +86,6 @@ class _SkipRideScreenState extends State<SkipRideScreen> {
                 tint: tint,
                 padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 96),
                 load: () => ParentApi.instance.skipRides(),
-                // Emptiness is judged AFTER filtering to this child. A family
-                // with two children would otherwise see the other one's
-                // requests counted as "something here" and get a blank list.
                 isEmpty: (rows) => _mine(rows).isEmpty,
                 empty: tn('skip.none', widget.child.name.split(' ').first),
                 builder: (context, rows) {
@@ -130,7 +109,6 @@ class _SkipRideScreenState extends State<SkipRideScreen> {
   }
 }
 
-/// One filed request.
 class _SkipCard extends StatelessWidget {
   const _SkipCard({required this.row, required this.onCancel});
 
@@ -145,11 +123,6 @@ class _SkipCard extends StatelessWidget {
     final leg = (row['legScope'] ?? 'BOTH') as String;
     final reason = (row['reason'] ?? '') as String;
 
-    // LATE_REJECTED is the one status a parent must not misread. It does not
-    // mean "refused" in the sense of somebody saying no — it means the bus had
-    // already gone, so nothing was suppressed and the crew is still expecting
-    // the child. Saying that plainly is the difference between a parent who
-    // makes a second telephone call and one who assumes it was handled.
     final (Color colour, String label) = switch (status) {
       'ACCEPTED' => (AppTheme.green, t('skip.accepted')),
       'LATE_REJECTED' => (AppTheme.amber, t('skip.tooLate')),
@@ -221,7 +194,6 @@ class _SkipCard extends StatelessWidget {
       a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
-/// The form.
 class _SkipSheet extends StatefulWidget {
   const _SkipSheet({required this.child});
 
@@ -241,9 +213,6 @@ class _SkipSheetState extends State<_SkipSheet> {
     ('OTHER', Icons.more_horiz_rounded),
   ];
 
-  /// The server refuses anything longer and tells the family to ask the office
-  /// for a hold. Enforced here too so the refusal is not the first a parent
-  /// hears of it, after they have filled the whole form in.
   static const _maxDays = 14;
 
   String _reason = 'FAMILY_PICKUP';
@@ -255,13 +224,6 @@ class _SkipSheetState extends State<_SkipSheet> {
   String? _error;
   SkipEligibility? _eligibility;
 
-  /// Minted ONCE, when the form opens, and reused for every retry.
-  ///
-  /// It has to be stable across attempts or it defeats its own purpose: a
-  /// parent who taps send, loses signal, and taps again would otherwise file
-  /// two skips, suppress the lines twice and send two notifications. Generated
-  /// from the child and the moment the form opened rather than a random value
-  /// so that it is stable even if this widget is rebuilt.
   late final String _idempotencyKey =
       '${widget.child.studentId}:${DateTime.now().millisecondsSinceEpoch}';
 
@@ -278,9 +240,6 @@ class _SkipSheetState extends State<_SkipSheet> {
     super.dispose();
   }
 
-  /// Ask, before the parent fills anything in, whether today can still be
-  /// skipped at all — so the answer is "the bus has already left" rather than a
-  /// refusal after the form is complete.
   Future<void> _checkEligibility() async {
     try {
       final e = await ParentApi.instance.skipRideEligibility(
@@ -289,9 +248,7 @@ class _SkipSheetState extends State<_SkipSheet> {
       );
       if (mounted) setState(() => _eligibility = e);
     } on ApiException {
-      // Not fatal. The server enforces the cut-off regardless; losing this only
-      // costs the warning, and blocking the form because a hint failed to load
-      // would be worse than letting them try.
+      // ignore: empty_catches
     }
   }
 
@@ -301,9 +258,6 @@ class _SkipSheetState extends State<_SkipSheet> {
     final picked = await pickDate(
       context,
       initial: start ? _from : _to,
-      // No past days. A skip cannot suppress a run that has already happened,
-      // and the server refuses them — so offering them would only produce an
-      // error the parent could have been spared.
       first: today,
       last: today.add(const Duration(days: 120)),
       tint: Role.parent.tint,
@@ -327,7 +281,6 @@ class _SkipSheetState extends State<_SkipSheet> {
     return _from.year == now.year && _from.month == now.month && _from.day == now.day;
   }
 
-  /// The warning shown when today's chosen legs have already departed.
   String? get _cutoffWarning {
     final e = _eligibility;
     if (!_isToday || e == null) return null;
@@ -353,10 +306,6 @@ class _SkipSheetState extends State<_SkipSheet> {
       _error = null;
     });
     try {
-      // The same proof the leave request asks for, and for the same reason:
-      // this acts on the school on the child's behalf. It takes her off the
-      // manifest and tells the crew not to wait — so it must be the guardian
-      // holding the phone, not whoever picked it up off the table.
       final ok = await Biometrics.confirm(reason: t('skip.confirmWithBiometrics'));
       if (!ok) {
         if (mounted) setState(() => _error = t('skip.notConfirmed'));
@@ -372,10 +321,6 @@ class _SkipSheetState extends State<_SkipSheet> {
         idempotencyKey: _idempotencyKey,
       );
       if (!mounted) return;
-      // The server accepts a late request and stores it, deliberately, so that
-      // "the family did tell us, at 07:12" survives — but it suppresses
-      // nothing. Saying so here is what stops a parent believing the bus has
-      // been told when it has not.
       final late = (row['status'] ?? '') == 'LATE_REJECTED';
       Navigator.of(context).pop(true);
       showNote(context, late ? t('skip.filedButLate') : t('skip.filed'));

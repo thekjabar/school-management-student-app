@@ -12,11 +12,6 @@ import 'handover_screen.dart';
 import 'home_tab.dart' show loadDutyTrip;
 import 'trip_screen.dart' show stopEtaLine;
 
-/// Every child on today's run, and where each one is.
-///
-/// Grouped by state rather than by stop, because the question this screen
-/// answers is "who is still not on" — a driver about to pull away wants the
-/// four names, not the twelve stops those names are spread across.
 class DriverStudents extends StatefulWidget {
   const DriverStudents({super.key});
 
@@ -30,22 +25,8 @@ class _DriverStudentsState extends State<DriverStudents> {
   String _query = '';
   String? _busyStudent;
 
-  /// What the collector-verification screen wrote, for the children it was
-  /// opened on this session.
-  ///
-  /// `POST /crew/handover` writes the custody ledger but does not itself
-  /// recompute the manifest, so the roster this list is drawn from can still
-  /// say "on board" for a child who has been handed over and signed for. The
-  /// row would then invite the driver to do it all again. This is not a state
-  /// the app invented — it is the answer the server gave, held on to until the
-  /// roster catches up.
   final Map<String, HandoverOutcome> _settled = {};
 
-  /// Board, drop off, or not travelling — written to the custody ledger.
-  ///
-  /// This list is where a driver looks for one name out of forty. It used to be
-  /// read-only, so finding the name meant remembering which stop it was under
-  /// and going to look for it again on the run screen.
   Future<void> _record(
     String tripId,
     _Rider entry,
@@ -60,15 +41,6 @@ class _DriverStudentsState extends State<DriverStudents> {
         tripId: tripId,
         studentId: entry.rider.studentId,
         eventType: eventType,
-        // Which stop this happened AT, which is not always the child's own.
-        //
-        // This sent entry.stop.stopId for everything. In the morning the child
-        // gets off at the SCHOOL, so the server — which expects the gate for an
-        // OUT-leg alighting — read the home stop as the wrong one, rewrote the
-        // event to WRONG_STOP and raised a CRITICAL safeguarding alert. Per
-        // child. Every morning. The run screen already worked this out with
-        // custodyStopId; this list was the one place that did not, and it is
-        // the list a driver uses to find one name out of forty.
         stopId: custodyStopId(
           leg: leg,
           eventType: eventType,
@@ -93,13 +65,6 @@ class _DriverStudentsState extends State<DriverStudents> {
     }
   }
 
-  /// The afternoon run, at the door.
-  ///
-  /// This used to be one more tap on the sheet, writing a plain HANDOVER event
-  /// with no collector on it at all — a row saying a child left the bus and
-  /// nothing whatever about who took her, which is the only part anybody asks
-  /// about afterwards. It goes to the verification screen now, and every way
-  /// out of that screen is a recorded decision.
   Future<void> _openHandover(String tripId, _Rider entry) async {
     final outcome = await Navigator.of(context).push<HandoverOutcome?>(
       MaterialPageRoute<HandoverOutcome?>(
@@ -144,8 +109,6 @@ class _DriverStudentsState extends State<DriverStudents> {
         await _record(tripId, entry, 'BOARDED', t('driver.onBoard'),
             leg: leg, terminalStopId: terminalStopId);
       case _Mark.dropped:
-        // Only ever the morning leg. Coming home, a child does not simply get
-        // off — they are given to somebody.
         await _record(tripId, entry, 'ALIGHTED', t('driver.atSchool'),
             leg: leg, terminalStopId: terminalStopId);
       case _Mark.handover:
@@ -166,9 +129,6 @@ class _DriverStudentsState extends State<DriverStudents> {
         final trip = await loadDutyTrip();
         if (trip == null) return _Roster(trip: null, riders: const []);
         final plan = await CrewApi.instance.plan(trip.id);
-        // The gate comes from the trip pack, not the plan. Fetched alongside so
-        // a morning drop-off can be recorded at the school rather than at the
-        // child's own stop — which the server reads as the wrong stop.
         final gate = await CrewApi.instance.terminalStopId(trip.id);
         return _Roster(
           trip: trip,
@@ -251,9 +211,6 @@ class _DriverStudentsState extends State<DriverStudents> {
             const SizedBox(height: 10),
 
             SizedBox(
-              // 44, not 34. These four are the fastest way to answer "who is
-              // still not on", and they were the smallest targets on the
-              // screen.
               height: 44,
               child: ListView(
                 scrollDirection: Axis.horizontal,
@@ -304,9 +261,6 @@ class _DriverStudentsState extends State<DriverStudents> {
                         leg: roster.trip!.leg,
                         settled: _settled[shown[i].rider.studentId],
                         busy: _busyStudent == shown[i].rider.studentId,
-                        // A child already off the bus has nothing left to
-                        // record, so that row is not a tap that does nothing —
-                        // it is not a tap.
                         onTap: shown[i].isDone
                             ? null
                             : () => _openActions(
@@ -335,8 +289,6 @@ class _Roster {
   final CrewTrip? trip;
   final List<_Rider> riders;
 
-  /// The campus gate. Needed to record WHERE a custody event happened: in the
-  /// morning a child gets off here, not at the stop their row is drawn under.
   final String? terminalStopId;
 }
 
@@ -422,8 +374,6 @@ class _RiderRow extends StatelessWidget {
   final _Rider entry;
   final String leg;
 
-  /// What the verification screen recorded for this child, where the roster has
-  /// not caught up with it yet.
   final HandoverOutcome? settled;
   final bool busy;
   final VoidCallback? onTap;
@@ -442,8 +392,6 @@ class _RiderRow extends StatelessWidget {
     };
 
     final row = Padding(
-      // 14 top and bottom puts the row at 66 — a name on a list a driver
-      // scrolls with a thumb while the engine is running.
       padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
         children: [
@@ -478,10 +426,6 @@ class _RiderRow extends StatelessWidget {
                 Text(
                   entry.rider.boardedAt != null
                       ? tn('driver.onBoardSince', hhmm(entry.rider.boardedAt))
-                      // The stop, and when the bus is due at it. Somebody
-                      // hunting one name out of forty is asking when THAT child
-                      // gets picked up, and the stop's name alone does not
-                      // answer it.
                       : entry.stop.etaAt == null
                           ? entry.stop.name
                           : '${entry.stop.name} · ${stopEtaLine(entry.stop)}',
@@ -501,8 +445,6 @@ class _RiderRow extends StatelessWidget {
             )
           else ...[
             Pill(word, color: colour),
-            // The chevron only where there is something to open, so the rows
-            // that do nothing do not look like the rows that do.
             if (onTap != null)
               Icon(Icons.chevron_right_rounded, size: 20, color: AppTheme.textFaint),
           ],
@@ -511,9 +453,6 @@ class _RiderRow extends StatelessWidget {
     );
 
     if (onTap == null || busy) return row;
-    // The Material is inside the card, so the ripple lands on the card's own
-    // surface. Without it the ink paints on the Scaffold, underneath an opaque
-    // white card, and the row gives no sign of having been pressed at all.
     return Material(
       color: Colors.transparent,
       child: InkWell(onTap: onTap, child: row),
@@ -521,19 +460,8 @@ class _RiderRow extends StatelessWidget {
   }
 }
 
-/// What a tap on a name can record.
-///
-/// [handover] is the odd one out: it records nothing by itself. It opens the
-/// screen where the driver checks the adult at the door against the list the
-/// school keeps, and the recording happens there.
 enum _Mark { boarded, dropped, handover, noShow }
 
-/// The sheet behind a name.
-///
-/// Full-width buttons, one per thing that can be written to the ledger, and
-/// only the ones that make sense for where this child currently is. Every one
-/// of them is a real event on the custody ledger — there is nothing here that
-/// only closes the sheet.
 class _MarkSheet extends StatelessWidget {
   const _MarkSheet({required this.entry, required this.leg});
 
@@ -608,13 +536,6 @@ class _MarkSheet extends StatelessWidget {
               ),
               const SizedBox(height: 10),
             ],
-            // Coming home this records nothing by itself: it opens the list of
-            // adults this child may be given to, which is the whole question at
-            // that door and the one this sheet used to answer by not asking it.
-            //
-            // Offered whether or not the boarding tap was made. A child is
-            // standing at the door either way, and a missed tap this morning is
-            // not a reason the driver cannot check who is taking her home.
             if (leg == 'RETURN' && !entry.isDone) ...[
               BigButton(
                 label: t('handover.open'),

@@ -3,12 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// The three languages a Kurdistan school actually needs.
-///
-/// Kurdish first, because it is the language of instruction in most of these
-/// schools and the one a guardian is most likely to read comfortably. Arabic
-/// second — the Region is bilingual and many families use it daily. English
-/// last, for staff and for anyone whose phone is set to it.
 enum Lang {
   ckb('کوردی', 'ku', 'CKB', TextDirection.rtl),
   ar('العربية', 'ar', 'AR', TextDirection.rtl),
@@ -18,13 +12,8 @@ enum Lang {
 
   final String label;
 
-  /// The IETF tag, sent as `X-Lang` on every request and saved on the phone.
   final String code;
 
-  /// The name of the same language in the platform's `Locale` enum, which is
-  /// what `POST /auth/locale` stores and what every notification is rendered
-  /// from. Kept separate from [code] because the two vocabularies genuinely
-  /// differ — the tag for Sorani is `ku`, the column value is `CKB`.
   final String serverCode;
 
   final TextDirection direction;
@@ -33,7 +22,6 @@ enum Lang {
       Lang.values.firstWhere((l) => l.code == code, orElse: () => Lang.en);
 }
 
-/// Light, dark, or whatever the phone is set to.
 enum AppThemeMode {
   system('system'),
   light('light'),
@@ -47,11 +35,6 @@ enum AppThemeMode {
       AppThemeMode.values.firstWhere((m) => m.code == code, orElse: () => AppThemeMode.system);
 }
 
-/// The chosen appearance.
-///
-/// Defaults to following the phone. Somebody who has set their handset to dark
-/// has already said what they want, and asking again in every app is how a
-/// setting screen fills up with questions nobody wanted to answer.
 class AppThemeSetting {
   AppThemeSetting._();
 
@@ -72,11 +55,6 @@ class AppThemeSetting {
   }
 }
 
-/// The chosen language, and the thing that rebuilds the app when it changes.
-///
-/// A ValueNotifier rather than a package: one setting, read everywhere, written
-/// from one screen. Anything heavier would be scaffolding around a single
-/// string.
 class AppLocale {
   AppLocale._();
 
@@ -84,7 +62,6 @@ class AppLocale {
 
   static const _key = 'sm_lang';
 
-  /// Read the saved choice, falling back to the phone's own language.
   static Future<void> restore() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString(_key);
@@ -92,9 +69,6 @@ class AppLocale {
       current.value = Lang.fromCode(saved);
       return;
     }
-    // No choice made yet. A phone already set to Kurdish or Arabic opens in
-    // it; anything else opens in English, which is the default and the one the
-    // sign-in screen offers first.
     final device = WidgetsBinding.instance.platformDispatcher.locale.languageCode;
     current.value = switch (device) {
       'ar' => Lang.ar,
@@ -103,18 +77,6 @@ class AppLocale {
     };
   }
 
-  /// Told about every change, so the account can be kept in step with the app.
-  ///
-  /// The language lives on the phone — it is chosen on the sign-in screen,
-  /// before there is an account to attach it to — but NOTIFICATIONS are written
-  /// from `Person.locale` on the server, because a push at 07:40 has no request
-  /// and no header to read. Without this hook the two drift apart on the very
-  /// first tap: the app turns English and the bus messages stay Kurdish.
-  ///
-  /// A callback rather than a direct call because this file is the bottom of
-  /// the stack — the API client imports it to put the language on every
-  /// request, so it cannot import the API client back. main() plugs the real
-  /// one in; tests leave it null.
   static Future<void> Function(Lang lang)? onChanged;
 
   static Future<void> set(Lang lang) async {
@@ -123,9 +85,6 @@ class AppLocale {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, lang.code);
 
-    // Deliberately not awaited, and its failure is swallowed. The choice is
-    // already saved on the phone; a dead network must not undo the tap that
-    // made it, and the next sign-in reconciles the account anyway.
     final tell = onChanged;
     if (tell != null) {
       unawaited(tell(lang).catchError((Object _) {}));
@@ -133,11 +92,6 @@ class AppLocale {
   }
 }
 
-/// Look a phrase up in the current language.
-///
-/// Falls back to English rather than to the key. A screen that has outrun the
-/// translators should read awkwardly, not show `home.todaysSchedule` to a
-/// parent.
 String t(String key) {
   final table = switch (AppLocale.current.value) {
     Lang.ckb => _ckb,
@@ -147,47 +101,29 @@ String t(String key) {
   return table[key] ?? _en[key] ?? key;
 }
 
-/// The same, with one value substituted for `{n}`.
 String tn(String key, Object value) => t(key).replaceAll('{n}', '$value');
 
-/// The same, with several named values substituted for `{name}` placeholders.
-///
-/// Kurdish and Arabic put the pieces of a sentence in a different order from
-/// English, so a phrase with two values cannot be assembled by concatenation —
-/// the translator has to be able to move them around the sentence.
 String tv(String key, Map<String, Object> values) {
   var out = t(key);
   values.forEach((k, v) => out = out.replaceAll('{$k}', '$v'));
   return out;
 }
 
-/// The tables, exposed so a test can compare them.
-///
-/// A missing key falls back to English, which is right on a phone and wrong for
-/// anybody hunting the gap — the screen looks fine and one line is quietly in
-/// the wrong language. test/strings_test.dart uses these to find them.
 Map<String, String> tableFor(Lang lang) => switch (lang) {
       Lang.ckb => _ckb,
       Lang.ar => _ar,
       Lang.en => _en,
     };
 
-/// Every phrase the app knows how to say, by key.
 Iterable<String> get englishKeys => _en.keys;
 
-/* ---------------------------------------------------------------------------
- * English — the reference. Every other table is checked against these keys.
- * ------------------------------------------------------------------------- */
-
 const Map<String, String> _en = {
-  // Brand and welcome
   'app.name': 'KSP',
   'app.tagline': 'Connecting students, parents,\nteachers and schools',
   'welcome.getStarted': 'Get started',
   'welcome.logIn': 'Log in',
   'welcome.usePhone': 'Use the phone number your school has for you.',
 
-  // Sign in
   'login.welcomeRole': 'Welcome back, {role}!',
   'role.parent': 'Parent',
   'role.teacher': 'Teacher',
@@ -215,7 +151,6 @@ const Map<String, String> _en = {
       'This password was given to you by the school. Sign in with it once more and you will be asked to choose your own.',
   'login.saveContinue': 'Save and continue',
 
-  // Navigation
   'nav.home': 'Home',
   'nav.children': 'Children',
   'nav.messages': 'Messages',
@@ -225,7 +160,6 @@ const Map<String, String> _en = {
   'nav.profile': 'Profile',
   'nav.askLeave': 'Leave',
 
-  // ---- The redesigned home screen ------------------------------------------
   'quick.bus': 'Bus tracking',
   'quick.assignments': 'Assignments',
   'quick.attendance': 'Attendance',
@@ -236,6 +170,8 @@ const Map<String, String> _en = {
   'marks.countedFrom': 'Counted from {n} pieces of work.',
   'marks.markedWork': 'Marked work',
   'marks.absent': 'Absent',
+  'marks.classAverage': 'Class average {avg} · {pct}',
+  'marks.classAverageFrom': 'from {n} marks',
   'quick.attitude': 'Attitude',
   'quick.timetable': 'Timetable',
   'quick.reports': 'Reports',
@@ -274,7 +210,6 @@ const Map<String, String> _en = {
   'attendance.excused': 'Excused',
   'attendance.keepItUp': 'Excellent — keep it up.',
   'attendance.watchThis': 'Worth keeping an eye on.',
-  // ---- Attitude -------------------------------------------------------------
   'attitude.whatTheySaid': 'What the school has said',
   'attitude.nothingYet': 'The school has not shared anything yet.',
   'attitude.summaryLine': "How {n} has been getting on, in the school's words.",
@@ -291,7 +226,6 @@ const Map<String, String> _en = {
   'attitude.settled': 'Settled',
   'attitude.mixed': 'Mixed',
   'attitude.needsWork': 'Needs work',
-  // Categories, as the API names them.
   'attitude.academic_effort': 'Effort in class',
   'attitude.academic_excellence': 'Excellent work',
   'attitude.helpfulness': 'Helpfulness',
@@ -306,7 +240,6 @@ const Map<String, String> _en = {
   'attitude.phone_or_device': 'Phone or device',
   'attitude.bus_conduct': 'Conduct on the bus',
   'attitude.other': 'Other',
-  // ---- Timetable and reports -----------------------------------------------
   'timetable.none': 'No timetable has been set for this class.',
   'timetable.nothingThatDay': 'No lessons that day.',
   'reports.marks': 'Marks by subject',
@@ -317,20 +250,8 @@ const Map<String, String> _en = {
   'reports.overall': 'Overall',
   'reports.exams': 'Exam results',
 
-
-  // ---- The driver and attendant app ----------------------------------------
   'driver.today': 'Today',
 
-  // ---- Dates ---------------------------------------------------------------
-  // Whole words, and short forms written out rather than sliced.
-  //
-  // These were all abbreviations, and six screens then cut them again to three
-  // CHARACTERS — which is fine for "Sep" and destroys a word in a script that
-  // does not abbreviate that way: Kurdish Friday, هەینی, reached the calendar as
-  // هەی, which is not a word. Nothing is derived from anything now. Where a
-  // column is too narrow for the whole word there is a separate short key,
-  // written by hand in each language, and it is chosen by the screen rather
-  // than produced by cutting.
   'month.1': 'January',
   'month.2': 'February',
   'month.3': 'March',
@@ -379,8 +300,6 @@ const Map<String, String> _en = {
   'pick.date': 'Pick a date',
   'pick.choose': 'Choose',
 
-
-  // ---- The teacher app -----------------------------------------------------
   'teacher.today': 'Today',
   'teacher.classes': 'Classes',
   'teacher.homework': 'Homework',
@@ -400,7 +319,6 @@ const Map<String, String> _en = {
   'teacher.searchRegister': 'Search by name or code',
   'teacher.registerNoMatch': 'No child on this register matches that.',
   'teacher.noTerm': 'No term is open. The school office sets these.',
-  // ---- The register --------------------------------------------------------
   'teacher.takeRegister': 'Take the register',
   'teacher.registerSaved': 'Register saved',
   'teacher.nothingMarked': 'Nothing is marked yet. Everyone shows as present until you save.',
@@ -408,7 +326,6 @@ const Map<String, String> _en = {
   'teacher.saveCount': 'Save {n}',
   'teacher.saveTally': 'Save — {n}',
   'teacher.tally': '{n} present, {a} absent, {l} late',
-  // ---- Homework ------------------------------------------------------------
   'teacher.setHomework': 'Set homework',
   'teacher.homeworkSet': 'Homework set',
   'teacher.setIt': 'Set it',
@@ -426,7 +343,6 @@ const Map<String, String> _en = {
   'teacher.familiesCanSee': 'Every family in this class will be able to see their own child\'s copy.',
   'teacher.setOn': 'Set {n}',
   'teacher.dueOn': 'due {n}',
-  // ---- Exams ---------------------------------------------------------------
   'teacher.newTest': 'New test',
   'teacher.testCreated': 'Test created',
   'teacher.create': 'Create',
@@ -441,7 +357,6 @@ const Map<String, String> _en = {
   'teacher.notPublished': 'Not yet published',
   'teacher.published': 'Published — families can see it now',
   'teacher.publishToFamilies': 'Publish to families',
-  // ---- Marks ---------------------------------------------------------------
   'teacher.marksSaved': 'Marks saved — families cannot see them yet',
   'teacher.marksReleased': 'Marks released to families',
   'teacher.familiesSeeMarks': 'Families can see these marks.',
@@ -501,10 +416,6 @@ const Map<String, String> _en = {
   'driver.notRecorded': '{name} was not recorded. Try again.',
   'driver.recordedAs': '{name} was recorded away from the expected stop. The office has been told.',
   'driver.onBoardSince': 'On board since {n}',
-  // ---- Passed without stopping ---------------------------------------------
-  // A stop skipped because nobody was waiting looks identical on a map to one
-  // the driver forgot, unless the difference is written down — which is what
-  // the required reason on this sheet is for.
   'driver.skipStop': 'Skip stop',
   'driver.skipped': 'Skipped',
   'driver.skipStopTitle': 'Skip this stop?',
@@ -514,21 +425,12 @@ const Map<String, String> _en = {
   'driver.skipReasonTooShort': 'Say a little more — at least 3 characters.',
   'driver.skipConfirm': 'Skip this stop',
 
-  // ---- Notices from the school --------------------------------------------
-  // CrewAnnouncementsController existed long before any screen here called
-  // it: drivers and attendants could be aimed at directly, and had nowhere to
-  // read it.
   'driver.announcements': 'Notices',
   'driver.noAnnouncements': 'The school has not sent anything yet.',
   'driver.ackNeeded': 'Needs your acknowledgement',
   'driver.mustAcknowledge':
       'This one asks to be acknowledged — press Got it once you have read and understood it.',
 
-  // ---- What to do right now ------------------------------------------------
-  // The run in five steps, in the order a driver does them, printed above the
-  // one button that is live at that moment. "BOARDING" is a state; "press Set
-  // off when you are ready to drive" is an instruction, and only one of the two
-  // is any use to a man who has never been shown this screen before.
   'driver.stepOf': 'Step {n} of 5',
   'driver.step.check': 'Press the button below and fill in the bus check. You cannot set off until it is done.',
   'driver.step.setOff': 'The bus check is done. Press Set off when you are ready to drive.',
@@ -536,18 +438,12 @@ const Map<String, String> _en = {
   'driver.step.endRun': 'You are at the last stop. Once every child is off, press End the run.',
   'driver.step.sweep': 'Walk to the back row and look under every seat. Then confirm it at the bottom of this screen.',
   'driver.step.done': 'This run is finished. There is nothing left to do.',
-  // Said once on the stop card, never once per child.
   'driver.tickAfterSetOff': 'Press Set off at the top of this screen first — then you can tick each child here.',
   'driver.dropAfterEnd': 'This run has ended, but children are still marked on the bus. Tap the green button beside each one to record them off.',
   'driver.stillAboardWarning': '{n} children are still on the bus.',
   'driver.stillAboardHow': 'If you end the run now, the record will say they never got off, and the office will be told. Go back and tap the green button beside each child first.',
   'driver.goBackAndDrop': 'Go back and record them off',
   'driver.endAnyway': 'End the run anyway',
-  // ---- Emptying the bus in one go ------------------------------------------
-  // Twenty-nine green buttons is not something anybody does at a school gate
-  // with a queue of buses behind him, and what he does instead is end the run
-  // with twenty-nine children still on the register as on board. One button,
-  // one request, and an answer that says what the server actually recorded.
   'driver.recordAllOffOut': 'Record all {n} off at the school',
   'driver.recordAllOffReturn': 'Record all {n} as handed over',
   'driver.recordAllOffTitleOut': 'Who got off at the school?',
@@ -563,12 +459,9 @@ const Map<String, String> _en = {
   'driver.someOffRefusedWhy': '{ok} recorded off, {bad} refused — {why}',
   'driver.allOffButAway':
       '{ok} recorded off. {away} were recorded away from the expected stop, and the office has been told.',
-  // The server's refusals, as instructions. The sentences these stand in for
-  // are listed in _serverSays, in trip_screen.dart.
   'driver.mustSetOff': 'The bus has not set off yet. Press Set off at the top of the screen first.',
   'driver.mustCheckBus': 'Fill in the bus check first. Press Start my shift at the top of the screen.',
 
-  // ---- When to leave, and what today actually costs -------------------------
   'driver.leaveBy': 'Leave by',
   'driver.leaveIn': 'Leave in {n} min',
   'driver.leaveNow': 'Leave now',
@@ -579,7 +472,6 @@ const Map<String, String> _en = {
   'driver.etaShort': '~{n}',
   'driver.etaDue': 'Due ~{n}',
   'driver.arrivedAt': 'Arrived {n}',
-  // ---- The cabin sweep -----------------------------------------------------
   'driver.beforeYouLeave': 'Before you leave the bus',
   'driver.sweepWhy': 'A closed bus gets dangerously hot within minutes in summer.',
   'driver.sweepHow': 'Check every row, under every seat, and the back row last. ',
@@ -595,18 +487,12 @@ const Map<String, String> _en = {
   'driver.sweepAfterRun': 'When the last child is off, walk the aisle and confirm the bus is empty here.',
   'driver.sweepOutstanding': 'This run has ended and the cabin sweep is not confirmed.',
   'driver.walkedTheBus': 'I have walked the bus — it is empty',
-  // The wait after the last child steps off. The server refuses to count a walk
-  // filed inside it, and said nothing about why — so the driver pressed again.
-  // These two lines are the rule, in a driver's words and with no rule in them.
   'driver.sweepWaitCountdown': 'You can confirm in {n}s',
   'driver.sweepWaitWhy':
       'The check is a walk to the back row. The bus cannot be signed off faster than it can be walked.',
   'driver.childFound': 'A child is still on the bus',
   'driver.childFoundWho': 'Say who, so the office can ring the family now.',
   'driver.childFoundFiled': 'Reported. The office has been told.',
-  // The three things the server can answer to a sweep. Only the first of them
-  // clears the run, so only the first of them is allowed to sound like good
-  // news — the app spent a long time saying "Sweep confirmed" over a refusal.
   'driver.sweepLate':
       'Your walk was recorded, but the deadline had already passed — it does not clear the alert, and the office has been told.',
   'driver.sweepRubberStamped':
@@ -616,7 +502,6 @@ const Map<String, String> _en = {
       'Your walk was recorded, but it has not cleared this bus. The office has the record.',
   'driver.sweepRecordedNotCleared':
       'Your walk was recorded and the office has been told. It stays here because it came in after the deadline — only the office can close it now.',
-  // ---- Papers --------------------------------------------------------------
   'driver.noPapers': 'Nothing is on file. The office holds licences, medicals and vetting checks — ask them to add yours, or the gate will stop you at check-in.',
   'driver.expires': 'Expires {n}',
   'driver.noExpiry': 'No expiry recorded',
@@ -628,13 +513,10 @@ const Map<String, String> _en = {
   'driver.credNotValid': 'The office has stopped this — you may not drive on it.',
   'driver.leaving': 'Your leaving process has started. The office will tell you when your access ends.',
 
-
-  // Greetings
   'greet.morning': 'Good morning,',
   'greet.afternoon': 'Good afternoon,',
   'greet.evening': 'Good evening,',
 
-  // Home
   'home.todaysSchedule': 'Today’s schedule',
   'home.quickActions': 'Quick actions',
   'home.noLessons': 'No lessons timetabled today.',
@@ -656,7 +538,6 @@ const Map<String, String> _en = {
   'action.calendar': 'School\ncalendar',
   'action.report': 'Report\ncard',
 
-  // Children
   'children.open': 'Open',
   'children.askLeave': 'Ask for leave',
   'children.homework': 'Homework',
@@ -672,14 +553,12 @@ const Map<String, String> _en = {
   'children.morning': 'Morning',
   'children.homeRun': 'Home run',
 
-  // Child detail tabs
   'tab.bus': 'Bus',
   'tab.timetable': 'Timetable',
   'tab.homework': 'Homework',
   'tab.marks': 'Marks',
   'tab.attendance': 'Attendance',
 
-  // Bus
   'bus.mapClosed': 'Map closed',
   'bus.checking': 'Checking…',
   'bus.minutesAway': 'About {n} minutes away',
@@ -708,7 +587,6 @@ const Map<String, String> _en = {
   'bus.locationHidden':
       'The school is keeping this journey private. Please speak to the school office.',
 
-  // Not riding today.
   'leave.noteAdd': 'Attach a doctor’s note',
   'leave.notePhotograph': 'Take a photograph',
   'leave.noteFromPhone': 'Choose from the phone',
@@ -783,7 +661,6 @@ const Map<String, String> _en = {
   'staffLeave.PUBLIC_DUTY': 'Public duty',
   'staffLeave.COMPASSIONATE': 'Compassionate leave',
   'staffLeave.OTHER': 'Other',
-  // The driver's own paperwork.
   'cred.loadFailed': 'Your documents could not be loaded.',
   'cred.retry': 'Try again',
   'driver.wrong': 'Wrong?',
@@ -801,7 +678,6 @@ const Map<String, String> _en = {
   'driver.corrected': 'The correction has been recorded.',
   'driver.correctionRefused': 'The server would not accept that correction.',
   'driver.nothingToCorrect': 'There is no record for this child to correct.',
-  // Recording what a child did.
   'behaviour.merit': 'Merit',
   'behaviour.rosterHint': 'Tap a child to record a merit or a concern.',
   'behaviour.concern': 'Concern',
@@ -937,7 +813,6 @@ const Map<String, String> _en = {
   'bus.notStarted': 'Not started yet',
   'bus.waitingAtStop': 'Waiting at the stop',
 
-  // Homework
   'hw.none': 'No homework has been set.',
   'hw.due': 'Due {n}',
   'hw.setOn': 'Set {n}',
@@ -968,7 +843,6 @@ const Map<String, String> _en = {
   'due.tomorrow': 'due tomorrow',
   'due.inDays': 'in {n} days',
 
-  // Marks
   'marks.comingUp': 'Coming up',
   'marks.published': 'Published marks',
   'marks.passed': 'Passed',
@@ -977,7 +851,6 @@ const Map<String, String> _en = {
   'marks.of': 'of {n}',
   'marks.topMark': 'top mark',
 
-  // Attendance
   'att.none': 'The register has not been marked yet.',
   'att.ofDays': 'of {n} days marked',
   'att.present': 'Present',
@@ -987,7 +860,6 @@ const Map<String, String> _en = {
   'att.notPresent': 'Days not present',
   'att.minutesLate': '{n} min late',
 
-  // Messages
   'msg.none': 'Nothing from the school yet.',
   'msg.gotIt': 'Got it',
   'msg.pinned': 'Pinned by the school',
@@ -1001,7 +873,6 @@ const Map<String, String> _en = {
   'msg.yesterday': 'yesterday',
   'msg.daysAgo': '{n} days ago',
 
-  // Fees
   'fees.title': 'Fees & payments',
   'fees.nothingOwed': 'Nothing owed',
   'fees.upToDate': 'Your account is up to date. Thank you.',
@@ -1025,14 +896,10 @@ const Map<String, String> _en = {
   'fees.total': 'Total',
   'fees.stillOwed': 'Still owed',
 
-  // Leave
   'leave.title': 'Leave requests',
   'leave.ask': 'Report a day away',
   'leave.none': 'No leave has been asked for. Tap “Ask for leave” when you need a day.',
   'leave.withdraw': 'Withdraw this request',
-  // The button, not the sentence. The dialog title above it has already said
-  // what is being withdrawn, and the full phrase did not fit — it rendered as
-  // "Withdraw this r...".
   'leave.withdrawDo': 'Withdraw',
   'leave.withdrawn': 'Request withdrawn',
   'leave.sent': 'The school has been told',
@@ -1051,7 +918,6 @@ const Map<String, String> _en = {
   'leave.reasonHint': 'High temperature since last night, seeing the doctor this morning.',
   'leave.reasonNeeded': 'Say briefly why, so the school knows.',
   'leave.confirmWithBiometrics': 'Confirm it is you before the school is told',
-// Student information
   'info.title': 'Student information',
   'info.knownAs': 'Called {name}',
   'info.born': 'Born',
@@ -1088,7 +954,6 @@ const Map<String, String> _en = {
   'info.fixedSeatAt': 'Seat {seat}, every day',
   'info.neverAlone': 'Never released alone',
   'info.correctionNote': 'The school office keeps this record. If anything here is wrong, tell them and they will correct it.',
-// Driver feedback
   'crew.title': 'Driver feedback',
   'crew.introTitle': 'Tell the school how the journey is going',
   'crew.introBody': 'Praise or a concern about the driver or attendant who carries your child. It goes to the school office. The driver is never shown it.',
@@ -1127,7 +992,6 @@ const Map<String, String> _en = {
   'crew.status.ESCALATED': 'Taken further',
   'crew.status.CLOSED_NO_ACTION': 'Closed',
 
-  // Memories
   'memories.title': 'School memories',
   'memories.subtitle': 'Days at school, as the school shared them.',
   'memories.viewAll': 'View all photos',
@@ -1138,7 +1002,6 @@ const Map<String, String> _en = {
   'quick.liveVideoSoon': 'Not ready yet. No bus has a camera fitted, so there is nothing to watch.',
   'quick.liveClassVideo': 'Live classroom',
   'quick.liveClassVideoSoon': 'Not ready yet. No classroom has a camera fitted, so there is nothing to watch.',
-// Where the child is
   'track.title': 'Where is my child',
   'track.onBoard': '{name} is on the bus',
   'track.arrived': '{name} has arrived',
@@ -1185,7 +1048,6 @@ const Map<String, String> _en = {
   'track.alighted': 'Got off',
   'quick.track': 'Where is she',
   'track.demoData': 'DEMONSTRATION — this bus is not real. Nothing on this map is a vehicle on a road.',
-// Home address on the map
   'home.title': 'Where we live',
   'home.explainTitle': 'So the bus knows where to find you',
   'home.explainBody': 'The school office uses this to choose which stop your child rides from. It does not move the stop by itself — the office decides that.',
@@ -1214,7 +1076,6 @@ const Map<String, String> _en = {
   'leave.busNote': 'The bus will not wait for your child on those days.',
   'leave.send': 'Tell the school',
 
-  // More
   'more.yourChildren': 'Your children',
   'more.moneyRequests': 'Money and requests',
   'more.notifications': 'Notifications',
@@ -1244,13 +1105,11 @@ const Map<String, String> _en = {
   'more.currentPassword': 'Current password',
   'more.passwordChanged': 'Password changed. Every other device has been signed out.',
 
-  // Status words
   'status.pending': 'Pending',
   'status.approved': 'Approved',
   'status.rejected': 'Rejected',
   'status.cancelled': 'Cancelled',
 
-  // Common
   'common.edit': 'Edit',
   'common.cancel': 'Cancel',
   'common.save': 'Save',
@@ -1560,6 +1419,10 @@ const Map<String, String> _en = {
   'teacher.viewTimetable': 'View timetable',
   'teacher.myClasses': 'My classes',
   'teacher.attendance': 'Attendance',
+  'teacher.viewList': 'Names',
+  'teacher.viewFaces': 'Faces',
+  'teacher.gridHint': 'Tap a face to mark absent, tap it again for present. Hold a face for late or excused.',
+  'teacher.noPhotoShort': 'No photo',
   'teacher.gradebook': 'Gradebook',
   'teacher.messages': 'Messages',
   'teacher.todaySchedule': 'Today\'s schedule',
@@ -2024,10 +1887,6 @@ const Map<String, String> _en = {
   'dec.sent': 'Thank you. The office will check this and confirm it.',
 };
 
-/* ---------------------------------------------------------------------------
- * Kurdish (Sorani)
- * ------------------------------------------------------------------------- */
-
 const Map<String, String> _ckb = {
   'app.name': 'KSP',
   'app.tagline': 'پەیوەندی نێوان قوتابی، دایک و باوک،\nمامۆستا و قوتابخانە',
@@ -2069,7 +1928,6 @@ const Map<String, String> _ckb = {
   'nav.more': 'زیاتر',
   'nav.account': 'هەژمار',
 
-  // ---- The redesigned home screen ------------------------------------------
   'quick.bus': 'شوێنکەوتنی پاس',
   'quick.assignments': 'ئەرکەکان',
   'quick.attendance': 'ئامادەبوون',
@@ -2080,6 +1938,8 @@ const Map<String, String> _ckb = {
   'marks.countedFrom': 'لە {n} کارەوە ژمێردراوە.',
   'marks.markedWork': 'کاری نمرەدراو',
   'marks.absent': 'ئامادە نەبوو',
+  'marks.classAverage': 'ناوەندی پۆل {avg} · {pct}',
+  'marks.classAverageFrom': 'لە {n} نمرەوە',
   'quick.attitude': 'ڕەفتار',
   'quick.timetable': 'خشتەی وانە',
   'quick.reports': 'ڕاپۆرتەکان',
@@ -2118,7 +1978,6 @@ const Map<String, String> _ckb = {
   'attendance.excused': 'بە مۆڵەت',
   'attendance.keepItUp': 'نایاب — بەردەوام بە.',
   'attendance.watchThis': 'شایانی سەرنجدانە.',
-  // ---- Attitude -------------------------------------------------------------
   'attitude.whatTheySaid': 'قوتابخانە چی گوتووە',
   'attitude.nothingYet': 'قوتابخانە هێشتا هیچی نەگوتووە.',
   'attitude.summaryLine': 'بە وتەی قوتابخانە، {n} چۆن بەڕێوە دەچێت.',
@@ -2149,7 +2008,6 @@ const Map<String, String> _ckb = {
   'attitude.phone_or_device': 'مۆبایل یان ئامێر',
   'attitude.bus_conduct': 'ڕەفتار لە پاسدا',
   'attitude.other': 'هیتر',
-  // ---- Timetable and reports -----------------------------------------------
   'timetable.none': 'هیچ خشتەیەک بۆ ئەم پۆلە دانەنراوە.',
   'timetable.nothingThatDay': 'لەو ڕۆژەدا هیچ وانەیەک نییە.',
   'reports.marks': 'نمرەکان بەپێی بابەت',
@@ -2160,14 +2018,8 @@ const Map<String, String> _ckb = {
   'reports.overall': 'گشتی',
   'reports.exams': 'ئەنجامی تاقیکردنەوەکان',
 
-
-  // ---- The driver and attendant app ----------------------------------------
   'driver.today': 'ئەمڕۆ',
 
-  // ---- Dates ---------------------------------------------------------------
-  // Every date in all three apps ran through a hardcoded English table, so a
-  // Kurdish screen said "Thu 3 Sep 2026". These are short forms on purpose:
-  // they sit inside cards and rows where a full month name would wrap.
   'month.1': 'کانوونی دووەم',
   'month.2': 'شوبات',
   'month.3': 'ئازار',
@@ -2199,9 +2051,6 @@ const Map<String, String> _ckb = {
   'day.5': 'هەینی',
   'day.6': 'شەممە',
   'day.7': 'یەکشەممە',
-  // Five of the seven are "<number>شەممە", so the number alone is how they are
-  // said and written short. هەینی and شەممە are already short, and are left
-  // whole — cutting هەینی to هەی is the bug this key exists to prevent.
   'dayShort.1': 'دوو',
   'dayShort.2': 'سێ',
   'dayShort.3': 'چوار',
@@ -2219,8 +2068,6 @@ const Map<String, String> _ckb = {
   'pick.date': 'Pick a date',
   'pick.choose': 'Choose',
 
-
-  // ---- The teacher app -----------------------------------------------------
   'teacher.today': 'ئەمڕۆ',
   'teacher.classes': 'پۆلەکان',
   'teacher.homework': 'ئەرکی ماڵەوە',
@@ -2240,7 +2087,6 @@ const Map<String, String> _ckb = {
   'teacher.searchRegister': 'بە ناو یان کۆد بگەڕێ',
   'teacher.registerNoMatch': 'هیچ منداڵێک لەم لیستەدا لەگەڵ ئەوە ناگونجێت.',
   'teacher.noTerm': 'هیچ وەرزێک کراوە نییە. نووسینگەی قوتابخانە ئەمانە دیاری دەکات.',
-  // ---- The register --------------------------------------------------------
   'teacher.takeRegister': 'تۆمارکردنی ئامادەبوون',
   'teacher.registerSaved': 'ئامادەبوون پاشەکەوتکرا',
   'teacher.nothingMarked': 'هێشتا هیچ نیشانە نەکراوە. هەموان بە ئامادە دەردەکەون تا پاشەکەوتی دەکەیت.',
@@ -2248,7 +2094,6 @@ const Map<String, String> _ckb = {
   'teacher.saveCount': 'پاشەکەوتکردن {n}',
   'teacher.saveTally': 'پاشەکەوتکردن — {n}',
   'teacher.tally': '{n} ئامادە، {a} ئامادە نەبوو، {l} دواکەوتوو',
-  // ---- Homework ------------------------------------------------------------
   'teacher.setHomework': 'دانانی ئەرکی ماڵەوە',
   'teacher.homeworkSet': 'ئەرکی ماڵەوە دانرا',
   'teacher.setIt': 'دایبنێ',
@@ -2266,7 +2111,6 @@ const Map<String, String> _ckb = {
   'teacher.familiesCanSee': 'هەموو خێزانێکی ئەم پۆلە دەتوانێت هی منداڵەکەی خۆی ببینێت.',
   'teacher.setOn': 'دانرا {n}',
   'teacher.dueOn': 'کۆتا بەروار {n}',
-  // ---- Exams ---------------------------------------------------------------
   'teacher.newTest': 'تاقیکردنەوەی نوێ',
   'teacher.testCreated': 'تاقیکردنەوە دروستکرا',
   'teacher.create': 'دروستکردن',
@@ -2281,7 +2125,6 @@ const Map<String, String> _ckb = {
   'teacher.notPublished': 'هێشتا بڵاو نەکراوەتەوە',
   'teacher.published': 'بڵاوکرایەوە — خێزانەکان ئێستا دەیبینن',
   'teacher.publishToFamilies': 'بڵاوکردنەوە بۆ خێزانەکان',
-  // ---- Marks ---------------------------------------------------------------
   'teacher.marksSaved': 'نمرەکان پاشەکەوتکران — خێزانەکان هێشتا نایانبینن',
   'teacher.marksReleased': 'نمرەکان بۆ خێزانەکان بڵاوکرانەوە',
   'teacher.familiesSeeMarks': 'خێزانەکان ئەم نمرانە دەبینن.',
@@ -2355,7 +2198,6 @@ const Map<String, String> _ckb = {
   'driver.mustAcknowledge':
       'ئەمە داوای پەسەندکردن دەکات — کاتێک خوێندتەوە و تێگەیشتیت، «تێگەیشتم» دابگرە.',
 
-  // ---- What to do right now ------------------------------------------------
   'driver.stepOf': 'هەنگاوی {n} لە 5',
   'driver.step.check': 'دوگمەی خوارەوە دابگرە و پشکنینی پاسەکە پڕ بکەرەوە. تا ئەوە تەواو نەبێت ناتوانیت بەڕێبکەویت.',
   'driver.step.setOff': 'پشکنینی پاسەکە تەواو بوو. کاتێک ئامادەی لێخوڕینیت، «بەڕێکەوتن» دابگرە.',
@@ -2397,7 +2239,6 @@ const Map<String, String> _ckb = {
   'driver.etaShort': '~{n}',
   'driver.etaDue': 'چاوەڕوانکراو ~{n}',
   'driver.arrivedAt': 'گەیشت {n}',
-  // ---- The cabin sweep -----------------------------------------------------
   'driver.beforeYouLeave': 'پێش ئەوەی پاسەکە بەجێبهێڵیت',
   'driver.sweepWhy': 'پاسی داخراو لە هاویندا لە چەند خولەکێکدا بە شێوەیەکی مەترسیدار گەرم دەبێت.',
   'driver.sweepHow': 'هەموو ڕیزێک، ژێر هەموو کورسییەک، و ڕیزی دواوە لە کۆتاییدا بپشکنە. ',
@@ -2428,7 +2269,6 @@ const Map<String, String> _ckb = {
       'پشکنینەکەت تۆمارکرا، بەڵام ئەم پاسەی پاک نەکردەوە. تۆمارەکە لای نووسینگەیە.',
   'driver.sweepRecordedNotCleared':
       'پشکنینەکەت تۆمارکرا و نووسینگە ئاگادارکرایەوە. لێرە دەمێنێتەوە چونکە دوای کاتی دیاریکراو گەیشت — تەنها نووسینگە دەتوانێت ئێستا دایبخات.',
-  // ---- Papers --------------------------------------------------------------
   'driver.noPapers': 'هیچ شتێک تۆمار نەکراوە. نووسینگە مۆڵەت و پشکنینەکان هەڵدەگرێت — داوایان لێبکە هی تۆ زیاد بکەن، ئەگەرنا لە دەروازە ڕێگرت لێدەکەن.',
   'driver.expires': 'بەسەردەچێت {n}',
   'driver.noExpiry': 'بەرواری بەسەرچوون تۆمار نەکراوە',
@@ -2439,7 +2279,6 @@ const Map<String, String> _ckb = {
   'driver.credBlocking': 'خەریکە ڕێگری دەکات',
   'driver.credNotValid': 'نووسینگە ئەمەی ڕاگرتووە — ناتوانیت پێی لێبخوڕیت.',
   'driver.leaving': 'پرۆسەی جێهێشتنت دەستی پێکردووە. نووسینگە پێت دەڵێت کەی دەستڕاگەیشتنت کۆتایی دێت.',
-
 
   'greet.morning': 'بەیانیت باش،',
   'greet.afternoon': 'ئێوارەت باش،',
@@ -2515,7 +2354,6 @@ const Map<String, String> _ckb = {
   'bus.locationHidden':
       'قوتابخانە زانیاری ئەم گەشتە بە نهێنی دەپارێزێت. تکایە لەگەڵ نووسینگەی قوتابخانە بدوێ.',
 
-  // Not riding today.
   'leave.noteAdd': 'راپۆرتی پزیشک هاوپێچ بکە',
   'leave.notePhotograph': 'وێنەیەک بگرە',
   'leave.noteFromPhone': 'لە مۆبایلەکەوە هەڵبژێرە',
@@ -2590,7 +2428,6 @@ const Map<String, String> _ckb = {
   'staffLeave.PUBLIC_DUTY': 'ئەرکی گشتی',
   'staffLeave.COMPASSIONATE': 'مۆڵەتی دۆخی تایبەت',
   'staffLeave.OTHER': 'شتێکی تر',
-  // The driver's own paperwork.
   'cred.loadFailed': 'بەڵگەنامەکانت نەهێنرانەوە.',
   'cred.retry': 'دووبارە هەوڵ بدەرەوە',
   'driver.wrong': 'هەڵەیە؟',
@@ -2608,7 +2445,6 @@ const Map<String, String> _ckb = {
   'driver.corrected': 'ڕاستکردنەوەکە تۆمارکرا.',
   'driver.correctionRefused': 'سێرڤەر ئەم ڕاستکردنەوەیەی وەرنەگرت.',
   'driver.nothingToCorrect': 'هیچ تۆمارێک نییە بۆ ئەم منداڵە کە ڕاست بکرێتەوە.',
-  // Recording what a child did.
   'behaviour.merit': 'خاڵی باش',
   'behaviour.rosterHint': 'دەست بنێ بە ناوی منداڵێک بۆ تۆمارکردنی خاڵی باش یان نیگەرانی.',
   'behaviour.concern': 'نیگەرانی',
@@ -2850,7 +2686,6 @@ const Map<String, String> _ckb = {
   'leave.reasonHint': 'لە دوێنێ شەوەوە تایەکی بەرزی هەیە، ئەمڕۆ بەیانی دەچینە لای پزیشک.',
   'leave.reasonNeeded': 'بە کورتی بڵێ بۆچی، تا قوتابخانە بزانێت.',
   'leave.confirmWithBiometrics': 'پێش ئەوەی قوتابخانە ئاگادار بکرێتەوە، دڵنیای بکەرەوە کە خۆتی',
-// Student information
   'info.title': 'زانیاری قوتابی',
   'info.knownAs': 'بانگی دەکرێت {name}',
   'info.born': 'لەدایکبوون',
@@ -2887,7 +2722,6 @@ const Map<String, String> _ckb = {
   'info.fixedSeatAt': 'کورسی {seat}، هەموو ڕۆژێک',
   'info.neverAlone': 'هەرگیز بە تەنها ناهێڵدرێت',
   'info.correctionNote': 'نووسینگەی قوتابخانە ئەم تۆمارە دەپارێزێت. ئەگەر شتێک هەڵەیە، پێیان بڵێ و ڕاستی دەکەنەوە.',
-// Driver feedback
   'crew.title': 'ڕای دەربارەی شۆفێر',
   'crew.introTitle': 'بە قوتابخانە بڵێ گەشتەکە چۆنە',
   'crew.introBody': 'پەسندکردن یان نیگەرانی دەربارەی شۆفێر یان هاوڕێی ناو پاسەکە. دەچێتە نووسینگەی قوتابخانە. شۆفێر هەرگیز نایبینێت.',
@@ -2926,7 +2760,6 @@ const Map<String, String> _ckb = {
   'crew.status.ESCALATED': 'بەرزکرایەوە',
   'crew.status.CLOSED_NO_ACTION': 'داخرا',
 
-  // Memories
   'memories.title': 'یادگاری قوتابخانە',
   'memories.subtitle': 'ڕۆژانی قوتابخانە، وەک قوتابخانە هاوبەشی کردوون.',
   'memories.viewAll': 'بینینی هەموو وێنەکان',
@@ -2937,7 +2770,6 @@ const Map<String, String> _ckb = {
   'quick.liveVideoSoon': 'هێشتا ئامادە نییە. هیچ پاسێک کامێرای لەسەر نییە، بۆیە هیچ شتێک نییە بۆ سەیرکردن.',
   'quick.liveClassVideo': 'ڤیدیۆی ڕاستەوخۆی پۆل',
   'quick.liveClassVideoSoon': 'هێشتا ئامادە نییە. هیچ پۆلێک کامێرای لەسەر نییە، بۆیە هیچ شتێک نییە بۆ سەیرکردن.',
-// Where the child is
   'track.title': 'منداڵەکەم لەکوێیە',
   'track.onBoard': '{name} لەناو پاسەکەدایە',
   'track.arrived': '{name} گەیشت',
@@ -2984,7 +2816,6 @@ const Map<String, String> _ckb = {
   'track.alighted': 'دابەزی',
   'quick.track': 'لەکوێیە',
   'track.demoData': 'نمایش — ئەم پاسە ڕاستەقینە نییە. هیچ شتێک لەسەر ئەم نەخشەیە ئۆتۆمبێلێکی سەر ڕێگا نییە.',
-// Home address on the map
   'home.title': 'شوێنی نیشتەجێبوونمان',
   'home.explainTitle': 'بۆ ئەوەی پاسەکە بزانێت لەکوێ بتاندۆزێتەوە',
   'home.explainBody': 'نووسینگەی قوتابخانە ئەمە بەکاردەهێنێت بۆ دیاریکردنی ئەو وەستانەی منداڵەکەت لێی سوار دەبێت. خۆی وەستانەکە ناگۆڕێت — نووسینگە بڕیاری لەسەر دەدات.',
@@ -3358,6 +3189,10 @@ const Map<String, String> _ckb = {
   'teacher.viewTimetable': 'خشتە ببینە',
   'teacher.myClasses': 'پۆلەکانم',
   'teacher.attendance': 'ئامادەبوون',
+  'teacher.viewList': 'ناوەکان',
+  'teacher.viewFaces': 'وێنەکان',
+  'teacher.gridHint': 'دەست بنێ بە وێنەیەک بۆ نیشانکردنی ئامادەنەبوو، دووبارە دەستی لێبنێ بۆ ئامادە. دەستت لەسەر وێنەکە ڕابگرە بۆ دواکەوتوو یان مۆڵەتدراو.',
+  'teacher.noPhotoShort': 'بێ وێنە',
   'teacher.gradebook': 'دەفتەری نمرە',
   'teacher.messages': 'نامەکان',
   'teacher.todaySchedule': 'خشتەی ئەمڕۆ',
@@ -3819,10 +3654,6 @@ const Map<String, String> _ckb = {
   'dec.sent': 'سوپاس. نووسینگە ئەمە دەپشکنێت و پەسەندی دەکات.',
 };
 
-/* ---------------------------------------------------------------------------
- * Arabic
- * ------------------------------------------------------------------------- */
-
 const Map<String, String> _ar = {
   'app.name': 'KSP',
   'app.tagline': 'يربط الطلاب وأولياء الأمور\nوالمعلمين والمدارس',
@@ -3863,7 +3694,6 @@ const Map<String, String> _ar = {
   'nav.more': 'المزيد',
   'nav.account': 'الحساب',
 
-  // ---- The redesigned home screen ------------------------------------------
   'quick.bus': 'تتبع الحافلة',
   'quick.assignments': 'الواجبات',
   'quick.attendance': 'الحضور',
@@ -3874,6 +3704,8 @@ const Map<String, String> _ar = {
   'marks.countedFrom': 'محسوب من {n} عملاً.',
   'marks.markedWork': 'الأعمال المصحّحة',
   'marks.absent': 'غائب',
+  'marks.classAverage': 'معدل الصف {avg} · {pct}',
+  'marks.classAverageFrom': 'من {n} درجة',
   'quick.attitude': 'السلوك',
   'quick.timetable': 'الجدول',
   'quick.reports': 'التقارير',
@@ -3912,7 +3744,6 @@ const Map<String, String> _ar = {
   'attendance.excused': 'بعذر',
   'attendance.keepItUp': 'ممتاز — واصل هكذا.',
   'attendance.watchThis': 'يستحق المتابعة.',
-  // ---- Attitude -------------------------------------------------------------
   'attitude.whatTheySaid': 'ما قالته المدرسة',
   'attitude.nothingYet': 'لم تشارك المدرسة شيئاً بعد.',
   'attitude.summaryLine': 'كيف يسير {n}، بكلمات المدرسة.',
@@ -3943,7 +3774,6 @@ const Map<String, String> _ar = {
   'attitude.phone_or_device': 'هاتف أو جهاز',
   'attitude.bus_conduct': 'السلوك في الحافلة',
   'attitude.other': 'أخرى',
-  // ---- Timetable and reports -----------------------------------------------
   'timetable.none': 'لم يُحدَّد جدول لهذا الصف.',
   'timetable.nothingThatDay': 'لا توجد حصص في ذلك اليوم.',
   'reports.marks': 'الدرجات حسب المادة',
@@ -3954,14 +3784,8 @@ const Map<String, String> _ar = {
   'reports.overall': 'الإجمالي',
   'reports.exams': 'نتائج الاختبارات',
 
-
-  // ---- The driver and attendant app ----------------------------------------
   'driver.today': 'اليوم',
 
-  // ---- Dates ---------------------------------------------------------------
-  // Every date in all three apps ran through a hardcoded English table, so a
-  // Kurdish screen said "Thu 3 Sep 2026". These are short forms on purpose:
-  // they sit inside cards and rows where a full month name would wrap.
   'month.1': 'كانون الثاني',
   'month.2': 'شباط',
   'month.3': 'آذار',
@@ -3993,7 +3817,6 @@ const Map<String, String> _ar = {
   'day.5': 'الجمعة',
   'day.6': 'السبت',
   'day.7': 'الأحد',
-  // Without the article, which is how a calendar column is written in Arabic.
   'dayShort.1': 'إثنين',
   'dayShort.2': 'ثلاثاء',
   'dayShort.3': 'أربعاء',
@@ -4011,8 +3834,6 @@ const Map<String, String> _ar = {
   'pick.date': 'Pick a date',
   'pick.choose': 'Choose',
 
-
-  // ---- The teacher app -----------------------------------------------------
   'teacher.today': 'اليوم',
   'teacher.classes': 'الصفوف',
   'teacher.homework': 'الواجبات',
@@ -4032,7 +3853,6 @@ const Map<String, String> _ar = {
   'teacher.searchRegister': 'ابحث بالاسم أو الرمز',
   'teacher.registerNoMatch': 'لا يوجد طالب في هذا السجل يطابق ذلك.',
   'teacher.noTerm': 'لا يوجد فصل دراسي مفتوح. الإدارة تحدد ذلك.',
-  // ---- The register --------------------------------------------------------
   'teacher.takeRegister': 'تسجيل الحضور',
   'teacher.registerSaved': 'تم حفظ الحضور',
   'teacher.nothingMarked': 'لم يُسجَّل شيء بعد. الجميع يظهر حاضراً حتى تحفظ.',
@@ -4040,7 +3860,6 @@ const Map<String, String> _ar = {
   'teacher.saveCount': 'حفظ {n}',
   'teacher.saveTally': 'حفظ — {n}',
   'teacher.tally': '{n} حاضر، {a} غائب، {l} متأخر',
-  // ---- Homework ------------------------------------------------------------
   'teacher.setHomework': 'إسناد واجب',
   'teacher.homeworkSet': 'تم إسناد الواجب',
   'teacher.setIt': 'إسناد',
@@ -4058,7 +3877,6 @@ const Map<String, String> _ar = {
   'teacher.familiesCanSee': 'كل عائلة في هذا الصف سترى نسخة ابنها.',
   'teacher.setOn': 'أُسند {n}',
   'teacher.dueOn': 'يُسلَّم {n}',
-  // ---- Exams ---------------------------------------------------------------
   'teacher.newTest': 'اختبار جديد',
   'teacher.testCreated': 'تم إنشاء الاختبار',
   'teacher.create': 'إنشاء',
@@ -4073,7 +3891,6 @@ const Map<String, String> _ar = {
   'teacher.notPublished': 'لم يُنشر بعد',
   'teacher.published': 'نُشر — العائلات تراه الآن',
   'teacher.publishToFamilies': 'النشر للعائلات',
-  // ---- Marks ---------------------------------------------------------------
   'teacher.marksSaved': 'حُفظت الدرجات — العائلات لا تراها بعد',
   'teacher.marksReleased': 'نُشرت الدرجات للعائلات',
   'teacher.familiesSeeMarks': 'العائلات ترى هذه الدرجات.',
@@ -4146,7 +3963,6 @@ const Map<String, String> _ar = {
   'driver.ackNeeded': 'يحتاج إلى إقرارك',
   'driver.mustAcknowledge': 'يطلب هذا إقراراً — اضغط فهمت بعد أن تقرأه وتفهمه.',
 
-  // ---- What to do right now ------------------------------------------------
   'driver.stepOf': 'الخطوة {n} من 5',
   'driver.step.check': 'اضغط الزر أدناه واملأ فحص الحافلة. لا يمكنك الانطلاق قبل إتمامه.',
   'driver.step.setOff': 'اكتمل فحص الحافلة. اضغط «الانطلاق» عندما تكون مستعداً للقيادة.',
@@ -4188,7 +4004,6 @@ const Map<String, String> _ar = {
   'driver.etaShort': '~{n}',
   'driver.etaDue': 'متوقع ~{n}',
   'driver.arrivedAt': 'وصلت {n}',
-  // ---- The cabin sweep -----------------------------------------------------
   'driver.beforeYouLeave': 'قبل أن تغادر الحافلة',
   'driver.sweepWhy': 'الحافلة المغلقة تصبح ساخنة بشكل خطير خلال دقائق في الصيف.',
   'driver.sweepHow': 'افحص كل صف، وتحت كل مقعد، والصف الخلفي في النهاية. ',
@@ -4219,7 +4034,6 @@ const Map<String, String> _ar = {
       'تم تسجيل فحصك، لكنه لم يُنهِ حالة هذه الحافلة. السجل لدى المكتب.',
   'driver.sweepRecordedNotCleared':
       'تم تسجيل فحصك وأُبلغ المكتب. يبقى هنا لأنه وصل بعد انتهاء الوقت المحدد — المكتب وحده من يمكنه إغلاقه الآن.',
-  // ---- Papers --------------------------------------------------------------
   'driver.noPapers': 'لا يوجد شيء مسجّل. الإدارة تحتفظ بالرخص والفحوصات الطبية والتدقيقات — اطلب منهم إضافة أوراقك، وإلا أوقفك الحارس عند الدخول.',
   'driver.expires': 'تنتهي {n}',
   'driver.noExpiry': 'لا يوجد تاريخ انتهاء مسجّل',
@@ -4230,7 +4044,6 @@ const Map<String, String> _ar = {
   'driver.credBlocking': 'على وشك المنع',
   'driver.credNotValid': 'أوقفها المكتب — لا يجوز القيادة بها.',
   'driver.leaving': 'بدأت إجراءات مغادرتك. ستخبرك الإدارة متى ينتهي وصولك.',
-
 
   'greet.morning': 'صباح الخير،',
   'greet.afternoon': 'مساء الخير،',
@@ -4306,7 +4119,6 @@ const Map<String, String> _ar = {
   'bus.locationHidden':
       'المدرسة تحتفظ بتفاصيل هذه الرحلة بصورة خاصة. يُرجى التحدث إلى إدارة المدرسة.',
 
-  // Not riding today.
   'leave.noteAdd': 'أرفق تقريرًا طبيًا',
   'leave.notePhotograph': 'التقط صورة',
   'leave.noteFromPhone': 'اختر من الهاتف',
@@ -4381,7 +4193,6 @@ const Map<String, String> _ar = {
   'staffLeave.PUBLIC_DUTY': 'واجب عام',
   'staffLeave.COMPASSIONATE': 'إجازة ظروف خاصة',
   'staffLeave.OTHER': 'أخرى',
-  // The driver's own paperwork.
   'cred.loadFailed': 'تعذّر تحميل مستنداتك.',
   'cred.retry': 'حاول مرة أخرى',
   'driver.wrong': 'خطأ؟',
@@ -4399,7 +4210,6 @@ const Map<String, String> _ar = {
   'driver.corrected': 'تم تسجيل التصحيح.',
   'driver.correctionRefused': 'لم يقبل الخادم هذا التصحيح.',
   'driver.nothingToCorrect': 'لا يوجد سجل لهذا الطفل لتصحيحه.',
-  // Recording what a child did.
   'behaviour.merit': 'نقطة إيجابية',
   'behaviour.rosterHint': 'اضغط على اسم الطالب لتسجيل نقطة إيجابية أو ملاحظة.',
   'behaviour.concern': 'ملاحظة',
@@ -4636,7 +4446,6 @@ const Map<String, String> _ar = {
   'leave.reasonHint': 'حرارة مرتفعة منذ الليلة الماضية، سنراجع الطبيب هذا الصباح.',
   'leave.reasonNeeded': 'اذكر السبب باختصار ليعرف المدرسة.',
   'leave.confirmWithBiometrics': 'أكّد هويتك قبل إبلاغ المدرسة',
-// Student information
   'info.title': 'معلومات الطالب',
   'info.knownAs': 'يُنادى {name}',
   'info.born': 'تاريخ الميلاد',
@@ -4673,7 +4482,6 @@ const Map<String, String> _ar = {
   'info.fixedSeatAt': 'المقعد {seat}، كل يوم',
   'info.neverAlone': 'لا يُسلَّم وحده أبداً',
   'info.correctionNote': 'مكتب المدرسة هو من يحفظ هذا السجل. إن كان أي شيء هنا خاطئاً فأبلغهم وسيصححونه.',
-// Driver feedback
   'crew.title': 'رأيك في السائق',
   'crew.introTitle': 'أخبر المدرسة كيف تسير الرحلة',
   'crew.introBody': 'ثناء أو ملاحظة عن السائق أو المرافق الذي ينقل طفلك. تصل إلى مكتب المدرسة. ولا يراها السائق أبداً.',
@@ -4712,7 +4520,6 @@ const Map<String, String> _ar = {
   'crew.status.ESCALATED': 'رُفعت',
   'crew.status.CLOSED_NO_ACTION': 'أُغلقت',
 
-  // Memories
   'memories.title': 'ذكريات المدرسة',
   'memories.subtitle': 'أيام المدرسة، كما شاركتها المدرسة.',
   'memories.viewAll': 'عرض كل الصور',
@@ -4723,7 +4530,6 @@ const Map<String, String> _ar = {
   'quick.liveVideoSoon': 'غير جاهز بعد. لا توجد كاميرا في أي حافلة، فلا شيء لمشاهدته.',
   'quick.liveClassVideo': 'بث مباشر للصف',
   'quick.liveClassVideoSoon': 'غير جاهز بعد. لا توجد كاميرا في أي صف، فلا شيء لمشاهدته.',
-// Where the child is
   'track.title': 'أين طفلي',
   'track.onBoard': '{name} في الحافلة',
   'track.arrived': '{name} وصل',
@@ -4770,7 +4576,6 @@ const Map<String, String> _ar = {
   'track.alighted': 'نزل',
   'quick.track': 'أين هو',
   'track.demoData': 'عرض توضيحي — هذه الحافلة ليست حقيقية. لا شيء على هذه الخريطة مركبة على الطريق.',
-// Home address on the map
   'home.title': 'مكان سكننا',
   'home.explainTitle': 'لتعرف الحافلة أين تجدكم',
   'home.explainBody': 'يستخدم مكتب المدرسة هذا لاختيار الموقف الذي يركب منه طفلك. لا يغيّر الموقف من تلقاء نفسه — المكتب هو من يقرر ذلك.',
@@ -5143,6 +4948,10 @@ const Map<String, String> _ar = {
   'teacher.viewTimetable': 'عرض الجدول',
   'teacher.myClasses': 'صفوفي',
   'teacher.attendance': 'الحضور',
+  'teacher.viewList': 'الأسماء',
+  'teacher.viewFaces': 'الصور',
+  'teacher.gridHint': 'اضغط على صورة لتسجيل الغياب، واضغط عليها مرة أخرى للحضور. اضغط مطولاً على الصورة للتأخر أو الغياب بعذر.',
+  'teacher.noPhotoShort': 'بلا صورة',
   'teacher.gradebook': 'سجل الدرجات',
   'teacher.messages': 'الرسائل',
   'teacher.todaySchedule': 'جدول اليوم',

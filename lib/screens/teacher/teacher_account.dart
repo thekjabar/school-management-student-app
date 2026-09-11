@@ -10,8 +10,6 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 
-/// The days of the school week in the order the Region reads them, which is
-/// also the order the timetable endpoint sorts on.
 const _order = [
   'SUNDAY',
   'MONDAY',
@@ -22,12 +20,6 @@ const _order = [
   'SATURDAY',
 ];
 
-/// The teacher's week as a screen of its own.
-///
-/// [TeacherWeek] is the same thing without the furniture, for the slot it fills
-/// in the bottom bar. The two were one widget, which meant the drawer and the
-/// home card pushed a bare Loader onto a route with no Scaffold under it: no
-/// canvas, no safe area, and no way back but the system gesture.
 class TeacherWeekScreen extends StatelessWidget {
   const TeacherWeekScreen({super.key});
 
@@ -39,7 +31,6 @@ class TeacherWeekScreen extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
-            // The back tile belongs to the pushed route and to nothing else.
             const _WeekHeader(withBack: true),
             const Expanded(child: TeacherWeek(withHeader: false)),
           ],
@@ -49,17 +40,9 @@ class TeacherWeekScreen extends StatelessWidget {
   }
 }
 
-/// The teacher's own record, and their week.
 class TeacherWeek extends StatelessWidget {
   const TeacherWeek({super.key, this.withHeader = true});
 
-  /// Draws the title and the week pill above the list.
-  ///
-  /// True in the bottom bar, where this widget is the whole page and there is
-  /// nothing above it to name the screen — and false under [TeacherWeekScreen],
-  /// which draws the same header itself with a back tile in it. The tab must
-  /// never get that tile: inside the bar there is nothing to pop, and a back
-  /// arrow that does nothing is the fault this split was made to fix.
   final bool withHeader;
 
   @override
@@ -81,8 +64,6 @@ class TeacherWeek extends StatelessWidget {
               }
               final days = _order.where(byDay.containsKey).toList();
 
-              // Every figure below is counted off the rows that came back.
-              // Nothing here is a constant dressed up as a statistic.
               final classes = slots
                   .map((s) => s.classId)
                   .where((id) => id.isNotEmpty)
@@ -145,27 +126,11 @@ class TeacherWeek extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The week itself
- * ------------------------------------------------------------------------- */
-
-/// Midnight on the Sunday the current week began on.
-///
-/// DateTime.weekday counts Monday as 1, so Sunday — 7 — is nought days back and
-/// every other day is its own number. Built by arithmetic on the calendar
-/// fields rather than by subtracting a Duration, so the hour a clock goes
-/// forward cannot land the week on the wrong day.
 DateTime _weekStart() {
   final now = DateTime.now();
   return DateTime(now.year, now.month, now.day - (now.weekday % 7));
 }
 
-/// Five theme colours across seven days.
-///
-/// Five is all the palette carries that is legible on BOTH canvases, and the
-/// cycle is over the fixed week order rather than over the days that happen to
-/// have lessons — so no two days that sit next to each other share a colour,
-/// and a given day keeps its colour whatever else is on the timetable.
 Color _dayColour(int index) {
   final palette = [
     AppTheme.violet,
@@ -177,7 +142,6 @@ Color _dayColour(int index) {
   return palette[index % palette.length];
 }
 
-/// The back tile, the title, and the week the list is showing.
 class _WeekHeader extends StatelessWidget {
   const _WeekHeader({required this.withBack});
 
@@ -217,15 +181,6 @@ class _WeekHeader extends StatelessWidget {
   }
 }
 
-/// The week the timetable below belongs to.
-///
-/// A LABEL, and deliberately not a control. GET /teacher/timetable takes one
-/// optional `weekday` filter and nothing else: the slots it returns are the
-/// recurring pattern, resolved server-side against today's date, and they carry
-/// a weekday rather than a date. There is no request this app can make for last
-/// week or next, so there is no chevron on this pill — a chevron here would be
-/// a third dead control shipped on this app in a day. The dates come off the
-/// phone's own clock, which is the same place the highlighted day comes from.
 class _WeekPill extends StatelessWidget {
   const _WeekPill();
 
@@ -233,8 +188,6 @@ class _WeekPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final start = _weekStart();
     final end = DateTime(start.year, start.month, start.day + 6);
-    // Only one month name when both ends share a month, which is the usual
-    // case: "1 – 7 Sep 2026" rather than "1 Sep – 7 Sep 2026".
     final from = start.month == end.month && start.year == end.year
         ? '${start.day}'
         : shortDate(start);
@@ -269,10 +222,6 @@ class _WeekPill extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Who the week belongs to
- * ------------------------------------------------------------------------- */
-
 class _Identity extends StatelessWidget {
   const _Identity({required this.name, required this.phone, required this.school});
 
@@ -289,8 +238,6 @@ class _Identity extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              // Tinted, always. Left to itself CircleInitials hashes the name
-              // into a hue of its own, and the teacher app is green.
               CircleInitials(label: name.isEmpty ? '?' : name, tint: Role.teacher.tint, size: 52),
               PositionedDirectional(
                 bottom: -1,
@@ -330,8 +277,6 @@ class _Identity extends StatelessWidget {
                   alignment: AlignmentDirectional.centerStart,
                   child: Text(
                     phone,
-                    // A phone number reads left-to-right even on a Kurdish
-                    // screen; mirroring it makes it unusable.
                     textDirection: TextDirection.ltr,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -368,15 +313,6 @@ class _Identity extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The three figures
- * ------------------------------------------------------------------------- */
-
-/// Days, lessons and classes, counted off the timetable that just loaded.
-///
-/// Not FigureStrip or IconFigureStrip: the first has no glyph at all and the
-/// second draws a 12pt value beside a 22px disc, which is a figure for the foot
-/// of a card rather than the three numbers this card exists for.
 class _Figures extends StatelessWidget {
   const _Figures({required this.days, required this.lessons, required this.classes});
 
@@ -487,15 +423,6 @@ class _Figure extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * One day
- * ------------------------------------------------------------------------- */
-
-/// A day of the week, with everything timetabled on it.
-///
-/// No chevron and no tap: a day on this screen opens nothing today, and this
-/// rebuild is a change of presentation rather than of destination. The card
-/// therefore promises nothing it cannot do.
 class _DayCard extends StatelessWidget {
   const _DayCard({
     required this.weekday,
@@ -528,8 +455,6 @@ class _DayCard extends StatelessWidget {
               child: _DayBlock(weekday: weekday, date: date, colour: colour),
             ),
             const SizedBox(width: 10),
-            // The bar runs the height of the day rather than of one lesson,
-            // which is what ties three lessons together as one day.
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 1),
               child: Container(
@@ -578,7 +503,6 @@ class _DayCard extends StatelessWidget {
   }
 }
 
-/// The tinted block on the leading side: the day, and the date it falls on.
 class _DayBlock extends StatelessWidget {
   const _DayBlock({required this.weekday, required this.date, required this.colour});
 
@@ -601,10 +525,6 @@ class _DayBlock extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
-              // weekdayName, not humanise: humanise only sentence-cases the
-              // API's enum, so every day on a Kurdish screen read "Sunday",
-              // "Monday". Uppercasing is a no-op in the two scripts that have
-              // no case, and gives the design's "SUN" in the one that does.
               weekdayName(weekday).toUpperCase(),
               maxLines: 1,
               style: TextStyle(

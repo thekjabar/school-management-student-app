@@ -13,19 +13,9 @@ import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
+import 'mark_bank.dart';
 import 'teacher_kit.dart';
 
-/// A teacher's classes, and the register for one of them.
-///
-/// Taking the register is the only writing most teachers do in this app every
-/// day, so it is one tap from the class list and saves in one call. Thirty
-/// separate requests over a school's connection is thirty chances for one to
-/// fail and leave a child unmarked with nobody the wiser.
-/// The class list as a screen of its own.
-///
-/// It used to be a bottom-bar tab. The bar now carries the five destinations
-/// the design asks for, so everything that was a tab and is still a place needs
-/// a Scaffold of its own to be pushed onto.
 class ClassesScreen extends StatelessWidget {
   const ClassesScreen({super.key});
 
@@ -138,14 +128,6 @@ class ClassesTab extends StatelessWidget {
   }
 }
 
-/// The register for one class on one day.
-///
-/// A page rather than a form: which class and which day at the top, where the
-/// class stands right now under it, then one card per child carrying the four
-/// marks. Nothing about what this screen DOES changed with the redesign — the
-/// whole register still saves in one call, a day that has already been taken
-/// still says so before anything is touched, and a register nobody has marked
-/// still cannot be saved by accident.
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key, required this.slot});
 
@@ -162,16 +144,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _dirty = false;
   bool _saving = false;
 
+  bool _grid = false;
+
   final _search = TextEditingController();
   String _query = '';
   Timer? _debounce;
   bool _searching = false;
 
-  /// The children the server said match the search, or null when there is
-  /// no search. Only ids come back into use: the rows drawn are still the
-  /// ones in [_marks], so a mark put against a child before the teacher
-  /// searched is still there when the search is cleared. Re-fetching the
-  /// rows themselves would wipe every unsaved mark on each keystroke.
   Set<String>? _matching;
 
   @override
@@ -193,8 +172,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
     setState(() => _query = value);
-    // A pause, not a keystroke: a teacher typing a name sends one request for
-    // the name, not one for every letter of it.
     _debounce = Timer(const Duration(milliseconds: 350), () => _runSearch(q));
   }
 
@@ -206,7 +183,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         date: _dateString,
         q: q,
       );
-      // Typed past this one while it was in flight; the newer search answers.
       if (!mounted || _query.trim() != q) return;
       setState(() => _matching = data.marks.map((m) => m.studentId).toSet());
     } on ApiException catch (e) {
@@ -226,22 +202,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
   }
 
-  /// Whether the amber note has been waved away.
-  ///
-  /// Dismissed for the sitting rather than for the day: it is a reminder, not a
-  /// record, and a teacher working down a class of fifty does not need telling
-  /// twice that nothing is marked yet.
   bool _hintDismissed = false;
 
   String get _dateString =>
       '${_date.year.toString().padLeft(4, '0')}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}';
 
-  /// How many children carry one mark.
-  ///
-  /// Every figure on this screen is counted from the marks in hand rather than
-  /// from a total the server sent, because the moment a teacher taps a letter
-  /// the two disagree and the one on screen is the true one.
   int _count(String status) => _marks.where((m) => m.status == status).length;
+
+  void _setStatus(RegisterMark mark, String status) {
+    setState(() {
+      mark.status = status;
+      if (status != 'LATE') mark.minutesLate = null;
+      _dirty = true;
+    });
+  }
+
+  Future<void> _pickStatus(RegisterMark mark) async {
+    final picked = await showAppSheet<String>(
+      context,
+      builder: (_) => _MarkSheet(mark: mark),
+    );
+    if (picked != null && mounted) _setStatus(mark, picked);
+  }
 
   Future<void> _save() async {
     setState(() => _saving = true);
@@ -288,11 +270,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.canvas,
-      // Fixed, rather than appearing the moment the register turns dirty: a bar
-      // that arrives from nowhere shifts the class list under the finger that
-      // is marking it. It stays disabled until something has actually been
-      // marked, which is the protection the appearing bar used to give — an
-      // untouched register saved by mistake marks the whole class present.
       bottomNavigationBar: _SaveBar(
         tally: tv('teacher.tallyFull', {
           'n': present,
@@ -314,7 +291,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             Padding(
               padding: const EdgeInsetsDirectional.fromSTEB(kGutter, 0, kGutter, 10),
-              child: TextField(
+              child: Row(children: [
+                Expanded(
+                  child: TextField(
                 controller: _search,
                 textInputAction: TextInputAction.search,
                 onChanged: _onQuery,
@@ -347,21 +326,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                   suffixIconConstraints: const BoxConstraints(minWidth: 42, minHeight: 42),
                 ),
-              ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _ModeToggle(
+                  grid: _grid,
+                  onChanged: (v) => setState(() => _grid = v),
+                ),
+              ]),
             ),
             Expanded(
-              // The height of the region is measured here so the body can fill
-              // it exactly and scroll its own children lazily. Fifty is an
-              // ordinary class in these schools, and fifty cards in one column
-              // is fifty cards laid out again on every single tap.
               child: LayoutBuilder(
                 builder: (context, box) =>
                     Loader<({bool alreadyTaken, List<RegisterMark> marks})>(
                   key: _loaderKey,
                   tint: Role.teacher.tint,
-                  // Horizontal only. Vertical padding here would make the
-                  // loader's own list taller than the screen, and then two
-                  // things would scroll where there should be one.
                   padding: const EdgeInsets.symmetric(horizontal: kGutter),
                   load: () async {
                     final data = await TeacherApi.instance.register(
@@ -369,10 +348,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       date: _dateString,
                     );
                     _marks = data.marks;
-                    // The loader rebuilds only itself when the fetch lands, and
-                    // the summary and the tally under the save button are drawn
-                    // from this state — without this they would sit at zero
-                    // until the first child was marked.
                     if (mounted) setState(() {});
                     return data;
                   },
@@ -387,9 +362,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     height: box.maxHeight,
                     child: RefreshIndicator(
                       color: Role.teacher.tint,
-                      // The loader's own pull-to-refresh only hears the list it
-                      // owns, and the list under a teacher's thumb is this one.
-                      // Same gesture, same reload.
                       onRefresh: () async {
                         await _loaderKey.currentState?.reload();
                       },
@@ -412,9 +384,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ] else if (!_hintDismissed) ...[
                                   NoticeBanner(
                                     icon: Icons.info_rounded,
-                                    // Said plainly, because the screen opens
-                                    // with everyone showing Present and that is
-                                    // a default, not a record.
                                     title: t('teacher.nothingMarkedTitle'),
                                     body: t('teacher.nothingMarkedBody'),
                                     color: AppTheme.amber,
@@ -429,7 +398,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   late: late,
                                   total: data.marks.length,
                                 ),
-                                const _ColumnHeadings(),
+                                if (_grid)
+                                  const _GridHint()
+                                else
+                                  const _ColumnHeadings(),
                               ],
                             ),
                           ),
@@ -443,7 +415,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ),
                               ),
                             ),
-                          SliverList.builder(
+                          if (_grid)
+                            SliverGrid.builder(
+                              gridDelegate:
+                                  const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 132,
+                                mainAxisSpacing: kCardGap,
+                                crossAxisSpacing: kCardGap,
+                                childAspectRatio: 0.72,
+                              ),
+                              itemCount: shown.length,
+                              itemBuilder: (context, i) {
+                                final mark = shown[i];
+                                return _FaceTile(
+                                  mark: mark,
+                                  position: data.marks.indexOf(mark) + 1,
+                                  onToggle: () => _setStatus(
+                                    mark,
+                                    mark.status == 'ABSENT' ? 'PRESENT' : 'ABSENT',
+                                  ),
+                                  onPickStatus: () => _pickStatus(mark),
+                                );
+                              },
+                            )
+                          else
+                            SliverList.builder(
                             itemCount: shown.length,
                             itemBuilder: (context, i) {
                               final mark = shown[i];
@@ -451,16 +447,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 padding: const EdgeInsets.only(bottom: kCardGap),
                                 child: _MarkRow(
                                   mark: mark,
-                                  // Where the child sits in the whole register,
-                                  // not in the search results: the number next
-                                  // to a name must not change when the teacher
-                                  // types.
                                   position: data.marks.indexOf(mark) + 1,
-                                  onChanged: (status) => setState(() {
-                                    mark.status = status;
-                                    if (status != 'LATE') mark.minutesLate = null;
-                                    _dirty = true;
-                                  }),
+                                  onChanged: (status) => _setStatus(mark, status),
                                 ),
                               );
                             },
@@ -481,12 +469,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 }
 
-/// Back, which class, which day.
-///
-/// Not [ScreenHeader]: this one carries a second line under the title saying
-/// what the page is, and a control on the right that is a pill rather than a
-/// square. Everything else about it — the white tile, the gutter, the weight of
-/// the title — is that header's, so the two read as the same furniture.
 class _RegisterHeader extends StatelessWidget {
   const _RegisterHeader({
     required this.className,
@@ -543,11 +525,6 @@ class _RegisterHeader extends StatelessWidget {
   }
 }
 
-/// The day, and a way to change it.
-///
-/// The chevron is drawn because the day really is switchable: the register
-/// endpoint takes a date, the picker the rest of the app already uses returns
-/// one, and the loader refetches for whichever day comes back.
 class _DatePill extends StatelessWidget {
   const _DatePill({required this.date, required this.onTap});
 
@@ -591,7 +568,6 @@ class _DatePill extends StatelessWidget {
   }
 }
 
-/// Where the class stands, counted from the marks on screen.
 class _Summary extends StatelessWidget {
   const _Summary({
     required this.present,
@@ -604,8 +580,6 @@ class _Summary extends StatelessWidget {
   final int absent;
   final int late;
 
-  /// The roster length, which is the only total there is — nothing on this
-  /// screen knows how many children the class is supposed to have.
   final int total;
 
   @override
@@ -706,7 +680,6 @@ class _Count extends StatelessWidget {
   }
 }
 
-/// What the three columns of the list below are.
 class _ColumnHeadings extends StatelessWidget {
   const _ColumnHeadings();
 
@@ -739,7 +712,6 @@ class _ColumnHeadings extends StatelessWidget {
   }
 }
 
-/// One child, and the four marks that can be put against them.
 class _MarkRow extends StatelessWidget {
   const _MarkRow({
     required this.mark,
@@ -749,16 +721,10 @@ class _MarkRow extends StatelessWidget {
 
   final RegisterMark mark;
 
-  /// Where in the list this child sits. Shown only when the school has given
-  /// the child no roll number of their own: an invented number in the column a
-  /// teacher reads as the roll is worse than no number at all.
   final int position;
 
   final ValueChanged<String> onChanged;
 
-  // A getter, not a const: the letter on each button is the first letter of the
-  // word in the language the app is showing, and a Kurdish register marked with
-  // P, A, L and E is four English initials nobody can read.
   static List<({String status, String letter, String word, Color colour})>
       get _options => [
             (
@@ -816,11 +782,6 @@ class _MarkRow extends StatelessWidget {
           const SizedBox(width: 7),
           CircleInitials(label: mark.name, size: 32),
           const SizedBox(width: 9),
-          // The name gives up its width first: the four marks are what the
-          // screen is for, and a long name that pushed them past the edge would
-          // leave a child unmarkable. It wraps rather than truncates — a
-          // Kurdish name is three words and the third is the one that tells
-          // two cousins apart, so "Shadan Ja…" is not a name, it is a guess.
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -864,7 +825,6 @@ class _MarkRow extends StatelessWidget {
   }
 }
 
-/// One of the four marks: the letter, and the word it stands for.
 class _MarkButton extends StatelessWidget {
   const _MarkButton({
     required this.letter,
@@ -897,8 +857,6 @@ class _MarkButton extends StatelessWidget {
                   ? colour
                   : colour.withValues(alpha: AppTheme.dark ? 0.22 : 0.12),
               borderRadius: BorderRadius.circular(12),
-              // The ring, so which mark is chosen is legible to somebody who
-              // cannot tell the four colours apart.
               boxShadow: chosen
                   ? [
                       BoxShadow(
@@ -942,20 +900,409 @@ class _MarkButton extends StatelessWidget {
   }
 }
 
-/// The bar the register is saved from.
-///
-/// Drawn here rather than with [BigButton] because it carries three things at
-/// once — a glyph, the action, and a live count of what is about to be written
-/// — and BigButton is one centred label by design. The radius, the fill and the
-/// busy spinner are BigButton's, so the two still match.
+({String letter, String word, Color colour})? _markLook(String status) {
+  for (final o in _MarkRow._options) {
+    if (o.status == status) {
+      return (letter: o.letter, word: o.word, colour: o.colour);
+    }
+  }
+  return null;
+}
+
+class _ModeToggle extends StatelessWidget {
+  const _ModeToggle({required this.grid, required this.onChanged});
+
+  final bool grid;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _segment(
+            icon: Icons.view_list_rounded,
+            label: t('teacher.viewList'),
+            on: !grid,
+            onTap: () => onChanged(false),
+          ),
+          const SizedBox(width: 2),
+          _segment(
+            icon: Icons.grid_view_rounded,
+            label: t('teacher.viewFaces'),
+            on: grid,
+            onTap: () => onChanged(true),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _segment({
+    required IconData icon,
+    required String label,
+    required bool on,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        selected: on,
+        label: label,
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            width: 38,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: on ? Role.teacher.tint : Colors.transparent,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(
+              icon,
+              size: 18,
+              color: on ? Colors.white : AppTheme.textMuted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GridHint extends StatelessWidget {
+  const _GridHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(2, 14, 2, 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.touch_app_outlined, size: 13, color: Role.teacher.tint),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              t('teacher.gridHint'),
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.35,
+                color: AppTheme.textMuted,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FaceTile extends StatelessWidget {
+  const _FaceTile({
+    required this.mark,
+    required this.position,
+    required this.onToggle,
+    required this.onPickStatus,
+  });
+
+  final RegisterMark mark;
+
+  final int position;
+
+  final VoidCallback onToggle;
+  final VoidCallback onPickStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = _markLook(mark.status);
+    final colour = look?.colour ?? AppTheme.textFaint;
+    final marked = mark.status != 'PRESENT';
+
+    return Semantics(
+      button: true,
+      label: '${mark.name}, ${look?.word ?? mark.status}',
+      child: Material(
+        color: AppTheme.surface,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: colour.withValues(alpha: marked ? 0.95 : 0.45),
+            width: marked ? 2.4 : 1.4,
+          ),
+        ),
+        child: InkWell(
+          onTap: onToggle,
+          onLongPress: onPickStatus,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _FacePanel(url: mark.photoUrl),
+                    if (marked)
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: colour.withValues(alpha: AppTheme.dark ? 0.42 : 0.30),
+                        ),
+                      ),
+                    PositionedDirectional(
+                      top: 4,
+                      start: 4,
+                      child: _TileChip(
+                        label: mark.rollNumber ?? '$position',
+                        background: AppTheme.canvas.withValues(alpha: 0.86),
+                        foreground: AppTheme.textMuted,
+                      ),
+                    ),
+                    PositionedDirectional(
+                      top: 4,
+                      end: 4,
+                      child: _TileChip(
+                        label: look?.letter ?? '?',
+                        background: colour,
+                        foreground: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 5, 6, 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      mark.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                        color: AppTheme.text,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      look?.word ?? mark.status,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w700,
+                        color: colour,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FacePanel extends StatelessWidget {
+  const _FacePanel({required this.url});
+
+  final String? url;
+
+  @override
+  Widget build(BuildContext context) {
+    if (url == null) return const _NoFace();
+    return Image.network(
+      url!,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => const _NoFace(),
+      loadingBuilder: (context, child, progress) => progress == null
+          ? child
+          : ColoredBox(color: AppTheme.neutralSoft, child: child),
+    );
+  }
+}
+
+class _NoFace extends StatelessWidget {
+  const _NoFace();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.center,
+      color: AppTheme.amber.withValues(alpha: AppTheme.dark ? 0.18 : 0.10),
+      padding: const EdgeInsets.all(6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.no_photography_outlined, size: 22, color: AppTheme.amber),
+          const SizedBox(height: 3),
+          Text(
+            t('teacher.noPhotoShort'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 8.5,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.amber,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TileChip extends StatelessWidget {
+  const _TileChip({
+    required this.label,
+    required this.background,
+    required this.foreground,
+  });
+
+  final String label;
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 18),
+      height: 18,
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          height: 1.1,
+          color: foreground,
+        ),
+      ),
+    );
+  }
+}
+
+class _MarkSheet extends StatelessWidget {
+  const _MarkSheet({required this.mark});
+
+  final RegisterMark mark;
+
+  @override
+  Widget build(BuildContext context) {
+    final options = _MarkRow._options;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: SizedBox(
+                    width: 52,
+                    height: 52,
+                    child: _FacePanel(url: mark.photoUrl),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        mark.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                          height: 1.2,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                      Text(
+                        mark.code,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                for (final o in options)
+                  _MarkButton(
+                    letter: o.letter,
+                    word: o.word,
+                    colour: o.colour,
+                    chosen: mark.status == o.status,
+                    onTap: () => Navigator.of(context).pop(o.status),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SaveBar extends StatelessWidget {
   const _SaveBar({required this.tally, required this.busy, required this.onSave});
 
   final String tally;
   final bool busy;
 
-  /// Null until something has been marked, which is what stops an untouched
-  /// register being written as a class full of present children.
   final VoidCallback? onSave;
 
   @override
@@ -1035,14 +1382,6 @@ class _SaveBar extends StatelessWidget {
   }
 }
 
-/// Who is in this class, in the order a register is read.
-///
-/// The list arrived from the server sorted as TEXT, which is why the owner's
-/// screenshot runs 1, 10, 11 … 18, 2, 3: "10" is before "2" alphabetically and
-/// so is "S0010" before "S0002". Nothing on this screen can make the server
-/// order its rows, so the order is imposed here, on every load, before anything
-/// is drawn — see [_byRoster]. A teacher scanning a register cannot use a list
-/// that jumps from 1 to 10.
 class ClassRosterScreen extends StatefulWidget {
   const ClassRosterScreen({super.key, required this.slot});
 
@@ -1056,11 +1395,6 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
   final _loaderKey = GlobalKey<LoaderState<List<ClassStudent>>>();
   final _search = TextEditingController();
 
-  /// Write down what a child did.
-  ///
-  /// The class this is recorded against is the slot the teacher opened the
-  /// roster from, so the office sees which lesson it happened in without the
-  /// teacher having to say.
   Future<void> _recordBehaviour(BuildContext context, ClassStudent student) async {
     final saved = await showAppSheet<bool>(
       context,
@@ -1071,18 +1405,19 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
     }
   }
 
-  /// The roster as it arrived, already ordered.
-  ///
-  /// Held here as well as inside the loader because the header counts it, and
-  /// because the filter tile has to know whether there is anything to filter BY
-  /// before it decides to exist at all.
+  Future<void> _awardMark(BuildContext context, ClassStudent student) => awardMark(
+        context,
+        studentId: student.studentId,
+        studentName: student.name,
+        classId: widget.slot.classId,
+        subjectId: widget.slot.subjectId,
+      );
+
   List<ClassStudent> _rows = const [];
 
   bool _searching = false;
   String _query = '';
 
-  /// The status being filtered to, or null for everybody. Only ever one of the
-  /// values the server actually sent for this class — see [_statuses].
   String? _status;
 
   @override
@@ -1091,19 +1426,6 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
     super.dispose();
   }
 
-  /* ---- Order ------------------------------------------------------------ */
-
-  /// Compare two identifiers the way a person reads them.
-  ///
-  /// Walks both strings in runs of digits and runs of everything else, and
-  /// compares a digit run by its VALUE rather than its spelling. So S0002 lands
-  /// after S0001, S0010 after S0009, and 10 after 9 — none of which plain
-  /// string comparison manages.
-  ///
-  /// The digit run is compared by length-then-text with leading zeros stripped
-  /// rather than parsed into an int: a code long enough to overflow one is
-  /// still a code, and a school that numbers its children 000000001 is not a
-  /// school this should give up on.
   static int _natural(String a, String b) {
     var i = 0;
     var j = 0;
@@ -1137,7 +1459,6 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
       i++;
       j++;
     }
-    // One is a prefix of the other: the shorter goes first.
     return (a.length - i) - (b.length - j);
   }
 
@@ -1151,13 +1472,6 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
     return digits.substring(i);
   }
 
-  /// Roll number first, code second.
-  ///
-  /// The roll is the number the school itself put on the child and the one
-  /// printed in the paper register, so it wins wherever it exists. A child the
-  /// school has given no roll goes to the END of the list rather than being
-  /// wedged between two numbered ones by their code — where they would look
-  /// like a gap in the numbering rather than an absence of it.
   static int _byRoster(ClassStudent a, ClassStudent b) {
     final rollA = a.rollNumber?.trim() ?? '';
     final rollB = b.rollNumber?.trim() ?? '';
@@ -1173,8 +1487,6 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
     return _natural(a.name, b.name);
   }
 
-  /* ---- What is on screen ------------------------------------------------ */
-
   List<ClassStudent> get _visible {
     final wanted = _query.trim().toLowerCase();
     return _rows.where((s) {
@@ -1185,12 +1497,6 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
     }).toList();
   }
 
-  /// The distinct statuses THIS class's roster actually carries.
-  ///
-  /// The filter is built from the payload in hand rather than from a list of
-  /// states somebody once wrote down, so it can only ever offer a choice that
-  /// has at least one child behind it. Fewer than two and there is nothing to
-  /// choose between, and the tile is not drawn at all.
   List<String> get _statuses {
     final seen = <String>{};
     for (final s in _rows) {
@@ -1201,12 +1507,6 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
     return list;
   }
 
-  /// A server word, made presentable — and deliberately NOT translated.
-  ///
-  /// The roster's status is an enum this app has never been given the
-  /// vocabulary of, so there is no key to look it up under; inventing labels
-  /// for values nobody has seen would be inventing data. Underscores become
-  /// spaces and SHOUTING becomes a word, which is as far as it is safe to go.
   static String _pretty(String raw) {
     final words = raw.replaceAll('_', ' ').trim().toLowerCase();
     if (words.isEmpty) return raw;
@@ -1228,8 +1528,6 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
       context,
       title: t('teacher.studentStatus'),
       tint: Role.teacher.tint,
-      // The empty string is "everybody". pickOne returns null for a sheet that
-      // was dismissed, so null cannot also mean a choice.
       selected: _status ?? '',
       options: [
         PickOption(
@@ -1267,9 +1565,6 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
           children: [
             _RosterHeader(
               title: '${widget.slot.className} · ${t('teacher.theChildren')}',
-              // Nothing at all until the roster has landed. "0 students" under
-              // the title of a class that has thirty is a figure, and a wrong
-              // one; a blank line is simply the count not being known yet.
               subtitle: total == 0
                   ? null
                   : narrowed
@@ -1278,11 +1573,6 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
               searching: _searching,
               filtered: _status != null,
               onSearch: _toggleSearch,
-              // Drawn ONLY when this roster carries two or more different
-              // statuses. Everything else the payload holds — name, code, roll
-              // number — is what the search field is for, and a filter tile
-              // that opens onto one option, or onto nothing, is a button that
-              // lies about having something behind it.
               onFilter: statuses.length > 1 ? _openFilter : null,
             ),
             if (_searching)
@@ -1316,30 +1606,15 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
                 ),
               ),
             Expanded(
-              // The height of the region is measured here so the body can fill
-              // it exactly and scroll its own children lazily. Fifty is an
-              // ordinary class in these schools, and fifty cards in one column
-              // is fifty cards laid out again on every keystroke in the search
-              // field.
               child: LayoutBuilder(
                 builder: (context, box) => Loader<List<ClassStudent>>(
                   key: _loaderKey,
                   tint: Role.teacher.tint,
-                  // Horizontal only: vertical padding here would make the
-                  // loader's own list taller than the screen, and then two
-                  // things would scroll where there should be one.
                   padding: const EdgeInsets.symmetric(horizontal: kGutter),
                   load: () async {
                     final list = await TeacherApi.instance.students(widget.slot.classId);
-                    // Defensively, every time. The order the rows arrive in is
-                    // the server's business and it has been wrong; this is the
-                    // one place that can guarantee what the teacher sees.
                     list.sort(_byRoster);
                     _rows = list;
-                    // The loader rebuilds only itself when the fetch lands, and
-                    // the header's count and the filter tile are drawn from
-                    // this state — without this the title would sit alone and
-                    // the filter would never appear.
                     if (mounted) setState(() {});
                     return list;
                   },
@@ -1349,9 +1624,6 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
                     height: box.maxHeight,
                     child: RefreshIndicator(
                       color: Role.teacher.tint,
-                      // The loader's own pull-to-refresh only hears the list it
-                      // owns, and the list under a teacher's thumb is this one.
-                      // Same gesture, same reload.
                       onRefresh: () async {
                         await _loaderKey.currentState?.reload();
                       },
@@ -1368,10 +1640,6 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
                                   className: widget.slot.className,
                                   subjectName: widget.slot.subjectName,
                                 ),
-                                // In words, once, above the list. The icon on
-                                // each row says a row is pressable; this says
-                                // what pressing one is for. Neither is obvious
-                                // from a column of names.
                                 Padding(
                                   padding: const EdgeInsets.only(top: 2, bottom: 2),
                                   child: Row(
@@ -1417,12 +1685,8 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
                                 padding: const EdgeInsets.only(bottom: kCardGap),
                                 child: _RosterRow(
                                   student: rows[i],
-                                  // The roster is the only screen in this app
-                                  // that lists a class by name with nothing to
-                                  // do to any of them. Recording what a child
-                                  // did belongs exactly here — one tap from the
-                                  // list a teacher already has open.
                                   onTap: () => _recordBehaviour(context, rows[i]),
+                                  onAward: () => _awardMark(context, rows[i]),
                                 ),
                               ),
                             ),
@@ -1441,13 +1705,6 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
   }
 }
 
-/// Back, which class, how many — and the two things that can be done to the
-/// list underneath.
-///
-/// Not [ScreenHeader]: this one carries a second line under the title, and up
-/// to two controls after it. Everything else about it — the tile, the gutter,
-/// the weight of the title — is that header's, and [_RegisterHeader]'s, so the
-/// three read as the same furniture.
 class _RosterHeader extends StatelessWidget {
   const _RosterHeader({
     required this.title,
@@ -1460,15 +1717,12 @@ class _RosterHeader extends StatelessWidget {
 
   final String title;
 
-  /// Null until the roster has arrived — the count is not known before then,
-  /// and a zero would be a wrong figure rather than a missing one.
   final String? subtitle;
 
   final bool searching;
   final bool filtered;
   final VoidCallback onSearch;
 
-  /// Null when this roster has nothing to filter by, and then no tile is drawn.
   final VoidCallback? onFilter;
 
   @override
@@ -1511,17 +1765,12 @@ class _RosterHeader extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           SquareButton(
-            // The glyph says what the tap does NEXT: a second press on an open
-            // search closes it and puts the whole class back.
             icon: searching ? Icons.close_rounded : Icons.search_rounded,
             onTap: onSearch,
           ),
           if (onFilter != null) ...[
             const SizedBox(width: 8),
             SquareButton(
-              // Filled while a filter is on, so a teacher who cannot find a
-              // child can see WHY the list is short. A count badge here would
-              // be a number about nothing.
               icon: filtered ? Icons.filter_alt_rounded : Icons.filter_alt_outlined,
               onTap: onFilter!,
             ),
@@ -1532,13 +1781,6 @@ class _RosterHeader extends StatelessWidget {
   }
 }
 
-/// The class in figures.
-///
-/// Three, not the four the design draws. The fourth and fifth cells were Boys
-/// and Girls, and the roster payload carries no sex or gender field — only an
-/// id, a code, a name, a roll number and a status. Guessing it from first names
-/// would be a figure the school never gave us, printed in a card that looks
-/// like a record.
 class _RosterSummary extends StatelessWidget {
   const _RosterSummary({
     required this.count,
@@ -1546,8 +1788,6 @@ class _RosterSummary extends StatelessWidget {
     required this.subjectName,
   });
 
-  /// The roster length, which is the only total there is — nothing on this
-  /// screen knows how many children the class is supposed to have.
   final int count;
 
   final String className;
@@ -1587,7 +1827,6 @@ class _RosterSummary extends StatelessWidget {
   }
 }
 
-/// One figure: a circular tinted glyph, the value, and what it is.
 class _RosterFigure extends StatelessWidget {
   const _RosterFigure({
     required this.icon,
@@ -1617,9 +1856,6 @@ class _RosterFigure extends StatelessWidget {
           child: Icon(icon, size: 18, color: color),
         ),
         const SizedBox(height: 8),
-        // Scaled down rather than clipped: a class called "Grade 5 — B" and a
-        // subject called "Mathematics" are both wider than a third of a phone,
-        // and a value reading "Mathema…" answers nothing.
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
@@ -1647,7 +1883,6 @@ class _RosterFigure extends StatelessWidget {
   }
 }
 
-/// What the three columns of the list below are.
 class _RosterHeadings extends StatelessWidget {
   const _RosterHeadings();
 
@@ -1680,12 +1915,13 @@ class _RosterHeadings extends StatelessWidget {
   }
 }
 
-/// One child on the roster.
 class _RosterRow extends StatelessWidget {
-  const _RosterRow({required this.student, this.onTap});
+  const _RosterRow({required this.student, this.onTap, this.onAward});
 
   final ClassStudent student;
   final VoidCallback? onTap;
+
+  final VoidCallback? onAward;
 
   @override
   Widget build(BuildContext context) {
@@ -1705,10 +1941,6 @@ class _RosterRow extends StatelessWidget {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
-                // The school's own roll number, or a dot where it has given
-                // none. The position in the list would look like a roll number
-                // and would not be one — and a made-up number in the column a
-                // teacher reads as the roll is worse than no number at all.
                 student.rollNumber ?? '·',
                 maxLines: 1,
                 style: TextStyle(
@@ -1720,15 +1952,6 @@ class _RosterRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 9),
-          // No tint, matching the register one screen away.
-          //
-          // The rule elsewhere in this app is to pass a tint, because an
-          // untinted avatar hashes the name into its own hue and a lone pink
-          // circle in a violet app looks like a mistake. A ROSTER is the case
-          // that rule was not written for: eighteen children in a column, and
-          // the hash is what lets a teacher find the same child by colour on
-          // both screens. Two treatments one screen apart is the bug, not the
-          // hue.
           CircleInitials(label: student.name, size: 34),
           const SizedBox(width: 10),
           Expanded(
@@ -1751,14 +1974,6 @@ class _RosterRow extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
           ),
-          // Something that says the row DOES something.
-          //
-          // Recording a merit or a concern is the only action on this screen,
-          // and it was reached by tapping a row that gave no sign of being
-          // tappable: a roll number, a name, a code, and an InkWell with no
-          // chevron, no icon and no hint. A teacher had no reason to press a
-          // child's name, so the feature was shipped and not found — which is
-          // the same as not shipping it.
           if (onTap != null) ...[
             const SizedBox(width: 8),
             Container(
@@ -1776,31 +1991,36 @@ class _RosterRow extends StatelessWidget {
               ),
             ),
           ],
+          if (onAward != null) ...[
+            const SizedBox(width: 6),
+            Tooltip(
+              message: t('bank.award'),
+              child: InkWell(
+                onTap: onAward,
+                borderRadius: BorderRadius.circular(9),
+                child: Container(
+                  width: 27,
+                  height: 27,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppTheme.amber.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(
+                    Icons.savings_outlined,
+                    size: 15,
+                    color: AppTheme.amber,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-/// Write down what a child did.
-///
-/// The last missing side of a feature that was otherwise finished. Teachers
-/// hold `academic.behavior.write`, the service has served the whole behaviour
-/// surface since it was built, the console has a page for it, and the PARENT
-/// app already displays these records — so the family's screen was fed by
-/// records the person best placed to write them could not write.
-///
-/// TWO DECISIONS, AND ONLY TWO. What kind of thing it was, and whether the
-/// family sees it. Everything else on the server's DTO — category, points,
-/// incident links — is either optional or belongs to the office, and a form
-/// with seven fields is one a teacher fills in for the first child and never
-/// again.
-///
-/// Telling the family is deliberately a separate, explicit switch, off by
-/// default, and it says what it costs: the server publishes immediately and
-/// then REFUSES to let the record be edited, because a parent has read it and
-/// quietly rewording it afterwards is how a behaviour log stops being evidence
-/// of anything.
 class BehaviourSheet extends StatefulWidget {
   const BehaviourSheet({super.key, required this.student, required this.classId});
 
@@ -1812,10 +2032,6 @@ class BehaviourSheet extends StatefulWidget {
 }
 
 class _BehaviourSheetState extends State<BehaviourSheet> {
-  /// MERIT or CONCERN. INCIDENT is the third kind the server accepts and is
-  /// deliberately not offered: an incident is a safeguarding record with its
-  /// own process and its own screen in the console, and a teacher reaching for
-  /// it from a class list is a teacher filing the wrong kind of thing.
   String _kind = 'MERIT';
   String? _category;
   final _note = TextEditingController();
@@ -1823,8 +2039,6 @@ class _BehaviourSheetState extends State<BehaviourSheet> {
   bool _busy = false;
   String? _error;
 
-  /// The categories that belong to each kind. Showing "bullying" under a merit
-  /// is how a form teaches people it was not written for them.
   static const _merit = ['ACADEMIC_EFFORT', 'ACADEMIC_EXCELLENCE', 'HELPFULNESS', 'ATTENDANCE'];
   static const _concern = [
     'DISRUPTION',
@@ -1861,8 +2075,6 @@ class _BehaviourSheetState extends State<BehaviourSheet> {
         kind: _kind,
         classId: widget.classId,
         category: _category,
-        // Signed, as the server expects: a merit adds, a concern takes away. A
-        // house total that cannot go down is not a points system.
         points: _kind == 'MERIT' ? 1 : -1,
         note: _note.text,
         visibleToGuardian: _tellFamily,
@@ -1927,9 +2139,6 @@ class _BehaviourSheetState extends State<BehaviourSheet> {
                       icon: Icons.star_rounded,
                       colour: AppTheme.green,
                       on: merit,
-                      // Clearing the category is not tidiness: the two lists do
-                      // not overlap, and keeping "bullying" selected while the
-                      // kind flips to a merit would send exactly that.
                       onTap: () => setState(() {
                         _kind = 'MERIT';
                         _category = null;
@@ -2020,7 +2229,6 @@ class _BehaviourSheetState extends State<BehaviourSheet> {
               ),
               const SizedBox(height: 6),
 
-              // The consequential switch, and it says what it costs.
               SwitchListTile.adaptive(
                 value: _tellFamily,
                 onChanged: (v) => setState(() => _tellFamily = v),

@@ -2,15 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
 
-/// The quieter half of a pair of buttons.
-///
-/// The kit has BigButton for the one thing a screen is about, and nothing for
-/// the action standing beside it. An OutlinedButton arrives with its own
-/// radius, its own height and its own grey — none of the three are this app's,
-/// and correcting all three by hand at every call site is what left these
-/// screens looking like somebody else's. So this is that shape drawn from
-/// AppTheme's tokens instead, the same way the parent's child card draws its
-/// own pair.
 class SoftButton extends StatelessWidget {
   const SoftButton({
     super.key,
@@ -23,13 +14,10 @@ class SoftButton extends StatelessWidget {
 
   final String label;
 
-  /// Null disables it — the same contract as BigButton.onPressed.
   final VoidCallback? onTap;
 
   final IconData? icon;
 
-  /// Set to colour it. Left off it stays quiet against the page, inside a
-  /// hairline, which is what a second action beside a filled one should be.
   final Color? tint;
 
   final double height;

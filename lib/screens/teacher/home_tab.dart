@@ -14,17 +14,9 @@ import 'exams_tab.dart';
 import 'homework_tab.dart';
 import 'teacher_account.dart';
 
-/// What a teacher lands on.
-///
-/// Ordered by the question each card answers, in the order the day asks them:
-/// how much am I teaching today, what do I need to open, what is next, whose
-/// class is it, what is due, what is being examined. A dashboard would show all
-/// six as figures; this shows the first thing a teacher can act on in each.
 class TeacherHome extends StatelessWidget {
   const TeacherHome({super.key, required this.onOpenTab});
 
-  /// For the cards that lead somewhere the SHELL owns — the messages tab, the
-  /// week. Everything else is pushed.
   final void Function(int tab) onOpenTab;
 
   @override
@@ -86,7 +78,6 @@ class TeacherHome extends StatelessWidget {
           ),
           const SizedBox(height: kCardGap),
 
-          // ---- Today's schedule --------------------------------------------
           Card16(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
             child: Column(
@@ -139,11 +130,9 @@ class TeacherHome extends StatelessWidget {
           ),
           const SizedBox(height: kCardGap),
 
-          // ---- The classes -------------------------------------------------
           _ClassesCard(classes: day.classes),
           const SizedBox(height: kCardGap),
 
-          // ---- What is due, and what is being examined ---------------------
           _TasksCard(homework: day.dueSoon),
           const SizedBox(height: kCardGap),
           _ExamsCard(exams: day.examsSoon),
@@ -158,13 +147,7 @@ class TeacherHome extends StatelessWidget {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
   }
 
-  /// The register needs a class. One class and it opens straight into it;
-  /// several and it asks which — rather than opening a list of classes whose
-  /// only purpose is to be tapped once.
   static Future<void> _register(BuildContext context, List<TeachingSlot> classes) async {
-    // With no classes there is nothing to pick from, and a button that does
-    // nothing at all is worse than one that opens the list and says why it is
-    // empty. The class screen already has that sentence.
     if (classes.isEmpty) {
       _push(context, const ClassesScreen());
       return;
@@ -190,7 +173,6 @@ class TeacherHome extends StatelessWidget {
     _push(context, RegisterScreen(slot: classes.firstWhere((c) => c.assignmentId == picked)));
   }
 
-  /// What can be done with the lesson in front of you.
   static Future<void> _lessonSheet(
     BuildContext context,
     TeacherSlot slot,
@@ -202,9 +184,6 @@ class TeacherHome extends StatelessWidget {
       title: '${slot.subjectName} · ${slot.className}',
       tint: Role.teacher.tint,
       options: [
-        // Only offered when this teacher actually holds the class on their
-        // assignment list — the register writes against that, and without one
-        // the choice used to be silently swallowed.
         if (owned.isNotEmpty)
           PickOption(
             value: 'register',
@@ -227,7 +206,6 @@ class TeacherHome extends StatelessWidget {
   }
 }
 
-/// Everything the screen needs, fetched together.
 class _Today {
   _Today({
     required this.profile,
@@ -237,8 +215,6 @@ class _Today {
     required this.exams,
   });
 
-  /// The same five answers, however they arrived — fetched here, or
-  /// prefetched during the splash. The screen must not be able to tell.
   factory _Today.from(TeacherPayload p) => _Today(
         profile: p.profile,
         slots: p.slots,
@@ -260,9 +236,6 @@ class _Today {
     return rows;
   }
 
-  /// Work still ahead of its due date, soonest first. Homework whose date has
-  /// passed is a marking job, not an upcoming task, and belongs on the homework
-  /// screen where it can be opened.
   List<TeacherHomework> get dueSoon {
     final midnight = DateTime.now().copyWith(hour: 0, minute: 0, second: 0, millisecond: 0);
     final rows = homework.where((h) => !h.dueDate.isBefore(midnight)).toList()
@@ -277,10 +250,6 @@ class _Today {
     return rows.take(2).toList();
   }
 }
-
-/* ---------------------------------------------------------------------------
- * The hero
- * ------------------------------------------------------------------------- */
 
 class _HeroCard extends StatelessWidget {
   const _HeroCard({required this.lessons, required this.onTap});
@@ -320,9 +289,6 @@ class _HeroCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // A daylight photograph on a night-time card glares. The
-                    // multiply takes it down to the brightness of the surface it
-                    // is sitting on rather than removing it.
                     ColorFiltered(
                       colorFilter: ColorFilter.mode(
                         AppTheme.dark ? const Color(0xFF6E7A72) : Colors.transparent,
@@ -334,10 +300,6 @@ class _HeroCard extends StatelessWidget {
                         alignment: AlignmentDirectional.centerEnd,
                       ),
                     ),
-                    // Cropping the picture to fill the card also crops the
-                    // faded edge it was exported with, which left a hard
-                    // vertical line down the middle of the card. This puts the
-                    // fade back, over whatever the crop happens to be.
                     DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -464,10 +426,6 @@ class _HeroCard extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The classes
- * ------------------------------------------------------------------------- */
-
 class _ClassesCard extends StatelessWidget {
   const _ClassesCard({required this.classes});
 
@@ -495,10 +453,6 @@ class _ClassesCard extends StatelessWidget {
               if (i > 0) Divider(height: 1, color: AppTheme.border),
               _ClassRow(slot: classes[i]),
             ],
-          // No "Add new class" row. The office owns the class list, there is no
-          // endpoint for a teacher to add one, and the row did nothing but
-          // raise a snack bar saying so — an affordance whose only function was
-          // to apologise for existing.
           const SizedBox(height: 12),
         ],
       ),
@@ -514,10 +468,6 @@ class _ClassRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tint = parseHex(slot.colorHex, Role.teacher.tint);
-    // "6A" rather than an icon: a teacher with five classes tells them apart
-    // by the name, and five identical group glyphs make that harder, not
-    // easier. The last word is the part that differs — "Grade 6A" and
-    // "Grade 6B" share everything before it.
     final words = slot.className.trim().split(RegExp(r'\s+'));
     final short = words.isEmpty ? '' : words.last;
 
@@ -601,10 +551,6 @@ class _ClassRow extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Tasks and exams
- * ------------------------------------------------------------------------- */
-
 class _TasksCard extends StatelessWidget {
   const _TasksCard({required this.homework});
 
@@ -652,8 +598,6 @@ class _TaskRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Red when it lands within two days, green when there is room. The colour
-    // is the whole point of putting a date on the right of the row.
     final urgent = days <= 2;
     final colour = urgent ? AppTheme.rose : Role.teacher.tint;
     final chip = parseHex(item.colorHex, AppTheme.amber);
@@ -848,10 +792,6 @@ class _ExamRow extends StatelessWidget {
     );
   }
 }
-
-/* ---------------------------------------------------------------------------
- * The tip
- * ------------------------------------------------------------------------- */
 
 class _TipCard extends StatelessWidget {
   const _TipCard();

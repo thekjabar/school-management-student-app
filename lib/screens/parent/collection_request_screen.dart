@@ -13,67 +13,11 @@ import '../../ui/pickers.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
 
-/// "My brother is collecting my child today."
-///
-/// THIS SCREEN CANNOT AUTHORISE ANYTHING, AND THAT IS THE WHOLE DESIGN.
-///
-/// The one-off collection authorisation is a real object on the server —
-/// students-service `school/one-time-authorizations` — but every route on it,
-/// including the reads, is gated on ONE_TIME_AUTH_ISSUE, which is an office
-/// permission. A guardian's token cannot create one, cannot read one and cannot
-/// see the six-character code. That is deliberate on the server's part: the
-/// code is a thing a stranger says at a door to walk away with a child, and the
-/// school decides who gets one after satisfying itself, by a telephone callback
-/// to the number ALREADY ON FILE, that the person asking is really the
-/// guardian. A phone in a stranger's hand cannot be that check.
-///
-/// So what the family app can honestly offer is the ASKING. This composes the
-/// request the office needs — who is collecting, how they are related, their
-/// telephone, their identity card number, which day and which run — and puts it
-/// on the dispatch board the office already watches, through POST
-/// /parent/concerns with topic PICKUP_ARRANGEMENT. The office reads it, rings
-/// the family back on the number it holds, and issues the code itself.
-///
-/// EVERY LINE HERE THAT COULD BE READ AS "DONE" HAS BEEN WRITTEN NOT TO BE. A
-/// parent who believes the collection is arranged sends their brother to a
-/// school that has never heard of him, and he is refused at the gate in front
-/// of the child. That is the failure this screen is built around: the banner
-/// says it is a request, the confirmation before sending says it again with the
-/// collector's name in it, the receipt after sending says it a third time, and
-/// no status this screen can show is ever coloured or worded as permission —
-/// not even CLOSED, which only means a dispatcher tidied their board.
-///
-/// It also declines to encourage the two patterns the server's anomaly detector
-/// (one-time-auth-anomaly.service.ts) exists to catch. One day and one run per
-/// request, never a range, and a standing footnote telling a family whose uncle
-/// collects every Thursday to ask for a permanent authorised collector instead
-/// — which is exactly what that detector says a repeating "one-off" should have
-/// been. And there is no resend button: the concern route merges a repeat into
-/// the open row and the newest text WINS, so a second request silently replaces
-/// the first on the office's board. When the server's answer says that has
-/// happened, this screen says so in as many words.
-///
-/// That merge is only ever into a request the office STILL HAS. Once they have
-/// closed it — which is how this flow normally ends, since they ring and then
-/// tidy their board — the next request is a new row and a new occurrence count,
-/// and the "this replaced the earlier one" line is correctly not shown. It used
-/// not to be: the dedupe key never varied, so the second request a family ever
-/// sent about a child broke a unique constraint and came back to them as a
-/// database sentence. The list below is filtered to collection requests for the
-/// same reason it is worded the way it is — every line under it is about
-/// somebody being handed a child, and nothing else may be drawn there.
 class CollectionRequestScreen extends StatefulWidget {
   const CollectionRequestScreen({super.key, required this.child, this.ridesTheBus = true});
 
   final Child child;
 
-  /// Whether this child travels on a school bus at all.
-  ///
-  /// A child who does NOT is the population this screen is most for — they are
-  /// collected at the gate every day, and the person collecting is the only
-  /// question — so the form must not ask them which BUS RUN their uncle is
-  /// meeting. The office reads that line off the board and rings the family
-  /// about a bus the child has never been on.
   final bool ridesTheBus;
 
   @override
@@ -92,14 +36,6 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
     );
     if (sent == null || !mounted) return;
 
-    // The receipt, and the only place the word "sent" appears. It says what was
-    // sent, what has NOT happened, and — when the server's own answer shows
-    // this request was merged into one already open — that the office can no
-    // longer see the earlier arrangement.
-    //
-    // One button, because there is nothing to decide here, and amber rather
-    // than green: green is the colour this app uses for a thing that has been
-    // settled, and nothing has been settled.
     await showDialog<void>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: AppTheme.dark ? 0.62 : 0.34),
@@ -142,11 +78,6 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
                 key: _loaderKey,
                 tint: tint,
                 padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 96),
-                // Collection requests ONLY. This list is drawn with wording that
-                // is true of nothing else the family can send: "Closed on the
-                // office board. That is not the school giving permission." A
-                // BUS_LATE row rendered under that line tells a family the
-                // school has declined a collection nobody ever asked about.
                 load: () => ParentApi.instance.concerns(
                       studentId: widget.child.studentId,
                       topic: 'PICKUP_ARRANGEMENT',
@@ -161,9 +92,6 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      // The first thing on the screen, above the button that
-                      // starts the form, because it is the thing a family has
-                      // to have read before they act on any of this.
                       NoticeBanner(
                         icon: Icons.gpp_maybe_rounded,
                         color: AppTheme.amber,
@@ -191,10 +119,6 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
                       ),
                       const SizedBox(height: 10),
 
-                      // The nudge away from the pattern the anomaly detector
-                      // flags: a "one-off" that happens every week is an
-                      // arrangement, and an arrangement belongs on the child's
-                      // permanent collector list with an approval behind it.
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -246,18 +170,12 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
   }
 }
 
-/// What the sheet hands back. Not the arrangement — there is no arrangement —
-/// only what the server said about where the message landed.
 class _Sent {
   const _Sent({required this.replacedAnother});
 
-  /// The server merged this into a request already open for this child and this
-  /// topic, and its `body` — the only thing the office actually reads — is now
-  /// this message and not the earlier one.
   final bool replacedAnother;
 }
 
-/// One request the office has, and what its state does NOT mean.
 class _RequestCard extends StatelessWidget {
   const _RequestCard({required this.row});
 
@@ -265,13 +183,6 @@ class _RequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // No green anywhere in here, on purpose.
-    //
-    // CLOSED is the state a family is most likely to misread, and it is the one
-    // that would do the damage: it means a dispatcher marked the row resolved
-    // on their board, which they also do after ringing to say no. It is
-    // rendered in the same neutral tone as the rest and carries a line saying
-    // so in words.
     final (Color colour, String label, String meaning) = switch (row.state) {
       'SEEN' => (AppTheme.blue, t('ota.state.SEEN'), t('ota.stateMeaning.SEEN')),
       'CLOSED' => (AppTheme.textMuted, t('ota.state.CLOSED'), t('ota.stateMeaning.CLOSED')),
@@ -317,8 +228,6 @@ class _RequestCard extends StatelessWidget {
   }
 }
 
-/// The receipt. One button and no choice: the sending has happened, and the
-/// only thing left is to be sure the family has read what has NOT happened.
 class _Receipt extends StatelessWidget {
   const _Receipt({required this.title, required this.body});
 
@@ -387,7 +296,6 @@ class _Receipt extends StatelessWidget {
   }
 }
 
-/// The form.
 class _RequestSheet extends StatefulWidget {
   const _RequestSheet({required this.child, required this.ridesTheBus});
 
@@ -399,9 +307,6 @@ class _RequestSheet extends StatefulWidget {
 }
 
 class _RequestSheetState extends State<_RequestSheet> {
-  /// Relations, not job titles. These are the people who actually turn up, and
-  /// offering them as taps rather than a text box means the office reads the
-  /// same seven words every time instead of forty spellings of "uncle".
   static const _relations = <(String, IconData)>[
     ('BROTHER', Icons.man_rounded),
     ('SISTER', Icons.woman_rounded),
@@ -412,14 +317,8 @@ class _RequestSheetState extends State<_RequestSheet> {
     ('OTHER', Icons.more_horiz_rounded),
   ];
 
-  /// The server's own ceiling on a concern message. Enforced here so that a
-  /// long note costs the note and never the facts the office needs.
   static const _maxMessage = 600;
 
-  /// How far ahead a family may ask. The code the office eventually issues
-  /// lives at most a day, so it is written on the morning it is needed — but
-  /// the ASKING is worth doing in advance, and a fortnight covers the trip to
-  /// Erbil that prompts most of these.
   static const _maxDaysAhead = 14;
 
   final _name = TextEditingController();
@@ -436,8 +335,6 @@ class _RequestSheetState extends State<_RequestSheet> {
   @override
   void initState() {
     super.initState();
-    // The send button is disabled until there is a name to send, so the field
-    // has to drive a rebuild.
     _name.addListener(() => setState(() {}));
   }
 
@@ -461,9 +358,6 @@ class _RequestSheetState extends State<_RequestSheet> {
     final picked = await pickDate(
       context,
       initial: _day,
-      // Never a past day. Nobody can be authorised to have collected a child
-      // yesterday, and offering it would only produce a request the office has
-      // to ring up and unpick.
       first: today,
       last: today.add(const Duration(days: _maxDaysAhead)),
       tint: Role.parent.tint,
@@ -471,13 +365,6 @@ class _RequestSheetState extends State<_RequestSheet> {
     if (picked != null) setState(() => _day = picked);
   }
 
-  /// Everything the office needs to ring back and issue a code, in the family's
-  /// own language, on labelled lines so a dispatcher can read it at a glance.
-  ///
-  /// The server appends who sent it and their telephone number, so this does
-  /// not repeat them. It is trimmed to the server's ceiling by dropping the
-  /// note last — the name, the relation and the day are what a callback is
-  /// made about; the note is context.
   String _message() {
     final lines = <String>[
       t('ota.msg.heading'),
@@ -486,9 +373,6 @@ class _RequestSheetState extends State<_RequestSheet> {
       if (_phone.text.trim().isNotEmpty) '${t('ota.msg.phone')} ${_phone.text.trim()}',
       if (_idNumber.text.trim().isNotEmpty) '${t('ota.msg.id')} ${_idNumber.text.trim()}',
       '${t('ota.msg.day')} ${longDate(_day)}',
-      // A child who is not on a bus has no run to be met at, and saying "Run:
-      // the run home" about one would send the office looking at a manifest
-      // this child has never appeared on.
       if (widget.ridesTheBus)
         '${t('ota.msg.run')} ${t('ota.leg.$_leg')}'
       else
@@ -515,10 +399,6 @@ class _RequestSheetState extends State<_RequestSheet> {
       return;
     }
 
-    // Said once more, with the collector's name in it, at the last moment
-    // before it goes. A family that taps through this has been told three times
-    // that nobody may collect until the office rings, and the one they cannot
-    // skip is the one that names the person they were about to send.
     final sure = await confirmDialog(
       context,
       icon: Icons.gpp_maybe_rounded,
@@ -535,10 +415,6 @@ class _RequestSheetState extends State<_RequestSheet> {
       _error = null;
     });
     try {
-      // The same proof the skip and leave forms ask for, and for a stronger
-      // reason: this names an adult to a school as somebody a child may be
-      // handed to. It has to be the guardian holding the phone, not whoever
-      // picked it up off the table.
       final ok = await Biometrics.confirm(reason: t('ota.confirmWithBiometrics'));
       if (!ok) {
         if (mounted) setState(() => _error = t('ota.notConfirmed'));
@@ -547,10 +423,6 @@ class _RequestSheetState extends State<_RequestSheet> {
 
       final res = await ParentApi.instance.raiseConcern(
         studentId: widget.child.studentId,
-        // URGENT only when the collection is today, because URGENT is what puts
-        // this in front of a dispatcher within minutes rather than on a board
-        // to be worked through. A request about next Thursday is a real thing
-        // to answer and not a reason to interrupt somebody watching buses.
         urgency: _isToday ? 'URGENT' : 'QUESTION',
         topic: 'PICKUP_ARRANGEMENT',
         message: _message(),
@@ -559,13 +431,6 @@ class _RequestSheetState extends State<_RequestSheet> {
       final times = (res['timesRaised'] as num?)?.toInt() ?? 1;
       Navigator.of(context).pop(_Sent(replacedAnother: times > 1));
     } on ApiException catch (e) {
-      // A 409 from this route is a dedupe-key collision, and the server's
-      // exception filter renders it as the literal "That tenantId, dedupeKey is
-      // already taken." That sentence is bookkeeping and it is being read under
-      // a send button by somebody arranging for a person to be handed a child.
-      // The generational key means it should no longer be reachable at all;
-      // this is what is shown if it ever is, and it says the only two things
-      // that matter — nothing went, and telephone if it is today.
       if (mounted) {
         setState(() => _error = e.status == 409
             ? tn('ota.notSent', widget.child.name.split(' ').first)
@@ -685,9 +550,6 @@ class _RequestSheetState extends State<_RequestSheet> {
                 onTap: _pickDay,
               ),
 
-              // Not asked of a child who does not ride the bus: there is no run
-              // to choose between, and an answer they were forced to invent
-              // goes onto the office's board as a fact.
               if (widget.ridesTheBus) ...[
                 const SizedBox(height: 16),
                 _Label(t('ota.run')),
@@ -756,7 +618,6 @@ class _RequestSheetState extends State<_RequestSheet> {
                 ),
               ),
               const SizedBox(height: 10),
-              // The last word on the form is the same word as the first.
               Text(
                 t('ota.formFoot'),
                 textAlign: TextAlign.center,

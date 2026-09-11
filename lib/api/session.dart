@@ -4,7 +4,6 @@ import '../i18n/strings.dart';
 import 'client.dart';
 import 'push.dart';
 
-/// One school (or operator) a person belongs to, and what they may do there.
 class Membership {
   Membership({
     required this.tenantId,
@@ -32,7 +31,6 @@ class Membership {
       );
 }
 
-/// Who is signed in.
 class Me {
   Me({
     required this.id,
@@ -53,42 +51,16 @@ class Me {
   final List<Membership> memberships;
   final Membership active;
 
-  /// The server's proof that this handset really is this person, for the push
-  /// provider — or null on a build of identity-service that does not mint one
-  /// yet.
-  ///
-  /// A Person id is not secret: it is in this very payload and in every portal
-  /// person listing. While the app claimed a push alias with the id alone,
-  /// anyone holding one could register their own handset under it and be sent
-  /// every notice that person is sent, including the boarded and set-down
-  /// messages that name the child, the stop and the minute. This is what makes
-  /// the claim checkable. Null is handled by not claiming anything at all —
-  /// see [Push.identify].
   final String? pushIdentityToken;
 
-  /// The language the SERVER will write this person's notifications in, as a
-  /// `Locale` name (CKB/KMR/AR/EN), or null on a payload from an older build.
-  /// Compared against the phone's own setting on start-up so a mismatch can be
-  /// corrected without a write on every launch.
   final String? locale;
 
-  /// This password was issued by the office and has to be changed before the
-  /// rest of the app will answer.
-  ///
-  /// The server enforces it now — every route outside the change-password
-  /// screen and the four sign-in routes refuses with `PASSWORD_CHANGE_REQUIRED`
-  /// — so the app has to be able to see it on a cold start, not only in the
-  /// sign-in reply. A restored session that ignored this would draw the normal
-  /// screens and then fail on all of them.
   final bool passwordMustChange;
 
   String get role => active.role;
   String get schoolName => active.tenantName;
   bool can(String permission) => active.permissions.contains(permission);
 
-  /// The first name, which is what a greeting should use. Kurdish full names
-  /// run to four parts and "Good morning, Karwan Ahmed Rasul Baban" reads like
-  /// a summons.
   String get firstName => name.split(' ').first;
 
   factory Me.fromJson(Map<String, dynamic> j) {
@@ -104,17 +76,8 @@ class Me {
       phone: (person['phoneE164'] ?? '') as String,
       phoneVerified: (person['phoneVerified'] ?? false) as bool,
       locale: person['locale'] as String?,
-      // Read from either place. identity-service sends it at the top of the
-      // envelope; accepting it beside the person too costs nothing and means a
-      // later move does not silently stop delivering push to every family while
-      // looking exactly like a server that had not been updated.
       pushIdentityToken: (j['pushIdentityToken'] ?? person['pushIdentityToken'])
           as String?,
-      // The office issued this password and the server now REFUSES everything
-      // else until it is changed. Carried on /auth/me and not only on the
-      // sign-in reply, because a cold start restores the token from storage and
-      // never passes through sign-in — without it the app would draw its normal
-      // screens and every one of them would fail.
       passwordMustChange:
           ((j['blockers'] as Map<String, dynamic>?)?['passwordMustChange'] ??
               false) as bool,
@@ -135,7 +98,6 @@ class Me {
   }
 }
 
-/// The result of signing in.
 class SignInResult {
   SignInResult({required this.me, required this.mustChangePassword});
 
@@ -143,22 +105,11 @@ class SignInResult {
   final bool mustChangePassword;
 }
 
-/// Sign-in, sign-out, and who am I.
-///
-/// Kept apart from the HTTP client so that the client knows nothing about
-/// people — it moves tokens and JSON, and this decides what a person is.
 class Session {
   Session._();
 
   static final Session instance = Session._();
 
-  /// Why the last sign-out happened, when the reason is worth saying.
-  ///
-  /// A restored session on an office-issued password has to go back to the
-  /// front door: the change-password step needs the number and the temporary
-  /// password typed into the sign-in form, and a cold start has neither. Being
-  /// returned to sign-in with no explanation reads as the app having broken, so
-  /// the login screen picks this up, says what happened, and clears it.
   static bool passwordChangeRequired = false;
 
   Me? _me;
@@ -166,19 +117,12 @@ class Session {
 
   final ApiClient _api = ApiClient.instance;
 
-  /// Sign in with a phone number and a password.
-  ///
-  /// The number is the identity: the school already holds a verified number for
-  /// every guardian and every member of staff, and inventing a username would
-  /// only be one more thing to lose.
   Future<SignInResult> signIn(String phone, String password) async {
     final body = await _api.post('/auth/login', {
       'phone': phone.trim(),
       'password': password,
     }) as Map<String, dynamic>;
 
-    // The mobile apps have no cookie jar, so the refresh token comes back in
-    // the body as well as in a Set-Cookie header the phone will ignore.
     await _api.saveSession(
       access: body['accessToken'] as String,
       refresh: body['refreshToken'] as String?,
@@ -198,9 +142,6 @@ class Session {
     if (me == null) {
       throw ApiException('Signed in, but your account could not be loaded.', 500);
     }
-    // Tie the handset to this person so the server can address them by our own
-    // id rather than by a device token that changes on every reinstall. The
-    // claim carries the server's proof, because the id on its own is public.
     await Push.identify(me.id, identityToken: me.pushIdentityToken);
     return SignInResult(
       me: me,
@@ -208,15 +149,6 @@ class Session {
     );
   }
 
-  /// Re-read the account from the server.
-  ///
-  /// Returns null only when the server has ANSWERED that the session is no
-  /// longer good. Anything else — no signal, a timeout, the platform being
-  /// down — is rethrown, because the caller has to be able to tell those apart.
-  ///
-  /// It used to catch every ApiException and return null, and OfflineException
-  /// is an ApiException: a phone in a lift produced the same answer as a
-  /// stood-down account, and the app sent both to the login screen.
   Future<Me?> refresh() async {
     final Map<String, dynamic> json;
     try {
@@ -231,24 +163,12 @@ class Session {
 
     _me = Me.fromJson(json);
     await _api.setTenant(_me!.active.tenantId);
-    // Kept so the app can open offline next time.
     await _api.saveMe(jsonEncode(json));
-    // Also here, not only in signIn: a session restored from disk on a cold
-    // start never passes through signIn, and would be subscribed to nothing.
     await Push.identify(_me!.id, identityToken: _me!.pushIdentityToken);
-    // Same reasoning for the language: a phone that was switched to English
-    // while signed in, or signed in long before this existed, would otherwise
-    // keep being sent Kurdish notifications. Writes nothing when they agree.
     await syncLocale();
     return _me;
   }
 
-  /// Who this phone last knew to be signed in, read from disk.
-  ///
-  /// Used to draw the app before — and, with no signal, instead of — an answer
-  /// from the server. Never used to decide whether a session is VALID: the
-  /// tokens are the authority on that and the server is the judge of the
-  /// tokens. This only decides what to put on screen meanwhile.
   Future<Me?> restoreMe() async {
     try {
       final raw = await _api.loadMe();
@@ -256,42 +176,23 @@ class Session {
       _me = Me.fromJson(jsonDecode(raw) as Map<String, dynamic>);
       return _me;
     } catch (_) {
-      // A payload written by an older build whose shape has since changed. Not
-      // worth a crash on start-up — the server will supply a fresh one.
       return null;
     }
   }
 
-  /// Tell the server which language to write this person's notifications in.
-  ///
-  /// `X-Lang` on every request already decides the language of the ANSWERS, but
-  /// a push at 07:40 has no request to read a header from — the outbox renders
-  /// it from `Person.locale`. Nothing was ever writing that column, so a parent
-  /// who switched the app to English kept getting Kurdish bus messages.
-  ///
-  /// Safe to call when signed out: the server answers 401 and the caller
-  /// ignores it, because the language is on the phone regardless and
-  /// [syncLocale] runs again on the next sign-in.
   Future<void> setLocale(Lang lang) async {
     await _api.post('/auth/locale', {'locale': lang.serverCode});
   }
 
-  /// Push the phone's language up if the account disagrees with it.
-  ///
-  /// Runs after sign-in. The phone is the authority: the choice was made on the
-  /// sign-in screen, in front of somebody who was reading it, and the column is
-  /// whatever the office happened to type when the family was enrolled.
   Future<void> syncLocale() async {
     if (_me?.locale == AppLocale.current.value.serverCode) return;
     try {
       await setLocale(AppLocale.current.value);
     } on ApiException {
-      // Not worth failing a sign-in over. The next language tap, or the next
-      // sign-in, tries again.
+      // ignore: empty_catches
     }
   }
 
-  /// Change your own password. Ends every other session, by design.
   Future<void> changePassword(String current, String next) async {
     await _api.post('/auth/password/change', {
       'currentPassword': current,
@@ -303,17 +204,11 @@ class Session {
     try {
       await _api.post('/auth/logout');
     } on ApiException {
-      // Signing out locally matters more than the server acknowledging it.
+      // ignore: empty_catches
     }
     _me = null;
     await _api.clear();
-    // Said out loud, so the gate returns to sign-in now rather than whenever
-    // the next request happens to fail. With no signal there is no next
-    // request, and the previous person's app simply stayed on screen.
     _api.signalSignedOut();
-    // Phones get shared here — one handset between two parents, or handed down
-    // to an older child. A device still subscribed after sign-out delivers one
-    // family's alerts to another.
     await Push.forget();
   }
 }

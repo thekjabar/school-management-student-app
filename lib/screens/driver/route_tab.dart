@@ -11,11 +11,6 @@ import 'home_tab.dart' show loadDutyTrip;
 import 'route_map.dart';
 import 'trip_screen.dart';
 
-/// The run, stop by stop.
-///
-/// The home screen answers "what next"; this answers "what is the shape of the
-/// morning" — which stops are behind, which is live, and how many children are
-/// waiting at each of the ones ahead.
 class DriverRoute extends StatelessWidget {
   const DriverRoute({super.key});
 
@@ -49,9 +44,6 @@ class DriverRoute extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // The run's name above the map rather than floating on it: the map
-            // now has its own callout in that corner, and the one thing a
-            // driver must find there is the next stop.
             Card16(
               padding: EdgeInsets.zero,
               child: Column(
@@ -104,8 +96,6 @@ class DriverRoute extends StatelessWidget {
                 ],
               ),
             ),
-            // Which stops the map could not place, if any. Said once, here,
-            // under the map that is missing them.
             RouteMapNote(stops: stops),
             const SizedBox(height: kCardGap),
 
@@ -147,11 +137,6 @@ class DriverRoute extends StatelessWidget {
   }
 }
 
-/// The run screen, told which day it belongs to.
-///
-/// Without the date it looks the run up in TODAY's list, so a run this screen
-/// is quite correctly showing on a Friday for the coming Sunday opened with no
-/// start button on it.
 void _openRun(BuildContext context, CrewTrip trip) {
   Navigator.of(context).push(
     MaterialPageRoute(
@@ -250,10 +235,6 @@ class _StopRow extends StatelessWidget {
                     SizedBox(
                       width: 44,
                       child: Text(
-                        // What happened, where it has; otherwise when the bus
-                        // is due, marked as a forecast. This column used to
-                        // show a dash for every stop still ahead, which is
-                        // most of them for most of the morning.
                         stop.arrivedAt != null || stop.departedAt != null
                             ? hhmm(stop.arrivedAt ?? stop.departedAt)
                             : stopEtaText(stop),

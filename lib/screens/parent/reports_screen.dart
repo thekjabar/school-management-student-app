@@ -14,22 +14,6 @@ import 'attendance_screen.dart';
 import 'attitude_screen.dart';
 import 'marks_screen.dart';
 
-/// What the school itself has said about this child's year.
-///
-/// Every figure on this screen was typed by the school: the term grades it
-/// released, and the report cards it published with the marks frozen onto them.
-/// This screen used to average the exam results and the homework itself and
-/// print the answer as "Average marks" — a number no teacher gave, that no
-/// office would stand behind, and that a parent would quote back at a meeting.
-/// The term grade is the row the school defends after a re-mark, so it is the
-/// row that is shown.
-///
-/// Only PUBLISHED work arrives here. A report the office is holding back and a
-/// report that was never generated look identical — both are simply absent —
-/// and that is the server's deliberate choice, because a school here withholds
-/// a report over unpaid fees and will not have that conversation through a
-/// phone screen at nine in the evening. So nothing on this screen may say the
-/// school has produced nothing. It says only that there is nothing to show.
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key, required this.child});
 
@@ -44,12 +28,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   int _tab = 0;
 
-  /// Which term's grades are on screen.
-  ///
-  /// The chips are built out of the terms inside the answer itself. Nothing in
-  /// the API lists a family's terms, and asking the server to filter by a term
-  /// id it does not know is not an error there — it answers with an empty list,
-  /// which would show a parent nothing and explain nothing.
   String? _termId;
 
   @override
@@ -69,19 +47,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 tint: tint,
                 padding: const EdgeInsets.fromLTRB(0, 0, 0, 20),
                 load: () async {
-                  // Three separate answers, fetched together but allowed to
-                  // fail apart. Future.wait fails fast: one endpoint returning
-                  // 500 threw away the whole screen, so a report card that had
-                  // arrived perfectly well went unread because the term grades
-                  // beside it did not load. And an empty section here says
-                  // "there is nothing to show" — which, printed over a fetch
-                  // that failed, tells a family the school published nothing.
                   final api = ParentApi.instance;
                   final id = widget.child.studentId;
-                  // All three are in flight before the first await, so this is
-                  // still one round trip's worth of waiting. Awaited one at a
-                  // time only because a wrapped call cannot throw, which keeps
-                  // the types exact and spares the screen a cast.
                   final cards = _slot(api.reportCards(id));
                   final terms = _slot(api.termGrades(id));
                   final exams = _slot(api.results(id));
@@ -90,9 +57,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     terms: await terms,
                     exams: await exams,
                   );
-                  // Nothing at all arrived — no connection, or the session is
-                  // gone. That is the Loader's own error page with its retry,
-                  // not three little retry lines on an otherwise blank screen.
                   final dead = report.totalFailure;
                   if (dead != null) throw dead;
                   return report;
@@ -100,8 +64,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 builder: (context, report) => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // The card on the left, the illustration on the right, in a
-                    // block tall enough to hold it whole.
                     SizedBox(
                       height: 124,
                       child: Stack(
@@ -157,9 +119,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Above everything, because a report card nobody has
-                          // opened is the one thing on this screen that is
-                          // waiting on the family rather than on the school.
                           if (report.unopened != null) ...[
                             _NewCard(report: report, onOpen: _open),
                             const SizedBox(height: kCardGap),
@@ -198,14 +157,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  /// One section failed while the others arrived. Refetching all three is
-  /// right: they are one request in practice, and a parent pressing "try
-  /// again" on the report cards would not expect the term grades beside them
-  /// to stay a minute out of date.
   void _retry() => _loader.currentState?.reload();
 
-  /// The other two tabs are whole screens of their own — the register and the
-  /// conduct log — rather than a second, thinner copy of them here.
   void _go(BuildContext context, int i) {
     if (i == 0) {
       setState(() => _tab = 0);
@@ -220,12 +173,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  /// Opening a card is the only thing that tells the office it reached the
-  /// family: the server stamps the moment as a side effect of fetching the
-  /// detail — once, and never again — and there is no acknowledgement to send
-  /// afterwards. So the fetch happens here, on a tap, and nowhere else. Filling
-  /// the list from the detail route, or fetching a card ahead of time, would
-  /// sign for a report nobody had read.
   Future<void> _open(ReportCardSummary card) async {
     final gone = await showAppSheet<bool>(
       context,
@@ -233,18 +180,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
     if (!mounted) return;
     if (gone == true) showNote(context, t('rep.cardGone'), bad: true);
-    // Quietly. The list on screen is right apart from one date — the card just
-    // opened now carries an opened-on stamp it did not have a minute ago — and
-    // a full reload would drop the whole screen back to its skeleton for that.
     _loader.currentState?.reload(quiet: true);
   }
 }
 
-/* ---------------------------------------------------------------------------
- * What the school published
- * ------------------------------------------------------------------------- */
-
-/// One of the three fetches: what came back, or why it did not.
 class _Slot<T> {
   _Slot.ok(this.value) : error = null;
   _Slot.failed(this.error) : value = null;
@@ -277,27 +216,13 @@ class _Report {
   final List<TermGradeGroup> terms;
   final List<ExamResultItem> exams;
 
-  /// Non-null when that one fetch failed, and kept apart from an empty list on
-  /// purpose. "The school has published nothing" and "this did not load" are
-  /// different sentences, and printing the first when the second is true tells
-  /// a family the school produced no report for their child when it may well
-  /// have published one an hour ago.
   final Object? cardsError;
   final Object? termsError;
   final Object? examsError;
 
-  /// All three failed: no connection, or the session has gone.
   Object? get totalFailure =>
       cardsError != null && termsError != null && examsError != null ? cardsError : null;
 
-  /// The newest published card this family has never opened.
-  ///
-  /// Only published cards reach the app at all — the server filters on the
-  /// state and a withheld card is simply absent — so an unopened one here is
-  /// always a document the school meant them to have. `openedAt` is null until
-  /// the family first opens it, and it is the very flag the office checks
-  /// before telephoning a family who says the report never arrived: worth one
-  /// line at the top of the screen rather than a row they have to scroll to.
   ReportCardSummary? get unopened {
     final waiting = cards.where((c) => c.openedAt == null).toList()
       ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
@@ -306,38 +231,11 @@ class _Report {
 
   int get unopenedCount => cards.where((c) => c.openedAt == null).length;
 
-  /// Whether the list is long enough, and mixed enough, to need year headings.
-  /// A family with one year of cards gets no headings; a family holding four
-  /// years of them gets one per year, and the rows stop repeating the year.
   bool get groupsByYear {
     final years = cards.map((c) => c.academicYearName).toSet();
     return years.length > 1 && !years.contains('');
   }
 
-  /// The cards as the list draws them: one run per academic year, each run
-  /// headed exactly once.
-  ///
-  /// The server orders by publishedAt and then version — NOT by year — so the
-  /// years arrive interleaved. A correction is published as a new card long
-  /// after the year it corrects has ended, so it sorts above the cards of the
-  /// year that followed it: 2024-2025, then 2023-2024, then 2024-2025 again.
-  /// A heading emitted wherever the year changed printed that year twice and
-  /// left rows standing under a heading that did not describe them.
-  ///
-  /// Grouping here, instead of trusting the order the wire happened to bring,
-  /// keeps every card of a year together. The runs stay in the order the
-  /// newest-first list first reaches each year — which is the year holding the
-  /// most recently published card, first — and inside a run the server's own
-  /// order is untouched, so the newest document is still the one on top. The
-  /// year names are whatever the registrar typed and are not compared as dates
-  /// or sorted: nothing here knows that '2024-2025' follows '2023-2024'.
-  ///
-  /// This only RE-ARRANGES the rows the server sent. No card is added, kept
-  /// from an earlier answer or invented, so a card the school withheld — which
-  /// the server never sends at all — still cannot appear.
-  ///
-  /// One run holding everything when there are no headings to draw, so the
-  /// list has a single shape to render either way.
   List<List<ReportCardSummary>> get cardRuns {
     if (!groupsByYear) return cards.isEmpty ? const [] : [cards];
     final runs = <String, List<ReportCardSummary>>{};
@@ -347,14 +245,6 @@ class _Report {
     return runs.values.toList();
   }
 
-  /// A correction is published as a NEW card with a higher version, and the old
-  /// one can still be live while it happens, so a family may hold two documents
-  /// for one term. The version number is what tells them apart; on a term with
-  /// only one card it is noise.
-  ///
-  /// Matched on the year as well as the term, because a whole-year card has no
-  /// term at all — two of them from two different years would otherwise look
-  /// like two versions of one document.
   bool showsVersion(ReportCardSummary card) {
     final siblings = cards.where(
       (c) => c.termId == card.termId && c.academicYearName == card.academicYearName,
@@ -370,30 +260,12 @@ Color colourFor(int percent) {
   return AppTheme.rose;
 }
 
-/// A mark as the school wrote it: 82 rather than 82.0, and 82.5 kept whole.
-///
-/// Callers deal with null themselves before they get here. A subject with no
-/// mark and a subject marked zero are different answers — "not marked" and
-/// "nothing right" — and printing them the same is the one mistake on this
-/// screen a parent could not recover from.
 String _mark(num? value) {
   if (value == null) return '—';
   final d = value.toDouble();
   return d == d.roundToDouble() ? d.round().toString() : '$d';
 }
 
-/* ---------------------------------------------------------------------------
- * A card the family has not opened yet
- * ------------------------------------------------------------------------- */
-
-/// Said at the top of the screen, because until now a published report card
-/// sat in a list below the term grades and a family who did not scroll never
-/// learned it existed. The school's side of that is worse: the office cannot
-/// tell a report that was ignored from one that was never found.
-///
-/// It names the newest unopened card and opens THAT card, not the list. The
-/// button is the same tap as the row, so the opened-on stamp is written the
-/// one way it is ever written.
 class _NewCard extends StatelessWidget {
   const _NewCard({required this.report, required this.onOpen});
 
@@ -404,8 +276,6 @@ class _NewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final card = report.unopened!;
     final waiting = report.unopenedCount;
-    // The document's own name, in the school's words: a term name it typed, or
-    // the whole-year card the server flags rather than leaving to be guessed.
     final title = card.wholeYear ? t('rep.wholeYear') : (card.termName ?? t('rep.reportCard'));
     final slots = {'title': title, 'date': shortDate(card.publishedAt), 'n': waiting};
 
@@ -420,13 +290,6 @@ class _NewCard extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * One section that did not load
- * ------------------------------------------------------------------------- */
-
-/// What a section says instead of "there is nothing to show here yet" when its
-/// own fetch failed. The distinction is the whole point: a family must never
-/// be told the school published nothing because a request timed out.
 class _SectionFailed extends StatelessWidget {
   const _SectionFailed({required this.onRetry});
 
@@ -465,10 +328,6 @@ class _SectionFailed extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The grades the school released, by term
- * ------------------------------------------------------------------------- */
-
 class _TermGrades extends StatelessWidget {
   const _TermGrades({
     required this.groups,
@@ -480,7 +339,6 @@ class _TermGrades extends StatelessWidget {
 
   final List<TermGradeGroup> groups;
 
-  /// This one fetch failed while the rest of the screen arrived.
   final bool failed;
   final VoidCallback onRetry;
   final String? termId;
@@ -488,10 +346,6 @@ class _TermGrades extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Resolved against what actually arrived rather than trusted: a term can
-    // stop being published between one load and the next, and a selection
-    // pointing at nothing would leave a parent on an empty card with no way
-    // back to the terms that are there.
     final group = groups.isEmpty
         ? null
         : groups.firstWhere((g) => g.termId == termId, orElse: () => groups.first);
@@ -530,9 +384,6 @@ class _TermGrades extends StatelessWidget {
               const SizedBox(height: 12),
             ],
 
-            // The school's own words: the class the child sat in, the year the
-            // term belongs to, and the days it ran. None of it is translated
-            // here — a school types these itself.
             Text(
               [group.className, group.academicYearName]
                   .where((s) => s.isNotEmpty)
@@ -560,16 +411,8 @@ class _TermGrades extends StatelessWidget {
                   value: group.averagePercent == null
                       ? '—'
                       : '${_mark(group.averagePercent)}%',
-                  // How much of the term this average is drawn from. Subjects
-                  // arrive as the school releases them, so four of nine is an
-                  // ordinary answer rather than a half-finished load — and the
-                  // five that are missing are not failures and are not counted
-                  // as any.
                   caption: tn('rep.subjectsReleased', group.subjectCount),
                 ),
-                // Only when the school actually marked subjects pass or fail.
-                // isPass is a three-state field, and a term where nobody set it
-                // would otherwise read "Passed 0" over a page of good marks.
                 if (group.subjectsPassed + group.subjectsFailed > 0) ...[
                   Figure(
                     label: t('rep.passed'),
@@ -644,13 +487,6 @@ class _TermChip extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * One subject line — on a term, or on a card
- * ------------------------------------------------------------------------- */
-
-/// The same row for both, because they are the same row: a term grade and a
-/// line on a report card carry exactly these fields, and drawing them twice
-/// would let them drift apart.
 class _GradeRow extends StatelessWidget {
   const _GradeRow({
     required this.subject,
@@ -679,8 +515,6 @@ class _GradeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final marked = score != null;
-    // The percentage decides the colour, not the pass flag: a school that never
-    // sets isPass still gets a page that reads at a glance.
     final colour = percent == null ? AppTheme.textMuted : colourFor(percent!.round());
     final comment = teacherComment?.trim() ?? '';
 
@@ -691,7 +525,6 @@ class _GradeRow extends StatelessWidget {
         children: [
           IconChip(
             icon: subjectIcon(subject),
-            // The subject's own colour when the school picked one.
             color: parseHex(colorHex, colour),
             background: parseHex(colorHex, colour)
                 .withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
@@ -705,10 +538,6 @@ class _GradeRow extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        // Already in the reader's language, and on a card it is
-                        // the label frozen on at generation — a subject renamed
-                        // in March must not rewrite a document printed in
-                        // January.
                         subject,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -721,8 +550,6 @@ class _GradeRow extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // "No mark" rather than a dash or a zero. An unmarked
-                    // subject and a subject marked nothing are different facts.
                     Text(
                       marked
                           ? tv('rep.outOf', {
@@ -774,16 +601,12 @@ class _GradeRow extends StatelessWidget {
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      // The school's own letter, whatever alphabet it is in.
                       if (gradeLetter != null && gradeLetter!.isNotEmpty)
                         Tag(
                           gradeLetter!,
                           color: colour,
                           background: colour.withValues(alpha: AppTheme.dark ? 0.20 : 0.12),
                         ),
-                      // Three states. A null pass flag means the school did not
-                      // say, and printing that as "Failed" would be a lie about
-                      // a child.
                       if (isPass == true)
                         Tag(
                           t('rep.passed'),
@@ -827,10 +650,6 @@ class _GradeRow extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The report cards themselves
- * ------------------------------------------------------------------------- */
-
 class _Cards extends StatelessWidget {
   const _Cards({required this.report, required this.onOpen, required this.onRetry});
 
@@ -858,12 +677,6 @@ class _Cards extends StatelessWidget {
             )
           else ...[
             for (var r = 0; r < runs.length; r++) ...[
-              // One heading per year, taken from the run it heads rather than
-              // from a comparison with the row above, so it cannot be printed
-              // twice for one year or stand over rows from another. Only for a
-              // family who holds cards from more than one year. It replaces the
-              // divider rather than sitting under it — a rule and a heading
-              // together read as two separations of the same list.
               if (byYear)
                 _YearHeading(name: runs[r].first.academicYearName, first: r == 0),
               for (var i = 0; i < runs[r].length; i++) ...[
@@ -871,17 +684,12 @@ class _Cards extends StatelessWidget {
                 _CardRow(
                   card: runs[r][i],
                   showVersion: report.showsVersion(runs[r][i]),
-                  // The year is already the heading above it; repeating it on
-                  // every row leaves the class name fighting for the same line.
                   showYear: !byYear,
                   onTap: () => onOpen(runs[r][i]),
                 ),
               ],
             ],
             const SizedBox(height: 4),
-            // Said out loud, because it is true and because a family should not
-            // discover it from the office. Opening a card is what records that
-            // it arrived; there is nothing else to press.
             Text(
               t('rep.openRecorded'),
               style: TextStyle(fontSize: 11, height: 1.4, color: AppTheme.textFaint),
@@ -904,7 +712,6 @@ class _CardRow extends StatelessWidget {
   final ReportCardSummary card;
   final bool showVersion;
 
-  /// False when a year heading above the row already says it.
   final bool showYear;
   final VoidCallback onTap;
 
@@ -937,9 +744,6 @@ class _CardRow extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          // A card with no term is the whole-year document, and
-                          // the server flags it rather than leaving it to be
-                          // guessed from the missing term.
                           card.wholeYear ? t('rep.wholeYear') : (card.termName ?? ''),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -983,26 +787,17 @@ class _CardRow extends StatelessWidget {
                           ),
                         ],
                       ),
-                      // The school's own word for the result, when it printed
-                      // one. Not a percentage worked out from it.
                       if (card.overallGrade != null && card.overallGrade!.isNotEmpty)
                         StatusChip(card.overallGrade!, color: tint),
-                      // How much of the year the document covers, so a card
-                      // with two subjects on it is not mistaken for the full
-                      // report at a glance.
                       if (card.subjectCount > 0)
                         StatusChip(
                           tn('rep.subjectsOnCard', card.subjectCount),
                           color: AppTheme.textMuted,
                         ),
-                      // Three states. A card that printed no promotion decision
-                      // gets no chip — never "Not promoted".
                       if (card.promoted == true)
                         StatusChip(t('rep.promoted'), color: AppTheme.green),
                       if (card.promoted == false)
                         StatusChip(t('rep.notPromoted'), color: AppTheme.rose),
-                      // The receipt, from the family's side: which reports they
-                      // have actually looked at.
                       StatusChip(
                         card.openedAt == null
                             ? t('rep.notOpenedYet')
@@ -1022,9 +817,6 @@ class _CardRow extends StatelessWidget {
   }
 }
 
-/// The school year a run of cards belongs to, in the school's own words. Never
-/// translated: '2024–2025' or whatever the registrar typed is what every other
-/// school document calls that year.
 class _YearHeading extends StatelessWidget {
   const _YearHeading({required this.name, required this.first});
 
@@ -1050,17 +842,6 @@ class _YearHeading extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * One card, opened
- * ------------------------------------------------------------------------- */
-
-/// The document itself, fetched when a parent opens it and at no other moment.
-///
-/// Popping `true` means the card is gone: the school superseded or withheld it
-/// between the list arriving and this tap. The server answers the same way
-/// whether the card never existed, belongs to another child or has been pulled,
-/// so the screen does not guess which — it says the card is no longer there and
-/// refreshes the list.
 class _CardSheet extends StatefulWidget {
   const _CardSheet({required this.child, required this.card});
 
@@ -1082,9 +863,6 @@ class _CardSheetState extends State<_CardSheet> {
     _load();
   }
 
-  /// Safe to run again on retry: the server stamps the opened moment only when
-  /// it is still empty, so a second read cannot move the date the office quotes
-  /// back to a family.
   Future<void> _load() async {
     setState(() {
       _busy = true;
@@ -1141,8 +919,6 @@ class _CardSheetState extends State<_CardSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Titled from the row that was tapped, so the sheet has a heading
-            // before the document arrives.
             Text(
               t('rep.reportCard'),
               style: TextStyle(
@@ -1168,8 +944,6 @@ class _CardSheetState extends State<_CardSheet> {
                     ),
                   ),
                 ),
-                // Always here, unlike the list: on the document itself the
-                // version is part of what a parent is holding.
                 Pill(tn('rep.version', widget.card.version), color: AppTheme.textMuted),
               ],
             ),
@@ -1182,10 +956,6 @@ class _CardSheetState extends State<_CardSheet> {
             else if (_error != null)
               _SheetError(message: _error!, tint: tint, onRetry: _load)
             else if (detail != null)
-              // hasPdf is on the LIST row, not on the document: the detail
-              // answers with the address of the rendered file, which nothing
-              // in the app may fetch. So the flag travels from the row that
-              // was tapped.
               _CardBody(detail: detail, preparedCopy: widget.card.hasPdf),
           ],
         ),
@@ -1242,11 +1012,6 @@ class _CardBody extends StatelessWidget {
 
   final ReportCardDetail detail;
 
-  /// The school attached a rendered document to this card. It is NOT an
-  /// address the app can open — no parent-facing route serves a report-card
-  /// file, and the asset must not be publicly fetchable — so this says the
-  /// document exists and where to ask for it, and offers no button that would
-  /// fail.
   final bool preparedCopy;
 
   @override
@@ -1256,9 +1021,6 @@ class _CardBody extends StatelessWidget {
         .where((s) => s.isNotEmpty)
         .join('  •  ');
 
-    // Each of these is separately nullable on a real card: a school can print a
-    // rank with no class size, or attendance with no GPA. Only what was printed
-    // is shown, and "Rank 4 of null" is never one of the answers.
     final figures = <Figure>[
       if (d.overallScore != null)
         Figure(label: t('rep.overallScore'), value: _mark(d.overallScore)),
@@ -1314,9 +1076,6 @@ class _CardBody extends StatelessWidget {
               tv('rep.publishedOn', {'date': longDate(d.publishedAt)}),
               color: AppTheme.textMuted,
             ),
-            // What the office sees. Never null on the document — reading it is
-            // what sets it — so the first time a parent opens a card this is
-            // today, and it stays that day for good.
             StatusChip(
               tv('rep.firstOpened', {'date': longDate(d.openedAt)}),
               color: AppTheme.green,
@@ -1328,8 +1087,6 @@ class _CardBody extends StatelessWidget {
                     : tv('rep.rankOf', {'rank': d.classRank!, 'size': d.classSize!}),
                 color: Role.parent.tint,
               ),
-            // Three states again: no promotion decision printed means no chip,
-            // not "Not promoted".
             if (d.promoted == true)
               StatusChip(t('rep.promoted'), color: AppTheme.green),
             if (d.promoted == false)
@@ -1372,8 +1129,6 @@ class _CardBody extends StatelessWidget {
           ),
         ],
 
-        // Typed by a teacher about this child, in whatever language they typed
-        // it. Nothing is done to it.
         if ((d.homeroomComment ?? '').trim().isNotEmpty) ...[
           const SizedBox(height: 12),
           _Comment(title: t('rep.homeroomComment'), body: d.homeroomComment!.trim()),
@@ -1390,9 +1145,6 @@ class _CardBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SectionRow(title: t('rep.subjects'), dense: true),
-              // Plain text, not the section's action slot: the count is a fact
-              // about the document, and putting it where a link goes offers a
-              // tap that leads nowhere.
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Text(
@@ -1537,10 +1289,6 @@ class _Box extends StatelessWidget {
     );
   }
 }
-
-/* ---------------------------------------------------------------------------
- * What the marks came from
- * ------------------------------------------------------------------------- */
 
 class _Recent extends StatelessWidget {
   const _Recent({required this.report, required this.child, required this.onRetry});

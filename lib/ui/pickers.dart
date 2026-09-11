@@ -6,22 +6,6 @@ import 'format.dart';
 import 'kit.dart';
 import 'sheets.dart';
 
-/// Choosing a date, and choosing from a list.
-///
-/// Both were Flutter's defaults with a colour scheme applied. That is not the
-/// same as belonging: Material's date picker has its own corner radius, its own
-/// grid metrics, its own header, and a dropdown opens a floating menu that
-/// looks nothing like the rest of these screens. On a form a parent uses twice
-/// a term, the moment it opens is the moment the app stops feeling like one
-/// thing.
-///
-/// These are sheets, because everything else that asks a question in this app
-/// is a sheet, and they are built from the same Card16 / Pill / BigButton
-/// vocabulary as the screens behind them.
-
-/// A month grid, as a sheet.
-///
-/// Returns the chosen day, or null if dismissed.
 Future<DateTime?> pickDate(
   BuildContext context, {
   required DateTime initial,
@@ -42,11 +26,6 @@ Future<DateTime?> pickDate(
   );
 }
 
-/// One choice from a short list, as a sheet.
-///
-/// A sheet rather than a menu because a menu that opens over the field hides
-/// the thing being answered, and because on a phone a list of classes is
-/// easier to hit at full width than in a 200px popup.
 Future<T?> pickOne<T>(
   BuildContext context, {
   required List<PickOption<T>> options,
@@ -73,10 +52,6 @@ class PickOption<T> {
   final String? subtitle;
   final IconData? icon;
 }
-
-/* ---------------------------------------------------------------------------
- * The sheets
- * ------------------------------------------------------------------------- */
 
 class _SheetFrame extends StatelessWidget {
   const _SheetFrame({required this.title, required this.child});
@@ -183,8 +158,6 @@ class _DateSheetState extends State<_DateSheet> {
     final firstOfMonth = DateTime(_month.year, _month.month);
     final daysInMonth = DateTime(_month.year, _month.month + 1, 0).day;
 
-    // The week starts on Saturday in the Region, not Monday and not Sunday.
-    // Dart gives Monday = 1 … Sunday = 7, so Saturday (6) becomes column 0.
     final lead = (firstOfMonth.weekday + 1) % 7;
 
     final canBack = !DateTime(_month.year, _month.month, 1)
@@ -268,8 +241,6 @@ class _DateSheetState extends State<_DateSheet> {
                         decoration: BoxDecoration(
                           color: chosen ? widget.tint : Colors.transparent,
                           shape: BoxShape.circle,
-                          // Today is outlined, the chosen day is filled. Two
-                          // different facts, so they must not look alike.
                           border: today && !chosen
                               ? Border.all(color: widget.tint, width: 1.4)
                               : null,
@@ -413,10 +384,6 @@ class _OptionSheet<T> extends StatelessWidget {
   }
 }
 
-/// A form row that opens one of the sheets above.
-///
-/// Looks like the app's other fields rather than like a Material dropdown, and
-/// says what is chosen rather than showing a caret over an empty box.
 class PickerField extends StatelessWidget {
   const PickerField({
     super.key,
@@ -439,10 +406,6 @@ class PickerField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // An empty label is no label, not a blank line. Callers that already
-        // draw their own heading pass '' — and the invisible Text plus its gap
-        // made those fields taller than the ones beside them, which is what
-        // knocked "Out of" off the same line as "Date".
         if (label.isNotEmpty) ...[
           Text(
             label,

@@ -11,23 +11,6 @@ import '../ui/pickers.dart';
 import '../ui/screen_kit.dart';
 import '../ui/sheets.dart';
 
-/// Time off, for the member of staff carrying the phone.
-///
-/// ONE screen for two apps. The driver and the teacher ask the office for leave
-/// in exactly the same words and get back exactly the same six states, so this
-/// is written once and tinted by the caller. A second copy would drift, and the
-/// half that drifted would be whichever of the two nobody was looking at.
-///
-/// The screen answers three questions and refuses to be vague about any of
-/// them: what am I owed, what have I asked for, and what happened to it. The
-/// third is the one that matters. A refusal shown as a red word and nothing
-/// else is worse than no screen at all — the person is left knowing they were
-/// told no and not knowing why, which is exactly the position the paper
-/// notebook already put them in. So `decisionNote` is rendered in full wherever
-/// it exists, and where it does NOT exist the screen says so out loud rather
-/// than leaving a blank that reads as "no reason needed".
-
-/// What the screen needs, both halves fetched together.
 class _LeaveState {
   _LeaveState(this.rows, this.entitlement);
 
@@ -35,10 +18,6 @@ class _LeaveState {
   final StaffLeaveEntitlement entitlement;
 }
 
-/// The row that opens it, for a Profile tab.
-///
-/// A widget rather than a copied `TileRow` in each app, so the icon, the words
-/// and the destination cannot drift apart between the two.
 class StaffLeaveTile extends StatelessWidget {
   const StaffLeaveTile({super.key, required this.tint, this.last = true});
 
@@ -73,9 +52,6 @@ class _StaffLeaveScreenState extends State<StaffLeaveScreen> {
   final GlobalKey<LoaderState<_LeaveState>> _loader = GlobalKey<LoaderState<_LeaveState>>();
 
   Future<_LeaveState> _load() async {
-    // Both at once. The allowance is a separate route because it is a separate
-    // table, but a screen that painted the list first and the allowance a
-    // second later would flicker on every pull-to-refresh.
     final results = await Future.wait([
       StaffLeaveApi.instance.mine(),
       StaffLeaveApi.instance.entitlement(),
@@ -193,21 +169,6 @@ class _StaffLeaveScreenState extends State<StaffLeaveScreen> {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * What you are owed
- * ------------------------------------------------------------------------- */
-
-/// The allowance, or an honest account of why there is not one.
-///
-/// Three different answers, and they are not the same answer:
-///
-///  * No employment record here at all — the supply teacher in week one. There
-///    is nothing to show and nothing has gone wrong.
-///  * An employment, but nobody has set this year's entitlement up yet.
-///  * Real numbers.
-///
-/// Collapsing the first two into "0 days left" would tell somebody they had
-/// used up an allowance that was never granted, and they would stop asking.
 class _Allowance extends StatelessWidget {
   const _Allowance({required this.entitlement, required this.tint});
 
@@ -223,9 +184,6 @@ class _Allowance extends StatelessWidget {
       return _Note(text: t('staffLeave.noAllowance'), color: AppTheme.blue);
     }
 
-    // Newest period only. An operator carrying three years of balances would
-    // otherwise put last year's spent allowance on the same card as this
-    // year's, which is a number nobody can act on.
     final newest = entitlement.balances.first.periodKey;
     final current = entitlement.balances.where((b) => b.periodKey == newest).toList();
 
@@ -270,8 +228,6 @@ class _AllowanceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = balance.entitledDays + balance.carriedOverDays;
-    // Guarded, because a balance set up as nought entitled days is legal and a
-    // division by it is not.
     final fraction = total <= 0 ? 0.0 : (balance.remainingDays / total).clamp(0.0, 1.0);
     final low = balance.remainingDays <= 0;
 
@@ -326,10 +282,6 @@ class _AllowanceRow extends StatelessWidget {
     );
   }
 }
-
-/* ---------------------------------------------------------------------------
- * One request
- * ------------------------------------------------------------------------- */
 
 class _LeaveCard extends StatelessWidget {
   const _LeaveCard({required this.leave, required this.tint, this.onWithdraw});
@@ -387,8 +339,6 @@ class _LeaveCard extends StatelessWidget {
                   tv('staffLeave.cost', {'n': _days(leave.workingDays!)}),
                   color: AppTheme.textMuted,
                 ),
-              // Said only when it is UNPAID. "Paid" on every other card would be
-              // a promise this screen is not the one making.
               if (!leave.paid) Pill(t('staffLeave.unpaidTag'), color: AppTheme.amber),
             ],
           ),
@@ -427,7 +377,6 @@ class _LeaveCard extends StatelessWidget {
     );
   }
 
-  /// The dates, and the hours where it is only part of a day.
   static String _dateLine(StaffLeave leave) {
     if (leave.partDay) {
       return '${longDate(leave.fromDate)} · '
@@ -444,13 +393,6 @@ class _LeaveCard extends StatelessWidget {
   }
 }
 
-/// What happened, and what happens next.
-///
-/// Every one of the six states says something. The two that settle against the
-/// person — REJECTED and REVOKED — say WHY, and when the office recorded no
-/// reason they say that instead of falling silent. Silence there is read as
-/// "there was a reason and you are not being told it", which is the worst of
-/// the three possible readings and the only one this screen can rule out.
 class _Outcome extends StatelessWidget {
   const _Outcome({required this.leave});
 
@@ -526,9 +468,6 @@ class _Outcome extends StatelessWidget {
         ),
       );
     } else if (leave.refused) {
-      // The honest version of a blank. The office refused and wrote nothing
-      // down, and the person is entitled to know that is what happened rather
-      // than to be shown an empty space.
       lines.add(const SizedBox(height: 8));
       lines.add(
         Text(
@@ -576,17 +515,6 @@ class _Outcome extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Asking
- * ------------------------------------------------------------------------- */
-
-/// The request form.
-///
-/// Whole days only. `fromMinute`/`toMinute` exist on the server for a clinic
-/// appointment at eleven, but they are refused unless BOTH are given and the
-/// two dates are the same day, and a form that let somebody set one of them
-/// would produce a 400 they could not read their way out of. Part days are
-/// still displayed when the office records one.
 class _RequestSheet extends StatefulWidget {
   const _RequestSheet({required this.tint});
 
@@ -630,10 +558,6 @@ class _RequestSheetState extends State<_RequestSheet> {
   }
 
   Future<void> _pickFrom() async {
-    // A year back and a year forward. Leave is recorded after the fact at least
-    // as often as before it — the driver who was off sick on the Thursday and
-    // is filling it in on the Monday — so a picker that started today would
-    // make the commonest case impossible.
     final chosen = await pickDate(
       context,
       initial: _from ?? _today,
@@ -645,8 +569,6 @@ class _RequestSheetState extends State<_RequestSheet> {
     if (chosen == null || !mounted) return;
     setState(() {
       _from = chosen;
-      // A last day left behind the new first day is a 400 waiting to happen,
-      // so it follows rather than being left wrong.
       if (_to == null || _to!.isBefore(chosen)) _to = chosen;
     });
   }
@@ -690,10 +612,6 @@ class _RequestSheetState extends State<_RequestSheet> {
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
-      // The server's own words. It refuses a double booking, leave that starts
-      // after somebody left, and a reason of one character, and each of those
-      // messages names the thing to change — replacing them with "that did not
-      // work" would strip the only instruction in the answer.
       if (mounted) setState(() => _error = errorText(e));
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -786,9 +704,6 @@ class _RequestSheetState extends State<_RequestSheet> {
                 controller: _reason,
                 minLines: 2,
                 maxLines: 4,
-                // 500 on the server, and a field that let somebody type 600
-                // characters would throw the whole request away at the end of
-                // it rather than at the 501st.
                 maxLength: 500,
                 textInputAction: TextInputAction.newline,
                 decoration: InputDecoration(
@@ -823,10 +738,6 @@ class _RequestSheetState extends State<_RequestSheet> {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Small shared pieces
- * ------------------------------------------------------------------------- */
-
 class _Note extends StatelessWidget {
   const _Note({required this.text, required this.color});
 
@@ -859,18 +770,11 @@ class _Note extends StatelessWidget {
   }
 }
 
-/// The kind of leave, in the reader's own language.
-///
-/// Keyed on the enum value itself, exactly as `format.dart` keys month names on
-/// their number, so a kind the server adds later shows as its own name rather
-/// than as a blank while the translations catch up.
 String leaveKindLabel(String kind) {
   final label = t('staffLeave.$kind');
   return label == 'staffLeave.$kind' ? humanise(kind) : label;
 }
 
-/// The colour a status is read in. Refusals and revocations are the same red:
-/// both end with the person not getting the days.
 Color leaveStatusColor(String status) => switch (status) {
       'PENDING' => AppTheme.amber,
       'APPROVED' => AppTheme.green,
@@ -880,7 +784,6 @@ Color leaveStatusColor(String status) => switch (status) {
       _ => AppTheme.textMuted,
     };
 
-/// A day count with no trailing nought: half a day is "0.5", three days is "3".
 String _days(double value) {
   if (value == value.roundToDouble()) return value.toStringAsFixed(0);
   return value.toStringAsFixed(1);

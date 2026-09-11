@@ -6,19 +6,6 @@ import 'async.dart';
 import 'motion.dart';
 import 'nav_glyphs.dart';
 
-/// The pieces the mockup is made of.
-///
-/// Every screen in the three apps is built from these seven, and nothing else:
-/// a gradient header, a card, a strip of figures, a section heading, a list
-/// row, a row of quick actions, and a bottom bar. Keeping the vocabulary that
-/// small is what makes the parent app and the driver app feel like one product
-/// rather than two that happen to share a logo.
-
-/// The tinted header at the top of every home screen.
-///
-/// A soft vertical gradient from the role's colour into the page, rather than a
-/// flat block: the flat version reads as a coloured bar stuck on top, and the
-/// fade is what makes the card below it look like it is floating.
 class RoleHeader extends StatelessWidget {
   const RoleHeader({
     super.key,
@@ -37,22 +24,14 @@ class RoleHeader extends StatelessWidget {
   final String greeting;
   final String name;
 
-  /// Initials, when there is no photograph — and there usually is not. Families
-  /// here are frequently not comfortable with a child's photograph in an app,
-  /// so a tinted circle of initials is the default rather than the fallback.
   final String? avatarLabel;
 
   final int notificationCount;
   final VoidCallback? onBell;
 
-  /// Tapping the avatar opens the account drawer. The face is where people
-  /// already press to find "my account" — a separate menu button beside it
-  /// would be a second thing to learn for the same destination.
   final VoidCallback? onAvatar;
   final Widget? trailing;
 
-  /// Anything that sits under the greeting inside the wash — the child picker,
-  /// for instance.
   final Widget? bottom;
 
   @override
@@ -101,10 +80,6 @@ class RoleHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              // These three are independent. The menu used to live inside the
-              // `else`, so any screen passing a `trailing` widget — the driver
-              // and teacher apps both pass a date pill — silently lost the only
-              // way into the account drawer.
               ?trailing,
               if (trailing == null && onBell != null)
                 BellButton(count: notificationCount, onTap: onBell),
@@ -121,8 +96,6 @@ class RoleHeader extends StatelessWidget {
   }
 }
 
-/// A circle of initials, coloured from the name so the same person keeps the
-/// same colour everywhere in the app.
 class CircleInitials extends StatelessWidget {
   const CircleInitials({super.key, required this.label, this.tint, this.size = 42});
 
@@ -166,7 +139,6 @@ class CircleInitials extends StatelessWidget {
   }
 }
 
-/// The bell, with the little red count on it.
 class BellButton extends StatelessWidget {
   const BellButton({super.key, required this.count, this.onTap});
 
@@ -217,8 +189,6 @@ class BellButton extends StatelessWidget {
   }
 }
 
-/// One figure in a strip: a small grey label, a large value, and a caption
-/// underneath that says whether the value is good.
 class Figure {
   const Figure({required this.label, required this.value, this.caption, this.captionColor});
 
@@ -228,10 +198,6 @@ class Figure {
   final Color? captionColor;
 }
 
-/// Three figures side by side with hairline dividers between them.
-///
-/// Three, almost always. Four fits on a wide phone and wraps on a narrow one,
-/// and a strip that reflows is a strip nobody can compare at a glance.
 class FigureStrip extends StatelessWidget {
   const FigureStrip({super.key, required this.figures});
 
@@ -292,7 +258,6 @@ class FigureStrip extends StatelessWidget {
   }
 }
 
-/// A section title with an optional "View All" on the right.
 class Heading extends StatelessWidget {
   const Heading(this.title, {super.key, this.action, this.onAction, this.tint});
 
@@ -337,7 +302,6 @@ class Heading extends StatelessWidget {
   }
 }
 
-/// The rounded tinted square that fronts every list row.
 class Chip36 extends StatelessWidget {
   const Chip36({
     super.key,
@@ -367,7 +331,6 @@ class Chip36 extends StatelessWidget {
   }
 }
 
-/// A row inside a white card: chip, two lines of text, something on the right.
 class TileRow extends StatelessWidget {
   const TileRow({
     super.key,
@@ -459,7 +422,6 @@ class TileRow extends StatelessWidget {
   }
 }
 
-/// One of the four squares in a Quick Actions row.
 class QuickAction {
   const QuickAction({
     required this.icon,
@@ -476,34 +438,18 @@ class QuickAction {
   final Color color;
   final VoidCallback? onTap;
 
-  /// False draws the tile plainly unavailable — flat grey, no ripple — rather
-  /// than live. A tile that looks ready and then apologises is the thing this
-  /// app has been stripping out; one that looks unavailable and says why is
-  /// honest about work that has not happened yet.
   final bool enabled;
 
-  /// Shown when a disabled tile is pressed. Without it a disabled tile is a
-  /// dead end, which is only marginally better than a lie.
   final String? note;
 
-  /// Set when the design's mark is not in the Material set — see
-  /// nav_glyphs.dart. [icon] stays required as the fallback.
   final Widget Function(Color color, double size)? glyph;
 }
 
-/// The tinted squares across one card.
-///
-/// Seven of them: the six the design's close-up shows plus Bus tracking, which
-/// is first on the full home screen. Seven do not fit a phone, which is what
-/// the rule beneath is for — it is a scroll indicator, not decoration. Four or
-/// fewer still spread to fill the width, so nothing that fits looks cut off.
 class QuickActions extends StatelessWidget {
   const QuickActions({super.key, required this.actions});
 
   final List<QuickAction> actions;
 
-  /// Wide enough for "Assignments" at the label's size, which is the longest
-  /// word any of these carry in the three languages.
   static const _tile = 62.0;
 
   @override
@@ -513,10 +459,6 @@ class QuickActions extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, box) {
           final fits = actions.length * _tile <= box.maxWidth;
-          // Left to right, a step apart. The stagger is capped inside `Rise`,
-          // so eleven tiles do not take eleven steps to arrive — the ones past
-          // the fold come in together, and the whole row is settled inside
-          // two-thirds of a second however many there are.
           final row = Row(
             mainAxisSize: fits ? MainAxisSize.max : MainAxisSize.min,
             children: [
@@ -549,13 +491,10 @@ class _Tile extends StatelessWidget {
 
   final QuickAction action;
 
-  /// Position in the row, which is all the tile knows about the stagger.
   final int index;
 
   @override
   Widget build(BuildContext context) {
-    // A disabled tile is drawn in the muted colour rather than its own, so it
-    // reads as not-yet from across the room instead of on the second tap.
     final on = action.enabled;
     final tint = on ? action.color : AppTheme.textFaint;
 
@@ -611,11 +550,6 @@ class _Tile extends StatelessWidget {
   }
 }
 
-/// A horizontally scrolling row with a progress rule beneath it.
-///
-/// The rule is not a page indicator — the row scrolls continuously — it is a
-/// hint that there is more to the side, which a row of tiles cut off at the
-/// card's edge does not give on its own.
 class _ScrollingActions extends StatefulWidget {
   const _ScrollingActions({required this.row, required this.width, required this.span});
 
@@ -670,10 +604,8 @@ class _ScrollingActionsState extends State<_ScrollingActions> {
 class _Rule extends StatelessWidget {
   const _Rule({required this.progress, required this.visible});
 
-  /// 0 at the left of the row, 1 at the right.
   final double progress;
 
-  /// How much of the row is on screen, as a fraction — the thumb's length.
   final double visible;
 
   @override
@@ -694,10 +626,6 @@ class _Rule extends StatelessWidget {
           ),
           AnimatedPositionedDirectional(
             duration: motionOff(context) ? Duration.zero : const Duration(milliseconds: 90),
-            // start, not left. This row scrolls horizontally, so in Kurdish and
-            // Arabic its origin is the visual RIGHT: with a physical `left` the
-            // thumb sat at the wrong end un-scrolled and then travelled
-            // backwards as the row moved.
             start: (rail - thumb) * progress,
             child: Container(
               width: thumb,
@@ -714,7 +642,6 @@ class _Rule extends StatelessWidget {
   }
 }
 
-/// The white card everything sits on.
 class Card16 extends StatelessWidget {
   const Card16({
     super.key,
@@ -741,11 +668,6 @@ class Card16 extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? AppTheme.surface,
         borderRadius: BorderRadius.circular(radius),
-        // No outline on the light theme. A grey hairline round every card is
-        // what turned a white page into a grey one: eight cards on a screen is
-        // eight grey rectangles, and the design separates them with light.
-        // The dark theme is the opposite — nothing casts a shadow on navy, so
-        // there the border IS the edge.
         border: AppTheme.dark
             ? Border.all(color: border ?? AppTheme.border)
             : (border == null ? null : Border.all(color: border!)),
@@ -770,7 +692,6 @@ class Card16 extends StatelessWidget {
   }
 }
 
-/// A short status word: Excellent, Pending, High Priority.
 class Pill extends StatelessWidget {
   const Pill(this.label, {super.key, required this.color, this.background});
 
@@ -794,13 +715,9 @@ class Pill extends StatelessWidget {
   }
 }
 
-/// One destination in the bottom bar.
 class NavItem {
   const NavItem(this.filled, this.outline, this.label, {this.glyph});
 
-  /// Set on the parent bar, whose four marks are drawn rather than taken from
-  /// the Material set — see nav_glyphs.dart. The two IconData stay required so
-  /// the driver and teacher bars are unaffected.
   final NavGlyph? glyph;
 
   final IconData filled;
@@ -808,7 +725,6 @@ class NavItem {
   final String label;
 }
 
-/// The bottom bar. Icon above a small label, the active one in the role colour.
 class BottomNav extends StatelessWidget {
   const BottomNav({
     super.key,
@@ -843,19 +759,11 @@ class BottomNav extends StatelessWidget {
                   behavior: HitTestBehavior.opaque,
                   onTap: () => onChanged(i),
                   child: AnimatedContainer(
-                    // Short enough to feel like a response to the tap rather
-                    // than an animation being played at you — and nothing at
-                    // all for somebody who has asked their phone to stop
-                    // moving things.
                     duration: motionOff(context) ? Duration.zero : const Duration(milliseconds: 180),
                     curve: Curves.easeOutCubic,
                     height: 46,
                     margin: const EdgeInsets.symmetric(horizontal: 3),
                     decoration: BoxDecoration(
-                      // The selected tab is a soft pill in the role's colour
-                      // rather than a bare tinted icon over a hairline rule.
-                      // It reads as a control, and it is the same shape as
-                      // every other selected thing in the app.
                       color: on ? tint.withValues(alpha: AppTheme.dark ? 0.22 : 0.12) : Colors.transparent,
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -872,10 +780,6 @@ class BottomNav extends StatelessWidget {
                             color: on ? tint : AppTheme.textFaint,
                           ),
                         ),
-                        // The label appears only on the selected tab. Four
-                        // permanent 10px captions is what made this bar look
-                        // like a toolbar from another decade; the icons carry
-                        // the rest, and the one that matters says its name.
                         ClipRect(
                           child: AnimatedAlign(
                             duration: motionOff(context) ? Duration.zero : const Duration(milliseconds: 180),
@@ -916,13 +820,6 @@ class BottomNav extends StatelessWidget {
   }
 }
 
-/// A bottom bar with a raised action in the middle.
-///
-/// The centre button is not a sixth destination — it is the one thing a parent
-/// DOES rather than reads, and it sits apart because mixing an action into a
-/// row of destinations is how people tap it expecting a page. Two slots either
-/// side, which is as many as a thumb can reach without the bar becoming a
-/// menu.
 class CenterActionNav extends StatelessWidget {
   const CenterActionNav({
     super.key,
@@ -943,18 +840,12 @@ class CenterActionNav extends StatelessWidget {
   final IconData centerIcon;
   final VoidCallback onCenter;
 
-  /// A word inside the button. The driver's raised action is not "add
-  /// something" — it is the one thing the whole app exists to start, and a
-  /// naked icon does not say which.
   final String? centerLabel;
 
-  /// Index -> a dot on that item. A count is not shown: "you have something"
-  /// is the whole message, and a number invites arithmetic nobody wanted.
   final Map<int, bool> badges;
 
   static const _bar = 64.0;
 
-  /// How far the raised button rises above the bar.
   static const _lift = 10.0;
   static const _fab = 54.0;
 
@@ -967,8 +858,6 @@ class CenterActionNav extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
         child: SizedBox(
-          // Room above the bar for the part of the button that stands proud
-          // of it. Without it the raised action is clipped by the bar's box.
           height: _bar + _lift,
           child: Stack(
             alignment: Alignment.bottomCenter,
@@ -995,7 +884,6 @@ class CenterActionNav extends StatelessWidget {
                   child: Row(
                     children: [
                       for (var i = 0; i < half; i++) Expanded(child: _slot(i)),
-                      // The gap the raised button sits in.
                       SizedBox(width: _fab + 18),
                       for (var i = half; i < items.length; i++) Expanded(child: _slot(i)),
                     ],
@@ -1011,18 +899,9 @@ class CenterActionNav extends StatelessWidget {
                     width: _fab,
                     height: _fab,
                     decoration: BoxDecoration(
-                      // The role hue, not one fixed brand colour: the teacher
-                      // bar is green in the design and a violet button in it
-                      // would be the only violet on the screen.
                       color: tint,
                       shape: BoxShape.circle,
-                      // The ring is the page showing through, which is what
-                      // gives the bar its notch without cutting a hole in it.
                       border: Border.all(color: AppTheme.canvas, width: 3.5),
-                      // A neutral halo, as the design draws it. Tinting the
-                      // shadow with the button's own violet painted a coloured
-                      // crescent on the ring, which read as a second circle
-                      // rather than as depth.
                       boxShadow: AppTheme.dark
                           ? null
                           : const [
@@ -1061,7 +940,6 @@ class CenterActionNav extends StatelessWidget {
     );
   }
 
-  /// The slate the design draws an unselected mark in.
   static Color get _idle =>
       AppTheme.dark ? const Color(0xFFA8B0C0) : const Color(0xFF5B6478);
 
@@ -1069,14 +947,6 @@ class CenterActionNav extends StatelessWidget {
     final on = i == index;
     final item = items[i];
 
-    // Where you are is the colour of the icon and the word, and on the light
-    // canvas a short rule under them as well.
-    //
-    // The dark canvas had a tinted block behind the whole slot. It was there
-    // because a rule that reads on white disappears on navy — but the block
-    // was heavier than anything else in the bar, and against a dark ground the
-    // violet icon is already the brightest thing on the screen. It does not
-    // need a box drawn round it to be found.
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => onChanged(i),
@@ -1086,9 +956,6 @@ class CenterActionNav extends StatelessWidget {
           alignment: Alignment.center,
           children: [
             if (on && !AppTheme.dark)
-              // Clear of the bar's edge, and rounded on all four corners. Sat
-              // flush against the bottom it was sliced in half by the bar's
-              // own clip and read as a rendering fault rather than as a rule.
               PositionedDirectional(
                 bottom: 7,
                 child: Container(
@@ -1203,8 +1070,6 @@ class BigButton extends StatelessWidget {
   }
 }
 
-/// A tinted banner with a circular icon on the right — the teacher's
-/// "Today's Overview".
 class Banner2 extends StatelessWidget {
   const Banner2({
     super.key,
@@ -1257,14 +1122,6 @@ class Banner2 extends StatelessWidget {
   }
 }
 
-
-/// Opens the account drawer.
-///
-/// Sits beside the bell rather than replacing the avatar, and looks exactly
-/// like the bell, because the two do the same kind of thing: open something
-/// from the header. The account used to be a labelled tab in the bottom bar;
-/// moving it behind an icon means the icon has to be one people already read
-/// as "menu", not a chevron tucked onto a circle of initials.
 class _MenuButton extends StatelessWidget {
   const _MenuButton({required this.onTap});
 
@@ -1293,12 +1150,6 @@ class _MenuButton extends StatelessWidget {
   }
 }
 
-
-/// A tab that can be navigated INSIDE.
-///
-/// Wraps one bottom-bar destination in its own Navigator so pushes from that
-/// tab sit under the bar instead of over it. [key] must be stable per tab —
-/// it is what lets the shell ask "can this tab go back?" before the app does.
 class TabHost extends StatelessWidget {
   const TabHost({super.key, required this.navigatorKey, required this.child});
 
@@ -1317,16 +1168,6 @@ class TabHost extends StatelessWidget {
   }
 }
 
-/// Ask before doing something the person cannot undo.
-///
-/// Returns true only if they actually chose to go ahead — dismissing by tapping
-/// outside, or by the system back gesture, returns false rather than null, so a
-/// caller can never treat "they walked away" as "they agreed".
-///
-/// [tone] carries the weight: rose for something destructive, the role's own
-/// colour for something merely irreversible. The icon sits in a soft disc of
-/// that tone, which is the whole visual argument the dialog makes before
-/// anybody reads a word.
 Future<bool> confirmDialog(
   BuildContext context, {
   required IconData icon,
@@ -1341,8 +1182,6 @@ Future<bool> confirmDialog(
 
   final answer = await showDialog<bool>(
     context: context,
-    // The app's own dim rather than Material's near-black, which sits oddly
-    // over a page that is already dark.
     barrierColor: Colors.black.withValues(alpha: AppTheme.dark ? 0.62 : 0.34),
     builder: (context) => Dialog(
       backgroundColor: AppTheme.surface,
@@ -1385,8 +1224,6 @@ Future<bool> confirmDialog(
                   child: _ConfirmButton(
                     label: cancelLabel ?? t('common.cancel'),
                     icon: Icons.close_rounded,
-                    // Outlined, not filled: the safe answer should be the easy
-                    // one to hit and the quiet one to look at.
                     filled: false,
                     colour: AppTheme.violet,
                     onTap: () => Navigator.of(context).pop(false),
@@ -1413,10 +1250,6 @@ Future<bool> confirmDialog(
   return answer ?? false;
 }
 
-/// The disc the dialog opens with, and the specks around it.
-///
-/// The specks are decoration and nothing else — they are what stops a large
-/// flat circle reading as a loading state.
 class _ConfirmMark extends StatelessWidget {
   const _ConfirmMark({required this.icon, required this.colour});
 

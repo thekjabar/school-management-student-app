@@ -24,20 +24,11 @@ import 'student_info_screen.dart';
 import 'timetable_screen.dart';
 import 'track_screen.dart';
 
-/// The one screen a parent opens on the way out of the door.
-///
-/// Ordered by how quickly the answer goes stale. The bus is first because it is
-/// the only thing on this page that changes minute to minute and the only thing
-/// they can still act on; the register and the marks are yesterday's news by
-/// comparison and sit lower, however much a school cares about them.
 class HomeTab extends StatelessWidget {
   const HomeTab({super.key, required this.child, required this.onOpenTab});
 
   final Child child;
 
-  /// Asked for when a card leads somewhere the SHELL owns — the messages
-  /// tab, for instance. Anything that lives on the child's own screen is
-  /// pushed directly rather than routed through a tab index.
   final void Function(int tab) onOpenTab;
 
   @override
@@ -46,15 +37,9 @@ class HomeTab extends StatelessWidget {
       tint: Role.parent.tint,
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
       load: () async {
-        // One pass, all at once. Seven sequential round trips on a school
-        // connection is the difference between a screen and a wait.
         final payload = await HomePayload.fetch(child.studentId);
         return _Home.from(payload);
       },
-      // The six blocks arrive in the order they are read, a step apart. It is
-      // the page's own entrance and nothing more: it plays when the screen
-      // appears — see the latch in motion.dart — not every time the Loader
-      // refetches, or the screen would ripple at every poll.
       builder: (context, home) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -71,14 +56,6 @@ class HomeTab extends StatelessWidget {
             index: 1,
             child: QuickActions(
               actions: [
-                // First in the row, and off.
-                //
-                // It leads deliberately: this is the thing parents ask for, and
-                // putting it where the eye lands is the point of showing it at
-                // all. It is still disabled, because no vehicle has a camera
-                // fitted and there is no stream to open, and the note says that
-                // rather than "coming soon" — a promise nobody is in a position
-                // to make about hardware that has not been bought.
                 QuickAction(
                   icon: Icons.videocam_outlined,
                   label: t('quick.liveVideo'),
@@ -86,10 +63,6 @@ class HomeTab extends StatelessWidget {
                   enabled: false,
                   note: t('quick.liveVideoSoon'),
                 ),
-                // Beside the bus camera, not instead of it: two different
-                // rooms, two different pieces of hardware, two different
-                // installs. Off for the same honest reason — no classroom has
-                // a camera fitted yet — rather than a date nobody can promise.
                 QuickAction(
                   icon: Icons.cast_for_education_outlined,
                   label: t('quick.liveClassVideo'),
@@ -169,7 +142,6 @@ class HomeTab extends StatelessWidget {
           ),
           const SizedBox(height: kCardGap),
 
-          // ---- Today's schedule -------------------------------------------
           Rise(
             index: 2,
             child: Card16(
@@ -185,10 +157,6 @@ class HomeTab extends StatelessWidget {
                   if (home.today.isEmpty)
                     _Quiet(text: t('home.nothingToday'))
                   else
-                    // The lessons are NOT staggered inside the card. The rail
-                    // down the left is one continuous line through every dot,
-                    // and drawing it a row at a time reads as a list being cut
-                    // off rather than as a day arriving.
                     ScheduleTimeline(
                       onTap: (_) => _push(context, TimetableScreen(child: child)),
                       entries: [
@@ -208,26 +176,15 @@ class HomeTab extends StatelessWidget {
           ),
           const SizedBox(height: kCardGap),
 
-          // ---- What is coming ----------------------------------------------
-          //
-          // Straight under today's lessons, because "when is the maths exam" is
-          // asked in the same breath as "what has he got today" — and until the
-          // exams route was wired the app could not answer it anywhere.
           Rise(
             index: 3,
             child: _ExamsCard(exams: home.exams, onSeeAll: () => onOpenTab(2)),
           ),
           const SizedBox(height: kCardGap),
 
-          // ---- The child ---------------------------------------------------
           Rise(index: 4, child: _ChildCard(child: child, home: home)),
           const SizedBox(height: kCardGap),
 
-          // ---- Attendance, and what has happened ---------------------------
-          //
-          // Side by side, as the design has them. Two half-width cards read as
-          // "here is the summary" in one glance where two stacked full-width
-          // ones read as two more sections to scroll past.
           Rise(
             index: 5,
             child: IntrinsicHeight(
@@ -259,7 +216,6 @@ class HomeTab extends StatelessWidget {
   }
 }
 
-/// Everything the home screen needs, fetched together.
 class _Home {
   _Home({
     required this.transport,
@@ -271,8 +227,6 @@ class _Home {
     required this.exams,
   });
 
-  /// The same seven answers, however they arrived — fetched here, or prefetched
-  /// during the splash. The screen must not be able to tell the difference.
   factory _Home.from(HomePayload p) => _Home(
         transport: p.transport,
         week: p.week,
@@ -291,7 +245,6 @@ class _Home {
   final List<Announcement> announcements;
   final List<UpcomingExam> exams;
 
-  /// Today's lessons, in the order they happen.
   List<Lesson> get today {
     final name = todayWeekday();
     final day = week.where((d) => d.weekday == name).toList();
@@ -307,8 +260,6 @@ class _Home {
     return homework.where((h) => !h.handedIn && h.dueDate.difference(midnight).inDays <= 7).length;
   }
 
-  /// The average of whatever has been marked. Null rather than zero when
-  /// nothing has: a child with no marks yet has not scored nought.
   int? get averageMark {
     final marked = homework.where((h) => h.score != null && (h.maxScore ?? 0) > 0).toList();
     if (marked.isEmpty) return null;
@@ -319,10 +270,6 @@ class _Home {
     return (total / marked.length).round();
   }
 }
-
-/* ---------------------------------------------------------------------------
- * The bus
- * ------------------------------------------------------------------------- */
 
 class _BusCard extends StatelessWidget {
   const _BusCard({required this.child, required this.transport, required this.onTap});
@@ -362,8 +309,6 @@ class _BusCard extends StatelessWidget {
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          // Sampled from the design: a lavender barely off the page in the
-          // light theme, and a violet-leaning navy in the dark one.
           color: AppTheme.dark ? const Color(0xFF101627) : const Color(0xFFF7F3FF),
           borderRadius: BorderRadius.circular(kCardRadius),
           border: Border.all(
@@ -376,9 +321,6 @@ class _BusCard extends StatelessWidget {
             builder: (context, box) {
               return Stack(
                 children: [
-                  // The scene sits against the right edge and the text is held
-                  // clear of it; the house end of the picture is allowed to run
-                  // under nothing, which is why the column is the narrower half.
                   PositionedDirectional(
                     end: 0,
                     top: 0,
@@ -401,9 +343,6 @@ class _BusCard extends StatelessWidget {
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // The design draws this chip on the dark canvas
-                              // only: on white the violet title carries the
-                              // card without it.
                               if (AppTheme.dark) ...[
                                 Container(
                                   width: 34,
@@ -501,8 +440,6 @@ class _BusCard extends StatelessWidget {
     );
   }
 
-  /// The run that answers "where is my child now" — the afternoon one once it
-  /// is under way, the morning one until then.
   TripToday? get _liveRun {
     if (transport.today.isEmpty) return null;
     final back = transport.today.where((t) => t.leg == 'RETURN').toList();
@@ -513,10 +450,6 @@ class _BusCard extends StatelessWidget {
     return out.isNotEmpty ? out.first : transport.today.first;
   }
 }
-
-/* ---------------------------------------------------------------------------
- * The child
- * ------------------------------------------------------------------------- */
 
 class _ChildCard extends StatelessWidget {
   const _ChildCard({required this.child, required this.home});
@@ -651,11 +584,6 @@ class _ProfileButton extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Attendance
- * ------------------------------------------------------------------------- */
-
-/// How much of a window a period covers, and what to call it.
 enum _Period { week, month, term }
 
 class _AttendanceCard extends StatefulWidget {
@@ -663,8 +591,6 @@ class _AttendanceCard extends StatefulWidget {
 
   final Child child;
 
-  /// What came with the home payload: the term, which is what the endpoint
-  /// answers when it is asked for no window at all.
   final AttendanceSummary summary;
 
   @override
@@ -674,17 +600,12 @@ class _AttendanceCard extends StatefulWidget {
 class _AttendanceCardState extends State<_AttendanceCard> {
   _Period _period = _Period.week;
 
-  /// Null until a different window has been fetched. The term figure arrives
-  /// with the page, so the first frame costs no request.
   AttendanceSummary? _fetched;
   bool _busy = false;
 
   @override
   void initState() {
     super.initState();
-    // The card opens on the week, which is the number a parent checks; the
-    // payload carries the term. So one request, once, rather than a figure
-    // whose caption says one thing and whose value means another.
     _load(_Period.week);
   }
 
@@ -698,10 +619,8 @@ class _AttendanceCardState extends State<_AttendanceCard> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     return switch (p) {
-      // Monday of this week. weekday is 1..7 with Monday at 1.
       _Period.week => (from: today.subtract(Duration(days: today.weekday - 1)), to: today),
       _Period.month => (from: DateTime(today.year, today.month, 1), to: today),
-      // No window: the endpoint answers for the term, which is its default.
       _Period.term => (from: null, to: null),
     };
   }
@@ -725,7 +644,6 @@ class _AttendanceCardState extends State<_AttendanceCard> {
       });
     } catch (e) {
       if (!mounted) return;
-      // The figure on screen stays as it was rather than emptying itself.
       setState(() => _busy = false);
       showNote(context, errorText(e), bad: true);
     }
@@ -845,24 +763,11 @@ class _Tally extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Exams ahead
- * ------------------------------------------------------------------------- */
-
-/// The dates a family has to plan around.
-///
-/// Read-only, deliberately. There is no exam a guardian may open: the only
-/// detail route the school service has is permission-guarded and the guardian
-/// role carries no permissions at all, so a row that led anywhere would lead to
-/// a 403. Everything the school said about the exam is therefore ON the row.
 class _ExamsCard extends StatelessWidget {
   const _ExamsCard({required this.exams, required this.onSeeAll});
 
   final List<UpcomingExam> exams;
 
-  /// The calendar tab, which now carries every one of these on its own date.
-  /// The endpoint caps at fifty with no paging, so this is the only "more"
-  /// there is — and it goes to a screen that already exists.
   final VoidCallback onSeeAll;
 
   @override
@@ -870,10 +775,6 @@ class _ExamsCard extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    // Cut again against LOCAL midnight. The server cuts at UTC midnight and
-    // Erbil is three hours ahead of it, so for the first three hours of the day
-    // yesterday's exam is still in the answer — and "yesterday" under a heading
-    // that says upcoming is worse than one row fewer.
     final ahead = [
       for (final e in exams)
         if (!DateTime(e.date.year, e.date.month, e.date.day).isBefore(today)) e,
@@ -890,9 +791,6 @@ class _ExamsCard extends StatelessWidget {
             actionLabel: shown.isEmpty ? null : t('home.viewAll'),
             onAction: onSeeAll,
           ),
-          // Empty is ORDINARY, not a failure. A child between classes has no
-          // class for an exam to hang on and the server answers with an empty
-          // list, so this stays quiet rather than showing something wrong.
           if (shown.isEmpty)
             _Quiet(text: t('home.noExams'))
           else
@@ -919,15 +817,11 @@ class _ExamRow extends StatelessWidget {
 
   final UpcomingExam exam;
 
-  /// Whole days from today. Never negative — the card filters those out.
   final int days;
 
   @override
   Widget build(BuildContext context) {
-    // The subject's own colour, as the timetable and the calendar already use
-    // it, so a row is recognised before it is read.
     final colour = parseHex(exam.colorHex, Role.parent.tint);
-    // Tomorrow is the one a family still has an evening to do something about.
     final urgent = days <= 1;
     final chip = urgent ? AppTheme.rose : Role.parent.tint;
 
@@ -937,8 +831,6 @@ class _ExamRow extends StatelessWidget {
       if (kindKey != null) t(kindKey),
     ].join('  •  ');
 
-    // One line, one flexible child: the day, then whatever else the school
-    // filled in. Any of the three can be missing and the line still reads.
     final line = [
       longDate(exam.date),
       if (exam.startMinute != null) clock(exam.startMinute),
@@ -969,9 +861,6 @@ class _ExamRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      // The server's title is nullable and there is no English
-                      // word to fall back on: the subject is what the school
-                      // would have called it anyway.
                       exam.title ?? exam.subject,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1027,10 +916,6 @@ class _ExamRow extends StatelessWidget {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Recent updates
- * ------------------------------------------------------------------------- */
-
 class _UpdatesCard extends StatelessWidget {
   const _UpdatesCard({required this.home, required this.child, required this.onSeeAll});
 
@@ -1042,7 +927,6 @@ class _UpdatesCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final entries = <UpdateEntry>[];
 
-    // Newest first, across every kind — a parent does not think in sources.
     for (final a in home.attitude.notes.take(1)) {
       entries.add(UpdateEntry(
         icon: a.isMerit ? Icons.star_rounded : Icons.error_outline_rounded,
@@ -1098,10 +982,6 @@ class _UpdatesCard extends StatelessWidget {
     );
   }
 }
-
-/* ---------------------------------------------------------------------------
- * Small shared bits
- * ------------------------------------------------------------------------- */
 
 class _Quiet extends StatelessWidget {
   const _Quiet({required this.text});

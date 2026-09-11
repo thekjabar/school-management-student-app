@@ -11,16 +11,6 @@ import '../../ui/kit.dart';
 import '../../ui/motion.dart';
 import 'leave_screen.dart';
 
-/// Every child on this account, with the one number that matters next to each.
-///
-/// A family with three at the school gets three cards rather than a picker they
-/// have to work through one at a time — this is the screen for "how are they
-/// all doing", which the home screen deliberately cannot answer.
-///
-/// The card is the home screen's child card with a bus line and two actions
-/// under it: the same gutter, the same gap, the same ringed avatar, the same
-/// figure strip. It is the same child in the same product, so it is the same
-/// card.
 class ChildrenTab extends StatelessWidget {
   const ChildrenTab({super.key, required this.children, required this.selected});
 
@@ -31,14 +21,8 @@ class ChildrenTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Loader<Map<String, _Snapshot>>(
       tint: Role.parent.tint,
-      // The page gutter and the gap between cards are the kit's, not this
-      // screen's own: a 16 gutter beside every other screen's 14 is visible the
-      // moment somebody moves between them.
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20),
       load: () async {
-        // One pass per child, all in flight together. Three children on a slow
-        // cell is three round trips either way; doing them in sequence just
-        // makes the parent wait three times as long.
         final entries = await Future.wait(
           children.map((c) async {
             final r = await Future.wait([
@@ -63,8 +47,6 @@ class ChildrenTab extends StatelessWidget {
         children: [
           for (var i = 0; i < children.length; i++) ...[
             if (i > 0) const SizedBox(height: kCardGap),
-            // The entrance every other stack of cards in the app arrives with:
-            // a step apart, and capped, so a family of five does not queue.
             Rise(
               index: i,
               child: _ChildCard(
@@ -86,13 +68,11 @@ class _Snapshot {
   final TransportInfo transport;
   final List<HomeworkItem> homework;
 
-  /// What is happening to this child on the bus right now, in one line.
   String get busLine {
     if (!transport.ridesTheBus) return t('children.notOnBus');
     if (transport.today.isEmpty) return t('children.noBusToday');
     final out = transport.today.where((t) => t.leg == 'OUT').firstOrNull;
     final back = transport.today.where((t) => t.leg == 'RETURN').firstOrNull;
-    // The afternoon run is the live question after the morning one is done.
     if (back != null && (back.boardedAt != null || back.status == 'IN_PROGRESS')) {
       return '${t('children.homeRun')} · ${t(back.childLineKey).toLowerCase()}';
     }
@@ -131,11 +111,6 @@ class _ChildCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              // Ringed and tinted, the way the home screen and every pushed
-              // screen draw a child. Left untinted, CircleInitials hashes the
-              // name into a hue of its own — so this one card came out pink in
-              // an app that is violet throughout, which is most of why the
-              // screen did not look like the others.
               Container(
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
@@ -177,11 +152,6 @@ class _ChildCard extends StatelessWidget {
           const SizedBox(height: 12),
           Container(height: 1, color: AppTheme.border),
           const SizedBox(height: 12),
-          // The strip the home screen, the profile and the attendance screen
-          // all use for a child's figures — the only screen still on the plain
-          // one was this. Each glyph carries the colour the caption used to
-          // carry: green while the register is healthy, amber when it is not,
-          // amber while something is due.
           IconFigureStrip(
             figures: [
               IconFigure(
@@ -214,10 +184,6 @@ class _ChildCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          // A fact inside a card sits on the page's own ground inside a
-          // hairline — the kit's StatBox, the attendance tallies and the leave
-          // screen's date field are all this shape. This was a bare canvas
-          // block with no edge, which on the dark theme is no edge at all.
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
@@ -274,24 +240,12 @@ class _ChildCard extends StatelessWidget {
   }
 }
 
-/// One of the two actions at the foot of a child's card.
-///
-/// The kit has BigButton for the single thing a screen is about, and the home
-/// screen's tinted chip for one action on a card; it has nothing for a PAIR
-/// sitting side by side, so this is that shape drawn from the same tokens — a
-/// soft tint for the action the card is for, the page's own ground inside a
-/// hairline for the quieter one.
-///
-/// Not an OutlinedButton: that arrives with its own radius, its own height and
-/// its own grey, and none of the three are the app's. Correcting all of them by
-/// hand at the call site is what left this screen looking like somebody else's.
 class _CardAction extends StatelessWidget {
   const _CardAction({required this.label, required this.onTap, this.tint});
 
   final String label;
   final VoidCallback onTap;
 
-  /// Set on the action the card is for. Left off, the button stays quiet.
   final Color? tint;
 
   @override

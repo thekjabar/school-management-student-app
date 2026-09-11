@@ -10,12 +10,6 @@ import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import 'homework_detail.dart';
 
-/// Everything the school has set, in the order it falls due.
-///
-/// The tabs are the four states a piece of work can be in, and the top card is
-/// only ever the ones still ahead — because a parent opening this screen is
-/// asking "what does he still have to do", and a list that mixes that with six
-/// weeks of marked work answers a different question.
 class AssignmentsScreen extends StatefulWidget {
   const AssignmentsScreen({super.key, required this.child});
 
@@ -287,8 +281,6 @@ class _Row extends StatelessWidget {
   Widget build(BuildContext context) {
     final colour = parseHex(item.colorHex, AppTheme.violet);
 
-    // The pill carries the urgency, and its colour is the whole reason a parent
-    // can read this list without doing date arithmetic in their head.
     final (word, chipColour) = item.score != null
         ? (t('hw.marked'), AppTheme.blue)
         : item.handedIn
@@ -372,8 +364,6 @@ class _Row extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // The design capitalises these; the shared due-word strings are
-            // written for mid-sentence use.
             StatusChip(_caps(word), color: chipColour),
                 const SizedBox(height: 4),
                 Text(

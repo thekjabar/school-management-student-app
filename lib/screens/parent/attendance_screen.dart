@@ -9,12 +9,6 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 
-/// The register, as a month rather than a tally.
-///
-/// The four figures answer "is this a problem"; the calendar answers "when",
-/// which is the question a parent asks next and the one a percentage cannot.
-/// Absences are the only days the school records individually, so every other
-/// school day in the past is drawn present — which is what the register means.
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key, required this.child});
 
@@ -77,8 +71,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             ),
                             IconFigure(
                               icon: Icons.track_changes_rounded,
-                              // 'Rate' rather than 'Attendance rate': the strip
-                              // gives each label a quarter of a phone.
                               label: t('att.rateShort'),
                               value: a.total > 0 ? '${a.ratePercent}%' : '—',
                               caption: t('att.thisTerm'),
@@ -136,10 +128,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * The month
- * ------------------------------------------------------------------------- */
-
 class _MonthCard extends StatelessWidget {
   const _MonthCard({
     required this.month,
@@ -151,8 +139,6 @@ class _MonthCard extends StatelessWidget {
   final DateTime month;
   final AttendanceSummary summary;
 
-  /// Overview puts the legend and the ring beside the grid; the calendar tab
-  /// gives the grid the whole card.
   final bool compact;
 
   final ValueChanged<DateTime> onMonth;
@@ -205,8 +191,6 @@ class _Grid extends StatelessWidget {
   final AttendanceSummary summary;
   final ValueChanged<DateTime> onMonth;
 
-  /// Sunday first — the school week here starts on Sunday, and a grid that
-  /// starts on Monday puts the weekend in the middle of the row.
   static const _weekStart = DateTime.sunday;
 
   @override
@@ -216,7 +200,6 @@ class _Grid extends StatelessWidget {
     final first = DateTime(month.year, month.month);
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
 
-    // How many blanks before the 1st.
     final lead = (first.weekday - _weekStart + 7) % 7;
 
     final marks = <int, String>{};
@@ -287,9 +270,6 @@ class _Grid extends StatelessWidget {
     );
   }
 
-  /// Seven of these share the width of a phone, so the whole word cannot fit.
-  /// The short phrase is written out per language rather than cut from the
-  /// long one — cutting is what turned Kurdish Friday into a non-word.
   String _weekdayShort(int weekday) => t('dayShort.$weekday');
 }
 
@@ -341,7 +321,6 @@ class _Cell extends StatelessWidget {
 
     final date = DateTime(month.year, month.month, day);
     final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
-    // Friday and Saturday are the weekend here.
     final weekend = date.weekday == DateTime.friday || date.weekday == DateTime.saturday;
     final past = !date.isAfter(DateTime(now.year, now.month, now.day));
 
@@ -450,10 +429,6 @@ class _Legend extends StatelessWidget {
     );
   }
 }
-
-/* ---------------------------------------------------------------------------
- * Recent, and the numbers behind it
- * ------------------------------------------------------------------------- */
 
 class _RecentCard extends StatelessWidget {
   const _RecentCard({required this.summary});
