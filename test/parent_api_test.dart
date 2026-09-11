@@ -370,6 +370,52 @@ void main() {
     }
   });
 
+  test('the household parses, and today is ordered across the children', () async {
+    final overview = await ParentApi.instance.household();
+    expect(overview.households, isNotEmpty);
+    for (final group in overview.households) {
+      expect(group.familyId, isNotEmpty);
+      for (final child in group.children) {
+        expect(child.studentId, isNotEmpty);
+        expect(child.name, isNotEmpty);
+        if (child.stopsHidden) {
+          for (final ride in child.rides) {
+            expect(ride.pickupStop, isNull, reason: 'a hidden stop must not arrive anyway');
+            expect(ride.dropoffStop, isNull);
+          }
+        }
+      }
+    }
+
+    final day = await ParentApi.instance.householdDay();
+    expect(day.date, isNotEmpty);
+    var previous = DateTime.utc(1970);
+    for (final event in day.events) {
+      expect(event.childName, isNotEmpty);
+      final at = event.at;
+      expect(at, isNotNull, reason: 'an event with no time cannot be placed on the timeline');
+      expect(
+        at!.isBefore(previous),
+        isFalse,
+        reason: 'the server sorts these, so the screen renders them straight down',
+      );
+      previous = at;
+    }
+    for (final overlap in day.overlaps) {
+      expect(overlap.minutesApart, greaterThanOrEqualTo(0));
+      expect(overlap.a.childName, isNot(overlap.b.childName), reason: 'a child cannot clash with itself');
+    }
+
+    final conflicts = await ParentApi.instance.householdConflicts();
+    for (final row in conflicts.households) {
+      expect(row.ok, row.conflicts.isEmpty, reason: 'ok and the list must agree');
+      for (final problem in [...row.conflicts, ...row.notes]) {
+        expect(problem.code, isNotEmpty);
+        expect(problem.message, isNotEmpty, reason: 'the code is translated, the message is the fallback');
+      }
+    }
+  });
+
   test('a wrong password is reported as one, not as something else', () async {
     try {
       await Session.instance.signIn(phone, 'not-the-password');

@@ -1359,6 +1359,387 @@ class TripToday {
   }
 }
 
+int _hhInt(dynamic v) => (v as num?)?.toInt() ?? 0;
+bool _hhBool(dynamic v) => (v ?? false) as bool;
+Map<String, dynamic>? _hhObj(dynamic v) => v is Map<String, dynamic> ? v : null;
+List<Map<String, dynamic>> _hhList(dynamic v) => (v as List?)
+        ?.whereType<Map<String, dynamic>>()
+        .toList(growable: false) ??
+    const <Map<String, dynamic>>[];
+String? _hhName(dynamic v) => _hhObj(v)?['name'] as String?;
+
+class SchoolContact {
+  SchoolContact({required this.name, required this.phone});
+
+  final String name;
+  final String? phone;
+
+  factory SchoolContact.fromJson(Map<String, dynamic>? j) => SchoolContact(
+        name: (j?['name'] ?? '') as String,
+        phone: j?['phone'] as String?,
+      );
+}
+
+class SiblingRules {
+  SiblingRules({
+    required this.releaseRule,
+    required this.mustShareRoute,
+    required this.mustShareVehicle,
+    required this.enforcedAtHandover,
+  });
+
+  final String releaseRule;
+  final bool mustShareRoute;
+  final bool mustShareVehicle;
+  final bool enforcedAtHandover;
+
+  bool get anySet =>
+      releaseRule != 'NONE' || mustShareRoute || mustShareVehicle;
+
+  factory SiblingRules.fromJson(Map<String, dynamic>? j) => SiblingRules(
+        releaseRule: (j?['siblingReleaseRule'] ?? 'NONE') as String,
+        mustShareRoute: _hhBool(j?['siblingsMustShareRoute']),
+        mustShareVehicle: _hhBool(j?['siblingsMustShareVehicle']),
+        enforcedAtHandover: _hhBool(j?['enforcedAtHandover']),
+      );
+}
+
+class HouseholdRide {
+  HouseholdRide({
+    required this.legScope,
+    required this.routeCode,
+    required this.routeName,
+    required this.pickupStop,
+    required this.dropoffStop,
+  });
+
+  final String legScope;
+  final String? routeCode;
+  final String? routeName;
+  final String? pickupStop;
+  final String? dropoffStop;
+
+  factory HouseholdRide.fromJson(Map<String, dynamic> j) => HouseholdRide(
+        legScope: (j['legScope'] ?? '') as String,
+        routeCode: _hhObj(j['route'])?['code'] as String?,
+        routeName: _hhName(j['route']),
+        pickupStop: _hhName(j['pickupStop']),
+        dropoffStop: _hhName(j['dropoffStop']),
+      );
+}
+
+class HouseholdChild {
+  HouseholdChild({
+    required this.studentId,
+    required this.name,
+    required this.className,
+    required this.campusName,
+    required this.shift,
+    required this.ridesTheBus,
+    required this.stopsHidden,
+    required this.receivesRoutineAlerts,
+    required this.escortName,
+    required this.escortHidden,
+    required this.rides,
+  });
+
+  final String studentId;
+  final String name;
+  final String? className;
+  final String? campusName;
+  final String? shift;
+  final bool ridesTheBus;
+  final bool stopsHidden;
+  final bool receivesRoutineAlerts;
+  final String? escortName;
+  final bool escortHidden;
+  final List<HouseholdRide> rides;
+
+  factory HouseholdChild.fromJson(Map<String, dynamic> j) => HouseholdChild(
+        studentId: (j['studentId'] ?? '') as String,
+        name: (j['name'] ?? '') as String,
+        className: (j['className'] ?? j['gradeLabel']) as String?,
+        campusName: _hhName(j['campus']),
+        shift: j['shift'] as String?,
+        ridesTheBus: _hhBool(j['ridesTheBus']),
+        stopsHidden: _hhBool(j['stopsHidden']),
+        receivesRoutineAlerts: _hhBool(j['receivesRoutineAlerts']),
+        escortName: _hhName(j['releaseEscort']),
+        escortHidden: _hhBool(j['escortNamedButNotOnYourAccount']),
+        rides: _hhList(j['transport']).map(HouseholdRide.fromJson).toList(growable: false),
+      );
+}
+
+class HouseholdGroup {
+  HouseholdGroup({
+    required this.familyId,
+    required this.code,
+    required this.name,
+    required this.rules,
+    required this.children,
+  });
+
+  final String familyId;
+  final String code;
+  final String name;
+  final SiblingRules rules;
+  final List<HouseholdChild> children;
+
+  factory HouseholdGroup.fromJson(Map<String, dynamic> j) => HouseholdGroup(
+        familyId: (j['familyId'] ?? '') as String,
+        code: (j['code'] ?? '') as String,
+        name: (j['name'] ?? '') as String,
+        rules: SiblingRules.fromJson(_hhObj(j['rules'])),
+        children: _hhList(j['children']).map(HouseholdChild.fromJson).toList(growable: false),
+      );
+}
+
+class HouseholdOverview {
+  HouseholdOverview({
+    required this.school,
+    required this.childCount,
+    required this.truncated,
+    required this.maxChildren,
+    required this.households,
+  });
+
+  final SchoolContact school;
+  final int childCount;
+  final bool truncated;
+  final int maxChildren;
+  final List<HouseholdGroup> households;
+
+  factory HouseholdOverview.fromJson(Map<String, dynamic> j) => HouseholdOverview(
+        school: SchoolContact.fromJson(_hhObj(j['school'])),
+        childCount: _hhInt(j['childCount']),
+        truncated: _hhBool(j['truncated']),
+        maxChildren: _hhInt(j['maxChildren']),
+        households: _hhList(j['households']).map(HouseholdGroup.fromJson).toList(growable: false),
+      );
+}
+
+class DayChild {
+  DayChild({
+    required this.studentId,
+    required this.name,
+    required this.campusName,
+    required this.ridesToday,
+    required this.bellTimesKnown,
+    required this.dayKind,
+    required this.closed,
+    required this.transportRunning,
+    required this.note,
+  });
+
+  final String studentId;
+  final String name;
+  final String? campusName;
+  final bool ridesToday;
+  final bool bellTimesKnown;
+  final String? dayKind;
+  final bool closed;
+  final bool transportRunning;
+  final String? note;
+
+  factory DayChild.fromJson(Map<String, dynamic> j) {
+    final day = _hhObj(j['schoolDay']);
+    return DayChild(
+      studentId: (j['studentId'] ?? '') as String,
+      name: (j['name'] ?? '') as String,
+      campusName: _hhName(j['campus']),
+      ridesToday: _hhBool(j['ridesToday']),
+      bellTimesKnown: _hhBool(j['bellTimesKnown']),
+      dayKind: day?['kind'] as String?,
+      closed: _hhBool(day?['closed']),
+      transportRunning: day == null ? true : _hhBool(day['transportRunning']),
+      note: day?['note'] as String?,
+    );
+  }
+}
+
+class DayEvent {
+  DayEvent({
+    required this.at,
+    required this.kind,
+    required this.childName,
+    required this.placeName,
+    required this.routeName,
+    required this.tripId,
+    required this.tripStatus,
+    required this.actualAt,
+    required this.status,
+  });
+
+  final DateTime? at;
+  final String kind;
+  final String childName;
+  final String? placeName;
+  final String? routeName;
+  final String? tripId;
+  final String? tripStatus;
+  final DateTime? actualAt;
+  final String status;
+
+  bool get cancelled => tripStatus == 'CANCELLED';
+
+  factory DayEvent.fromJson(Map<String, dynamic> j) => DayEvent(
+        at: HomeArrival._at(j['atUtc']),
+        kind: (j['kind'] ?? '') as String,
+        childName: (j['childName'] ?? '') as String,
+        placeName: (j['stopName'] ?? j['campusName']) as String?,
+        routeName: j['routeName'] as String?,
+        tripId: j['tripId'] as String?,
+        tripStatus: j['tripStatus'] as String?,
+        actualAt: HomeArrival._at(j['actualAt']),
+        status: (j['status'] ?? '') as String,
+      );
+}
+
+class DayOverlapSide {
+  DayOverlapSide({required this.childName, required this.kind, required this.at, required this.placeName});
+
+  final String childName;
+  final String kind;
+  final DateTime? at;
+  final String? placeName;
+
+  factory DayOverlapSide.fromJson(Map<String, dynamic>? j) => DayOverlapSide(
+        childName: (j?['childName'] ?? '') as String,
+        kind: (j?['kind'] ?? '') as String,
+        at: HomeArrival._at(j?['atUtc']),
+        placeName: j?['placeName'] as String?,
+      );
+}
+
+class DayOverlap {
+  DayOverlap({required this.minutesApart, required this.a, required this.b});
+
+  final int minutesApart;
+  final DayOverlapSide a;
+  final DayOverlapSide b;
+
+  factory DayOverlap.fromJson(Map<String, dynamic> j) => DayOverlap(
+        minutesApart: _hhInt(j['minutesApart']),
+        a: DayOverlapSide.fromJson(_hhObj(j['a'])),
+        b: DayOverlapSide.fromJson(_hhObj(j['b'])),
+      );
+}
+
+class DayWithoutTime {
+  DayWithoutTime({required this.studentId, required this.childName, required this.reason});
+
+  final String studentId;
+  final String childName;
+  final String reason;
+
+  factory DayWithoutTime.fromJson(Map<String, dynamic> j) => DayWithoutTime(
+        studentId: (j['studentId'] ?? '') as String,
+        childName: (j['childName'] ?? '') as String,
+        reason: (j['reason'] ?? '') as String,
+      );
+}
+
+class HouseholdDay {
+  HouseholdDay({
+    required this.school,
+    required this.date,
+    required this.isToday,
+    required this.children,
+    required this.events,
+    required this.overlaps,
+    required this.withoutTimes,
+  });
+
+  final SchoolContact school;
+  final String date;
+  final bool isToday;
+  final List<DayChild> children;
+  final List<DayEvent> events;
+  final List<DayOverlap> overlaps;
+  final List<DayWithoutTime> withoutTimes;
+
+  factory HouseholdDay.fromJson(Map<String, dynamic> j) => HouseholdDay(
+        school: SchoolContact.fromJson(_hhObj(j['school'])),
+        date: (j['date'] ?? '') as String,
+        isToday: _hhBool(j['isToday']),
+        children: _hhList(j['children']).map(DayChild.fromJson).toList(growable: false),
+        events: _hhList(j['events']).map(DayEvent.fromJson).toList(growable: false),
+        overlaps: _hhList(j['overlaps']).map(DayOverlap.fromJson).toList(growable: false),
+        withoutTimes: _hhList(j['withoutTimes']).map(DayWithoutTime.fromJson).toList(growable: false),
+      );
+}
+
+class HouseholdConflict {
+  HouseholdConflict({
+    required this.code,
+    required this.childName,
+    required this.routeCount,
+    required this.vehicleCount,
+    required this.message,
+  });
+
+  final String code;
+  final String? childName;
+  final int? routeCount;
+  final int? vehicleCount;
+  final String message;
+
+  factory HouseholdConflict.fromJson(Map<String, dynamic> j) => HouseholdConflict(
+        code: (j['code'] ?? '') as String,
+        childName: j['childName'] as String?,
+        routeCount: (j['routeCount'] as num?)?.toInt(),
+        vehicleCount: (j['vehicleCount'] as num?)?.toInt(),
+        message: (j['message'] ?? '') as String,
+      );
+}
+
+class ConflictHousehold {
+  ConflictHousehold({
+    required this.familyId,
+    required this.name,
+    required this.ok,
+    required this.childrenRiding,
+    required this.distinctRoutes,
+    required this.distinctVehicles,
+    required this.conflicts,
+    required this.notes,
+  });
+
+  final String familyId;
+  final String name;
+  final bool ok;
+  final int childrenRiding;
+  final int distinctRoutes;
+  final int distinctVehicles;
+  final List<HouseholdConflict> conflicts;
+  final List<HouseholdConflict> notes;
+
+  factory ConflictHousehold.fromJson(Map<String, dynamic> j) => ConflictHousehold(
+        familyId: (j['familyId'] ?? '') as String,
+        name: (j['name'] ?? '') as String,
+        ok: _hhBool(j['ok']),
+        childrenRiding: _hhInt(j['childrenRiding']),
+        distinctRoutes: _hhInt(j['distinctRoutes']),
+        distinctVehicles: _hhInt(j['distinctVehicles']),
+        conflicts: _hhList(j['conflicts']).map(HouseholdConflict.fromJson).toList(growable: false),
+        notes: _hhList(j['notes']).map(HouseholdConflict.fromJson).toList(growable: false),
+      );
+}
+
+class HouseholdConflicts {
+  HouseholdConflicts({required this.school, required this.ok, required this.households});
+
+  final SchoolContact school;
+  final bool ok;
+  final List<ConflictHousehold> households;
+
+  factory HouseholdConflicts.fromJson(Map<String, dynamic> j) => HouseholdConflicts(
+        school: SchoolContact.fromJson(_hhObj(j['school'])),
+        ok: _hhBool(j['ok']),
+        households: _hhList(j['households']).map(ConflictHousehold.fromJson).toList(growable: false),
+      );
+}
+
 class RouteSafety {
   RouteSafety({
     required this.ridesTheBus,
@@ -1915,6 +2296,22 @@ class ParentApi {
       if (address != null) 'address': address.trim(),
       if (note != null) 'note': note.trim(),
     });
+  }
+
+  Future<HouseholdOverview> household() async {
+    final json = await _api.get('/parent/household') as Map<String, dynamic>;
+    return HouseholdOverview.fromJson(json);
+  }
+
+  Future<HouseholdDay> householdDay({String? date}) async {
+    final query = date == null ? '' : '?date=$date';
+    final json = await _api.get('/parent/household/day$query') as Map<String, dynamic>;
+    return HouseholdDay.fromJson(json);
+  }
+
+  Future<HouseholdConflicts> householdConflicts() async {
+    final json = await _api.get('/parent/household/conflicts') as Map<String, dynamic>;
+    return HouseholdConflicts.fromJson(json);
   }
 
   Future<RouteSafety> routeSafety(String studentId, {int days = 30}) async {
