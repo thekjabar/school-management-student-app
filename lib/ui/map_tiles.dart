@@ -32,7 +32,7 @@ class MapTiles {
 
   static TileLayer layer() => TileLayer(
         urlTemplate:
-            'https://api.mapbox.com/styles/v1/$_rasterStyle/tiles/512/{z}/{x}/{y}@2x'
+            'https://api.mapbox.com/styles/v1/$_rasterStyle/tiles/256/{z}/{x}/{y}@2x'
             '?access_token=$token',
         errorTileCallback: (_, _, _) {
           WidgetsBinding.instance.addPostFrameCallback((_) => trouble.value = true);
@@ -43,8 +43,8 @@ class MapTiles {
           }
           return tileWidget;
         },
-        tileDimension: 512,
-        zoomOffset: -1,
+        tileDimension: 256,
+        zoomOffset: 0,
         userAgentPackageName: 'com.kurdistanstudentprotection.ksp',
         maxNativeZoom: 20,
       );
