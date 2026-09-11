@@ -9,6 +9,7 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/motion.dart';
+import 'attendance_screen.dart';
 import 'leave_screen.dart';
 
 class ChildrenTab extends StatelessWidget {
@@ -29,6 +30,7 @@ class ChildrenTab extends StatelessWidget {
               ParentApi.instance.attendance(c.studentId),
               ParentApi.instance.transport(c.studentId),
               ParentApi.instance.homework(c.studentId),
+              ParentApi.instance.attendanceTrend(c.studentId),
             ]);
             return MapEntry(
               c.studentId,
@@ -36,6 +38,7 @@ class ChildrenTab extends StatelessWidget {
                 attendance: r[0] as AttendanceSummary,
                 transport: r[1] as TransportInfo,
                 homework: r[2] as List<HomeworkItem>,
+                trend: r[3] as AttendanceTrend,
               ),
             );
           }),
@@ -62,11 +65,17 @@ class ChildrenTab extends StatelessWidget {
 }
 
 class _Snapshot {
-  _Snapshot({required this.attendance, required this.transport, required this.homework});
+  _Snapshot({
+    required this.attendance,
+    required this.transport,
+    required this.homework,
+    required this.trend,
+  });
 
   final AttendanceSummary attendance;
   final TransportInfo transport;
   final List<HomeworkItem> homework;
+  final AttendanceTrend trend;
 
   String get busLine {
     if (!transport.ridesTheBus) return t('children.notOnBus');
@@ -96,10 +105,10 @@ class _ChildCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tint = Role.parent.tint;
-    final rate = snap?.attendance.ratePercent;
-    final marked = (snap?.attendance.total ?? 0) > 0;
+    final trend = snap?.trend;
+    final marked = (trend?.daysMarked ?? 0) > 0;
     final dueSoon = snap?.dueSoon ?? 0;
-    final onTrack = (rate ?? 100) >= 95;
+    final look = attendanceBand(trend?.band);
 
     return Card16(
       padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
@@ -157,11 +166,11 @@ class _ChildCard extends StatelessWidget {
               IconFigure(
                 icon: Icons.verified_user_outlined,
                 label: t('home.attendance'),
-                value: marked ? '$rate%' : '—',
+                value: percent(trend?.attendanceRate),
                 caption: marked
-                    ? tn('children.absent', snap!.attendance.absent)
+                    ? tv('att.missedShort', {'n': percent(trend!.missedPercent)})
                     : t('home.notMarked'),
-                color: onTrack ? AppTheme.green : AppTheme.amber,
+                color: marked ? look.colour : AppTheme.textMuted,
               ),
               IconFigure(
                 icon: Icons.assignment_outlined,

@@ -106,6 +106,48 @@ void main() {
     expect(a.present + a.absent + a.late + a.excused, lessThanOrEqualTo(a.total + 1));
   });
 
+  test('the attendance trend carries a band and a caption the screen can use', () async {
+    final trend = await ParentApi.instance.attendanceTrend(child.studentId);
+
+    expect(
+      ['OK', 'WATCH', 'CONCERN', 'UNKNOWN'],
+      contains(trend.band),
+      reason: 'the banner takes its colour and wording from band alone',
+    );
+    expect(
+      trend.termName != null || (trend.from != null && trend.to != null),
+      isTrue,
+      reason: 'every figure is captioned from the response, never from a hardcoded term',
+    );
+
+    if (trend.daysMarked == 0) {
+      expect(trend.missedPercent, isNull, reason: 'nothing marked is not nought per cent');
+      expect(trend.attendanceRate, isNull);
+      expect(trend.band, 'UNKNOWN');
+    } else {
+      expect(trend.missedPercent, inInclusiveRange(0, 100));
+      expect(trend.attendanceRate, inInclusiveRange(0, 100));
+      expect(
+        trend.daysMissed,
+        trend.absent + trend.excused,
+        reason: 'missed must mean what the office means by it',
+      );
+    }
+
+    for (final m in trend.byMonth) {
+      expect(
+        m.monthNumber,
+        inInclusiveRange(1, 12),
+        reason: 'the bar label reads monthShort.<n>, so n must be a real month',
+      );
+    }
+
+    if (trend.direction != null) {
+      expect(['BETTER', 'WORSE', 'SAME'], contains(trend.direction));
+      expect(trend.previous, isNotNull, reason: 'a direction with nothing to compare against');
+    }
+  });
+
   test('transport parses, including today\'s runs', () async {
     final t = await ParentApi.instance.transport(child.studentId);
     expect(t.ridesTheBus, isTrue, reason: 'this child should be on a bus in the demo data');

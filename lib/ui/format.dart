@@ -49,6 +49,22 @@ String longDate(DateTime? d) {
   return '${_day(d.weekday)} ${d.day} ${_month(d.month)} ${d.year}';
 }
 
+String percent(num? value) {
+  if (value == null) return '—';
+  final v = value.toDouble();
+  return v == v.roundToDouble() ? '${v.round()}%' : '${v.toStringAsFixed(1)}%';
+}
+
+String dayRange(DateTime? from, DateTime? to) {
+  if (from == null || to == null) return '—';
+  return '${shortDate(from)} – ${shortDate(to)}';
+}
+
+String termCaption(String? termName, DateTime? from, DateTime? to) {
+  if (termName != null && termName.trim().isNotEmpty) return termName;
+  return dayRange(from, to);
+}
+
 String dueWord(int days) {
   if (days < -1) return tn('due.overdue', -days);
   if (days == -1) return t('due.yesterday');

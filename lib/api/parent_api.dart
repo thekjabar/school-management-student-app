@@ -1060,14 +1060,24 @@ class UpcomingExam {
   }
 }
 
+DateTime? _calendarDay(Object? iso) {
+  if (iso is! String || iso.length < 10) return null;
+  return DateTime.tryParse(iso.substring(0, 10));
+}
+
 class AttendanceSummary {
   AttendanceSummary({
     required this.present,
     required this.late,
     required this.absent,
     required this.excused,
+    required this.leftEarly,
     required this.total,
     required this.ratePercent,
+    required this.termId,
+    required this.termName,
+    required this.from,
+    required this.to,
     required this.exceptions,
   });
 
@@ -1075,8 +1085,13 @@ class AttendanceSummary {
   final int late;
   final int absent;
   final int excused;
+  final int leftEarly;
   final int total;
-  final int ratePercent;
+  final double? ratePercent;
+  final String? termId;
+  final String? termName;
+  final DateTime? from;
+  final DateTime? to;
   final List<AttendanceException> exceptions;
 
   factory AttendanceSummary.fromJson(Map<String, dynamic> j) => AttendanceSummary(
@@ -1084,11 +1099,130 @@ class AttendanceSummary {
         late: (j['late'] as num?)?.toInt() ?? 0,
         absent: (j['absent'] as num?)?.toInt() ?? 0,
         excused: (j['excused'] as num?)?.toInt() ?? 0,
+        leftEarly: (j['leftEarly'] as num?)?.toInt() ?? 0,
         total: (j['total'] as num?)?.toInt() ?? 0,
-        ratePercent: (j['ratePercent'] as num?)?.toInt() ?? 0,
+        ratePercent: (j['ratePercent'] as num?)?.toDouble(),
+        termId: j['termId'] as String?,
+        termName: j['termName'] as String?,
+        from: _calendarDay(j['from']),
+        to: _calendarDay(j['to']),
         exceptions: ((j['exceptions'] as List?) ?? [])
             .map((e) => AttendanceException.fromJson(e as Map<String, dynamic>))
             .toList(),
+      );
+}
+
+class AttendanceTrend {
+  AttendanceTrend({
+    required this.termId,
+    required this.termName,
+    required this.from,
+    required this.to,
+    required this.present,
+    required this.absent,
+    required this.late,
+    required this.excused,
+    required this.leftEarly,
+    required this.daysMarked,
+    required this.daysMissed,
+    required this.missedPercent,
+    required this.attendanceRate,
+    required this.band,
+    required this.expectedSchoolDays,
+    required this.byMonth,
+    required this.previous,
+    required this.direction,
+  });
+
+  final String? termId;
+  final String? termName;
+  final DateTime? from;
+  final DateTime? to;
+  final int present;
+  final int absent;
+  final int late;
+  final int excused;
+  final int leftEarly;
+  final int daysMarked;
+  final int daysMissed;
+  final double? missedPercent;
+  final double? attendanceRate;
+  final String band;
+  final int expectedSchoolDays;
+  final List<AttendanceMonthPoint> byMonth;
+  final AttendanceTermFigures? previous;
+  final String? direction;
+
+  factory AttendanceTrend.fromJson(Map<String, dynamic> j) => AttendanceTrend(
+        termId: j['termId'] as String?,
+        termName: j['termName'] as String?,
+        from: _calendarDay(j['from']),
+        to: _calendarDay(j['to']),
+        present: (j['present'] as num?)?.toInt() ?? 0,
+        absent: (j['absent'] as num?)?.toInt() ?? 0,
+        late: (j['late'] as num?)?.toInt() ?? 0,
+        excused: (j['excused'] as num?)?.toInt() ?? 0,
+        leftEarly: (j['leftEarly'] as num?)?.toInt() ?? 0,
+        daysMarked: (j['daysMarked'] as num?)?.toInt() ?? 0,
+        daysMissed: (j['daysMissed'] as num?)?.toInt() ?? 0,
+        missedPercent: (j['missedPercent'] as num?)?.toDouble(),
+        attendanceRate: (j['attendanceRate'] as num?)?.toDouble(),
+        band: (j['band'] as String?) ?? 'UNKNOWN',
+        expectedSchoolDays: (j['expectedSchoolDays'] as num?)?.toInt() ?? 0,
+        byMonth: ((j['byMonth'] as List?) ?? [])
+            .map((e) => AttendanceMonthPoint.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        previous: j['previous'] == null
+            ? null
+            : AttendanceTermFigures.fromJson(j['previous'] as Map<String, dynamic>),
+        direction: j['direction'] as String?,
+      );
+}
+
+class AttendanceMonthPoint {
+  AttendanceMonthPoint({
+    required this.month,
+    required this.daysMarked,
+    required this.daysMissed,
+    required this.attendanceRate,
+  });
+
+  final String month;
+  final int daysMarked;
+  final int daysMissed;
+  final double? attendanceRate;
+
+  int get monthNumber => int.tryParse(month.split('-').last) ?? 0;
+
+  factory AttendanceMonthPoint.fromJson(Map<String, dynamic> j) => AttendanceMonthPoint(
+        month: (j['month'] as String?) ?? '',
+        daysMarked: (j['daysMarked'] as num?)?.toInt() ?? 0,
+        daysMissed: (j['daysMissed'] as num?)?.toInt() ?? 0,
+        attendanceRate: (j['attendanceRate'] as num?)?.toDouble(),
+      );
+}
+
+class AttendanceTermFigures {
+  AttendanceTermFigures({
+    required this.termName,
+    required this.daysMarked,
+    required this.daysMissed,
+    required this.missedPercent,
+    required this.attendanceRate,
+  });
+
+  final String? termName;
+  final int daysMarked;
+  final int daysMissed;
+  final double? missedPercent;
+  final double? attendanceRate;
+
+  factory AttendanceTermFigures.fromJson(Map<String, dynamic> j) => AttendanceTermFigures(
+        termName: j['termName'] as String?,
+        daysMarked: (j['daysMarked'] as num?)?.toInt() ?? 0,
+        daysMissed: (j['daysMissed'] as num?)?.toInt() ?? 0,
+        missedPercent: (j['missedPercent'] as num?)?.toDouble(),
+        attendanceRate: (j['attendanceRate'] as num?)?.toDouble(),
       );
 }
 
@@ -1645,6 +1779,13 @@ class ParentApi {
       '/parent/children/$studentId/attendance${q.isEmpty ? '' : '?${q.join('&')}'}',
     ) as Map<String, dynamic>;
     return AttendanceSummary.fromJson(json);
+  }
+
+  Future<AttendanceTrend> attendanceTrend(String studentId, {String? termId}) async {
+    final json = await _api.get(
+      '/parent/children/$studentId/attendance/trend${termId == null ? '' : '?termId=$termId'}',
+    ) as Map<String, dynamic>;
+    return AttendanceTrend.fromJson(json);
   }
 
   static String _day(DateTime d) =>

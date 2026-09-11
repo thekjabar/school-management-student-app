@@ -9,6 +9,49 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 
+typedef BandLook = ({Color colour, IconData icon, String title});
+
+BandLook attendanceBand(String? band) => switch (band) {
+      'OK' => (colour: AppTheme.green, icon: Icons.emoji_events_rounded, title: t('att.bandOk')),
+      'WATCH' => (
+          colour: AppTheme.amber,
+          icon: Icons.visibility_outlined,
+          title: t('att.bandWatch')
+        ),
+      'CONCERN' => (
+          colour: AppTheme.rose,
+          icon: Icons.support_agent_rounded,
+          title: t('att.bandConcern')
+        ),
+      _ => (
+          colour: AppTheme.blue,
+          icon: Icons.hourglass_bottom_rounded,
+          title: t('att.bandUnknown')
+        ),
+    };
+
+String attendanceBandBody(AttendanceTrend trend, String name, String term) =>
+    switch (trend.band) {
+      'OK' => tv('att.bandOkBody', {'name': name, 'term': term}),
+      'WATCH' => tv('att.bandWatchBody', {
+          'name': name,
+          'n': percent(trend.missedPercent),
+          'term': term,
+        }),
+      'CONCERN' => tv('att.bandConcernBody', {
+          'name': name,
+          'n': percent(trend.missedPercent),
+          'term': term,
+        }),
+      _ => tv('att.bandUnknownBody', {
+          'name': name,
+          'n': trend.daysMarked,
+          'term': term,
+        }),
+    };
+
+typedef _Trended = ({AttendanceSummary summary, AttendanceTrend trend});
+
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key, required this.child});
 
@@ -34,48 +77,70 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           children: [
             ScreenHeader(title: t('quick.attendance')),
             Expanded(
-              child: Loader<AttendanceSummary>(
+              child: Loader<_Trended>(
                 tint: tint,
                 padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20),
-                load: () => ParentApi.instance.attendance(widget.child.studentId),
-                builder: (context, a) {
-                  final good = a.ratePercent >= 95;
+                load: () async {
+                  final api = ParentApi.instance;
+                  final both = await Future.wait([
+                    api.attendance(widget.child.studentId),
+                    api.attendanceTrend(widget.child.studentId),
+                  ]);
+                  return (
+                    summary: both[0] as AttendanceSummary,
+                    trend: both[1] as AttendanceTrend,
+                  );
+                },
+                builder: (context, data) {
+                  final a = data.summary;
+                  final trend = data.trend;
+                  final term = termCaption(trend.termName, trend.from, trend.to);
+                  final look = attendanceBand(trend.band);
+                  final previous = trend.previous;
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Card16(
-                        padding: const EdgeInsets.fromLTRB(12, 13, 12, 13),
-                        child: IconFigureStrip(
-                          figures: [
-                            IconFigure(
-                              icon: Icons.verified_user_outlined,
-                              label: t('att.present'),
-                              value: a.total > 0 ? '${a.ratePercent}%' : '—',
-                              caption: t('att.thisTerm'),
-                              color: AppTheme.green,
+                        padding: const EdgeInsets.fromLTRB(12, 13, 12, 11),
+                        child: Column(
+                          children: [
+                            IconFigureStrip(
+                              figures: [
+                                IconFigure(
+                                  icon: Icons.verified_user_outlined,
+                                  label: t('att.present'),
+                                  value: percent(trend.attendanceRate),
+                                  caption: term,
+                                  color: AppTheme.green,
+                                ),
+                                IconFigure(
+                                  icon: Icons.event_busy_outlined,
+                                  label: t('att.absent'),
+                                  value: '${trend.absent}',
+                                  caption: term,
+                                  color: AppTheme.rose,
+                                ),
+                                IconFigure(
+                                  icon: Icons.schedule_rounded,
+                                  label: t('att.late'),
+                                  value: '${trend.late}',
+                                  caption: term,
+                                  color: AppTheme.blue,
+                                ),
+                                IconFigure(
+                                  icon: Icons.pie_chart_outline_rounded,
+                                  label: t('att.missed'),
+                                  value: percent(trend.missedPercent),
+                                  caption: term,
+                                  color: look.colour,
+                                ),
+                              ],
                             ),
-                            IconFigure(
-                              icon: Icons.event_busy_outlined,
-                              label: t('att.absent'),
-                              value: '${a.absent}',
-                              caption: t('att.thisTerm'),
-                              color: AppTheme.amber,
-                            ),
-                            IconFigure(
-                              icon: Icons.schedule_rounded,
-                              label: t('att.late'),
-                              value: '${a.late}',
-                              caption: t('att.thisTerm'),
-                              color: AppTheme.blue,
-                            ),
-                            IconFigure(
-                              icon: Icons.track_changes_rounded,
-                              label: t('att.rateShort'),
-                              value: a.total > 0 ? '${a.ratePercent}%' : '—',
-                              caption: t('att.thisTerm'),
-                              color: AppTheme.violet,
-                            ),
+                            const SizedBox(height: 11),
+                            Divider(height: 1, color: AppTheme.border),
+                            const SizedBox(height: 9),
+                            _CoverageLine(trend: trend),
                           ],
                         ),
                       ),
@@ -93,12 +158,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       ),
                       const SizedBox(height: kCardGap),
 
-                      if (_tab == 2)
-                        _Statistics(summary: a)
-                      else
+                      if (_tab == 2) ...[
+                        _TrendCard(trend: trend),
+                        const SizedBox(height: kCardGap),
+                        if (previous?.termName != null) ...[
+                          _CompareCard(trend: trend, previous: previous!, term: term),
+                          const SizedBox(height: kCardGap),
+                        ],
+                        _Statistics(summary: a),
+                      ] else
                         _MonthCard(
                           month: _month,
                           summary: a,
+                          rate: trend.attendanceRate,
+                          rateColour: look.colour,
                           compact: _tab == 0,
                           onMonth: (d) => setState(() => _month = d),
                         ),
@@ -108,12 +181,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       const SizedBox(height: kCardGap),
 
                       NoticeBanner(
-                        icon: good ? Icons.emoji_events_rounded : Icons.visibility_outlined,
-                        color: good ? AppTheme.green : AppTheme.amber,
-                        title: good ? t('att.goodJob') : t('attendance.watchThis'),
-                        body: tn(
-                          good ? 'att.goodJobBody' : 'att.watchBody',
+                        icon: look.icon,
+                        color: look.colour,
+                        title: look.title,
+                        body: attendanceBandBody(
+                          trend,
                           widget.child.name.split(' ').first,
+                          term,
                         ),
                       ),
                     ],
@@ -128,16 +202,220 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 }
 
+class _CoverageLine extends StatelessWidget {
+  const _CoverageLine({required this.trend});
+
+  final AttendanceTrend trend;
+
+  @override
+  Widget build(BuildContext context) {
+    final line = trend.expectedSchoolDays > 0
+        ? tv('att.registersTaken', {
+            'n': trend.daysMarked,
+            'm': trend.expectedSchoolDays,
+          })
+        : tn('att.registersMarked', trend.daysMarked);
+
+    return Row(
+      children: [
+        Icon(Icons.fact_check_outlined, size: 14, color: AppTheme.textMuted),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            line,
+            style: TextStyle(fontSize: 11, height: 1.3, color: AppTheme.textMuted),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TrendCard extends StatelessWidget {
+  const _TrendCard({required this.trend});
+
+  final AttendanceTrend trend;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = Role.parent.tint;
+    final months = trend.byMonth.where((m) => m.monthNumber > 0).toList();
+
+    return Card16(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 13),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionRow(title: t('att.trend')),
+          if (months.isEmpty)
+            Text(
+              t('att.nothingMarked'),
+              style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+            )
+          else
+            SizedBox(
+              height: 104,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (final m in months)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                percent(m.attendanceRate),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.text,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              height: 62,
+                              alignment: Alignment.bottomCenter,
+                              decoration: BoxDecoration(
+                                color: AppTheme.border,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: m.daysMarked == 0 || m.attendanceRate == null
+                                  ? null
+                                  : FractionallySizedBox(
+                                      widthFactor: 1,
+                                      heightFactor:
+                                          (m.attendanceRate! / 100).clamp(0.06, 1.0),
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          color: tint,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                            const SizedBox(height: 5),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                t('monthShort.${m.monthNumber}'),
+                                style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 10),
+          Text(
+            t('att.missedIncludesExcused'),
+            style: TextStyle(fontSize: 10.5, height: 1.35, color: AppTheme.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompareCard extends StatelessWidget {
+  const _CompareCard({
+    required this.trend,
+    required this.previous,
+    required this.term,
+  });
+
+  final AttendanceTrend trend;
+  final AttendanceTermFigures previous;
+  final String term;
+
+  @override
+  Widget build(BuildContext context) {
+    final (word, colour) = switch (trend.direction) {
+      'BETTER' => (t('att.better'), AppTheme.green),
+      'WORSE' => (t('att.worse'), AppTheme.rose),
+      'SAME' => (t('att.same'), AppTheme.blue),
+      _ => (t('att.noComparison'), AppTheme.textMuted),
+    };
+
+    Widget row(String label, double? missed, bool strong) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: strong ? FontWeight.w700 : FontWeight.w500,
+                    color: strong ? AppTheme.text : AppTheme.textMuted,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                percent(missed),
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                  color: strong ? AppTheme.text : AppTheme.textMuted,
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return Card16(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 13),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionRow(
+            title: tv('att.comparedWith', {'term': previous.termName ?? '—'}),
+            dense: true,
+          ),
+          Text(
+            t('att.missedShare'),
+            style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+          ),
+          row(term, trend.missedPercent, true),
+          Divider(height: 1, color: AppTheme.border),
+          row(previous.termName ?? '—', previous.missedPercent, false),
+          const SizedBox(height: 9),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Pill(word, color: colour),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MonthCard extends StatelessWidget {
   const _MonthCard({
     required this.month,
     required this.summary,
+    required this.rate,
+    required this.rateColour,
     required this.compact,
     required this.onMonth,
   });
 
   final DateTime month;
   final AttendanceSummary summary;
+
+  final double? rate;
+  final Color rateColour;
 
   final bool compact;
 
@@ -168,11 +446,23 @@ class _MonthCard extends StatelessWidget {
                           style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
                         ),
                         const SizedBox(height: 6),
-                        PercentRing(
-                          percent: summary.ratePercent.toDouble(),
-                          color: summary.ratePercent >= 95 ? AppTheme.green : AppTheme.amber,
-                          size: 84,
-                        ),
+                        if (rate == null)
+                          SizedBox(
+                            width: 84,
+                            height: 84,
+                            child: Center(
+                              child: Text(
+                                '—',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.textMuted,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          PercentRing(percent: rate!, color: rateColour, size: 84),
                       ],
                     ),
                   ],
@@ -330,6 +620,7 @@ class _Cell extends StatelessWidget {
         'ABSENT' => AppTheme.rose,
         'LATE' => AppTheme.blue,
         'EXCUSED' => AppTheme.amber,
+        'LEFT_EARLY' => AppTheme.violet,
         _ => AppTheme.green,
       };
     }
@@ -424,6 +715,8 @@ class _Legend extends StatelessWidget {
           row(AppTheme.green, t('att.present'), summary.present),
           row(AppTheme.rose, t('att.absent'), summary.absent),
           row(AppTheme.blue, t('att.late'), summary.late),
+          if (summary.leftEarly > 0)
+            row(AppTheme.violet, t('att.leftEarly'), summary.leftEarly),
         ],
       ),
     );
@@ -475,6 +768,7 @@ class _DayRow extends StatelessWidget {
       'ABSENT' => (AppTheme.rose, t('att.absent'), Icons.cancel_rounded),
       'LATE' => (AppTheme.blue, t('att.late'), Icons.schedule_rounded),
       'EXCUSED' => (AppTheme.amber, t('att.excusedShort'), Icons.event_available_rounded),
+      'LEFT_EARLY' => (AppTheme.violet, t('att.leftEarly'), Icons.logout_rounded),
       _ => (AppTheme.green, t('att.present'), Icons.check_circle_rounded),
     };
 
@@ -606,6 +900,7 @@ class _Statistics extends StatelessWidget {
           bar(t('att.absent'), summary.absent, AppTheme.rose),
           bar(t('att.late'), summary.late, AppTheme.blue),
           if (summary.excused > 0) bar(t('attendance.excused'), summary.excused, AppTheme.amber),
+          if (summary.leftEarly > 0) bar(t('att.leftEarly'), summary.leftEarly, AppTheme.violet),
         ],
       ),
     );

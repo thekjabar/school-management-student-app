@@ -517,8 +517,12 @@ class _ChildCard extends StatelessWidget {
               IconFigure(
                 icon: Icons.verified_user_outlined,
                 label: t('quick.attendance'),
-                value: home.attendance.total > 0 ? '${home.attendance.ratePercent}%' : '—',
-                caption: t('home.thisWeek'),
+                value: percent(home.attendance.ratePercent),
+                caption: termCaption(
+                  home.attendance.termName,
+                  home.attendance.from,
+                  home.attendance.to,
+                ),
                 color: AppTheme.green,
               ),
               IconFigure(
@@ -601,19 +605,40 @@ class _AttendanceCardState extends State<_AttendanceCard> {
   _Period _period = _Period.week;
 
   AttendanceSummary? _fetched;
+  AttendanceTrend? _trend;
   bool _busy = false;
 
   @override
   void initState() {
     super.initState();
     _load(_Period.week);
+    _loadTrend();
+  }
+
+  Future<void> _loadTrend() async {
+    try {
+      final got = await ParentApi.instance.attendanceTrend(widget.child.studentId);
+      if (!mounted) return;
+      setState(() => _trend = got);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _trend = null);
+    }
   }
 
   String get _label => switch (_period) {
         _Period.week => t('home.thisWeek'),
         _Period.month => t('home.thisMonth'),
-        _Period.term => t('home.thisTerm'),
+        _Period.term => _fetched == null
+            ? t('home.thisTerm')
+            : termCaption(_fetched!.termName, _fetched!.from, _fetched!.to),
       };
+
+  String _termLine(AttendanceTrend trend) {
+    final term = termCaption(trend.termName, trend.from, trend.to);
+    if (trend.band == 'UNKNOWN') return tn('att.registersMarked', trend.daysMarked);
+    return tv('att.missedInTerm', {'n': percent(trend.missedPercent), 'term': term});
+  }
 
   ({DateTime? from, DateTime? to}) _window(_Period p) {
     final now = DateTime.now();
@@ -667,8 +692,9 @@ class _AttendanceCardState extends State<_AttendanceCard> {
   Widget build(BuildContext context) {
     final summary = _fetched ?? widget.summary;
     final marked = summary.total > 0;
-    final rate = summary.ratePercent.toDouble();
-    final good = rate >= 95;
+    final rate = summary.ratePercent ?? 0;
+    final trend = _trend;
+    final look = attendanceBand(trend?.band);
 
     return Card16(
       padding: const EdgeInsets.all(12),
@@ -689,7 +715,7 @@ class _AttendanceCardState extends State<_AttendanceCard> {
               children: [
                 PercentRing(
                   percent: rate,
-                  color: good ? AppTheme.green : AppTheme.amber,
+                  color: _period == _Period.term ? look.colour : Role.parent.tint,
                   size: 74,
                   label: t('att.present'),
                 ),
@@ -707,26 +733,27 @@ class _AttendanceCardState extends State<_AttendanceCard> {
                 ),
               ],
             ),
-            const SizedBox(height: 11),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-              decoration: BoxDecoration(
-                color: (good ? AppTheme.green : AppTheme.amber)
-                    .withValues(alpha: AppTheme.dark ? 0.16 : 0.10),
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Text(
-                '${good ? '🎉' : '👀'}  ${good ? t('attendance.keepItUp') : t('attendance.watchThis')}',
-                maxLines: 2,
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w600,
-                  height: 1.3,
-                  color: good ? AppTheme.green : AppTheme.amber,
+            if (trend != null) ...[
+              const SizedBox(height: 11),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                decoration: BoxDecoration(
+                  color: look.colour.withValues(alpha: AppTheme.dark ? 0.16 : 0.10),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Text(
+                  '${look.title}  ·  ${_termLine(trend)}',
+                  maxLines: 2,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
+                    color: look.colour,
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ],
       ),
