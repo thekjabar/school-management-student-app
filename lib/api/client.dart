@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 
 import '../i18n/strings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'offline_cache.dart';
 
 const String kApiBase = String.fromEnvironment(
   'API_BASE',
@@ -141,6 +142,7 @@ class ApiClient {
     _access = null;
     _refresh = null;
     _tenantId = null;
+    await OfflineCache.instance.clear();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tenantKey);
     for (final key in _secretKeys) {

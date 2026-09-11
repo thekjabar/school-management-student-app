@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../api/offline_cache.dart';
 import '../../api/parent_api.dart';
 import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
+import '../../ui/format.dart';
 import '../../ui/kit.dart';
 import '../../ui/nav_glyphs.dart';
 import '../../ui/pickers.dart';
@@ -145,6 +147,34 @@ class _ParentAppState extends State<ParentApp> {
               notificationCount: _unread,
               canSwitchChild: children != null && children.length > 1,
               onSwitchChild: () => _pickChild(children ?? const []),
+            ),
+            ValueListenableBuilder<DateTime?>(
+              valueListenable: OfflineCache.instance.savedDataShown,
+              builder: (context, savedAt, _) {
+                if (savedAt == null) return const SizedBox.shrink();
+                return Container(
+                  width: double.infinity,
+                  color: AppTheme.amber.withValues(alpha: AppTheme.dark ? 0.18 : 0.10),
+                  padding: const EdgeInsets.symmetric(horizontal: kGutter, vertical: 7),
+                  child: Row(
+                    children: [
+                      Icon(Icons.cloud_off_rounded, size: 14, color: AppTheme.amber),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          tn('offline.savedAt', hhmm(savedAt)),
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            height: 1.35,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.amber,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
             Expanded(
               child: children == null

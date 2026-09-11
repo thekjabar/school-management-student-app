@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import '../i18n/strings.dart';
 import 'attachments.dart';
 import 'client.dart';
+import 'offline_cache.dart';
 
 class Child {
   Child({
@@ -2238,10 +2240,24 @@ class ParentApi {
   static final ParentApi instance = ParentApi._();
   final ApiClient _api = ApiClient.instance;
 
-  Future<List<Child>> children() async {
-    final json = await _api.get('/parent/children');
-    return (json as List).map((e) => Child.fromJson(e as Map<String, dynamic>)).toList();
+  Future<T> _keepable<T>(String path, T Function(dynamic json) parse) async {
+    try {
+      final json = await _api.get(path);
+      unawaited(OfflineCache.instance.write(path, json));
+      OfflineCache.instance.servedLive();
+      return parse(json);
+    } on OfflineException {
+      final saved = await OfflineCache.instance.read(path);
+      if (saved == null) rethrow;
+      OfflineCache.instance.servedFromCache(saved.savedAt);
+      return parse(saved.value);
+    }
   }
+
+  Future<List<Child>> children() => _keepable(
+        '/parent/children',
+        (json) => (json as List).map((e) => Child.fromJson(e as Map<String, dynamic>)).toList(),
+      );
 
   Future<List<RecentCrew>> recentCrew(String studentId) async {
     final json = await _api.get('/parent/children/$studentId/recent-crew');
@@ -2367,12 +2383,12 @@ class ParentApi {
     return ChildProfile.fromJson(json);
   }
 
-  Future<List<DayOfLessons>> timetable(String studentId) async {
-    final json = await _api.get('/parent/children/$studentId/timetable') as Map<String, dynamic>;
-    return ((json['days'] as List?) ?? [])
-        .map((e) => DayOfLessons.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
+  Future<List<DayOfLessons>> timetable(String studentId) => _keepable(
+        '/parent/children/$studentId/timetable',
+        (json) => (((json as Map<String, dynamic>)['days'] as List?) ?? [])
+            .map((e) => DayOfLessons.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
 
   Future<List<HomeworkItem>> homework(String studentId) async {
     final json = await _api.get('/parent/children/$studentId/homework?pageSize=50');
@@ -2632,10 +2648,10 @@ class ParentApi {
     });
   }
 
-  Future<List<Announcement>> announcements() async {
-    final json = await _api.get('/parent/announcements?pageSize=50');
-    return Paged.from<Announcement>(json, Announcement.fromJson).rows;
-  }
+  Future<List<Announcement>> announcements() => _keepable(
+        '/parent/announcements?pageSize=50',
+        (json) => Paged.from<Announcement>(json, Announcement.fromJson).rows,
+      );
 
   Future<void> markAnnouncementRead(String id) async {
     await _api.post('/parent/announcements/$id/read');
@@ -2651,10 +2667,10 @@ class ParentApi {
     return json is Map ? ((json['marked'] as num?)?.toInt() ?? 0) : 0;
   }
 
-  Future<FeeSummary> fees() async {
-    final json = await _api.get('/parent/fees') as Map<String, dynamic>;
-    return FeeSummary.fromJson(json);
-  }
+  Future<FeeSummary> fees() => _keepable(
+        '/parent/fees',
+        (json) => FeeSummary.fromJson(json as Map<String, dynamic>),
+      );
 
   Future<PaymentOptions?> paymentOptions() async {
     try {
