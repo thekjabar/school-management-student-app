@@ -184,6 +184,7 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
                     ],
 
                     _MapCard(
+                      key: const ValueKey('home-address-map'),
                       pin: _pin ?? _fallback,
                       placed: _pin != null,
                       enabled: _editing,
@@ -699,6 +700,7 @@ class _NoMap extends StatelessWidget {
 
 class _MapCard extends StatelessWidget {
   const _MapCard({
+    super.key,
     required this.pin,
     required this.placed,
     required this.enabled,

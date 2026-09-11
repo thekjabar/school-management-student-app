@@ -231,7 +231,7 @@ class ApiClient {
       throw OfflineException();
     }
 
-    if (res.statusCode == 401 && retry) {
+    if (res.statusCode == 401 && retry && !path.startsWith('/auth/login')) {
       switch (await _renew()) {
         case Renewal.renewed:
           return _send(method, path, body, false);
@@ -309,7 +309,7 @@ class ApiClient {
       throw OfflineException();
     }
 
-    if (res.statusCode == 401 && retry) {
+    if (res.statusCode == 401 && retry && !path.startsWith('/auth/login')) {
       switch (await _renew()) {
         case Renewal.renewed:
           return _sendFile(path, field, bytes, filename, mime, fields, false);
