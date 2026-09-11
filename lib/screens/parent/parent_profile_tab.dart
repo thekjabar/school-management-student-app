@@ -15,6 +15,7 @@ import '../../ui/settings_widgets.dart';
 import '../../ui/sheets.dart';
 import 'children_tab.dart';
 import 'consents_screen.dart';
+import 'dropoff_screen.dart';
 import 'household_screen.dart';
 import 'fees_screen.dart';
 import 'help_screen.dart';
@@ -422,6 +423,15 @@ class _Settings extends StatelessWidget {
           ),
           Divider(height: 1, color: AppTheme.border),
           const _ConsentsRow(),
+          Divider(height: 1, color: AppTheme.border),
+          _Row(
+            icon: Icons.pin_drop_outlined,
+            title: t('profile.dropoff'),
+            sub: t('profile.dropoffSub'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const DropoffScreen()),
+            ),
+          ),
           Divider(height: 1, color: AppTheme.border),
           _Row(
             icon: Icons.family_restroom_outlined,

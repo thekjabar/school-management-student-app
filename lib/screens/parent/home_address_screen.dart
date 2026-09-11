@@ -314,6 +314,7 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
       _busy = true;
       _error = null;
     });
+    final movedPin = _pin != null && (_wasPin == null || _wasPin != _pin);
     try {
       await ParentApi.instance.saveHomeLocation(
         lat: _pin?.latitude,
@@ -331,10 +332,66 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
       });
       showNote(context, t('home.saved'));
       _loader.currentState?.reload(quiet: true);
+      if (movedPin) await _offerToTellTheOffice();
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _offerToTellTheOffice() async {
+    if (!mounted) return;
+
+    final ask = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(t('home.askOfficeTitle')),
+        content: Text(t('home.askOfficeBody'), style: const TextStyle(height: 1.55)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(t('home.askOfficeLater')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(t('home.askOfficeSend')),
+          ),
+        ],
+      ),
+    );
+    if (ask != true || !mounted) return;
+
+    try {
+      final children = await ParentApi.instance.children();
+      final address = _address.text.trim();
+      final message = address.isEmpty
+          ? t('home.askOfficeMessage')
+          : tn('home.askOfficeMessageAt', address);
+
+      var sent = 0;
+      for (final child in children) {
+        try {
+          await ParentApi.instance.raiseConcern(
+            studentId: child.studentId,
+            urgency: 'QUESTION',
+            topic: 'PICKUP_ARRANGEMENT',
+            message: message,
+          );
+          sent++;
+        } on ApiException catch (e) {
+          debugPrint('home: could not ask about ${child.studentId}: ${e.message}');
+        }
+      }
+
+      if (!mounted) return;
+      showNote(
+        context,
+        sent == 0 ? t('home.askOfficeFailed') : tn('home.askOfficeSent', sent),
+        bad: sent == 0,
+      );
+    } on ApiException catch (e) {
+      if (mounted) showNote(context, e.message, bad: true);
     }
   }
 }

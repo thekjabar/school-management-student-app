@@ -14,8 +14,13 @@ class MapTiles {
 
   static const _styleOverride = String.fromEnvironment('MAPBOX_STYLE');
 
+  static const _rasterOverride = String.fromEnvironment('MAPBOX_RASTER_STYLE');
+
   static String get _style =>
       _styleOverride.isEmpty ? _fallbackStyle : _styleOverride;
+
+  static String get _rasterStyle =>
+      _rasterOverride.isEmpty ? _fallbackStyle : _rasterOverride;
 
   static String get styleUri => 'mapbox://styles/$_style';
 
@@ -27,7 +32,7 @@ class MapTiles {
 
   static TileLayer layer() => TileLayer(
         urlTemplate:
-            'https://api.mapbox.com/styles/v1/$_style/tiles/512/{z}/{x}/{y}@2x'
+            'https://api.mapbox.com/styles/v1/$_rasterStyle/tiles/512/{z}/{x}/{y}@2x'
             '?access_token=$token',
         errorTileCallback: (_, _, _) {
           WidgetsBinding.instance.addPostFrameCallback((_) => trouble.value = true);
