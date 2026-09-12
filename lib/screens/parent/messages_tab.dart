@@ -9,6 +9,8 @@ import '../../ui/attachments.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
+import '../../ui/pickers.dart';
+import '../../ui/sheets.dart';
 import '../../ui/screen_kit.dart';
 import 'conversation_screen.dart';
 
@@ -714,9 +716,9 @@ Future<void> _startConversation(BuildContext context) async {
     showNote(context, t('conv.none'), bad: true);
     return;
   }
-  final opened = await showDialog<ThreadSummary>(
-    context: context,
-    builder: (_) => _NewConversationDialog(children: children),
+  final opened = await showAppSheet<ThreadSummary>(
+    context,
+    builder: (_) => _NewConversationSheet(children: children),
   );
   if (opened == null || !context.mounted) return;
   await Navigator.of(context).push(
@@ -734,17 +736,17 @@ const _topics = <String>[
   'BILLING',
 ];
 
-class _NewConversationDialog extends StatefulWidget {
-  const _NewConversationDialog({required this.children});
+class _NewConversationSheet extends StatefulWidget {
+  const _NewConversationSheet({required this.children});
 
   final List<Child> children;
 
   @override
-  State<_NewConversationDialog> createState() => _NewConversationDialogState();
+  State<_NewConversationSheet> createState() => _NewConversationSheetState();
 }
 
-class _NewConversationDialogState extends State<_NewConversationDialog> {
-  late String _studentId = widget.children.first.studentId;
+class _NewConversationSheetState extends State<_NewConversationSheet> {
+  late Child _child = widget.children.first;
   String _topic = 'GENERAL';
   final _subject = TextEditingController();
   final _body = TextEditingController();
@@ -757,35 +759,65 @@ class _NewConversationDialogState extends State<_NewConversationDialog> {
     super.dispose();
   }
 
+  Future<void> _pickChild() async {
+    final picked = await pickOne<String>(
+      context,
+      tint: Role.parent.tint,
+      selected: _child.studentId,
+      title: t('conv.whichChild'),
+      options: [
+        for (final c in widget.children)
+          PickOption(value: c.studentId, label: c.name),
+      ],
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _child = widget.children.firstWhere((c) => c.studentId == picked));
+  }
+
+  Future<void> _pickTopic() async {
+    final picked = await pickOne<String>(
+      context,
+      tint: Role.parent.tint,
+      selected: _topic,
+      title: t('conv.topic'),
+      options: [
+        for (final k in _topics) PickOption(value: k, label: t('conv.topic.$k')),
+      ],
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _topic = picked);
+  }
+
   Future<void> _open() async {
     final subject = _subject.text.trim();
     final body = _body.text.trim();
-    if (subject.length < 2 || body.isEmpty) return;
+    if (subject.length < 2 || body.isEmpty) {
+      showNote(context, t('conv.needBoth'), bad: true);
+      return;
+    }
     setState(() => _busy = true);
     try {
       final id = await ParentApi.instance.openThread(
-        studentId: _studentId,
+        studentId: _child.studentId,
         subject: subject,
         body: body,
         topic: _topic,
       );
-      final child = widget.children.firstWhere((c) => c.studentId == _studentId);
-      if (mounted) {
-        Navigator.of(context).pop(
-          ThreadSummary(
-            id: id,
-            subject: subject,
-            topic: _topic,
-            status: 'OPEN',
-            studentId: _studentId,
-            studentName: child.name,
-            lastMessageAt: DateTime.now(),
-            lastMessageBy: 'FAMILY',
-            messageCount: 1,
-            unread: false,
-          ),
-        );
-      }
+      if (!mounted) return;
+      Navigator.of(context).pop(
+        ThreadSummary(
+          id: id,
+          subject: subject,
+          topic: _topic,
+          status: 'OPEN',
+          studentId: _child.studentId,
+          studentName: _child.name,
+          lastMessageAt: DateTime.now(),
+          lastMessageBy: 'FAMILY',
+          messageCount: 1,
+          unread: false,
+        ),
+      );
     } on ApiException catch (e) {
       if (mounted) {
         setState(() => _busy = false);
@@ -794,65 +826,116 @@ class _NewConversationDialogState extends State<_NewConversationDialog> {
     }
   }
 
+  InputDecoration _box(String hint) => InputDecoration(
+        hintText: hint,
+        counterText: '',
+        filled: true,
+        fillColor: AppTheme.canvas,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: AppTheme.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: AppTheme.border),
+        ),
+      );
+
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textMuted,
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: AppTheme.surface,
-      title: Text(t('conv.start'), style: const TextStyle(fontSize: 17)),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (widget.children.length > 1)
-              DropdownButtonFormField<String>(
-                initialValue: _studentId,
-                isExpanded: true,
-                decoration: InputDecoration(labelText: t('common.child')),
-                items: [
-                  for (final c in widget.children)
-                    DropdownMenuItem(value: c.studentId, child: Text(c.name)),
-                ],
-                onChanged: (v) => setState(() => _studentId = v ?? _studentId),
+    final tint = Role.parent.tint;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
               ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: _topic,
-              isExpanded: true,
-              decoration: InputDecoration(labelText: t('conv.topic')),
-              items: [
-                for (final k in _topics)
-                  DropdownMenuItem(value: k, child: Text(humanise(k))),
+              const SizedBox(height: 18),
+              Text(
+                t('conv.start'),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                  color: AppTheme.text,
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (widget.children.length > 1) ...[
+                PickerField(
+                  label: t('conv.whichChild'),
+                  value: _child.name,
+                  onTap: _pickChild,
+                ),
+                const SizedBox(height: 14),
               ],
-              onChanged: (v) => setState(() => _topic = v ?? _topic),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _subject,
-              decoration: InputDecoration(labelText: t('conv.subject')),
-              textCapitalization: TextCapitalization.sentences,
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _body,
-              minLines: 3,
-              maxLines: 6,
-              decoration: InputDecoration(labelText: t('conv.writeSomething')),
-              textCapitalization: TextCapitalization.sentences,
-            ),
-          ],
+              PickerField(
+                label: t('conv.topic'),
+                value: t('conv.topic.$_topic'),
+                onTap: _pickTopic,
+              ),
+              const SizedBox(height: 14),
+              _label(t('conv.subject')),
+              TextField(
+                controller: _subject,
+                maxLength: 200,
+                textCapitalization: TextCapitalization.sentences,
+                style: TextStyle(fontSize: 14, color: AppTheme.text),
+                decoration: _box(t('conv.subjectHint')),
+              ),
+              const SizedBox(height: 14),
+              _label(t('conv.message')),
+              TextField(
+                controller: _body,
+                maxLines: 4,
+                maxLength: 4000,
+                textCapitalization: TextCapitalization.sentences,
+                style: TextStyle(fontSize: 14, color: AppTheme.text),
+                decoration: _box(t('conv.writeSomething')),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: BigButton(
+                  label: _busy ? t('conv.sending') : t('conv.send'),
+                  color: tint,
+                  onPressed: _busy ? null : _open,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: Text(t('common.cancel')),
-        ),
-        TextButton(
-          onPressed: _busy ? null : _open,
-          child: Text(t('conv.send')),
-        ),
-      ],
     );
   }
 }

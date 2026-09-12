@@ -344,55 +344,59 @@ class UnderlineTabs extends StatelessWidget {
             bottom: 0,
             child: Container(height: 1.5, color: AppTheme.border),
           ),
-          Row(
-            children: [
-              for (var i = 0; i < tabs.length; i++)
-                Expanded(
-                  child: GestureDetector(
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const ClampingScrollPhysics(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < tabs.length; i++)
+                  GestureDetector(
                     onTap: () => onChanged(i),
                     behavior: HitTestBehavior.opaque,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if (tabs[i].icon != null) ...[
-                              Icon(
-                                tabs[i].icon,
-                                size: 14,
-                                color: i == index
-                                    ? tint
-                                    : tabs[i].color ?? AppTheme.textMuted,
-                              ),
-                              const SizedBox(width: 5),
-                            ],
-                            Flexible(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  tabs[i].label,
-                                  maxLines: 1,
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: i == index ? tint : AppTheme.textMuted,
-                                  ),
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        right: i == tabs.length - 1 ? 0 : 18,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (tabs[i].icon != null) ...[
+                                Icon(
+                                  tabs[i].icon,
+                                  size: 14,
+                                  color: i == index
+                                      ? tint
+                                      : tabs[i].color ?? AppTheme.textMuted,
+                                ),
+                                const SizedBox(width: 5),
+                              ],
+                              Text(
+                                tabs[i].label,
+                                maxLines: 1,
+                                softWrap: false,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: i == index ? tint : AppTheme.textMuted,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 9),
-                        Container(
-                          height: 2.5,
-                          color: i == index ? tint : Colors.transparent,
-                        ),
-                      ],
+                            ],
+                          ),
+                          const SizedBox(height: 9),
+                          Container(
+                            height: 2.5,
+                            color: i == index ? tint : Colors.transparent,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
