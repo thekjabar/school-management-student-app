@@ -11,6 +11,7 @@ import '../../ui/async.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/nav_glyphs.dart';
+import '../school_picker.dart';
 import 'announcements_screen.dart';
 import 'home_tab.dart';
 import 'profile_tab.dart';
@@ -85,6 +86,8 @@ class _DriverAppState extends State<DriverApp> {
               greeting: greeting,
               name: me?.name ?? '',
               school: me?.schoolName ?? '',
+              canSwitchSchool: schoolsForRole(role).length > 1,
+              onSwitchSchool: () => pickSchool(context, role: role),
               notificationCount: _unread,
               onBell: _openAnnouncements,
             ),
@@ -149,6 +152,8 @@ class _DriverHeader extends StatelessWidget {
     required this.greeting,
     required this.name,
     required this.school,
+    required this.canSwitchSchool,
+    required this.onSwitchSchool,
     required this.notificationCount,
     required this.onBell,
   });
@@ -156,6 +161,8 @@ class _DriverHeader extends StatelessWidget {
   final String greeting;
   final String name;
   final String school;
+  final bool canSwitchSchool;
+  final VoidCallback onSwitchSchool;
   final int notificationCount;
   final VoidCallback onBell;
 
@@ -218,19 +225,31 @@ class _DriverHeader extends StatelessWidget {
                 ),
                 if (school.isNotEmpty) ...[
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Text('🏫', style: TextStyle(fontSize: 11)),
-                      const SizedBox(width: 5),
-                      Flexible(
-                        child: Text(
-                          school,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                  GestureDetector(
+                    onTap: canSwitchSchool ? onSwitchSchool : null,
+                    behavior: HitTestBehavior.opaque,
+                    child: Row(
+                      children: [
+                        const Text('🏫', style: TextStyle(fontSize: 11)),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            school,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: canSwitchSchool ? FontWeight.w700 : FontWeight.w400,
+                              color: canSwitchSchool ? tint : AppTheme.textMuted,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                        if (canSwitchSchool) ...[
+                          const SizedBox(width: 2),
+                          Icon(Icons.expand_more_rounded, size: 14, color: tint),
+                        ],
+                      ],
+                    ),
                   ),
                 ],
               ],

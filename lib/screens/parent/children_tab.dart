@@ -27,10 +27,10 @@ class ChildrenTab extends StatelessWidget {
         final entries = await Future.wait(
           children.map((c) async {
             final r = await Future.wait([
-              ParentApi.instance.attendance(c.studentId),
-              ParentApi.instance.transport(c.studentId),
-              ParentApi.instance.homework(c.studentId),
-              ParentApi.instance.attendanceTrend(c.studentId),
+              ParentApi.instance.attendance(c.studentId, tenantId: c.tenantId),
+              ParentApi.instance.transport(c.studentId, tenantId: c.tenantId),
+              ParentApi.instance.homework(c.studentId, tenantId: c.tenantId),
+              ParentApi.instance.attendanceTrend(c.studentId, tenantId: c.tenantId),
             ]);
             return MapEntry(
               c.studentId,

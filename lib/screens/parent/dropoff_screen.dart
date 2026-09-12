@@ -38,7 +38,10 @@ class _DropoffScreenState extends State<DropoffScreen> {
     final out = <ChildDropoff>[];
     for (final child in children) {
       try {
-        final options = await ParentApi.instance.dropoffOptions(child.studentId);
+        final options = await ParentApi.instance.dropoffOptions(
+          child.studentId,
+          tenantId: child.tenantId,
+        );
         out.add(ChildDropoff(
           child: child,
           usualStop: options.usualStop,
@@ -64,6 +67,7 @@ class _DropoffScreenState extends State<DropoffScreen> {
         studentId: child.studentId,
         alternateStopId: option.id,
         reason: reason.trim().isEmpty ? null : reason.trim(),
+        tenantId: child.tenantId,
       );
       if (!mounted) return;
       showNote(context, tn('dropoff.sent', child.name.split(' ').first));

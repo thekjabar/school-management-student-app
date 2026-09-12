@@ -8,6 +8,7 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/nav_glyphs.dart';
 import '../../ui/pickers.dart';
+import '../school_picker.dart';
 import 'classes_tab.dart';
 import 'exams_tab.dart';
 import 'home_tab.dart';
@@ -72,6 +73,9 @@ class _TeacherAppState extends State<TeacherApp> {
             _TeacherHeader(
               greeting: greeting,
               name: me?.name ?? '',
+              school: me?.schoolName ?? '',
+              canSwitchSchool: schoolsForRole(role).length > 1,
+              onSwitchSchool: () => pickSchool(context, role: role),
               notificationCount: _unread,
               onBell: () => setState(() => _tab = 1),
             ),
@@ -139,12 +143,18 @@ class _TeacherHeader extends StatelessWidget {
   const _TeacherHeader({
     required this.greeting,
     required this.name,
+    required this.school,
+    required this.canSwitchSchool,
+    required this.onSwitchSchool,
     required this.onBell,
     this.notificationCount = 0,
   });
 
   final String greeting;
   final String name;
+  final String school;
+  final bool canSwitchSchool;
+  final VoidCallback onSwitchSchool;
   final VoidCallback onBell;
   final int notificationCount;
 
@@ -206,26 +216,40 @@ class _TeacherHeader extends StatelessWidget {
                   style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                 ),
                 const SizedBox(height: 5),
-                Container(
-                  padding: const EdgeInsetsDirectional.fromSTEB(8, 4, 10, 4),
-                  decoration: BoxDecoration(
-                    color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.12),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.school_rounded, size: 13, color: tint),
-                      const SizedBox(width: 5),
-                      Text(
-                        t('teacher.roleLabel'),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: tint,
+                GestureDetector(
+                  onTap: canSwitchSchool ? onSwitchSchool : null,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: const EdgeInsetsDirectional.fromSTEB(8, 4, 10, 4),
+                    decoration: BoxDecoration(
+                      color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.school_rounded, size: 13, color: tint),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            canSwitchSchool && school.isNotEmpty
+                                ? school
+                                : t('teacher.roleLabel'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: tint,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                        if (canSwitchSchool) ...[
+                          const SizedBox(width: 2),
+                          Icon(Icons.expand_more_rounded, size: 14, color: tint),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
               ],

@@ -5,6 +5,7 @@ import '../i18n/strings.dart';
 import 'attachments.dart';
 import 'client.dart';
 import 'offline_cache.dart';
+import 'session.dart';
 
 class Child {
   Child({
@@ -16,6 +17,8 @@ class Child {
     required this.classId,
     required this.relationship,
     required this.isPrimary,
+    required this.tenantId,
+    required this.schoolName,
   });
 
   final String studentId;
@@ -27,7 +30,10 @@ class Child {
   final String relationship;
   final bool isPrimary;
 
-  factory Child.fromJson(Map<String, dynamic> j) => Child(
+  final String tenantId;
+  final String schoolName;
+
+  factory Child.fromJson(Map<String, dynamic> j, [Membership? school]) => Child(
         studentId: j['studentId'] as String,
         code: (j['code'] ?? '') as String,
         name: (j['name'] ?? '') as String,
@@ -36,6 +42,8 @@ class Child {
         classId: j['classId'] as String?,
         relationship: (j['relationship'] ?? '') as String,
         isPrimary: (j['isPrimary'] ?? false) as bool,
+        tenantId: school?.tenantId ?? '',
+        schoolName: school?.tenantName ?? '',
       );
 }
 
@@ -2240,24 +2248,48 @@ class ParentApi {
   static final ParentApi instance = ParentApi._();
   final ApiClient _api = ApiClient.instance;
 
-  Future<T> _keepable<T>(String path, T Function(dynamic json) parse) async {
+  Future<T> _keepable<T>(
+    String path,
+    T Function(dynamic json) parse, {
+    String? tenantId,
+  }) async {
+    final key = tenantId == null ? path : '$tenantId$path';
     try {
-      final json = await _api.get(path);
-      unawaited(OfflineCache.instance.write(path, json));
+      final json = await _api.get(path, tenantId: tenantId);
+      unawaited(OfflineCache.instance.write(key, json));
       OfflineCache.instance.servedLive();
       return parse(json);
     } on OfflineException {
-      final saved = await OfflineCache.instance.read(path);
+      final saved = await OfflineCache.instance.read(key);
       if (saved == null) rethrow;
       OfflineCache.instance.servedFromCache(saved.savedAt);
       return parse(saved.value);
     }
   }
 
-  Future<List<Child>> children() => _keepable(
+  Future<List<Child>> children() async {
+    final schools = Session.instance.me?.schoolsFor(kGuardianRoles) ?? const <Membership>[];
+    if (schools.isEmpty) {
+      return _keepable(
         '/parent/children',
-        (json) => (json as List).map((e) => Child.fromJson(e as Map<String, dynamic>)).toList(),
+        (json) => _childList(json, Session.instance.me?.active),
       );
+    }
+    if (schools.length == 1) return _childrenAt(schools.first);
+
+    final lists = await Future.wait(schools.map(_childrenAt));
+    return [for (final list in lists) ...list];
+  }
+
+  Future<List<Child>> _childrenAt(Membership school) => _keepable(
+        '/parent/children',
+        (json) => _childList(json, school),
+        tenantId: school.tenantId,
+      );
+
+  List<Child> _childList(dynamic json, Membership? school) => (json as List)
+      .map((e) => Child.fromJson(e as Map<String, dynamic>, school))
+      .toList();
 
   Future<List<RecentCrew>> recentCrew(String studentId) async {
     final json = await _api.get('/parent/children/$studentId/recent-crew');
@@ -2390,8 +2422,14 @@ class ParentApi {
             .toList(),
       );
 
-  Future<List<HomeworkItem>> homework(String studentId) async {
-    final json = await _api.get('/parent/children/$studentId/homework?pageSize=50');
+  static String? _scope(String? tenantId) =>
+      (tenantId == null || tenantId.isEmpty) ? null : tenantId;
+
+  Future<List<HomeworkItem>> homework(String studentId, {String? tenantId}) async {
+    final json = await _api.get(
+      '/parent/children/$studentId/homework?pageSize=50',
+      tenantId: _scope(tenantId),
+    );
     return Paged.from<HomeworkItem>(json, HomeworkItem.fromJson).rows;
   }
 
@@ -2432,8 +2470,11 @@ class ParentApi {
         .toList();
   }
 
-  Future<AttitudeSummary> attitude(String studentId) async {
-    final json = await _api.get('/parent/children/$studentId/attitude') as Map<String, dynamic>;
+  Future<AttitudeSummary> attitude(String studentId, {String? tenantId}) async {
+    final json = await _api.get(
+      '/parent/children/$studentId/attitude',
+      tenantId: _scope(tenantId),
+    ) as Map<String, dynamic>;
     return AttitudeSummary.fromJson(json);
   }
 
@@ -2441,20 +2482,31 @@ class ParentApi {
     await _api.post('/parent/attitude/$id/seen');
   }
 
-  Future<AttendanceSummary> attendance(String studentId, {DateTime? from, DateTime? to}) async {
+  Future<AttendanceSummary> attendance(
+    String studentId, {
+    DateTime? from,
+    DateTime? to,
+    String? tenantId,
+  }) async {
     final q = <String>[
       if (from != null) 'from=${_day(from)}',
       if (to != null) 'to=${_day(to)}',
     ];
     final json = await _api.get(
       '/parent/children/$studentId/attendance${q.isEmpty ? '' : '?${q.join('&')}'}',
+      tenantId: _scope(tenantId),
     ) as Map<String, dynamic>;
     return AttendanceSummary.fromJson(json);
   }
 
-  Future<AttendanceTrend> attendanceTrend(String studentId, {String? termId}) async {
+  Future<AttendanceTrend> attendanceTrend(
+    String studentId, {
+    String? termId,
+    String? tenantId,
+  }) async {
     final json = await _api.get(
       '/parent/children/$studentId/attendance/trend${termId == null ? '' : '?termId=$termId'}',
+      tenantId: _scope(tenantId),
     ) as Map<String, dynamic>;
     return AttendanceTrend.fromJson(json);
   }
@@ -2462,8 +2514,11 @@ class ParentApi {
   static String _day(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  Future<TransportInfo> transport(String studentId) async {
-    final json = await _api.get('/parent/children/$studentId/transport') as Map<String, dynamic>;
+  Future<TransportInfo> transport(String studentId, {String? tenantId}) async {
+    final json = await _api.get(
+      '/parent/children/$studentId/transport',
+      tenantId: _scope(tenantId),
+    ) as Map<String, dynamic>;
     return TransportInfo.fromJson(json);
   }
 
@@ -2528,9 +2583,13 @@ class ParentApi {
       _api.post('/auth/profile/change-requests/$id/cancel');
 
   Future<({String? usualStop, List<DropoffOption> options, String note})> dropoffOptions(
-    String studentId,
-  ) async {
-    final json = await _api.get('/parent/children/$studentId/dropoff-options') as Map<String, dynamic>;
+    String studentId, {
+    String? tenantId,
+  }) async {
+    final json = await _api.get(
+      '/parent/children/$studentId/dropoff-options',
+      tenantId: _scope(tenantId),
+    ) as Map<String, dynamic>;
     final usual = json['usualStop'] as Map<String, dynamic>?;
     return (
       usualStop: usual?['name'] as String?,
@@ -2545,8 +2604,9 @@ class ParentApi {
     required String studentId,
     required String alternateStopId,
     String? reason,
+    String? tenantId,
   }) async {
-    await _api.post('/parent/dropoff-changes', {
+    await _api.postAs(_scope(tenantId), '/parent/dropoff-changes', {
       'studentId': studentId,
       'alternateStopId': alternateStopId,
       if (reason != null && reason.isNotEmpty) 'reason': reason,
@@ -2592,8 +2652,9 @@ class ParentApi {
     required String urgency,
     required String topic,
     String? message,
+    String? tenantId,
   }) async {
-    final json = await _api.post('/parent/concerns', {
+    final json = await _api.postAs(_scope(tenantId), '/parent/concerns', {
       'studentId': studentId,
       'urgency': urgency,
       'topic': topic,

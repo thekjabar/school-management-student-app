@@ -33,6 +33,8 @@ class _ParentAppState extends State<ParentApp> {
   String? _error;
   int _unread = 0;
 
+  bool _switching = false;
+
   List<NavItem> get _nav => [
     NavItem(Icons.home_rounded, Icons.home_outlined, t('nav.home'), glyph: NavGlyph.home),
     NavItem(Icons.sms_rounded, Icons.sms_outlined, t('nav.messages'), glyph: NavGlyph.messages),
@@ -51,15 +53,22 @@ class _ParentAppState extends State<ParentApp> {
   Future<void> _load() async {
     try {
       final children = await ParentApi.instance.children();
+      final start = _pickFrom(children, _selectedId) ??
+          (children.isNotEmpty ? children.first : null);
+      if (start != null && !await _openSchoolOf(start)) return;
       if (!mounted) return;
       setState(() {
         _children = children;
-        _selectedId ??= children.isNotEmpty ? children.first.studentId : null;
+        _selectedId = start?.studentId;
         _error = null;
+        _switching = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = errorText(e));
+      setState(() {
+        _error = errorText(e);
+        _switching = false;
+      });
     }
 
     try {
@@ -76,7 +85,41 @@ class _ParentAppState extends State<ParentApp> {
     return children.firstWhere((c) => c.studentId == _selectedId, orElse: () => children.first);
   }
 
+  void _retry() {
+    setState(() {
+      _error = null;
+      _switching = true;
+    });
+    _load();
+  }
+
+  Child? _pickFrom(List<Child> children, String? id) {
+    if (id == null) return null;
+    for (final c in children) {
+      if (c.studentId == id) return c;
+    }
+    return null;
+  }
+
+  Future<bool> _openSchoolOf(Child child) async {
+    if (child.tenantId.isEmpty) return true;
+    if (child.tenantId == Session.instance.me?.active.tenantId) return true;
+    try {
+      await Session.instance.switchTenant(child.tenantId);
+      return true;
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = errorText(e);
+          _switching = false;
+        });
+      }
+      return false;
+    }
+  }
+
   Future<void> _pickChild(List<Child> children) async {
+    final manySchools = children.map((c) => c.tenantId).toSet().length > 1;
     final picked = await pickOne<String>(
       context,
       title: t('home.whichChild'),
@@ -86,20 +129,31 @@ class _ParentAppState extends State<ParentApp> {
           .map((c) => PickOption(
                 value: c.studentId,
                 label: c.name,
-                subtitle: '${c.className} · ${c.code}',
+                subtitle: manySchools && c.schoolName.isNotEmpty
+                    ? '${c.className} · ${c.schoolName}'
+                    : '${c.className} · ${c.code}',
                 icon: Icons.child_care_rounded,
               ))
           .toList(),
     );
-    if (picked != null && mounted) _switchTo(picked);
+    if (picked != null && mounted) await _switchTo(picked);
   }
 
-  void _switchTo(String id) {
+  Future<void> _switchTo(String id) async {
     if (id == _selectedId) return;
+    final next = _pickFrom(_children ?? const [], id);
+    if (next == null) return;
+    setState(() {
+      _error = null;
+      _switching = true;
+    });
+    if (!await _openSchoolOf(next)) return;
+    if (!mounted) return;
     setState(() {
       _selectedId = id;
       _navKeys = List.generate(4, (_) => GlobalKey<NavigatorState>());
       _tab = 0;
+      _switching = false;
     });
   }
 
@@ -177,39 +231,40 @@ class _ParentAppState extends State<ParentApp> {
               },
             ),
             Expanded(
-              child: children == null
-                  ? (_error != null
-                      ? _CannotReach(message: _error!, tint: role.tint, onRetry: _load)
-                      : const _HomeSkeleton())
-                  : child == null
-                      ? const _NoChildren()
-                      : IndexedStack(
-                          index: _tab,
-                          children: [
-                            TabHost(
-                              navigatorKey: _navKeys[0],
-                              child: HomeTab(
-                                child: child,
-                                onOpenTab: (i) => setState(() => _tab = i),
+              child: _error != null
+                  ? _CannotReach(message: _error!, tint: role.tint, onRetry: _retry)
+                  : (children == null || _switching)
+                      ? const _HomeSkeleton()
+                      : child == null
+                          ? const _NoChildren()
+                          : IndexedStack(
+                            index: _tab,
+                            children: [
+                              TabHost(
+                                navigatorKey: _navKeys[0],
+                                child: HomeTab(
+                                  child: child,
+                                  onOpenTab: (i) => setState(() => _tab = i),
+                                ),
                               ),
-                            ),
-                            TabHost(
-                              navigatorKey: _navKeys[1],
-                              child: MessagesTab(onRead: () => setState(() => _unread = 0)),
-                            ),
-                            TabHost(
-                              navigatorKey: _navKeys[2],
-                              child: CalendarTab(child: child),
-                            ),
-                            TabHost(
-                              navigatorKey: _navKeys[3],
-                              child: ParentProfileTab(
-                                children: children,
-                                onOpenChild: (c) => _switchTo(c.studentId),
+                              TabHost(
+                                navigatorKey: _navKeys[1],
+                                child: MessagesTab(onRead: () => setState(() => _unread = 0)),
                               ),
-                            ),
-                          ],
-                        ),
+                              TabHost(
+                                navigatorKey: _navKeys[2],
+                                child: CalendarTab(child: child),
+                              ),
+                              TabHost(
+                                navigatorKey: _navKeys[3],
+                                child: ParentProfileTab(
+                                  children: children,
+                                  selected: child,
+                                  onOpenChild: (c) => _switchTo(c.studentId),
+                                ),
+                              ),
+                            ],
+                          ),
             ),
           ],
         ),

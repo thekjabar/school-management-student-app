@@ -138,6 +138,12 @@ class ApiClient {
     await prefs.setString(_tenantKey, id);
   }
 
+  Future<void> forgetTenant() async {
+    _tenantId = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_tenantKey);
+  }
+
   Future<void> clear() async {
     _access = null;
     _refresh = null;
@@ -162,10 +168,10 @@ class ApiClient {
     if (!_signedOut.isClosed) _signedOut.add(null);
   }
 
-  Map<String, String> _headers({bool json = false}) => {
+  Map<String, String> _headers({bool json = false, String? tenantId}) => {
         if (json) 'Content-Type': 'application/json',
         if (_access != null) 'Authorization': 'Bearer $_access',
-        'X-Tenant-Id': ?_tenantId,
+        'X-Tenant-Id': ?(tenantId ?? _tenantId),
         'X-Lang': AppLocale.current.value.code,
       };
 
@@ -205,9 +211,13 @@ class ApiClient {
     }();
   }
 
-  Future<dynamic> get(String path) => _send('GET', path);
+  Future<dynamic> get(String path, {String? tenantId}) =>
+      _send('GET', path, null, true, tenantId);
 
   Future<dynamic> post(String path, [Object? body]) => _send('POST', path, body);
+
+  Future<dynamic> postAs(String? tenantId, String path, [Object? body]) =>
+      _send('POST', path, body, true, tenantId);
 
   Future<dynamic> patch(String path, [Object? body]) => _send('PATCH', path, body);
 
@@ -215,13 +225,19 @@ class ApiClient {
 
   Future<dynamic> delete(String path, [Object? body]) => _send('DELETE', path, body);
 
-  Future<dynamic> _send(String method, String path, [Object? body, bool retry = true]) async {
+  Future<dynamic> _send(
+    String method,
+    String path, [
+    Object? body,
+    bool retry = true,
+    String? tenantId,
+  ]) async {
     final uri = Uri.parse('$kApiBase$path');
     http.Response res;
 
     try {
       final request = http.Request(method, uri)
-        ..headers.addAll(_headers(json: body != null));
+        ..headers.addAll(_headers(json: body != null, tenantId: tenantId));
       if (body != null) request.body = jsonEncode(body);
       final streamed = await _http.send(request).timeout(const Duration(seconds: 25));
       res = await http.Response.fromStream(streamed);
@@ -234,7 +250,7 @@ class ApiClient {
     if (res.statusCode == 401 && retry && !path.startsWith('/auth/login')) {
       switch (await _renew()) {
         case Renewal.renewed:
-          return _send(method, path, body, false);
+          return _send(method, path, body, false, tenantId);
         case Renewal.unreachable:
           throw OfflineException();
         case Renewal.rejected:

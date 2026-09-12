@@ -14,6 +14,7 @@ import 'i18n/strings.dart';
 import 'api/session.dart';
 import 'screens/driver/driver_app.dart';
 import 'screens/login_screen.dart';
+import 'screens/school_picker.dart';
 import 'screens/splash_screen.dart';
 import 'screens/parent/parent_app.dart';
 import 'screens/teacher/teacher_app.dart';
@@ -159,6 +160,8 @@ class _GateState extends State<_Gate> {
 
   bool _offline = false;
 
+  bool _schoolChosen = false;
+
   StreamSubscription<void>? _signedOut;
 
   @override
@@ -178,12 +181,41 @@ class _GateState extends State<_Gate> {
 
   Future<void> _restore() async {
     final boot = await Boot.instance.start();
+    var chosen = await Session.instance.schoolChosen();
+    final me = boot.me;
+    if (me != null) {
+      chosen = await _alignTenant(me, chosen);
+    }
     if (!mounted) return;
     setState(() {
-      _me = boot.me;
+      _me = Session.instance.me ?? me;
       _offline = boot.offline;
+      _schoolChosen = chosen;
       _ready = true;
     });
+  }
+
+  Future<void> _settleAfterSignIn(Me me) async {
+    final chosen = await _alignTenant(me, false);
+    if (!mounted) return;
+    setState(() {
+      _me = Session.instance.me ?? me;
+      _schoolChosen = chosen;
+      _ready = true;
+    });
+  }
+
+  Future<bool> _alignTenant(Me me, bool chosen) async {
+    final mine = me.schoolsFor(rolesForApp(_role));
+    if (mine.isEmpty) return chosen;
+    if (mine.any((m) => m.tenantId == me.active.tenantId)) return chosen;
+    if (mine.length > 1) return false;
+    try {
+      await Session.instance.switchTenant(mine.first.tenantId);
+    } on ApiException {
+      return chosen;
+    }
+    return chosen;
   }
 
   @override
@@ -198,14 +230,29 @@ class _GateState extends State<_Gate> {
       return LoginScreen(
         role: _role,
         offline: _offline,
-        onSignedIn: (me) => setState(() => _me = me),
+        onSignedIn: (me) {
+          setState(() {
+            _me = me;
+            _schoolChosen = false;
+            _ready = false;
+          });
+          _settleAfterSignIn(me);
+        },
       );
     }
 
-    final membership = _membershipForThisApp();
-    if (membership == null) {
+    return ValueListenableBuilder<String?>(
+      valueListenable: Session.instance.activeTenant,
+      builder: (context, tenantId, _) => _shell(tenantId),
+    );
+  }
+
+  Widget _shell(String? tenantId) {
+    final me = Session.instance.me ?? _me!;
+
+    if (_membershipForThisApp(me) == null) {
       return _WrongApp(
-        role: _me!.role,
+        role: me.role,
         onSignOut: () async {
           await Session.instance.signOut();
           if (mounted) setState(() => _me = null);
@@ -213,23 +260,30 @@ class _GateState extends State<_Gate> {
       );
     }
 
+    if (_role != Role.parent &&
+        !_schoolChosen &&
+        me.schoolsFor(rolesForApp(_role)).length > 1) {
+      return SchoolChoiceScreen(
+        role: _role,
+        onChosen: () => setState(() => _schoolChosen = true),
+      );
+    }
+
     return switch (kRole) {
-      'driver' => DriverApp(),
-      'teacher' => TeacherApp(),
-      _ => ParentApp(),
+      'driver' => DriverApp(key: ValueKey(tenantId)),
+      'teacher' => TeacherApp(key: ValueKey(tenantId)),
+      _ => const ParentApp(),
     };
   }
 
-  Membership? _membershipForThisApp() {
-    final wanted = switch (kRole) {
-      'driver' => const ['DRIVER', 'ATTENDANT'],
-      'teacher' => const ['TEACHER'],
-      _ => const ['GUARDIAN'],
-    };
-    for (final m in _me!.memberships) {
-      if (wanted.contains(m.role)) return m;
+  Membership? _membershipForThisApp(Me me) {
+    final wanted = rolesForApp(_role);
+    final mine = me.schoolsFor(wanted);
+    if (mine.isEmpty) return wanted.contains(me.role) ? me.active : null;
+    for (final m in mine) {
+      if (m.tenantId == me.active.tenantId) return m;
     }
-    return wanted.contains(_me!.role) ? _me!.active : null;
+    return mine.first;
   }
 }
 

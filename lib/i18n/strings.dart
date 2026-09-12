@@ -2179,6 +2179,13 @@ const Map<String, String> _en = {
   'consent.stop.OPERATOR_DATA_SHARING': 'Your permission stops now, and the school must stop passing your child’s details to the bus company beyond what is needed to carry them safely.',
   'consent.stop.TRIP_AUDIO_RECORDING': 'Your permission stops now, and the school must stop recording sound on your child’s bus.',
   'consent.stop.MARKETING': 'Your permission stops now, and the school must stop using your child in publicity and advertising.',
+  'school.whichSchool': 'Which school?',
+  'school.chooseTitle': 'Choose your school',
+  'school.chooseBody': 'You work at more than one school. Pick the one you want to open — you can change it whenever you like.',
+  'school.attendant': 'Bus attendant',
+  'school.opening': 'Opening the school…',
+  'household.oneSchoolTitle': 'One school at a time',
+  'household.oneSchoolBody': 'These times are from {name} only. Children at your other school are not compared here yet.',
 };
 
 const Map<String, String> _ckb = {
@@ -4238,6 +4245,13 @@ const Map<String, String> _ckb = {
   'consent.stop.OPERATOR_DATA_SHARING': 'ڕەزامەندییەکەت ئێستا کۆتایی دێت، و دەبێت قوتابخانە واز بهێنێت لە دانی زانیاری منداڵەکەت بە کۆمپانیای پاس زیاتر لەوەی بۆ گواستنەوەی بە سەلامەتی پێویستە.',
   'consent.stop.TRIP_AUDIO_RECORDING': 'ڕەزامەندییەکەت ئێستا کۆتایی دێت، و دەبێت قوتابخانە واز بهێنێت لە تۆمارکردنی دەنگ لە پاسی منداڵەکەتدا.',
   'consent.stop.MARKETING': 'ڕەزامەندییەکەت ئێستا کۆتایی دێت، و دەبێت قوتابخانە واز بهێنێت لە بەکارهێنانی منداڵەکەت لە بانگەشە و ڕیکلامدا.',
+  'school.whichSchool': 'کام قوتابخانە؟',
+  'school.chooseTitle': 'قوتابخانەکەت هەڵبژێرە',
+  'school.chooseBody': 'تۆ لە زیاتر لە یەک قوتابخانە کار دەکەیت. ئەوەی دەتەوێت بیکەیتەوە هەڵبژێرە — هەر کاتێک بتەوێت دەتوانیت بیگۆڕیت.',
+  'school.attendant': 'یاریدەدەری پاس',
+  'school.opening': 'قوتابخانەکە دەکرێتەوە…',
+  'household.oneSchoolTitle': 'هەر جارێک یەک قوتابخانە',
+  'household.oneSchoolBody': 'ئەم کاتانە تەنها لە {name}ەوەن. ئەو منداڵانەی لە قوتابخانەکەی تریتن هێشتا لێرە بەراورد ناکرێن.',
 };
 
 const Map<String, String> _ar = {
@@ -6289,4 +6303,11 @@ const Map<String, String> _ar = {
   'consent.stop.OPERATOR_DATA_SHARING': 'تنتهي موافقتك الآن، وعلى المدرسة التوقّف عن تمرير بيانات طفلك إلى شركة الحافلات بما يتجاوز ما يلزم لنقله بأمان.',
   'consent.stop.TRIP_AUDIO_RECORDING': 'تنتهي موافقتك الآن، وعلى المدرسة التوقّف عن تسجيل الصوت في حافلة طفلك.',
   'consent.stop.MARKETING': 'تنتهي موافقتك الآن، وعلى المدرسة التوقّف عن استخدام طفلك في الدعاية والإعلان.',
+  'school.whichSchool': 'أي مدرسة؟',
+  'school.chooseTitle': 'اختر مدرستك',
+  'school.chooseBody': 'أنت تعمل في أكثر من مدرسة. اختر المدرسة التي تريد فتحها — يمكنك تغييرها متى شئت.',
+  'school.attendant': 'مرافق الحافلة',
+  'school.opening': 'جارٍ فتح المدرسة…',
+  'household.oneSchoolTitle': 'مدرسة واحدة في كل مرة',
+  'household.oneSchoolBody': 'هذه المواعيد من {name} فقط. الأطفال في مدرستك الأخرى غير مشمولين بالمقارنة هنا بعد.',
 };

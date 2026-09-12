@@ -1,8 +1,18 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../i18n/strings.dart';
 import 'client.dart';
+import 'offline_cache.dart';
 import 'push.dart';
+
+const List<String> kGuardianRoles = ['GUARDIAN'];
+
+const List<String> kTeacherRoles = ['TEACHER'];
+
+const List<String> kCrewRoles = ['DRIVER', 'ATTENDANT'];
 
 class Membership {
   Membership({
@@ -61,6 +71,9 @@ class Me {
   String get schoolName => active.tenantName;
   bool can(String permission) => active.permissions.contains(permission);
 
+  List<Membership> schoolsFor(List<String> roles) =>
+      memberships.where((m) => roles.contains(m.role)).toList(growable: false);
+
   String get firstName => name.split(' ').first;
 
   factory Me.fromJson(Map<String, dynamic> j) {
@@ -112,8 +125,12 @@ class Session {
 
   static bool passwordChangeRequired = false;
 
+  static const _schoolChosenKey = 'sm_school_chosen';
+
   Me? _me;
   Me? get me => _me;
+
+  final ValueNotifier<String?> activeTenant = ValueNotifier<String?>(null);
 
   final ApiClient _api = ApiClient.instance;
 
@@ -149,6 +166,32 @@ class Session {
     );
   }
 
+  Future<Me?> switchTenant(String tenantId) async {
+    final body =
+        await _api.post('/auth/tenant', {'tenantId': tenantId}) as Map<String, dynamic>;
+    await _api.saveSession(
+      access: body['accessToken'] as String,
+      tenantId: tenantId,
+    );
+    await OfflineCache.instance.clear();
+
+    final me = await refresh();
+    if (me != null && me.active.tenantId != tenantId) {
+      throw ApiException('That school did not open. Try again.', 409);
+    }
+    return me;
+  }
+
+  Future<bool> schoolChosen() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_schoolChosenKey) ?? false;
+  }
+
+  Future<void> markSchoolChosen() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_schoolChosenKey, true);
+  }
+
   Future<Me?> refresh() async {
     final Map<String, dynamic> json;
     try {
@@ -158,11 +201,16 @@ class Session {
         _me = null;
         return null;
       }
+      if (e.status == 403 && _api.tenantId != null) {
+        await _api.forgetTenant();
+        return refresh();
+      }
       rethrow;
     }
 
     _me = Me.fromJson(json);
     await _api.setTenant(_me!.active.tenantId);
+    activeTenant.value = _me!.active.tenantId;
     await _api.saveMe(jsonEncode(json));
     await Push.identify(_me!.id, identityToken: _me!.pushIdentityToken);
     await syncLocale();
@@ -174,6 +222,7 @@ class Session {
       final raw = await _api.loadMe();
       if (raw == null) return null;
       _me = Me.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      activeTenant.value = _me!.active.tenantId;
       return _me;
     } catch (_) {
       return null;
@@ -207,7 +256,10 @@ class Session {
       // ignore: empty_catches
     }
     _me = null;
+    activeTenant.value = null;
     await _api.clear();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_schoolChosenKey);
     _api.signalSignedOut();
     await Push.forget();
   }

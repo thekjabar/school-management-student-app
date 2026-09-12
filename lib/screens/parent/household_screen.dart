@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/parent_api.dart';
+import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
@@ -75,10 +76,20 @@ class _Day extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final closed = day.children.where((c) => c.closed).toList();
+    final schools = Session.instance.me?.schoolsFor(kGuardianRoles).length ?? 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (schools > 1) ...[
+          NoticeBanner(
+            icon: Icons.school_outlined,
+            color: AppTheme.blue,
+            title: t('household.oneSchoolTitle'),
+            body: tv('household.oneSchoolBody', {'name': day.school.name}),
+          ),
+          const SizedBox(height: kCardGap),
+        ],
         if (day.overlaps.isNotEmpty) ...[
           NoticeBanner(
             icon: Icons.merge_type_rounded,

@@ -23,31 +23,38 @@ import 'personal_info_screen.dart';
 import 'settings_screen.dart';
 
 class ParentProfileTab extends StatelessWidget {
-  const ParentProfileTab({super.key, required this.children, this.onOpenChild});
+  const ParentProfileTab({
+    super.key,
+    required this.children,
+    required this.selected,
+    this.onOpenChild,
+  });
 
   final List<Child> children;
+  final Child? selected;
   final void Function(Child child)? onOpenChild;
 
   @override
   Widget build(BuildContext context) {
     final tint = Role.parent.tint;
     final me = Session.instance.me;
+    final child = selected ?? (children.isEmpty ? null : children.first);
 
     return Loader<AttitudeSummary?>(
       tint: tint,
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20),
       load: () async {
-        if (children.isEmpty) return null;
-        return ParentApi.instance.attitude(children.first.studentId);
+        if (child == null) return null;
+        return ParentApi.instance.attitude(child.studentId, tenantId: child.tenantId);
       },
       builder: (context, attitude) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _Overview(me: me, tint: tint),
           const SizedBox(height: kCardGap),
-          _Children(children: children, onOpen: onOpenChild),
+          _Children(children: children, selected: child, onOpen: onOpenChild),
           const SizedBox(height: kCardGap),
-          _Settings(children: children),
+          _Settings(children: children, selected: child),
           const SizedBox(height: kCardGap),
           _Figures(children: children, attitude: attitude),
           const SizedBox(height: kCardGap),
@@ -245,9 +252,10 @@ class _Fact extends StatelessWidget {
 }
 
 class _Children extends StatelessWidget {
-  const _Children({required this.children, required this.onOpen});
+  const _Children({required this.children, required this.selected, required this.onOpen});
 
   final List<Child> children;
+  final Child? selected;
   final void Function(Child child)? onOpen;
 
   @override
@@ -272,7 +280,7 @@ class _Children extends StatelessWidget {
                         Expanded(
                           child: ChildrenTab(
                             children: children,
-                            selected: children.first,
+                            selected: selected ?? children.first,
                           ),
                         ),
                       ],
@@ -363,9 +371,10 @@ class _ChildRow extends StatelessWidget {
 }
 
 class _Settings extends StatelessWidget {
-  const _Settings({required this.children});
+  const _Settings({required this.children, required this.selected});
 
   final List<Child> children;
+  final Child? selected;
 
   @override
   Widget build(BuildContext context) {
@@ -411,7 +420,7 @@ class _Settings extends StatelessWidget {
                                 Expanded(
                                   child: ChildrenTab(
                                     children: children,
-                                    selected: children.first,
+                                    selected: selected ?? children.first,
                                   ),
                                 ),
                               ],

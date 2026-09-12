@@ -425,6 +425,7 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
             urgency: 'QUESTION',
             topic: 'PICKUP_ARRANGEMENT',
             message: message,
+            tenantId: child.tenantId,
           );
           sent++;
         } on ApiException catch (e) {
