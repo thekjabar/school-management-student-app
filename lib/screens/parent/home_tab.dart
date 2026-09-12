@@ -290,7 +290,7 @@ class _BusCard extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                t('bus.notOnBus'),
+                tn('bus.notOnBus', child.name),
                 style: TextStyle(fontSize: 13.5, color: AppTheme.textMuted),
               ),
             ),

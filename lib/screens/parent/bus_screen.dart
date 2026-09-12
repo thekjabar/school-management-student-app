@@ -155,7 +155,7 @@ class _BusScreenState extends State<BusScreen> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(0, 44, 0, 26),
                           child: Text(
-                            t('bus.notOnBus'),
+                            tn('bus.notOnBus', widget.child.name),
                             textAlign: TextAlign.center,
                             style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
                           ),
