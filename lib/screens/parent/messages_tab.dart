@@ -552,45 +552,91 @@ class _Conversations extends StatefulWidget {
 }
 
 class _ConversationsState extends State<_Conversations> {
-  final _key = GlobalKey<LoaderState<List<ThreadSummary>>>();
+  late Future<List<ThreadSummary>> _threads = ParentApi.instance.threads();
+
+  void _reload() => setState(() => _threads = ParentApi.instance.threads());
 
   @override
   Widget build(BuildContext context) {
     final tint = Role.parent.tint;
     return Card16(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
-      child: Loader<List<ThreadSummary>>(
-        key: _key,
-        tint: tint,
-        padding: EdgeInsets.zero,
-        empty: t('conv.none'),
-        isEmpty: (rows) => rows.isEmpty,
-        load: () => ParentApi.instance.threads(),
-        builder: (context, rows) => Column(
-          children: [
-            SectionRow(
-              title: t('conv.title'),
-              actionLabel: t('conv.start'),
-              actionIcon: Icons.add_rounded,
-              onAction: () => _startConversation(context),
-            ),
-            for (var i = 0; i < rows.length; i++) ...[
-              if (i > 0) Divider(height: 1, color: AppTheme.border),
-              _ThreadRow(
-                thread: rows[i],
-                tint: tint,
-                onTap: () async {
-                  await Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => ConversationScreen(thread: rows[i]),
+      child: Column(
+        children: [
+          SectionRow(
+            title: t('conv.title'),
+            actionLabel: t('conv.start'),
+            actionIcon: Icons.add_rounded,
+            onAction: () async {
+              await _startConversation(context);
+              if (mounted) _reload();
+            },
+          ),
+          FutureBuilder<List<ThreadSummary>>(
+            future: _threads,
+            builder: (context, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 26),
+                  child: Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                  );
-                  _key.currentState?.reload();
-                },
-              ),
-            ],
-          ],
-        ),
+                  ),
+                );
+              }
+              if (snap.hasError) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 22),
+                  child: Column(
+                    children: [
+                      Text(
+                        errorText(snap.error),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                      ),
+                      const SizedBox(height: 10),
+                      TextButton(onPressed: _reload, child: Text(t('common.tryAgain'))),
+                    ],
+                  ),
+                );
+              }
+              final rows = snap.data ?? const <ThreadSummary>[];
+              if (rows.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 26),
+                  child: Center(
+                    child: Text(
+                      t('conv.none'),
+                      style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                    ),
+                  ),
+                );
+              }
+              return Column(
+                children: [
+                  for (var i = 0; i < rows.length; i++) ...[
+                    if (i > 0) Divider(height: 1, color: AppTheme.border),
+                    _ThreadRow(
+                      thread: rows[i],
+                      tint: tint,
+                      onTap: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ConversationScreen(thread: rows[i]),
+                          ),
+                        );
+                        if (mounted) _reload();
+                      },
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }
