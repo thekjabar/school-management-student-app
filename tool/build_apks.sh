@@ -42,9 +42,16 @@ for role in "${ROLES[@]}"; do
   rm -rf build/app/intermediates/merged_assets
   rm -rf build/app/intermediates/assets
 
+  case "$role" in
+    parent) api="https://parent-api.krsprotection.com" ;;
+    *)      api="https://api.krsprotection.com" ;;
+  esac
+  echo "api: $api"
+
   flutter build apk --release \
     --flavor "$role" \
     --dart-define="APP_ROLE=$role" \
+    --dart-define="API_BASE=$api" \
     --dart-define="MAPBOX_TOKEN=$MAPBOX_TOKEN" \
     --dart-define="MAPBOX_STYLE=$MAPBOX_STYLE" \
     --split-per-abi
