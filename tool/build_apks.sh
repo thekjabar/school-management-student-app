@@ -43,7 +43,8 @@ for role in "${ROLES[@]}"; do
   rm -rf build/app/intermediates/assets
 
   case "$role" in
-    parent) api="https://parent-api.krsprotection.com" ;;
+    parent)  api="https://parent-api.krsprotection.com" ;;
+    teacher) api="https://teacher-api.krsprotection.com" ;;
     *)      api="https://api.krsprotection.com" ;;
   esac
   echo "api: $api"

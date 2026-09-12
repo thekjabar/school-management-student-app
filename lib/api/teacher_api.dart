@@ -322,7 +322,7 @@ class TeacherApi {
     String? note,
     bool visibleToGuardian = false,
   }) async {
-    await _api.post('/school/behavior', {
+    await _api.post('/teacher/behaviour', {
       'studentId': studentId,
       'kind': kind,
       'classId': ?classId,
@@ -478,7 +478,7 @@ class TeacherApi {
   }
 
   Future<String?> currentTermId() async {
-    final json = await _api.get('/school/terms?pageSize=10');
+    final json = await _api.get('/teacher/terms?pageSize=10');
     final rows = Paged.from<Map<String, dynamic>>(json, (m) => m).rows;
     for (final row in rows) {
       if (row['isCurrent'] == true) return row['id'] as String?;
@@ -553,7 +553,7 @@ class TeacherApi {
     String? studentId,
   }) async {
     final json = await _api.upload(
-      '/school/uploads/direct',
+      '/teacher/uploads/direct',
       field: 'file',
       bytes: bytes,
       filename: filename,

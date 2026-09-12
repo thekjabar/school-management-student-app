@@ -1,3 +1,4 @@
+import '../main.dart';
 import 'client.dart';
 import 'session.dart';
 
@@ -159,9 +160,11 @@ class StaffLeaveApi {
 
   final ApiClient _api = ApiClient.instance;
 
-  String get _base => Session.instance.me?.active.tenantKind == 'OPERATOR'
-      ? '/operator/staff-leave/mine'
-      : '/school/staff-leave/mine';
+  String get _base => kRole == 'teacher'
+      ? '/teacher/staff-leave/mine'
+      : Session.instance.me?.active.tenantKind == 'OPERATOR'
+          ? '/operator/staff-leave/mine'
+          : '/school/staff-leave/mine';
 
   Future<List<StaffLeave>> mine() async {
     final json = await _api.get('$_base?pageSize=50');
