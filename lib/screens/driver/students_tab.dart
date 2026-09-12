@@ -427,8 +427,8 @@ class _RiderRow extends StatelessWidget {
                   entry.rider.boardedAt != null
                       ? tn('driver.onBoardSince', hhmm(entry.rider.boardedAt))
                       : entry.stop.etaAt == null
-                          ? entry.stop.name
-                          : '${entry.stop.name} · ${stopEtaLine(entry.stop)}',
+                          ? (entry.rider.pickup?.address ?? entry.stop.name)
+                          : '${entry.rider.pickup?.address ?? entry.stop.name} · ${stopEtaLine(entry.stop)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
@@ -516,8 +516,8 @@ class _MarkSheet extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        entry.stop.name,
-                        maxLines: 1,
+                        entry.rider.pickup?.address ?? entry.stop.name,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                       ),

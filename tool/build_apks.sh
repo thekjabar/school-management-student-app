@@ -45,6 +45,7 @@ for role in "${ROLES[@]}"; do
   case "$role" in
     parent)  api="https://parent-api.krsprotection.com" ;;
     teacher) api="https://teacher-api.krsprotection.com" ;;
+    driver)  api="https://driver-api.krsprotection.com" ;;
     *)      api="https://api.krsprotection.com" ;;
   esac
   echo "api: $api"

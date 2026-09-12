@@ -218,10 +218,33 @@ class CrewTrip {
   }
 }
 
+class PickupPoint {
+  const PickupPoint({required this.lat, required this.lon, this.address, this.note});
+
+  final double lat;
+  final double lon;
+  final String? address;
+  final String? note;
+
+  static PickupPoint? fromJson(Object? raw) {
+    if (raw is! Map<String, dynamic>) return null;
+    final lat = (raw['lat'] as num?)?.toDouble();
+    final lon = (raw['lon'] as num?)?.toDouble();
+    if (lat == null || lon == null) return null;
+    return PickupPoint(
+      lat: lat,
+      lon: lon,
+      address: raw['address'] as String?,
+      note: raw['note'] as String?,
+    );
+  }
+}
+
 class RiderOnStop {
   RiderOnStop({
     required this.studentId,
     required this.name,
+    required this.pickup,
     required this.seatNumber,
     required this.requiresAssistance,
     required this.boardedAt,
@@ -231,6 +254,9 @@ class RiderOnStop {
 
   final String studentId;
   final String name;
+
+  final PickupPoint? pickup;
+
   final String? seatNumber;
   final bool requiresAssistance;
   final DateTime? boardedAt;
@@ -246,6 +272,7 @@ class RiderOnStop {
   factory RiderOnStop.fromJson(Map<String, dynamic> j) => RiderOnStop(
         studentId: j['studentId'] as String,
         name: (j['name'] ?? 'Student') as String,
+        pickup: PickupPoint.fromJson(j['pickup']),
         seatNumber: j['seatNumber'] as String?,
         requiresAssistance: (j['requiresAssistance'] ?? false) as bool,
         boardedAt: j['boardedAt'] == null ? null : DateTime.parse(j['boardedAt'] as String).toLocal(),
