@@ -112,6 +112,9 @@ dependencies:
   # flutter_map stays: the driver's route map is built on it, and a driver's
   # handset is the one most likely to have no Play Services at all.
 
+  record: ^5.1.2
+  just_audio: ^0.9.42
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

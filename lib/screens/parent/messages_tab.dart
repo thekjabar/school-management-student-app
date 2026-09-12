@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/client.dart';
 import '../../api/parent_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
@@ -9,6 +10,7 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
+import 'conversation_screen.dart';
 
 class MessagesTab extends StatefulWidget {
   const MessagesTab({super.key, required this.onRead});
@@ -165,6 +167,11 @@ class _MessagesTabState extends State<MessagesTab> {
                         icon: Icons.priority_high_rounded,
                         color: AppTheme.rose,
                       ),
+                      TabSpec(
+                        label: t('msg.conversations'),
+                        icon: Icons.chat_bubble_outline_rounded,
+                        color: AppTheme.green,
+                      ),
                     ],
                   ),
                 ],
@@ -172,7 +179,9 @@ class _MessagesTabState extends State<MessagesTab> {
             ),
             const SizedBox(height: kCardGap),
 
-            if (rows.isEmpty)
+            if (_tab == 4)
+              const _Conversations()
+            else if (rows.isEmpty)
               Card16(
                 padding: const EdgeInsets.symmetric(vertical: 34),
                 child: Center(
@@ -531,6 +540,257 @@ class _GotIt extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _Conversations extends StatefulWidget {
+  const _Conversations();
+
+  @override
+  State<_Conversations> createState() => _ConversationsState();
+}
+
+class _ConversationsState extends State<_Conversations> {
+  final _key = GlobalKey<LoaderState<List<ThreadSummary>>>();
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = Role.parent.tint;
+    return Card16(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
+      child: Loader<List<ThreadSummary>>(
+        key: _key,
+        tint: tint,
+        padding: EdgeInsets.zero,
+        empty: t('conv.none'),
+        isEmpty: (rows) => rows.isEmpty,
+        load: () => ParentApi.instance.threads(),
+        builder: (context, rows) => Column(
+          children: [
+            SectionRow(
+              title: t('conv.title'),
+              actionLabel: t('conv.start'),
+              actionIcon: Icons.add_rounded,
+              onAction: () => _startConversation(context),
+            ),
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) Divider(height: 1, color: AppTheme.border),
+              _ThreadRow(
+                thread: rows[i],
+                tint: tint,
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ConversationScreen(thread: rows[i]),
+                    ),
+                  );
+                  _key.currentState?.reload();
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ThreadRow extends StatelessWidget {
+  const _ThreadRow({required this.thread, required this.tint, required this.onTap});
+
+  final ThreadSummary thread;
+  final Color tint;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: tint.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.chat_bubble_outline_rounded, size: 18, color: tint),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    thread.subject,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: thread.unread ? FontWeight.w800 : FontWeight.w600,
+                      color: AppTheme.text,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    thread.studentName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (thread.resolved)
+              StatusChip(t('conv.resolved'), color: AppTheme.textMuted)
+            else if (thread.unread)
+              Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(color: tint, shape: BoxShape.circle),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _startConversation(BuildContext context) async {
+  final children = await ParentApi.instance.children();
+  if (!context.mounted) return;
+  if (children.isEmpty) {
+    showNote(context, t('conv.none'), bad: true);
+    return;
+  }
+  final opened = await showDialog<ThreadSummary>(
+    context: context,
+    builder: (_) => _NewConversationDialog(children: children),
+  );
+  if (opened == null || !context.mounted) return;
+  await Navigator.of(context).push(
+    MaterialPageRoute<void>(builder: (_) => ConversationScreen(thread: opened)),
+  );
+}
+
+const _topics = <String>[
+  'GENERAL',
+  'ABSENCE',
+  'TRANSPORT',
+  'ACADEMIC',
+  'BEHAVIOUR',
+  'HEALTH',
+  'BILLING',
+];
+
+class _NewConversationDialog extends StatefulWidget {
+  const _NewConversationDialog({required this.children});
+
+  final List<Child> children;
+
+  @override
+  State<_NewConversationDialog> createState() => _NewConversationDialogState();
+}
+
+class _NewConversationDialogState extends State<_NewConversationDialog> {
+  late String _studentId = widget.children.first.studentId;
+  String _topic = 'GENERAL';
+  final _subject = TextEditingController();
+  final _body = TextEditingController();
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _subject.dispose();
+    _body.dispose();
+    super.dispose();
+  }
+
+  Future<void> _open() async {
+    final subject = _subject.text.trim();
+    final body = _body.text.trim();
+    if (subject.length < 2 || body.isEmpty) return;
+    setState(() => _busy = true);
+    try {
+      final thread = await ParentApi.instance.openThread(
+        studentId: _studentId,
+        subject: subject,
+        body: body,
+        topic: _topic,
+      );
+      if (mounted) Navigator.of(context).pop(thread);
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        showNote(context, e.message, bad: true);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppTheme.surface,
+      title: Text(t('conv.start'), style: const TextStyle(fontSize: 17)),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (widget.children.length > 1)
+              DropdownButtonFormField<String>(
+                initialValue: _studentId,
+                isExpanded: true,
+                decoration: InputDecoration(labelText: t('common.child')),
+                items: [
+                  for (final c in widget.children)
+                    DropdownMenuItem(value: c.studentId, child: Text(c.name)),
+                ],
+                onChanged: (v) => setState(() => _studentId = v ?? _studentId),
+              ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              initialValue: _topic,
+              isExpanded: true,
+              decoration: InputDecoration(labelText: t('conv.topic')),
+              items: [
+                for (final k in _topics)
+                  DropdownMenuItem(value: k, child: Text(humanise(k))),
+              ],
+              onChanged: (v) => setState(() => _topic = v ?? _topic),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _subject,
+              decoration: InputDecoration(labelText: t('conv.subject')),
+              textCapitalization: TextCapitalization.sentences,
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _body,
+              minLines: 3,
+              maxLines: 6,
+              decoration: InputDecoration(labelText: t('conv.writeSomething')),
+              textCapitalization: TextCapitalization.sentences,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
+          child: Text(t('common.cancel')),
+        ),
+        TextButton(
+          onPressed: _busy ? null : _open,
+          child: Text(t('conv.send')),
+        ),
+      ],
     );
   }
 }

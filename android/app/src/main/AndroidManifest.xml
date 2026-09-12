@@ -46,6 +46,7 @@
       asking a driver for their whole photo library to take one picture.
     -->
     <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!--
       Used, not required. One codebase builds five apps from this manifest and
       only the driver's ever opens a camera, so a camera-less handset must

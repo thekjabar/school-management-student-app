@@ -2626,6 +2626,7 @@ class ParentApi {
     String? studentId,
     String? note,
     DateTime? capturedAt,
+    int? durationMs,
   }) async {
     final json = await _api.upload(
       '/parent/uploads',
@@ -2638,6 +2639,7 @@ class ParentApi {
         'subjectStudentId': ?studentId,
         if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
         'capturedAt': ?capturedAt?.toUtc().toIso8601String(),
+        if (durationMs != null) 'durationMs': durationMs.toString(),
       },
     );
     final id = json is Map ? json['id'] : null;
@@ -2645,6 +2647,70 @@ class ParentApi {
       throw ApiException('The school could not store that file.', 500);
     }
     return id;
+  }
+
+  Future<List<ThreadSummary>> threads({String? status, String? studentId}) async {
+    final q = <String>['pageSize=50'];
+    if (status != null && status.isNotEmpty) q.add('status=$status');
+    if (studentId != null && studentId.isNotEmpty) q.add('studentId=$studentId');
+    final json = await _api.get('/parent/messages?${q.join('&')}');
+    return Paged.from<ThreadSummary>(json, ThreadSummary.fromJson).rows;
+  }
+
+  Future<int> unreadThreadCount() async {
+    final json = await _api.get('/parent/messages/unread-count');
+    final v = json is Map ? json['unread'] : null;
+    return (v as num?)?.toInt() ?? 0;
+  }
+
+  Future<ThreadSummary> openThread({
+    required String studentId,
+    required String subject,
+    String? body,
+    String? topic,
+    String? voiceNoteAssetId,
+  }) async {
+    final json = await _api.post('/parent/messages', {
+      'studentId': studentId,
+      'subject': subject,
+      if (body != null && body.trim().isNotEmpty) 'body': body.trim(),
+      if (topic != null && topic.isNotEmpty) 'topic': topic,
+      if (voiceNoteAssetId != null && voiceNoteAssetId.isNotEmpty)
+        'voiceNoteAssetId': voiceNoteAssetId,
+    });
+    return ThreadSummary.fromJson((json as Map<String, dynamic>?) ?? const {});
+  }
+
+  Future<List<ThreadMessage>> threadMessages(String id) async {
+    final json = await _api.get('/parent/messages/$id/messages?limit=100');
+    return Paged.from<ThreadMessage>(json, ThreadMessage.fromJson).rows;
+  }
+
+  Future<void> replyToThread(
+    String id, {
+    String? body,
+    String? voiceNoteAssetId,
+  }) async {
+    await _api.post('/parent/messages/$id/messages', {
+      if (body != null && body.trim().isNotEmpty) 'body': body.trim(),
+      if (voiceNoteAssetId != null && voiceNoteAssetId.isNotEmpty)
+        'voiceNoteAssetId': voiceNoteAssetId,
+    });
+  }
+
+  Future<String?> voiceUrl(String threadId, String messageId) async {
+    final json =
+        await _api.get('/parent/messages/$threadId/messages/$messageId/voice');
+    final v = json is Map ? json['url'] : null;
+    return v is String && v.isNotEmpty ? v : null;
+  }
+
+  Future<void> markThreadRead(String id) async {
+    await _api.post('/parent/messages/$id/read', const {});
+  }
+
+  Future<void> resolveThread(String id) async {
+    await _api.post('/parent/messages/$id/resolve', const {});
   }
 
   Future<Map<String, dynamic>> raiseConcern({
@@ -3462,4 +3528,118 @@ class ConsentFormDetail {
       form: ConsentForm.fromJson((j['form'] as Map<String, dynamic>?) ?? const {}),
     );
   }
+}
+
+class VoiceNote {
+  VoiceNote({
+    required this.attachmentId,
+    required this.durationMs,
+    required this.mime,
+    required this.state,
+  });
+
+  final String attachmentId;
+  final int? durationMs;
+  final String mime;
+  final String state;
+
+  bool get ready => state == 'READY';
+
+  Duration get length => Duration(milliseconds: durationMs ?? 0);
+
+  factory VoiceNote.fromJson(Map<String, dynamic> j) => VoiceNote(
+        attachmentId: (j['attachmentId'] ?? '') as String,
+        durationMs: (j['durationMs'] as num?)?.toInt(),
+        mime: (j['mime'] ?? 'audio/mp4') as String,
+        state: (j['state'] ?? 'PENDING') as String,
+      );
+}
+
+class ThreadSummary {
+  ThreadSummary({
+    required this.id,
+    required this.subject,
+    required this.topic,
+    required this.status,
+    required this.studentId,
+    required this.studentName,
+    required this.lastMessageAt,
+    required this.lastMessageBy,
+    required this.messageCount,
+    required this.unread,
+  });
+
+  final String id;
+  final String subject;
+  final String topic;
+  final String status;
+  final String studentId;
+  final String studentName;
+  final DateTime? lastMessageAt;
+  final String lastMessageBy;
+  final int messageCount;
+  final bool unread;
+
+  bool get resolved => status == 'RESOLVED';
+
+  factory ThreadSummary.fromJson(Map<String, dynamic> j) => ThreadSummary(
+        id: (j['id'] ?? '') as String,
+        subject: (j['subject'] ?? '') as String,
+        topic: (j['topic'] ?? 'GENERAL') as String,
+        status: (j['status'] ?? 'OPEN') as String,
+        studentId: (j['studentId'] ?? '') as String,
+        studentName: (j['studentName'] ?? '') as String,
+        lastMessageAt: j['lastMessageAt'] is String
+            ? DateTime.tryParse(j['lastMessageAt'] as String)?.toLocal()
+            : null,
+        lastMessageBy: (j['lastMessageBy'] ?? 'SCHOOL') as String,
+        messageCount: (j['messageCount'] as num?)?.toInt() ?? 0,
+        unread: (j['unread'] ?? false) as bool,
+      );
+}
+
+class ThreadMessage {
+  ThreadMessage({
+    required this.id,
+    required this.party,
+    required this.authorName,
+    required this.authorRole,
+    required this.body,
+    required this.voice,
+    required this.systemNote,
+    required this.sentAt,
+    required this.retractedAt,
+  });
+
+  final String id;
+  final String party;
+  final String authorName;
+  final String? authorRole;
+  final String? body;
+  final VoiceNote? voice;
+  final bool systemNote;
+  final DateTime? sentAt;
+  final DateTime? retractedAt;
+
+  bool get fromFamily => party == 'FAMILY';
+
+  bool get withdrawn => retractedAt != null;
+
+  factory ThreadMessage.fromJson(Map<String, dynamic> j) => ThreadMessage(
+        id: (j['id'] ?? '') as String,
+        party: (j['party'] ?? 'SCHOOL') as String,
+        authorName: (j['authorName'] ?? '') as String,
+        authorRole: j['authorRole'] as String?,
+        body: j['body'] as String?,
+        voice: j['voice'] == null
+            ? null
+            : VoiceNote.fromJson(j['voice'] as Map<String, dynamic>),
+        systemNote: (j['systemNote'] ?? false) as bool,
+        sentAt: j['sentAt'] is String
+            ? DateTime.tryParse(j['sentAt'] as String)?.toLocal()
+            : null,
+        retractedAt: j['retractedAt'] is String
+            ? DateTime.tryParse(j['retractedAt'] as String)?.toLocal()
+            : null,
+      );
 }
