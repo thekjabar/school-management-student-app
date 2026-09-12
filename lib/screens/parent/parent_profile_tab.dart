@@ -42,6 +42,7 @@ class ParentProfileTab extends StatelessWidget {
 
     return Loader<AttitudeSummary?>(
       tint: tint,
+      watch: child?.studentId,
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20),
       load: () async {
         if (child == null) return null;

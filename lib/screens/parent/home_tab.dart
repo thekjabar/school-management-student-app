@@ -35,6 +35,7 @@ class HomeTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Loader<_Home>(
       tint: Role.parent.tint,
+      watch: child.studentId,
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
       load: () async {
         final payload = await HomePayload.fetch(child.studentId);

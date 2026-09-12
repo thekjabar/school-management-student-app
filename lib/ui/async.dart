@@ -21,6 +21,7 @@ class Loader<T> extends StatefulWidget {
     this.empty,
     this.isEmpty,
     this.tint,
+    this.watch,
     this.padding = const EdgeInsets.fromLTRB(16, 4, 16, 28),
   });
 
@@ -31,6 +32,12 @@ class Loader<T> extends StatefulWidget {
   final bool Function(T data)? isEmpty;
 
   final Color? tint;
+
+  /// What the load depends on. A Loader that stays mounted while this changes
+  /// refetches; without it the first future is kept and the screen shows the
+  /// data it opened with.
+  final Object? watch;
+
   final EdgeInsets padding;
 
   @override
@@ -53,6 +60,12 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
     AppLocale.current.removeListener(_languageChanged);
     routeObserver.unsubscribe(this);
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant Loader<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.watch != oldWidget.watch) reload();
   }
 
   @override

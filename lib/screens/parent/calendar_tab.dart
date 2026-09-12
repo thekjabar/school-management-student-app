@@ -32,6 +32,7 @@ class _CalendarTabState extends State<CalendarTab> {
 
     return Loader<_Diary>(
       tint: tint,
+      watch: widget.child.studentId,
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20),
       load: () async {
         final r = await Future.wait([
