@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api/offline_cache.dart';
@@ -51,6 +53,7 @@ class _ParentAppState extends State<ParentApp> {
   }
 
   Future<void> _load() async {
+    unawaited(Entitlements.instance.refresh());
     try {
       final children = await ParentApi.instance.children();
       final start = _pickFrom(children, _selectedId) ??

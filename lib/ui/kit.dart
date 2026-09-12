@@ -430,6 +430,7 @@ class QuickAction {
     this.onTap,
     this.glyph,
     this.enabled = true,
+    this.locked = false,
     this.note,
   });
 
@@ -439,6 +440,8 @@ class QuickAction {
   final VoidCallback? onTap;
 
   final bool enabled;
+
+  final bool locked;
 
   final String? note;
 
@@ -495,7 +498,7 @@ class _Tile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final on = action.enabled;
+    final on = action.enabled && !action.locked;
     final tint = on ? action.color : AppTheme.textFaint;
 
     return GestureDetector(
@@ -513,16 +516,36 @@ class _Tile extends StatelessWidget {
             Pop(
               index: index,
               extraDelay: const Duration(milliseconds: 60),
-              child: Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: action.glyph == null
-                    ? Icon(action.icon, size: 22, color: tint)
-                    : Center(child: action.glyph!(tint, 22)),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: action.glyph == null
+                        ? Icon(action.icon, size: 22, color: tint)
+                        : Center(child: action.glyph!(tint, 22)),
+                  ),
+                  if (action.locked)
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Container(
+                        width: 17,
+                        height: 17,
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: Icon(Icons.lock_rounded, size: 10, color: AppTheme.textFaint),
+                      ),
+                    ),
+                ],
               ),
             ),
             const SizedBox(height: 9),

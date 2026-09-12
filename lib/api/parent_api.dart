@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 
 import '../i18n/strings.dart';
 import 'attachments.dart';
@@ -3646,4 +3646,87 @@ class ThreadMessage {
             ? DateTime.tryParse(j['retractedAt'] as String)?.toLocal()
             : null,
       );
+}
+
+class PackageEntitlements {
+  const PackageEntitlements({
+    required this.paidSections,
+    required this.blurbs,
+    required this.lockedByChild,
+  });
+
+  final Set<String> paidSections;
+
+  final Map<String, Map<String, String>> blurbs;
+
+  final Map<String, Set<String>> lockedByChild;
+
+  static const PackageEntitlements none = PackageEntitlements(
+    paidSections: <String>{},
+    blurbs: <String, Map<String, String>>{},
+    lockedByChild: <String, Set<String>>{},
+  );
+
+  bool isLocked(String childId, String sectionKey) =>
+      lockedByChild[childId]?.contains(sectionKey) ?? false;
+
+  String blurbFor(String sectionKey, String lang) =>
+      blurbs[sectionKey]?[lang] ?? blurbs[sectionKey]?['en'] ?? '';
+
+  factory PackageEntitlements.fromJson(Map<String, dynamic> j) {
+    final paid = <String>{};
+    final blurbs = <String, Map<String, String>>{};
+    for (final raw in (j['sections'] as List?) ?? const []) {
+      final s = raw as Map<String, dynamic>;
+      final key = (s['key'] ?? '') as String;
+      if (key.isEmpty) continue;
+      if ((s['paid'] ?? false) as bool) paid.add(key);
+      final b = s['blurb'] as Map<String, dynamic>?;
+      if (b != null) {
+        blurbs[key] = {
+          for (final e in b.entries)
+            if (e.value is String) e.key: e.value as String,
+        };
+      }
+    }
+
+    final locked = <String, Set<String>>{};
+    for (final raw in (j['children'] as List?) ?? const []) {
+      final c = raw as Map<String, dynamic>;
+      final id = (c['studentId'] ?? '') as String;
+      if (id.isEmpty) continue;
+      locked[id] = {
+        for (final k in (c['lockedSections'] as List?) ?? const [])
+          if (k is String) k,
+      };
+    }
+
+    return PackageEntitlements(
+      paidSections: paid,
+      blurbs: blurbs,
+      lockedByChild: locked,
+    );
+  }
+}
+
+class Entitlements {
+  Entitlements._();
+
+  static final Entitlements instance = Entitlements._();
+
+  final ApiClient _api = ApiClient.instance;
+
+  final ValueNotifier<PackageEntitlements> current =
+      ValueNotifier<PackageEntitlements>(PackageEntitlements.none);
+
+  Future<void> refresh() async {
+    try {
+      final json = await _api.get('/parent/entitlements');
+      current.value = PackageEntitlements.fromJson(json as Map<String, dynamic>);
+    } catch (_) {
+      current.value = PackageEntitlements.none;
+    }
+  }
+
+  void forget() => current.value = PackageEntitlements.none;
 }
