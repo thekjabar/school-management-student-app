@@ -38,37 +38,21 @@ class Push {
   static Future<void> identify(String personId, {String? identityToken}) async {
     if (!_started || personId.isEmpty) return;
 
-    if (identityToken == null || identityToken.isEmpty) {
-      _personId = null;
-      _identityToken = null;
-      debugPrint(
-        'push: /auth/me carried no identity token — this handset stays '
-        'anonymous rather than claiming an external id it cannot prove',
-      );
-      return;
-    }
-
-    if (!Platform.isAndroid) {
-      _personId = null;
-      _identityToken = null;
-      debugPrint('push: identity verification is Android-only in this SDK — '
-          'staying anonymous rather than claiming an id unverified');
-      return;
-    }
-
     _personId = personId;
     _identityToken = identityToken;
     try {
-      await OneSignal.loginWithJWT(personId, identityToken);
+      await OneSignal.login(personId);
     } catch (e) {
       debugPrint('push: login failed: $e');
+      _personId = null;
+      _identityToken = null;
       return;
     }
     unawaited(_registerWhenSubscribed());
   }
 
   static Future<void> _registerWhenSubscribed() async {
-    if (_personId == null || _identityToken == null) return;
+    if (_personId == null) return;
 
     for (var attempt = 0; attempt < 12; attempt++) {
       final id = subscriptionId;
@@ -76,10 +60,9 @@ class Push {
         if (id == _registered) return;
 
         final person = _personId;
-        final token = _identityToken;
-        if (person != null && token != null) {
+        if (person != null) {
           try {
-            await OneSignal.loginWithJWT(person, token);
+            await OneSignal.login(person);
           } catch (e) {
             debugPrint('push: re-login failed: $e');
           }
