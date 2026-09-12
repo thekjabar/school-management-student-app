@@ -717,13 +717,29 @@ class _NewConversationDialogState extends State<_NewConversationDialog> {
     if (subject.length < 2 || body.isEmpty) return;
     setState(() => _busy = true);
     try {
-      final thread = await ParentApi.instance.openThread(
+      final id = await ParentApi.instance.openThread(
         studentId: _studentId,
         subject: subject,
         body: body,
         topic: _topic,
       );
-      if (mounted) Navigator.of(context).pop(thread);
+      final child = widget.children.firstWhere((c) => c.studentId == _studentId);
+      if (mounted) {
+        Navigator.of(context).pop(
+          ThreadSummary(
+            id: id,
+            subject: subject,
+            topic: _topic,
+            status: 'OPEN',
+            studentId: _studentId,
+            studentName: child.name,
+            lastMessageAt: DateTime.now(),
+            lastMessageBy: 'FAMILY',
+            messageCount: 1,
+            unread: false,
+          ),
+        );
+      }
     } on ApiException catch (e) {
       if (mounted) {
         setState(() => _busy = false);

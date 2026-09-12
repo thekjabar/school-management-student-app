@@ -2663,7 +2663,7 @@ class ParentApi {
     return (v as num?)?.toInt() ?? 0;
   }
 
-  Future<ThreadSummary> openThread({
+  Future<String> openThread({
     required String studentId,
     required String subject,
     String? body,
@@ -2678,7 +2678,11 @@ class ParentApi {
       if (voiceNoteAssetId != null && voiceNoteAssetId.isNotEmpty)
         'voiceNoteAssetId': voiceNoteAssetId,
     });
-    return ThreadSummary.fromJson((json as Map<String, dynamic>?) ?? const {});
+    final id = json is Map ? json['id'] : null;
+    if (id is! String || id.isEmpty) {
+      throw ApiException('The school could not open that conversation.', 500);
+    }
+    return id;
   }
 
   Future<List<ThreadMessage>> threadMessages(String id) async {
