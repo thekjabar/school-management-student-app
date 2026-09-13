@@ -313,6 +313,8 @@ class _MapCard extends StatelessWidget {
                   interactionOptions: const InteractionOptions(
                     flags: InteractiveFlag.pinchZoom |
                         InteractiveFlag.pinchMove |
+                        InteractiveFlag.drag |
+                        InteractiveFlag.flingAnimation |
                         InteractiveFlag.doubleTapZoom,
                   ),
                 ),
