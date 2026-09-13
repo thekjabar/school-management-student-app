@@ -358,6 +358,9 @@ class _TripScreenState extends State<TripScreen> {
 
                   final aboard = _stillAboard(data.plan);
 
+                  final currentStop =
+                      data.plan.stops.where((s) => !s.done).firstOrNull?.plannedSequence;
+
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -480,7 +483,9 @@ class _TripScreenState extends State<TripScreen> {
                               _query.isEmpty ||
                               s.students.any((r) => _matches(r, _query)))
                           .map(
-                        (s) => _StopCard(
+                        (s) => StopCard(
+                          key: ValueKey('stop-${s.plannedSequence}'),
+                          current: s.plannedSequence == currentStop,
                           query: _query,
                           stop: s,
                           tripId: widget.tripId,
@@ -1029,8 +1034,9 @@ class _OrderToggle extends StatelessWidget {
   }
 }
 
-class _StopCard extends StatefulWidget {
-  const _StopCard({
+class StopCard extends StatefulWidget {
+  const StopCard({
+    super.key,
     required this.stop,
     required this.tripId,
     required this.leg,
@@ -1040,6 +1046,7 @@ class _StopCard extends StatefulWidget {
     required this.started,
     required this.onChanged,
     this.query = '',
+    this.current = false,
   });
 
   final PlannedStop stop;
@@ -1056,14 +1063,16 @@ class _StopCard extends StatefulWidget {
 
   final bool started;
 
+  final bool current;
+
   final VoidCallback onChanged;
 
   @override
-  State<_StopCard> createState() => _StopCardState();
+  State<StopCard> createState() => _StopCardState();
 }
 
-class _StopCardState extends State<_StopCard> {
-  bool _open = false;
+class _StopCardState extends State<StopCard> {
+  bool? _openChoice;
   String? _busyStudent;
   bool _busyStop = false;
 
@@ -1089,7 +1098,7 @@ class _StopCardState extends State<_StopCard> {
   }
 
   @override
-  void didUpdateWidget(covariant _StopCard old) {
+  void didUpdateWidget(covariant StopCard old) {
     super.didUpdateWidget(old);
     _syncHold();
   }
@@ -1233,275 +1242,604 @@ class _StopCardState extends State<_StopCard> {
 
   @override
   Widget build(BuildContext context) {
-    final s = widget.stop;
-    final remaining = s.remaining;
-    final canSkip = !s.done && s.arrivedAt == null;
-    final holdLeft = _holdLeft;
-    final holding = holdLeft > 0;
-    final open = _open || widget.query.isNotEmpty;
+    final open = widget.query.isNotEmpty || (_openChoice ?? widget.current);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
       child: Panel(
         padding: EdgeInsets.zero,
         child: Column(
           children: [
-            InkWell(
-              onTap: () => setState(() => _open = !_open),
-              borderRadius: BorderRadius.circular(AppTheme.radius),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: s.skipped
-                            ? AppTheme.amberSoft
-                            : s.done
-                                ? AppTheme.greenSoft
-                                : remaining == 0
-                                    ? AppTheme.greenSoft
-                                    : Role.driver.wash,
-                        borderRadius: BorderRadius.circular(11),
-                      ),
-                      child: s.skipped
-                          ? Icon(Icons.skip_next_rounded, size: 18, color: AppTheme.amber)
-                          : s.done || remaining == 0
-                              ? Icon(Icons.check_rounded, size: 18, color: AppTheme.green)
-                              : Text(
-                                  '${s.plannedSequence}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 14,
-                                    color: Role.driver.tint,
-                                  ),
-                                ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            s.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            [
-                              if (s.landmark != null) s.landmark!,
-                              if (s.metresAway != null)
-                                tn('driver.metresAway', s.metresAway!),
-                            ].join(' · '),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                          ),
-                          if (s.skippedReason != null) ...[
-                            const SizedBox(height: 3),
-                            Text(
-                              s.skippedReason!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 12, color: AppTheme.amber),
-                            ),
-                          ],
-                          if (s.etaAt != null) ...[
-                            const SizedBox(height: 3),
-                            StopEta(stop: s),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Tag(
-                      s.skipped
-                          ? t('driver.skipped')
-                          : remaining == 0
-                              ? t('driver.done')
-                              : tn('driver.nLeft', remaining),
-                      color: s.skipped
-                          ? AppTheme.amber
-                          : remaining == 0
-                              ? AppTheme.green
-                              : AppTheme.amber,
-                      background: s.skipped
-                          ? AppTheme.amberSoft
-                          : remaining == 0
-                              ? AppTheme.greenSoft
-                              : AppTheme.amberSoft,
-                    ),
-                    const SizedBox(width: 6),
-                    Icon(
-                      open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                      color: AppTheme.textFaint,
-                    ),
-                  ],
-                ),
-              ),
+            _StopHeader(
+              stop: widget.stop,
+              open: open,
+              onTap: () => setState(() => _openChoice = !(_openChoice ?? widget.current)),
             ),
             if (open) ...[
               Divider(height: 1, color: AppTheme.border),
-              if (!widget.running &&
-                  widget.started &&
-                  s.students.any((r) => r.boardedAt != null && r.alightedAt == null))
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.info_outline_rounded, size: 16, color: AppTheme.amber),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          t('driver.dropAfterEnd'),
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            height: 1.45,
-                            color: AppTheme.textMuted,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else if (!widget.running)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.info_outline_rounded, size: 16, color: AppTheme.textMuted),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          t('driver.tickAfterSetOff'),
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            height: 1.45,
-                            color: AppTheme.textMuted,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: _flow(),
                 ),
-              if (s.arrivedAt == null)
-                Padding(
-                  padding: EdgeInsets.fromLTRB(16, 12, 16, canSkip ? 2 : 4),
-                  child: BigButton(
-                    label: t('driver.arrived'),
-                    color: Role.driver.tint,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget? _banner() {
+    final s = widget.stop;
+    if (!widget.running &&
+        widget.started &&
+        s.students.any((r) => r.boardedAt != null && r.alightedAt == null)) {
+      return _FlowBanner(
+        text: t('driver.dropAfterEnd'),
+        colour: AppTheme.amber,
+        wash: AppTheme.amberSoft,
+      );
+    }
+    if (!widget.running) {
+      return _FlowBanner(
+        text: t('driver.tickAfterSetOff'),
+        colour: AppTheme.textMuted,
+        wash: AppTheme.neutralSoft,
+      );
+    }
+    if (s.done) return null;
+    return _FlowBanner(
+      text: s.students.length > 1 ? t('driver.flow.guideMany') : t('driver.flow.guide'),
+      colour: AppTheme.blue,
+      wash: AppTheme.blueSoft,
+    );
+  }
+
+  List<Widget> _flow() {
+    final s = widget.stop;
+    final running = widget.running;
+    final canSkip = !s.done && s.arrivedAt == null;
+    final holdLeft = _holdLeft;
+    final holding = holdLeft > 0;
+    final banner = _banner();
+    final hasChildren = s.students.isNotEmpty;
+
+    return [
+      ?banner,
+      _FlowStep(
+        number: 1,
+        label: t('driver.flow.arrive'),
+        done: s.arrivedAt != null,
+        first: banner == null,
+        child: s.arrivedAt != null
+            ? _FlowDone(
+                icon: Icons.location_on_rounded,
+                text: tn('driver.arrivedAt', hhmm(s.arrivedAt)),
+                colour: AppTheme.green,
+              )
+            : _FlowButton(
+                label: t('driver.arrived'),
+                icon: Icons.location_on_rounded,
+                colour: Colors.white,
+                fill: Role.driver.tint,
+                busy: _busyStop,
+                onPressed: running
+                    ? () => _stopAction(
+                          () => CrewApi.instance.arriveAtStop(widget.tripId, s.plannedSequence),
+                          t('driver.arrived'),
+                        )
+                    : null,
+              ),
+      ),
+      _FlowStep(
+        number: 2,
+        label: t('driver.flow.skip'),
+        done: s.skipped,
+        child: s.skipped
+            ? _FlowDone(
+                icon: Icons.skip_next_rounded,
+                text: t('driver.skipped'),
+                colour: AppTheme.amber,
+                mirror: true,
+              )
+            : _FlowButton(
+                label: t('driver.skipStop'),
+                icon: Icons.skip_next_rounded,
+                mirror: true,
+                colour: AppTheme.text,
+                fill: AppTheme.surface,
+                outline: true,
+                onPressed: canSkip && running && !_busyStop ? _skipStop : null,
+              ),
+      ),
+      if (hasChildren)
+        _FlowStep(
+          number: 3,
+          label: s.students.length > 1 ? t('driver.flow.children') : t('driver.flow.child'),
+          done: s.remaining == 0,
+          child: _childActions(),
+        ),
+      _FlowStep(
+        number: hasChildren ? 4 : 3,
+        label: t('driver.flow.leave'),
+        done: s.done,
+        child: s.done
+            ? _FlowDone(
+                icon: s.skipped ? Icons.skip_next_rounded : Icons.check_circle_rounded,
+                text: s.skipped
+                    ? t('driver.skipped')
+                    : tn('driver.flow.movedOnAt', hhmm(s.departedAt)),
+                colour: s.skipped ? AppTheme.amber : AppTheme.green,
+                mirror: s.skipped,
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _FlowButton(
+                    label: holding
+                        ? '${t('driver.movingOn')} · ${holdLeft ~/ 60}:${(holdLeft % 60).toString().padLeft(2, '0')}'
+                        : t('driver.movingOn'),
+                    icon: Icons.skip_next_rounded,
+                    mirror: true,
+                    colour: Colors.white,
+                    fill: AppTheme.blue,
                     busy: _busyStop,
-                    onPressed: widget.running
+                    onPressed: running && !holding
                         ? () => _stopAction(
-                              () => CrewApi.instance
-                                  .arriveAtStop(widget.tripId, s.plannedSequence),
-                              t('driver.arrived'),
+                              () => CrewApi.instance.leaveStop(widget.tripId, s.plannedSequence),
+                              t('driver.movingOn'),
                             )
                         : null,
                   ),
-                ),
-              if (canSkip)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 2),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 40,
-                    child: TextButton.icon(
-                      onPressed: widget.running && !_busyStop ? _skipStop : null,
-                      icon: Icon(Icons.skip_next_rounded, size: 18, color: AppTheme.textMuted),
-                      label: Text(
-                        t('driver.skipStop'),
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textMuted,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              if (widget.query.isEmpty && s.students.length > 3)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 2, 14, 6),
-                  child: RosterFilters(
-                    riders: s.students,
-                    value: _show,
-                    onChanged: (f) => setState(() => _show = f),
-                  ),
-                ),
-              ...RosterFilters.apply(s.students, widget.query.isEmpty ? _show : RosterFilter.all)
-                  .where((r) => _TripScreenState._matches(r, widget.query))
-                  .map((r) => _RiderRow(
-                    rider: r,
-                    leg: widget.leg,
-                    schoolReached: widget.schoolReached,
-                    busy: _busyStudent == r.studentId,
-                    canPickUp: widget.running,
-                    canSetDown: widget.started,
-                    onBoard: () => _mark(r, 'BOARDED', t('driver.onBoard')),
-                    onOff: () => _mark(
-                      r,
-                      widget.leg == 'OUT' ? 'ALIGHTED' : 'HANDOVER',
-                      widget.leg == 'OUT'
-                          ? (widget.schoolReached
-                              ? t('driver.atSchool')
-                              : t('driver.setDownEarly'))
-                          : t('driver.handedOver'),
-                    ),
-                    onNoShow: () => _mark(r, 'NO_SHOW', t('driver.notRiding')),
-                    onCorrect: () => _correct(r),
-                  )),
-              if (!s.done)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      BigButton(
-                        label: holding
-                            ? '${t('driver.movingOn')} · ${holdLeft ~/ 60}:${(holdLeft % 60).toString().padLeft(2, '0')}'
-                            : t('driver.movingOn'),
-                        color: AppTheme.blue,
-                        busy: _busyStop,
-                        onPressed: widget.running && !holding
-                            ? () => _stopAction(
-                                  () => CrewApi.instance
-                                      .leaveStop(widget.tripId, s.plannedSequence),
-                                  t('driver.movingOn'),
-                                )
-                            : null,
-                      ),
-                      if (holding) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(Icons.timer_outlined, size: 16, color: AppTheme.textMuted),
-                            const SizedBox(width: 7),
-                            Expanded(
-                              child: Text(
-                                t('driver.holdAtStop'),
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  height: 1.45,
-                                  color: AppTheme.textMuted,
-                                ),
-                              ),
+                  if (holding) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.timer_outlined, size: 16, color: AppTheme.textMuted),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            t('driver.holdAtStop'),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              height: 1.45,
+                              color: AppTheme.textMuted,
                             ),
-                          ],
+                          ),
                         ),
                       ],
-                    ],
+                    ),
+                  ],
+                ],
+              ),
+      ),
+    ];
+  }
+
+  Widget _childActions() {
+    final s = widget.stop;
+    final riders = RosterFilters.apply(
+      s.students,
+      widget.query.isEmpty ? _show : RosterFilter.all,
+    ).where((r) => _TripScreenState._matches(r, widget.query)).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (widget.query.isEmpty && s.students.length > 3)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: RosterFilters(
+              riders: s.students,
+              value: _show,
+              onChanged: (f) => setState(() => _show = f),
+            ),
+          ),
+        for (final (i, r) in riders.indexed) ...[
+          if (i > 0) ...[
+            const SizedBox(height: 12),
+            Divider(height: 1, color: AppTheme.border),
+            const SizedBox(height: 12),
+          ],
+          _ChildActions(
+            rider: r,
+            leg: widget.leg,
+            schoolReached: widget.schoolReached,
+            named: s.students.length > 1 || r.name.trim() != s.name.trim(),
+            busy: _busyStudent == r.studentId,
+            canPickUp: widget.running,
+            canSetDown: widget.started,
+            onBoard: () => _mark(r, 'BOARDED', t('driver.onBoard')),
+            onOff: () => _mark(
+              r,
+              widget.leg == 'OUT' ? 'ALIGHTED' : 'HANDOVER',
+              widget.leg == 'OUT'
+                  ? (widget.schoolReached ? t('driver.atSchool') : t('driver.setDownEarly'))
+                  : t('driver.handedOver'),
+            ),
+            onNoShow: () => _mark(r, 'NO_SHOW', t('driver.notRiding')),
+            onCorrect: () => _correct(r),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _StopHeader extends StatelessWidget {
+  const _StopHeader({required this.stop, required this.open, required this.onTap});
+
+  final PlannedStop stop;
+  final bool open;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = stop;
+    final remaining = s.remaining;
+    final settled = s.done || remaining == 0;
+    final place = [
+      if (s.landmark != null && s.landmark!.isNotEmpty) s.landmark!,
+      if (s.metresAway != null) tn('driver.metresAway', s.metresAway!),
+    ].join(' · ');
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppTheme.radius),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: s.skipped
+                    ? AppTheme.amberSoft
+                    : settled
+                        ? AppTheme.greenSoft
+                        : Role.driver.wash,
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: s.skipped
+                  ? _Mirrored(
+                      child: Icon(Icons.skip_next_rounded, size: 22, color: AppTheme.amber),
+                    )
+                  : settled
+                      ? Icon(Icons.check_rounded, size: 22, color: AppTheme.green)
+                      : FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Text(
+                              '${s.plannedSequence}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18,
+                                color: Role.driver.tint,
+                              ),
+                            ),
+                          ),
+                        ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    s.name,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      height: 1.3,
+                      color: AppTheme.text,
+                    ),
+                  ),
+                  if (place.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      place,
+                      style: TextStyle(fontSize: 13, height: 1.35, color: AppTheme.textMuted),
+                    ),
+                  ],
+                  if (s.skippedReason != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      s.skippedReason!,
+                      style: TextStyle(fontSize: 12.5, height: 1.35, color: AppTheme.amber),
+                    ),
+                  ],
+                  if (s.etaAt != null) ...[
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        Icon(
+                          s.etaIsActual ? Icons.check_circle_rounded : Icons.schedule_rounded,
+                          size: 16,
+                          color: s.etaIsActual ? AppTheme.green : AppTheme.textMuted,
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            stopEtaText(s),
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: s.etaIsActual ? AppTheme.green : AppTheme.textMuted,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: s.skipped
+                    ? AppTheme.amberSoft
+                    : remaining == 0
+                        ? AppTheme.greenSoft
+                        : Role.driver.wash,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                s.skipped
+                    ? t('driver.skipped')
+                    : remaining == 0
+                        ? t('driver.done')
+                        : tn('driver.nLeft', remaining),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: s.skipped
+                      ? AppTheme.amber
+                      : remaining == 0
+                          ? AppTheme.green
+                          : Role.driver.tint,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+              size: 28,
+              color: AppTheme.textMuted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FlowBanner extends StatelessWidget {
+  const _FlowBanner({required this.text, required this.colour, required this.wash});
+
+  final String text;
+  final Color colour;
+  final Color wash;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: wash,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded, size: 20, color: colour),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 13.5, height: 1.45, color: AppTheme.text),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FlowStep extends StatelessWidget {
+  const _FlowStep({
+    required this.number,
+    required this.label,
+    required this.done,
+    required this.child,
+    this.first = false,
+  });
+
+  final int number;
+  final String label;
+  final bool done;
+  final Widget child;
+  final bool first;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = done ? AppTheme.green : AppTheme.textMuted;
+    return Padding(
+      padding: EdgeInsets.only(top: first ? 0 : 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (done)
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Icon(Icons.check_circle_rounded, size: 17, color: tone),
+                )
+              else
+                Text(
+                  '$number.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: tone,
                   ),
                 ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: tone,
+                  ),
+                ),
+              ),
             ],
-          ],
+          ),
+          const SizedBox(height: 8),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _Mirrored extends StatelessWidget {
+  const _Mirrored({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Transform.flip(
+        flipX: Directionality.of(context) == TextDirection.rtl,
+        child: child,
+      );
+}
+
+class _FlowDone extends StatelessWidget {
+  const _FlowDone({
+    required this.icon,
+    required this.text,
+    required this.colour,
+    this.mirror = false,
+  });
+
+  final IconData icon;
+  final String text;
+  final Color colour;
+  final bool mirror;
+
+  @override
+  Widget build(BuildContext context) {
+    final glyph = Icon(icon, size: 18, color: colour);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.neutralSoft,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          mirror ? _Mirrored(child: glyph) : glyph,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: colour),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FlowButton extends StatelessWidget {
+  const _FlowButton({
+    required this.label,
+    required this.icon,
+    required this.colour,
+    required this.fill,
+    required this.onPressed,
+    this.busy = false,
+    this.outline = false,
+    this.mirror = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color colour;
+  final Color fill;
+  final VoidCallback? onPressed;
+  final bool busy;
+  final bool outline;
+  final bool mirror;
+
+  @override
+  Widget build(BuildContext context) {
+    final live = onPressed != null && !busy;
+    final dim = !live && !busy;
+    final tone = dim ? colour.withValues(alpha: outline ? 0.4 : 0.55) : colour;
+    final ground = dim && !outline ? fill.withValues(alpha: 0.5) : fill;
+    final glyph = Icon(icon, size: 22, color: tone);
+
+    return Semantics(
+      button: true,
+      enabled: live,
+      child: Material(
+        color: ground,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: outline
+              ? BorderSide(color: AppTheme.textFaint.withValues(alpha: dim ? 0.35 : 0.6), width: 1.2)
+              : BorderSide.none,
+        ),
+        child: InkWell(
+          onTap: live ? onPressed : null,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Center(
+                child: busy
+                    ? SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.4, color: colour),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          mirror ? _Mirrored(child: glyph) : glyph,
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: Text(
+                              label,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 16,
+                                height: 1.25,
+                                fontWeight: FontWeight.w700,
+                                color: tone,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -1654,11 +1992,12 @@ String stopEtaLine(PlannedStop stop) => stop.etaAt == null
         ? tn('driver.arrivedAt', hhmm(stop.etaAt))
         : tn('driver.etaDue', hhmm(stop.etaAt));
 
-class _RiderRow extends StatelessWidget {
-  const _RiderRow({
+class _ChildActions extends StatelessWidget {
+  const _ChildActions({
     required this.rider,
     required this.leg,
     required this.schoolReached,
+    required this.named,
     required this.busy,
     required this.canPickUp,
     required this.canSetDown,
@@ -1672,6 +2011,8 @@ class _RiderRow extends StatelessWidget {
   final String leg;
 
   final bool schoolReached;
+
+  final bool named;
   final bool busy;
 
   final bool canPickUp;
@@ -1688,130 +2029,123 @@ class _RiderRow extends StatelessWidget {
     final off = rider.alightedAt != null;
 
     final notRiding = !off && !onBus && rider.notTravelling;
+    final waiting = !off && !onBus && !notRiding;
+    final status = riderStatus(rider, leg: leg, schoolReached: schoolReached);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: off
-                  ? AppTheme.greenSoft
-                  : onBus
-                      ? AppTheme.blueSoft
-                      : notRiding
-                          ? AppTheme.roseSoft
-                          : AppTheme.neutralSoft,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              rider.seatNumber ?? '·',
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                color: off
-                    ? AppTheme.green
-                    : onBus
-                        ? AppTheme.blue
-                        : notRiding
-                            ? AppTheme.rose
-                            : AppTheme.textMuted,
-              ),
-            ),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    final showWho = named || !waiting || rider.requiresAssistance;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showWho) ...[
+          Row(
+            children: [
+              SeatChip(rider: rider, size: 34),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Flexible(
-                      child: Text(
-                        rider.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                    if (named || rider.requiresAssistance)
+                      Row(
+                        children: [
+                          if (named)
+                            Flexible(
+                              child: Text(
+                                rider.name,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.5,
+                                  color: AppTheme.text,
+                                ),
+                              ),
+                            ),
+                          if (named && rider.requiresAssistance) const SizedBox(width: 6),
+                          if (rider.requiresAssistance)
+                            Icon(Icons.accessible_rounded, size: 16, color: AppTheme.amber),
+                        ],
                       ),
-                    ),
-                    if (rider.requiresAssistance) ...[
-                      const SizedBox(width: 6),
-                      Icon(Icons.accessible_rounded, size: 14, color: AppTheme.amber),
-                    ],
+                    if (!waiting)
+                      Text(
+                        status.text,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: notRiding ? FontWeight.w600 : FontWeight.w500,
+                          color: status.tone,
+                        ),
+                      ),
                   ],
                 ),
-                if (off)
-                  Text(
-                    '${leg == 'OUT' ? (schoolReached ? t('driver.atSchool') : t('driver.setDownEarly')) : t('driver.handedOver')} ${hhmm(rider.alightedAt)}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: leg == 'OUT' && !schoolReached ? AppTheme.amber : AppTheme.green,
-                    ),
-                  )
-                else if (onBus)
-                  Text(
-                    tn('driver.onBoardSince', hhmm(rider.boardedAt)),
-                    style: TextStyle(fontSize: 11, color: AppTheme.blue),
-                  )
-                else if (notRiding)
-                  Text(
-                    t('driver.notRiding'),
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.rose,
-                    ),
-                  ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+        ],
+        if (busy)
+          const SizedBox(
+            height: 56,
+            child: Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.4),
+              ),
+            ),
+          )
+        else if (off)
+          _FlowButton(
+            label: t('driver.wrong'),
+            icon: Icons.edit_note_rounded,
+            colour: AppTheme.textMuted,
+            fill: AppTheme.neutralSoft,
+            onPressed: onCorrect,
+          )
+        else
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: onBus
+                      ? _FlowButton(
+                          label: leg == 'OUT' ? t('driver.setDown') : t('driver.handOver'),
+                          icon: Icons.logout_rounded,
+                          mirror: true,
+                          colour: AppTheme.green,
+                          fill: AppTheme.greenSoft,
+                          onPressed: canSetDown ? onOff : null,
+                        )
+                      : _FlowButton(
+                          label: t('driver.pickUp'),
+                          icon: Icons.login_rounded,
+                          mirror: true,
+                          colour: Role.driver.tint,
+                          fill: Role.driver.wash,
+                          onPressed: canPickUp ? onBoard : null,
+                        ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: onBus || notRiding
+                      ? _FlowButton(
+                          label: t('driver.wrong'),
+                          icon: Icons.edit_note_rounded,
+                          colour: AppTheme.textMuted,
+                          fill: AppTheme.neutralSoft,
+                          onPressed: onCorrect,
+                        )
+                      : _FlowButton(
+                          label: t('driver.notHere'),
+                          icon: Icons.close_rounded,
+                          colour: AppTheme.text,
+                          fill: AppTheme.neutralSoft,
+                          onPressed: canPickUp ? onNoShow : null,
+                        ),
+                ),
               ],
             ),
           ),
-          if (busy)
-            const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-          else if (off)
-            WordButton(
-              icon: Icons.edit_note_rounded,
-              label: t('driver.wrong'),
-              colour: AppTheme.textMuted,
-              onTap: onCorrect,
-            )
-          else
-            Row(
-              children: [
-                WordButton(
-                  icon: onBus ? Icons.logout_rounded : Icons.login_rounded,
-                  label: onBus
-                      ? (leg == 'OUT' ? t('driver.setDown') : t('driver.handOver'))
-                      : t('driver.pickUp'),
-                  colour: onBus ? AppTheme.green : Role.driver.tint,
-                  onTap: onBus
-                      ? (canSetDown ? onOff : null)
-                      : (canPickUp ? onBoard : null),
-                ),
-                if (!notRiding && !onBus) ...[
-                  const SizedBox(width: 6),
-                  WordButton(
-                    icon: Icons.close_rounded,
-                    label: t('driver.notHere'),
-                    colour: AppTheme.rose,
-                    onTap: canPickUp ? onNoShow : null,
-                  ),
-                ],
-                if (onBus || notRiding) ...[
-                  const SizedBox(width: 6),
-                  WordButton(
-                    icon: Icons.edit_note_rounded,
-                    label: t('driver.wrong'),
-                    colour: AppTheme.textMuted,
-                    onTap: onCorrect,
-                  ),
-                ],
-              ],
-            ),
-        ],
-      ),
+      ],
     );
   }
 }
