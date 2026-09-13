@@ -60,7 +60,7 @@ void main() {
             appBar: AppBar(title: Text(t('leave.title'))),
             body: Column(
               children: [
-                TextField(decoration: InputDecoration(hintText: t('login.phoneHint'))),
+                TextField(decoration: InputDecoration(hintText: t('phone.hint'))),
                 Builder(
                   builder: (context) => TextButton(
                     onPressed: () => showDatePicker(

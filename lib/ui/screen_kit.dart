@@ -23,9 +23,32 @@ class ScreenHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final heading = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 21,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.6,
+            height: 1.2,
+            color: AppTheme.text,
+          ),
+        ),
+        if (subtitle != null && subtitle!.isNotEmpty)
+          Text(
+            subtitle!,
+            style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+          ),
+      ],
+    );
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(kGutter, 6, kGutter, 10),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SquareButton(
             icon: Icons.arrow_back_rounded,
@@ -33,32 +56,25 @@ class ScreenHeader extends StatelessWidget {
           ),
           const SizedBox(width: 14),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.6,
-                    color: AppTheme.text,
-                  ),
-                ),
-                if (subtitle != null && subtitle!.isNotEmpty)
-                  Text(
-                    subtitle!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
-                  ),
-              ],
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 42),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: trailing == null
+                    ? heading
+                    : SizedBox(
+                        width: double.infinity,
+                        child: Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 10,
+                          runSpacing: 8,
+                          children: [heading, trailing!],
+                        ),
+                      ),
+              ),
             ),
           ),
-          ?trailing,
           if (trailing == null && onBell != null)
             SquareButton(
               icon: Icons.notifications_none_rounded,

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -43,6 +44,8 @@ class _BusScreenState extends State<BusScreen> {
   bool _dismissedAlerts = false;
 
   AssignedStops? _stops;
+
+  List<LatLng>? _framed;
 
   @override
   void initState() {
@@ -149,6 +152,8 @@ class _BusScreenState extends State<BusScreen> {
                   );
                 },
                 builder: (context, bus) {
+                  if (!bus.transport.ridesTheBus || bus.transport.locationHidden) _framed = null;
+
                   if (!bus.transport.ridesTheBus) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -446,21 +451,20 @@ class _BusScreenState extends State<BusScreen> {
   }
 
   void _frame(_Bus bus) {
-    if (!MapTiles.configured) return;
     final points = bus.mapPoints;
-    if (points.isEmpty) return;
-
-    if (points.length == 1) {
-      _map.move(points.first, 15.5);
+    if (!MapTiles.configured || points.isEmpty) {
+      _framed = null;
       return;
     }
-    _map.fitCamera(
-      CameraFit.coordinates(
-        coordinates: points,
-        padding: const EdgeInsets.fromLTRB(44, 76, 44, 66),
-        maxZoom: 16,
-      ),
-    );
+    final before = _framed;
+    _framed = points;
+    if (before == null || listEquals(before, points)) return;
+
+    if (points.length == 1) {
+      _map.move(points.first, _MapCard.singleZoom);
+      return;
+    }
+    _map.fitCamera(_MapCard.fit(points));
   }
 
   void _openTrack() => _openSection(ParentSection.track, (_) => TrackScreen(child: widget.child));
@@ -524,6 +528,14 @@ class _Bus {
     return null;
   }
 
+  String? get stopName {
+    final l = live;
+    final named = l != null && l.stopLat != null && l.stopLon != null
+        ? l.stopName
+        : (toSchool ? stops?.pickup?.name : stops?.dropoff?.name);
+    return named == null || named.trim().isEmpty ? null : named.trim();
+  }
+
   List<LatLng> get mapPoints => [?busAt, ?stopAt];
 
   List<StopToFix> get correctableStops {
@@ -566,6 +578,14 @@ class _MapCard extends StatelessWidget {
   final MapController controller;
   final VoidCallback onOpen;
 
+  static const singleZoom = 15.5;
+
+  static CameraFit fit(List<LatLng> points) => CameraFit.coordinates(
+        coordinates: points,
+        padding: const EdgeInsets.fromLTRB(44, 76, 44, 66),
+        maxZoom: 16,
+      );
+
   @override
   Widget build(BuildContext context) {
     final tint = Role.parent.tint;
@@ -594,14 +614,15 @@ class _MapCard extends StatelessWidget {
         mapController: controller,
         options: MapOptions(
           initialCenter: points.first,
-          initialZoom: 15,
+          initialZoom: singleZoom,
+          initialCameraFit: points.length > 1 ? fit(points) : null,
           minZoom: 4,
           maxZoom: 18,
           interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
           onTap: live == null ? null : (_, _) => onOpen(),
         ),
         children: [
-          MapTiles.layer(),
+          MapTiles.layer(panBuffer: 0),
 
           if (busAt != null && stopAt != null)
             Builder(
@@ -630,9 +651,9 @@ class _MapCard extends StatelessWidget {
               if (stopAt != null)
                 Marker(
                   point: stopAt,
-                  width: 30,
-                  height: 30,
-                  child: _StopPin(colour: tint),
+                  width: 140,
+                  height: 74,
+                  child: _StopPin(colour: tint, label: bus.stopName ?? t('track.stop')),
                 ),
               if (busAt != null)
                 Marker(
@@ -752,7 +773,7 @@ class _MapCard extends StatelessWidget {
 
               PositionedDirectional(
                 start: 10,
-                bottom: 10,
+                bottom: drawn ? 18 : 10,
                 child: _Callout(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 250),
@@ -813,9 +834,9 @@ class _MapCard extends StatelessWidget {
 
               if (drawn)
                 PositionedDirectional(
-                  end: 8,
-                  bottom: 6,
-                  child: const MapAttribution(),
+                  end: 6,
+                  bottom: 3,
+                  child: const MapAttribution(small: true),
                 ),
             ],
           ),
@@ -956,25 +977,65 @@ class _BusPin extends StatelessWidget {
 }
 
 class _StopPin extends StatelessWidget {
-  const _StopPin({required this.colour});
+  const _StopPin({required this.colour, required this.label});
 
   final Color colour;
+  final String label;
 
   @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          shape: BoxShape.circle,
-          border: Border.all(color: colour, width: 3),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
+  Widget build(BuildContext context) => Semantics(
+        label: label,
+        child: Column(
+          children: [
+            const SizedBox(height: 22),
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                shape: BoxShape.circle,
+                border: Border.all(color: colour, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(Icons.hail_rounded, size: 15, color: colour),
+            ),
+            const SizedBox(height: 2),
+            SizedBox(
+              height: 20,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10,
+                    height: 1.3,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.text,
+                  ),
+                ),
+              ),
             ),
           ],
         ),
-        child: Icon(Icons.person_pin_circle_outlined, size: 15, color: colour),
       );
 }
 

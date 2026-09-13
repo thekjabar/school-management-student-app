@@ -9,6 +9,7 @@ import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
+import '../../ui/phone_field.dart';
 import '../../ui/pickers.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
@@ -370,7 +371,7 @@ class _RequestSheetState extends State<_RequestSheet> {
       t('ota.msg.heading'),
       '${t('ota.msg.who')} ${_name.text.trim()}',
       '${t('ota.msg.relation')} ${t('ota.rel.$_relation')}',
-      if (_phone.text.trim().isNotEmpty) '${t('ota.msg.phone')} ${_phone.text.trim()}',
+      if (_phone.text.trim().isNotEmpty) '${t('ota.msg.phone')} ${IraqiPhone.digitsOf(_phone.text)}',
       if (_idNumber.text.trim().isNotEmpty) '${t('ota.msg.id')} ${_idNumber.text.trim()}',
       '${t('ota.msg.day')} ${longDate(_day)}',
       if (widget.ridesTheBus)
@@ -396,6 +397,10 @@ class _RequestSheetState extends State<_RequestSheet> {
     final who = _name.text.trim();
     if (who.length < 2) {
       setState(() => _error = t('ota.whoRequired'));
+      return;
+    }
+    if (_phone.text.trim().isNotEmpty && !IraqiPhone.isValid(_phone.text)) {
+      setState(() => _error = t('phone.invalid'));
       return;
     }
 
@@ -525,11 +530,10 @@ class _RequestSheetState extends State<_RequestSheet> {
               const SizedBox(height: 16),
               _Label(t('ota.phone')),
               const SizedBox(height: 8),
-              _Field(
+              PhoneTextField(
                 controller: _phone,
-                hint: t('ota.phoneHint'),
-                maxLength: 24,
-                keyboard: TextInputType.phone,
+                style: TextStyle(fontSize: 14, color: AppTheme.text),
+                decoration: _boxDecoration(),
               ),
 
               const SizedBox(height: 16),
@@ -654,7 +658,6 @@ class _Field extends StatelessWidget {
     required this.maxLength,
     this.lines = 1,
     this.autofocus = false,
-    this.keyboard,
     this.capitals = TextCapitalization.none,
   });
 
@@ -663,7 +666,6 @@ class _Field extends StatelessWidget {
   final int maxLength;
   final int lines;
   final bool autofocus;
-  final TextInputType? keyboard;
   final TextCapitalization capitals;
 
   @override
@@ -672,25 +674,26 @@ class _Field extends StatelessWidget {
         autofocus: autofocus,
         maxLength: maxLength,
         maxLines: lines,
-        keyboardType: keyboard,
         textCapitalization: capitals,
         style: TextStyle(fontSize: 14, color: AppTheme.text),
-        decoration: InputDecoration(
-          hintText: hint,
-          counterText: '',
-          filled: true,
-          fillColor: AppTheme.canvas,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: AppTheme.border),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: AppTheme.border),
-          ),
-        ),
+        decoration: _boxDecoration(hint: hint),
       );
 }
+
+InputDecoration _boxDecoration({String? hint}) => InputDecoration(
+      hintText: hint,
+      counterText: '',
+      filled: true,
+      fillColor: AppTheme.canvas,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: AppTheme.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: AppTheme.border),
+      ),
+    );
 
 class _Choice extends StatelessWidget {
   const _Choice({required this.label, required this.on, required this.onTap});

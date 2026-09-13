@@ -23,16 +23,30 @@ class Push {
 
   static String? _identityToken;
 
+  static final ValueNotifier<Map<String, dynamic>?> tapped = ValueNotifier<Map<String, dynamic>?>(null);
+
+  static final ValueNotifier<int> arrived = ValueNotifier<int>(0);
+
   static Future<void> start() async {
     if (_started || appId.isEmpty) return;
     _started = true;
     try {
       if (kDebugMode) OneSignal.Debug.setLogLevel(OSLogLevel.error);
       OneSignal.initialize(appId);
+      OneSignal.Notifications.addClickListener(_opened);
+      OneSignal.Notifications.addForegroundWillDisplayListener(_arriving);
     } catch (e) {
       debugPrint('push: init failed: $e');
       _started = false;
     }
+  }
+
+  static void _opened(OSNotificationClickEvent event) {
+    tapped.value = Map<String, dynamic>.of(event.notification.additionalData ?? const <String, dynamic>{});
+  }
+
+  static void _arriving(OSNotificationWillDisplayEvent event) {
+    arrived.value = arrived.value + 1;
   }
 
   static Future<void> identify(String personId, {String? identityToken}) async {
@@ -99,6 +113,7 @@ class Push {
     }
     _personId = null;
     _identityToken = null;
+    tapped.value = null;
     try {
       await OneSignal.logout();
     } catch (e) {

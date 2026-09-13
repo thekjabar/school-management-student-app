@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../api/client.dart';
 import '../api/push.dart';
@@ -10,6 +9,7 @@ import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
 import '../ui/async.dart';
 import '../ui/kit.dart';
+import '../ui/phone_field.dart';
 import '../ui/sheets.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -35,8 +35,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _next = TextEditingController();
   final _confirm = TextEditingController();
   final _passwordFocus = FocusNode();
-
-  static const _phoneDigits = 11;
 
   bool _busy = false;
   bool _obscure = true;
@@ -64,14 +62,11 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  bool get _phoneLooksRight {
-    final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
-    return digits.length == _phoneDigits && digits.startsWith('0');
-  }
+  bool get _phoneLooksRight => IraqiPhone.isValid(_phone.text);
 
   Future<void> _signIn() async {
     if (!_phoneLooksRight) {
-      setState(() => _error = t('login.phoneNeeded'));
+      setState(() => _error = t(_phone.text.trim().isEmpty ? 'login.phoneNeeded' : 'phone.invalid'));
       return;
     }
     setState(() {
@@ -79,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      final result = await Session.instance.signIn(_phone.text, _password.text);
+      final result = await Session.instance.signIn(IraqiPhone.digitsOf(_phone.text), _password.text);
       if (!mounted) return;
       if (result.mustChangePassword) {
         setState(() => _choosing = true);
@@ -110,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     try {
       await Session.instance.changePassword(_password.text, _next.text);
-      final again = await Session.instance.signIn(_phone.text, _next.text);
+      final again = await Session.instance.signIn(IraqiPhone.digitsOf(_phone.text), _next.text);
       if (!mounted) return;
       unawaited(Push.askPermission());
       widget.onSignedIn(again.me);
@@ -237,25 +232,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: const Icon(Icons.check_rounded, size: 16, color: Colors.white),
                 )
               : null,
-          child: TextField(
+          child: PhoneTextField(
             controller: _phone,
-            keyboardType: TextInputType.phone,
             textInputAction: TextInputAction.next,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(_phoneDigits),
-            ],
             onSubmitted: (_) => _passwordFocus.requestFocus(),
-            textDirection: TextDirection.ltr,
-            textAlign: TextAlign.left,
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.3,
               color: AppTheme.text,
             ),
-            decoration: InputDecoration(
-              hintText: t('login.phoneHint'),
+            decoration: const InputDecoration(
               filled: false,
               isDense: true,
               contentPadding: EdgeInsets.zero,
@@ -713,7 +700,7 @@ class _ForgotSheetState extends State<_ForgotSheet> {
   @override
   void initState() {
     super.initState();
-    _phone.text = widget.phone;
+    _phone.text = IraqiPhone.display(widget.phone);
     _phone.addListener(() => setState(() {}));
   }
 
@@ -723,14 +710,11 @@ class _ForgotSheetState extends State<_ForgotSheet> {
     super.dispose();
   }
 
-  bool get _looksRight {
-    final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
-    return digits.length == _LoginScreenState._phoneDigits && digits.startsWith('0');
-  }
+  bool get _looksRight => IraqiPhone.isValid(_phone.text);
 
   Future<void> _send() async {
     if (!_looksRight) {
-      setState(() => _error = t('login.phoneNeeded'));
+      setState(() => _error = t(_phone.text.trim().isEmpty ? 'login.phoneNeeded' : 'phone.invalid'));
       return;
     }
     setState(() {
@@ -740,7 +724,7 @@ class _ForgotSheetState extends State<_ForgotSheet> {
     try {
       await ApiClient.instance.post(
         '/auth/password/reset-request',
-        {'phone': _phone.text.trim()},
+        {'phone': IraqiPhone.digitsOf(_phone.text)},
       );
       if (!mounted) return;
       FocusScope.of(context).unfocus();
@@ -818,26 +802,18 @@ class _ForgotSheetState extends State<_ForgotSheet> {
           trailing: _looksRight
               ? Icon(Icons.check_circle_rounded, size: 22, color: AppTheme.green)
               : null,
-          child: TextField(
+          child: PhoneTextField(
             controller: _phone,
-            keyboardType: TextInputType.phone,
             textInputAction: TextInputAction.done,
             autofocus: widget.phone.isEmpty,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(_LoginScreenState._phoneDigits),
-            ],
             onSubmitted: (_) => _busy ? null : _send(),
-            textDirection: TextDirection.ltr,
-            textAlign: TextAlign.left,
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.3,
               color: AppTheme.text,
             ),
-            decoration: InputDecoration(
-              hintText: t('login.phoneHint'),
+            decoration: const InputDecoration(
               filled: false,
               isDense: true,
               contentPadding: EdgeInsets.zero,

@@ -2798,6 +2798,28 @@ class ParentApi {
     return json is Map ? ((json['marked'] as num?)?.toInt() ?? 0) : 0;
   }
 
+  Future<List<ParentAlert>> alerts() => _keepable(
+        '/parent/notifications?limit=50',
+        (json) => ((json is Map ? json['rows'] : null) as List? ?? const [])
+            .map((e) => ParentAlert.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+
+  Future<int> unreadAlertCount() async {
+    final json = await _api.get('/parent/notifications/unread-count');
+    final v = json is Map ? json['unread'] : null;
+    return (v as num?)?.toInt() ?? 0;
+  }
+
+  Future<void> markAlertRead(String id) async {
+    await _api.post('/parent/notifications/$id/read');
+  }
+
+  Future<int> markAllAlertsRead() async {
+    final json = await _api.post('/parent/notifications/read-all');
+    return json is Map ? ((json['marked'] as num?)?.toInt() ?? 0) : 0;
+  }
+
   Future<FeeSummary> fees() => _keepable(
         '/parent/fees',
         (json) => FeeSummary.fromJson(json as Map<String, dynamic>),
@@ -2961,6 +2983,56 @@ class Announcement {
         authorName: (j['authorName'] ?? '') as String,
         readAt: j['readAt'] == null ? null : DateTime.parse(j['readAt'] as String).toLocal(),
         attachmentCount: (j['attachmentCount'] as num?)?.toInt() ?? 0,
+      );
+}
+
+class ParentAlert {
+  ParentAlert({
+    required this.id,
+    required this.templateKey,
+    required this.category,
+    required this.priority,
+    required this.studentId,
+    required this.studentName,
+    required this.sourceType,
+    required this.sourceId,
+    required this.announcementId,
+    required this.title,
+    required this.body,
+    required this.readAt,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String? templateKey;
+  final String category;
+  final String priority;
+  final String? studentId;
+  final String? studentName;
+  final String sourceType;
+  final String? sourceId;
+  final String? announcementId;
+  final String? title;
+  final String body;
+  final DateTime? readAt;
+  final DateTime createdAt;
+
+  bool get urgent => priority == 'CRITICAL' || priority == 'HIGH';
+
+  factory ParentAlert.fromJson(Map<String, dynamic> j) => ParentAlert(
+        id: j['id'] as String,
+        templateKey: j['templateKey'] as String?,
+        category: (j['category'] ?? 'SYSTEM') as String,
+        priority: (j['priority'] ?? 'NORMAL') as String,
+        studentId: j['studentId'] as String?,
+        studentName: j['studentName'] as String?,
+        sourceType: (j['sourceType'] ?? 'SYSTEM') as String,
+        sourceId: j['sourceId'] as String?,
+        announcementId: j['announcementId'] as String?,
+        title: j['title'] as String?,
+        body: (j['body'] ?? '') as String,
+        readAt: j['readAt'] == null ? null : DateTime.parse(j['readAt'] as String).toLocal(),
+        createdAt: DateTime.parse(j['createdAt'] as String).toLocal(),
       );
 }
 

@@ -1988,18 +1988,6 @@ class _SweepCardState extends State<_SweepCard> {
             '${t('driver.sweepHow')}${t('driver.sweepWhy')}',
             style: TextStyle(fontSize: 12.5, height: 1.5, color: AppTheme.textMuted),
           ),
-          if (late && sweep.attemptsSoFar > 0) ...[
-            const SizedBox(height: 10),
-            Text(
-              t('driver.sweepRecordedNotCleared'),
-              style: TextStyle(
-                fontSize: 12.5,
-                height: 1.5,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.rose,
-              ),
-            ),
-          ],
           if (waiting) ...[
             const SizedBox(height: 12),
             Row(
@@ -2035,35 +2023,6 @@ class _SweepCardState extends State<_SweepCard> {
             ),
           ],
           const SizedBox(height: 14),
-          if (late && sweep.attemptsSoFar > 0)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.assignment_turned_in_rounded, size: 19, color: AppTheme.rose),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      sweep.confirmedAt != null
-                          ? tn('driver.sweepFiledAt', hhmm(sweep.confirmedAt))
-                          : t('driver.sweepFiled'),
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.4,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.rose,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
             BigButton(
               label: t('driver.walkedTheBus'),
               color: late ? AppTheme.rose : AppTheme.amber,

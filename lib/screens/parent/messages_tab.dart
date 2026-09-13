@@ -12,41 +12,128 @@ import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
 import '../../ui/sheets.dart';
 import '../../ui/screen_kit.dart';
+import 'alert_routes.dart';
 import 'conversation_screen.dart';
 import 'section_gate.dart';
 
 class MessagesTab extends StatefulWidget {
-  const MessagesTab({super.key, required this.child, required this.onRead});
+  const MessagesTab({
+    super.key,
+    required this.child,
+    required this.onRead,
+    required this.onOpenAlert,
+    required this.focus,
+  });
 
   final Child child;
 
   final VoidCallback onRead;
 
+  final Future<void> Function(AlertLink link) onOpenAlert;
+
+  final ValueNotifier<MessagesFocus?> focus;
+
   @override
   State<MessagesTab> createState() => _MessagesTabState();
 }
 
+class _Inbox {
+  const _Inbox(this.announcements, this.alerts, this.alertsError);
+
+  final List<Announcement> announcements;
+  final List<ParentAlert>? alerts;
+  final Object? alertsError;
+}
+
+class _Entry {
+  _Entry.announcement(Announcement this.announcement)
+      : alert = null,
+        at = announcement.sentAt ?? DateTime(0),
+        pinned = announcement.pinned;
+
+  _Entry.alert(ParentAlert this.alert)
+      : announcement = null,
+        at = alert.createdAt,
+        pinned = false;
+
+  final Announcement? announcement;
+  final ParentAlert? alert;
+  final DateTime at;
+  final bool pinned;
+}
+
 class _MessagesTabState extends State<MessagesTab> {
-  int _tab = 0;
+  MessagesFilter _filter = MessagesFilter.all;
+
+  final _loader = GlobalKey<LoaderState<_Inbox>>();
 
   final Set<String> _read = <String>{};
 
   final Set<String> _sending = <String>{};
 
+  final Set<String> _readAlerts = <String>{};
+
   bool _markingAll = false;
 
-  List<Announcement>? _all;
+  _Inbox? _inbox;
 
   bool _bellCleared = false;
 
+  String? _pendingAnnouncement;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focus.addListener(_focusChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focusChanged());
+  }
+
+  @override
+  void didUpdateWidget(covariant MessagesTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focus != widget.focus) {
+      oldWidget.focus.removeListener(_focusChanged);
+      widget.focus.addListener(_focusChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focus.removeListener(_focusChanged);
+    super.dispose();
+  }
+
+  void _focusChanged() {
+    final focus = widget.focus.value;
+    if (focus == null || !mounted) return;
+    widget.focus.value = null;
+    setState(() {
+      _filter = focus.filter;
+      _pendingAnnouncement = focus.announcementId;
+    });
+    if (focus.announcementId != null) _loader.currentState?.reload();
+  }
+
+  Future<_Inbox> _load() async {
+    final alerts = ParentApi.instance.alerts().then<Object>((v) => v, onError: (Object e) => e);
+    final announcements = await ParentApi.instance.announcements();
+    final got = await alerts;
+    return got is List<ParentAlert>
+        ? _Inbox(announcements, got, null)
+        : _Inbox(announcements, null, got);
+  }
+
   bool _isRead(Announcement a) => a.readAt != null || _read.contains(a.id);
 
+  bool _alertRead(ParentAlert a) => a.readAt != null || _readAlerts.contains(a.id);
+
   void _syncBell() {
-    final all = _all;
-    if (all == null) return;
-    final settled = all.every(
-      (a) => a.readAt != null || (_read.contains(a.id) && !_sending.contains(a.id)),
-    );
+    final inbox = _inbox;
+    if (inbox == null) return;
+    final settled = inbox.announcements.every(
+          (a) => a.readAt != null || (_read.contains(a.id) && !_sending.contains(a.id)),
+        ) &&
+        (inbox.alerts ?? const <ParentAlert>[]).every(_alertRead);
     if (!settled) {
       _bellCleared = false;
       return;
@@ -78,60 +165,111 @@ class _MessagesTabState extends State<MessagesTab> {
     }
   }
 
-  Future<void> _markAll(List<Announcement> all) async {
+  Future<void> _openAlert(ParentAlert alert) async {
+    setState(() => _readAlerts.add(alert.id));
+    await widget.onOpenAlert(AlertLink.fromAlert(alert));
+    if (mounted) await _loader.currentState?.reload(quiet: true);
+  }
+
+  Future<void> _markAll(_Inbox inbox) async {
     if (_markingAll) return;
-    final ids = all.where((a) => !_isRead(a)).map((a) => a.id).toSet();
-    if (ids.isEmpty) return;
+    final ids = inbox.announcements.where((a) => !_isRead(a)).map((a) => a.id).toSet();
+    final alertIds = (inbox.alerts ?? const <ParentAlert>[])
+        .where((a) => !_alertRead(a))
+        .map((a) => a.id)
+        .toSet();
+    if (ids.isEmpty && alertIds.isEmpty) return;
 
     setState(() {
       _markingAll = true;
       _read.addAll(ids);
       _sending.addAll(ids);
+      _readAlerts.addAll(alertIds);
     });
     try {
-      final marked = await ParentApi.instance.markAllAnnouncementsRead();
+      final marked = await Future.wait([
+        if (ids.isNotEmpty) ParentApi.instance.markAllAnnouncementsRead(),
+        if (alertIds.isNotEmpty) ParentApi.instance.markAllAlertsRead(),
+      ]);
       if (!mounted) return;
       setState(() {
         _markingAll = false;
         _sending.removeAll(ids);
       });
-      if (marked > 0) showNote(context, tn('msg.markedRead', marked));
+      final total = marked.fold<int>(0, (sum, n) => sum + n);
+      if (total > 0) showNote(context, tn('msg.markedRead', total));
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _markingAll = false;
         _read.removeAll(ids);
         _sending.removeAll(ids);
+        _readAlerts.removeAll(alertIds);
       });
       showNote(context, errorText(e), bad: true);
     }
+  }
+
+  List<_Entry> _entries(_Inbox inbox) {
+    final alerts = inbox.alerts ?? const <ParentAlert>[];
+    final rows = <_Entry>[
+      if (_filter != MessagesFilter.alerts)
+        for (final a in inbox.announcements)
+          if (switch (_filter) {
+            MessagesFilter.announcements => a.category == 'ANNOUNCEMENT' || a.category == 'EVENT',
+            MessagesFilter.notices => a.category == 'POLICY' || a.category == 'NOTICE',
+            MessagesFilter.urgent => a.priority == 'URGENT' || a.priority == 'HIGH',
+            _ => true,
+          })
+            _Entry.announcement(a),
+      if (_filter == MessagesFilter.all || _filter == MessagesFilter.alerts)
+        for (final a in alerts) _Entry.alert(a),
+      if (_filter == MessagesFilter.urgent)
+        for (final a in alerts)
+          if (a.urgent) _Entry.alert(a),
+    ];
+    rows.sort((a, b) {
+      if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+      return b.at.compareTo(a.at);
+    });
+    return rows;
+  }
+
+  void _openPending(_Inbox inbox) {
+    final id = _pendingAnnouncement;
+    if (id == null) return;
+    _pendingAnnouncement = null;
+    Announcement? found;
+    for (final a in inbox.announcements) {
+      if (a.id == id) found = a;
+    }
+    final item = found;
+    if (item == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _markRead(item);
+      _showAnnouncement(context, item);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final tint = Role.parent.tint;
 
-    return Loader<List<Announcement>>(
+    return Loader<_Inbox>(
+      key: _loader,
       tint: tint,
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
-      load: () => ParentApi.instance.announcements(),
-      builder: (context, all) {
-        _all = all;
+      load: _load,
+      builder: (context, inbox) {
+        _inbox = inbox;
         _syncBell();
-        final unread = all.where((a) => !_isRead(a)).length;
+        _openPending(inbox);
+        final unread = inbox.announcements.where((a) => !_isRead(a)).length +
+            (inbox.alerts ?? const <ParentAlert>[]).where((a) => !_alertRead(a)).length;
 
-        final rows = all.where((a) {
-          return switch (_tab) {
-            1 => a.category == 'ANNOUNCEMENT' || a.category == 'EVENT',
-            2 => a.category == 'POLICY' || a.category == 'NOTICE',
-            3 => a.priority == 'URGENT' || a.priority == 'HIGH',
-            _ => true,
-          };
-        }).toList()
-          ..sort((a, b) {
-            if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
-            return (b.sentAt ?? DateTime(0)).compareTo(a.sentAt ?? DateTime(0));
-          });
+        final rows = _entries(inbox);
+        final alertsFailed = inbox.alerts == null && _filter == MessagesFilter.alerts;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,10 +291,15 @@ class _MessagesTabState extends State<MessagesTab> {
                   const SizedBox(height: 10),
                   UnderlineTabs(
                     tint: tint,
-                    index: _tab,
-                    onChanged: (i) => setState(() => _tab = i),
+                    index: _filter.index,
+                    onChanged: (i) => setState(() => _filter = MessagesFilter.values[i]),
                     tabs: [
                       TabSpec(label: t('msg.all'), icon: Icons.forum_outlined),
+                      TabSpec(
+                        label: t('msg.alerts'),
+                        icon: Icons.notifications_active_outlined,
+                        color: AppTheme.amber,
+                      ),
                       TabSpec(
                         label: t('msg.announcements'),
                         icon: Icons.campaign_outlined,
@@ -184,7 +327,7 @@ class _MessagesTabState extends State<MessagesTab> {
             ),
             const SizedBox(height: kCardGap),
 
-            if (_tab == 4)
+            if (_filter == MessagesFilter.conversations)
               SectionGate(
                 childId: widget.child.studentId,
                 section: ParentSection.messages,
@@ -193,11 +336,14 @@ class _MessagesTabState extends State<MessagesTab> {
               )
             else if (rows.isEmpty)
               Card16(
-                padding: const EdgeInsets.symmetric(vertical: 34),
+                padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 18),
                 child: Center(
                   child: Text(
-                    t('msg.nothing'),
-                    style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                    alertsFailed
+                        ? '${t('msg.alertsFailed')} ${errorText(inbox.alertsError)}'
+                        : t('msg.nothing'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12.5, height: 1.5, color: AppTheme.textMuted),
                   ),
                 ),
               )
@@ -207,18 +353,25 @@ class _MessagesTabState extends State<MessagesTab> {
                 child: Column(
                   children: [
                     SectionRow(
-                      title: t('msg.fromSchool'),
+                      title: _filter == MessagesFilter.alerts ? t('msg.alertsTitle') : t('msg.fromSchool'),
                       actionLabel: unread > 0 ? t('msg.markAllRead') : null,
                       actionIcon: Icons.done_all_rounded,
-                      onAction: _markingAll ? null : () => _markAll(all),
+                      onAction: _markingAll ? null : () => _markAll(inbox),
                     ),
                     for (var i = 0; i < rows.length; i++) ...[
                       if (i > 0) Divider(height: 1, color: AppTheme.border),
-                      _MessageRow(
-                        item: rows[i],
-                        read: _isRead(rows[i]),
-                        onOpen: () => _markRead(rows[i]),
-                      ),
+                      if (rows[i].alert case final alert?)
+                        _AlertRow(
+                          item: alert,
+                          read: _alertRead(alert),
+                          onOpen: () => _openAlert(alert),
+                        )
+                      else if (rows[i].announcement case final announcement?)
+                        _MessageRow(
+                          item: announcement,
+                          read: _isRead(announcement),
+                          onOpen: () => _markRead(announcement),
+                        ),
                     ],
                   ],
                 ),
@@ -226,6 +379,166 @@ class _MessagesTabState extends State<MessagesTab> {
           ],
         );
       },
+    );
+  }
+}
+
+(Color, IconData) _announcementLook(Announcement item) {
+  final urgent = item.priority == 'URGENT' || item.priority == 'HIGH';
+  final (colour, icon) = switch (item.category) {
+    'EVENT' => (AppTheme.green, Icons.event_rounded),
+    'POLICY' || 'NOTICE' => (AppTheme.blue, Icons.description_rounded),
+    'TRANSPORT' => (AppTheme.amber, Icons.directions_bus_rounded),
+    'HEALTH' => (AppTheme.rose, Icons.favorite_rounded),
+    _ => (Role.parent.tint, Icons.account_balance_rounded),
+  };
+  return urgent ? (AppTheme.rose, Icons.priority_high_rounded) : (colour, icon);
+}
+
+void _showAnnouncement(BuildContext context, Announcement item) {
+  final (tint, icon) = _announcementLook(item);
+  showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: AppTheme.dark ? 0.62 : 0.34),
+    builder: (context) => _AnnouncementDialog(item: item, icon: icon, tint: tint),
+  );
+}
+
+String _when(DateTime? at) {
+  if (at == null) return '—';
+  final now = DateTime.now();
+  final midnight = DateTime(now.year, now.month, now.day);
+  final days = midnight.difference(DateTime(at.year, at.month, at.day)).inDays;
+  if (days <= 0) return hhmm(at);
+  if (days == 1) return t('due.yesterday');
+  if (days < 7) return t('day.${at.weekday}');
+  return shortDate(at);
+}
+
+class _UnreadDot extends StatelessWidget {
+  const _UnreadDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 20,
+      height: 20,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Role.parent.tint,
+        shape: BoxShape.circle,
+      ),
+      child: const Text(
+        '1',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+}
+
+class _InboxRow extends StatelessWidget {
+  const _InboxRow({
+    required this.tint,
+    required this.icon,
+    required this.title,
+    required this.byline,
+    required this.body,
+    required this.at,
+    required this.read,
+    required this.onTap,
+    this.pinned = false,
+  });
+
+  final Color tint;
+  final IconData icon;
+  final String title;
+  final String byline;
+  final String body;
+  final DateTime? at;
+  final bool read;
+  final bool pinned;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, size: 22, color: tint),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                      color: AppTheme.text,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    byline,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: tint,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    body,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.textMuted),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  _when(at),
+                  style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+                ),
+                const SizedBox(height: 6),
+                if (!read)
+                  const _UnreadDot()
+                else if (pinned)
+                  Icon(Icons.push_pin_rounded, size: 15, color: AppTheme.amber),
+              ],
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right_rounded, size: 19, color: AppTheme.textFaint),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -241,129 +554,60 @@ class _MessageRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final urgent = item.priority == 'URGENT' || item.priority == 'HIGH';
-    final (colour, icon) = switch (item.category) {
-      'EVENT' => (AppTheme.green, Icons.event_rounded),
-      'POLICY' || 'NOTICE' => (AppTheme.blue, Icons.description_rounded),
-      'TRANSPORT' => (AppTheme.amber, Icons.directions_bus_rounded),
-      'HEALTH' => (AppTheme.rose, Icons.favorite_rounded),
-      _ => (Role.parent.tint, Icons.account_balance_rounded),
-    };
-    final tint = urgent ? AppTheme.rose : colour;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    final (tint, icon) = _announcementLook(item);
+    return _InboxRow(
+      tint: tint,
+      icon: icon,
+      title: item.title,
+      byline: item.authorName.isEmpty ? t('msg.school') : item.authorName,
+      body: item.body,
+      at: item.sentAt,
+      read: read,
+      pinned: item.pinned,
       onTap: () {
         onOpen();
-        showDialog<void>(
-          context: context,
-          barrierColor: Colors.black.withValues(alpha: AppTheme.dark ? 0.62 : 0.34),
-          builder: (context) => _AnnouncementDialog(
-            item: item,
-            icon: urgent ? Icons.priority_high_rounded : icon,
-            tint: tint,
-          ),
-        );
+        _showAnnouncement(context, item);
       },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 13),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.11),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(urgent ? Icons.priority_high_rounded : icon, size: 22, color: tint),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3,
-                      color: AppTheme.text,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    item.authorName.isEmpty ? t('msg.school') : item.authorName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: tint,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    item.body,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.textMuted),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  _when(item.sentAt),
-                  style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
-                ),
-                const SizedBox(height: 6),
-                if (!read)
-                  Container(
-                    width: 20,
-                    height: 20,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Role.parent.tint,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Text(
-                      '1',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  )
-                else if (item.pinned)
-                  Icon(Icons.push_pin_rounded, size: 15, color: AppTheme.amber),
-              ],
-            ),
-            const SizedBox(width: 4),
-            Icon(Icons.chevron_right_rounded, size: 19, color: AppTheme.textFaint),
-          ],
-        ),
-      ),
     );
   }
+}
 
-  String _when(DateTime? at) {
-    if (at == null) return '—';
-    final now = DateTime.now();
-    final midnight = DateTime(now.year, now.month, now.day);
-    final days = midnight.difference(DateTime(at.year, at.month, at.day)).inDays;
-    if (days <= 0) return hhmm(at);
-    if (days == 1) return t('due.yesterday');
-    if (days < 7) return t('day.${at.weekday}');
-    return shortDate(at);
+class _AlertRow extends StatelessWidget {
+  const _AlertRow({required this.item, required this.read, required this.onOpen});
+
+  final ParentAlert item;
+
+  final bool read;
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final (colour, icon) = switch (alertDestinationFor(item.templateKey, item.category)) {
+      AlertDestination.track || AlertDestination.bus => (AppTheme.amber, Icons.directions_bus_rounded),
+      AlertDestination.dropoff => (AppTheme.amber, Icons.pin_drop_rounded),
+      AlertDestination.fees => (AppTheme.green, Icons.receipt_long_rounded),
+      AlertDestination.attendance => (AppTheme.green, Icons.verified_user_rounded),
+      AlertDestination.attitude => (AppTheme.violet, Icons.emoji_events_rounded),
+      AlertDestination.marks ||
+      AlertDestination.assignments ||
+      AlertDestination.reports =>
+        (AppTheme.violet, Icons.school_rounded),
+      AlertDestination.conversation => (AppTheme.green, Icons.chat_bubble_rounded),
+      AlertDestination.announcement => (AppTheme.violet, Icons.campaign_rounded),
+      AlertDestination.alerts => (Role.parent.tint, Icons.notifications_rounded),
+    };
+    final title = item.title?.trim() ?? '';
+    return _InboxRow(
+      tint: item.urgent ? AppTheme.rose : colour,
+      icon: item.urgent ? Icons.priority_high_rounded : icon,
+      title: title.isEmpty ? tOr('alert.cat.${item.category}', t('msg.alert')) : title,
+      byline: item.studentName?.isNotEmpty == true ? item.studentName! : t('msg.school'),
+      body: item.body,
+      at: item.createdAt,
+      read: read,
+      onTap: onOpen,
+    );
   }
 }
 

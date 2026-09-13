@@ -30,8 +30,6 @@ class _TrackScreenState extends State<TrackScreen> {
 
   Timer? _tick;
 
-  bool _framed = false;
-
   @override
   void initState() {
     super.initState();
@@ -79,8 +77,6 @@ class _TrackScreenState extends State<TrackScreen> {
                       color: AppTheme.blue,
                     );
                   }
-                  WidgetsBinding.instance.addPostFrameCallback((_) => _frame(bus));
-
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -90,7 +86,7 @@ class _TrackScreenState extends State<TrackScreen> {
                       ],
                       _StateCard(bus: bus, child: widget.child),
                       const SizedBox(height: kCardGap),
-                      _MapCard(bus: bus, controller: _map, onRecentre: () => _frame(bus, force: true)),
+                      _MapCard(bus: bus, controller: _map, onRecentre: () => _recentre(bus)),
                       const SizedBox(height: kCardGap),
                       _Details(bus: bus),
                     ],
@@ -104,27 +100,14 @@ class _TrackScreenState extends State<TrackScreen> {
     );
   }
 
-  void _frame(LiveBus bus, {bool force = false}) {
-    if (_framed && !force) return;
-
-    final points = <LatLng>[
-      if (bus.hasFix) LatLng(bus.lat!, bus.lon!),
-      if (bus.stopLat != null && bus.stopLon != null) LatLng(bus.stopLat!, bus.stopLon!),
-    ];
+  void _recentre(LiveBus bus) {
+    final points = _MapCard.pointsOf(bus);
     if (points.isEmpty) return;
-
-    _framed = true;
     if (points.length == 1) {
-      _map.move(points.first, 15.5);
+      _map.move(points.first, _MapCard.singleZoom);
       return;
     }
-    _map.fitCamera(
-      CameraFit.coordinates(
-        coordinates: points,
-        padding: const EdgeInsets.fromLTRB(48, 56, 48, 48),
-        maxZoom: 16,
-      ),
-    );
+    _map.fitCamera(_MapCard.fit(points));
   }
 }
 
@@ -265,10 +248,24 @@ class _MapCard extends StatelessWidget {
   final MapController controller;
   final VoidCallback onRecentre;
 
+  static const singleZoom = 15.5;
+
+  static List<LatLng> pointsOf(LiveBus bus) => [
+        if (bus.hasFix) LatLng(bus.lat!, bus.lon!),
+        if (bus.stopLat != null && bus.stopLon != null) LatLng(bus.stopLat!, bus.stopLon!),
+      ];
+
+  static CameraFit fit(List<LatLng> points) => CameraFit.coordinates(
+        coordinates: points,
+        padding: const EdgeInsets.fromLTRB(48, 56, 48, 48),
+        maxZoom: 16,
+      );
+
   @override
   Widget build(BuildContext context) {
     final tint = Role.parent.tint;
     final hasStop = bus.stopLat != null && bus.stopLon != null;
+    final points = pointsOf(bus);
 
     if (!bus.hasFix && !hasStop) {
       return Card16(
@@ -297,10 +294,6 @@ class _MapCard extends StatelessWidget {
       );
     }
 
-    final centre = bus.hasFix
-        ? LatLng(bus.lat!, bus.lon!)
-        : LatLng(bus.stopLat!, bus.stopLon!);
-
     return Card16(
       padding: EdgeInsets.zero,
       child: ClipRRect(
@@ -312,8 +305,9 @@ class _MapCard extends StatelessWidget {
               FlutterMap(
                 mapController: controller,
                 options: MapOptions(
-                  initialCenter: centre,
-                  initialZoom: 15,
+                  initialCenter: points.first,
+                  initialZoom: singleZoom,
+                  initialCameraFit: points.length > 1 ? fit(points) : null,
                   minZoom: 4,
                   maxZoom: 18,
                   interactionOptions: const InteractionOptions(
@@ -345,9 +339,12 @@ class _MapCard extends StatelessWidget {
                       if (hasStop)
                         Marker(
                           point: LatLng(bus.stopLat!, bus.stopLon!),
-                          width: 34,
-                          height: 34,
-                          child: _StopPin(colour: tint),
+                          width: 150,
+                          height: 78,
+                          child: _StopPin(
+                            colour: tint,
+                            label: (bus.stopName ?? '').trim().isEmpty ? t('track.stop') : bus.stopName!.trim(),
+                          ),
                         ),
                       if (bus.hasFix)
                         Marker(
@@ -549,25 +546,65 @@ class _HeadingPainter extends CustomPainter {
 }
 
 class _StopPin extends StatelessWidget {
-  const _StopPin({required this.colour});
+  const _StopPin({required this.colour, required this.label});
 
   final Color colour;
+  final String label;
 
   @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          shape: BoxShape.circle,
-          border: Border.all(color: colour, width: 3),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
+  Widget build(BuildContext context) => Semantics(
+        label: label,
+        child: Column(
+          children: [
+            const SizedBox(height: 22),
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                shape: BoxShape.circle,
+                border: Border.all(color: colour, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(Icons.hail_rounded, size: 17, color: colour),
+            ),
+            const SizedBox(height: 2),
+            SizedBox(
+              height: 20,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    height: 1.3,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.text,
+                  ),
+                ),
+              ),
             ),
           ],
         ),
-        child: Icon(Icons.person_pin_circle_outlined, size: 17, color: colour),
       );
 }
 

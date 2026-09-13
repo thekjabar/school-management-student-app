@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-
+import 'package:http/http.dart' show Client;
+import 'package:http/retry.dart' show RetryClient;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../i18n/strings.dart';
@@ -30,10 +31,25 @@ class MapTiles {
 
   static final trouble = ValueNotifier<bool>(false);
 
-  static TileLayer layer() => TileLayer(
+  static const cacheBytes = 200 * 1024 * 1024;
+
+  static String cacheKey(String url) =>
+      BuiltInMapCachingProvider.uuidTileKeyGenerator(url.split('?').first);
+
+  static final TileProvider _provider = NetworkTileProvider(
+    httpClient: RetryClient(Client()),
+    cachingProvider: BuiltInMapCachingProvider.getOrCreateInstance(
+      maxCacheSize: cacheBytes,
+      tileKeyGenerator: cacheKey,
+    ),
+  );
+
+  static TileLayer layer({int panBuffer = 1}) => TileLayer(
         urlTemplate:
             'https://api.mapbox.com/styles/v1/$_rasterStyle/tiles/256/{z}/{x}/{y}@2x'
             '?access_token=$token',
+        tileProvider: _provider,
+        panBuffer: panBuffer,
         errorTileCallback: (_, _, _) {
           WidgetsBinding.instance.addPostFrameCallback((_) => trouble.value = true);
         },
@@ -64,7 +80,6 @@ class MapAttribution extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final side = small ? 20.0 : 24.0;
     return Semantics(
       button: true,
       label: t('map.credits'),
@@ -72,19 +87,21 @@ class MapAttribution extends StatelessWidget {
         onTap: () => showAppSheet<void>(context, builder: (_) => const _CreditSheet()),
         behavior: HitTestBehavior.opaque,
         child: Container(
-          width: side,
-          height: side,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
           decoration: BoxDecoration(
-            color: AppTheme.surface.withValues(alpha: 0.86),
-            shape: BoxShape.circle,
-            boxShadow: AppTheme.dark
-                ? null
-                : const [BoxShadow(color: Color(0x14101828), blurRadius: 6, offset: Offset(0, 2))],
+            color: AppTheme.surface.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(4),
           ),
-          child: Icon(
-            Icons.info_outline_rounded,
-            size: small ? 12 : 14,
-            color: AppTheme.textMuted,
+          child: Text(
+            MapTiles.credit,
+            textDirection: TextDirection.ltr,
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: small ? 8 : 9,
+              height: 1.2,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.textMuted,
+            ),
           ),
         ),
       ),

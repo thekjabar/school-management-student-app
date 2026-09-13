@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../api/client.dart';
 import '../../api/offline_cache.dart';
 import '../../api/parent_api.dart';
+import '../../api/push.dart';
 import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
@@ -14,6 +15,7 @@ import '../../ui/nav_glyphs.dart';
 import '../../ui/pickers.dart';
 import '../../ui/async.dart';
 import '../../ui/home_kit.dart';
+import 'alert_routes.dart';
 import 'calendar_tab.dart';
 import 'home_tab.dart';
 import 'leave_screen.dart';
@@ -39,6 +41,8 @@ class _ParentAppState extends State<ParentApp> with WidgetsBindingObserver {
 
   bool _switching = false;
 
+  final ValueNotifier<MessagesFocus?> _messagesFocus = ValueNotifier<MessagesFocus?>(null);
+
   List<NavItem> get _nav => [
     NavItem(Icons.home_rounded, Icons.home_outlined, t('nav.home'), glyph: NavGlyph.home),
     NavItem(Icons.sms_rounded, Icons.sms_outlined, t('nav.messages'), glyph: NavGlyph.messages),
@@ -54,12 +58,17 @@ class _ParentAppState extends State<ParentApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     Entitlements.instance.forget();
     ApiClient.instance.onSectionLocked = _serverSaysLocked;
+    Push.tapped.addListener(_pushTapped);
+    Push.arrived.addListener(_refreshUnread);
     _load();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    Push.tapped.removeListener(_pushTapped);
+    Push.arrived.removeListener(_refreshUnread);
+    _messagesFocus.dispose();
     if (ApiClient.instance.onSectionLocked == _serverSaysLocked) {
       ApiClient.instance.onSectionLocked = null;
     }
@@ -72,7 +81,10 @@ class _ParentAppState extends State<ParentApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(Entitlements.instance.refresh());
+    if (state == AppLifecycleState.resumed) {
+      unawaited(Entitlements.instance.refresh());
+      unawaited(_refreshUnread());
+    }
   }
 
   Future<void> _load() async {
@@ -99,12 +111,68 @@ class _ParentAppState extends State<ParentApp> with WidgetsBindingObserver {
       });
     }
 
-    try {
-      final notices = await ParentApi.instance.announcements();
+    await _refreshUnread();
+    _pushTapped();
+  }
+
+  Future<void> _refreshUnread() async {
+    final counts = await Future.wait([
+      ParentApi.instance
+          .announcements()
+          .then((notices) => notices.where((n) => n.readAt == null).length, onError: (Object _) => 0),
+      ParentApi.instance.unreadAlertCount().then((n) => n, onError: (Object _) => 0),
+    ]);
+    if (!mounted) return;
+    setState(() => _unread = counts[0] + counts[1]);
+  }
+
+  void _pushTapped() {
+    final data = Push.tapped.value;
+    if (data == null || _children == null) return;
+    Push.tapped.value = null;
+    final link = AlertLink.fromPush(data);
+    if (link != null) unawaited(_openAlert(link));
+  }
+
+  Future<void> _openAlert(AlertLink link) async {
+    final children = _children ?? const <Child>[];
+    final target = link.studentId == null ? _selected : _pickFrom(children, link.studentId);
+    if (target != null &&
+        target.tenantId.isNotEmpty &&
+        target.tenantId != Session.instance.me?.active.tenantId) {
+      await _switchTo(target.studentId);
       if (!mounted) return;
-      setState(() => _unread = notices.where((n) => n.readAt == null).length);
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+    }
+
+    final id = link.notificationId;
+    if (id != null) unawaited(_markAlertRead(id));
+
+    final nav = _navKeys[_tab].currentState;
+    if (nav == null) return;
+    await openAlertDestination(
+      nav.context,
+      link: link,
+      child: target,
+      household: children,
+      showInMessages: _showInMessages,
+    );
+  }
+
+  Future<void> _markAlertRead(String id) async {
+    try {
+      await ParentApi.instance.markAlertRead(id);
     } catch (_) {
     }
+    await _refreshUnread();
+  }
+
+  void _showInMessages(MessagesFocus focus) {
+    if (!mounted) return;
+    setState(() => _tab = 1);
+    _navKeys[1].currentState?.popUntil((r) => r.isFirst);
+    _messagesFocus.value = focus;
   }
 
   Child? get _selected {
@@ -280,7 +348,9 @@ class _ParentAppState extends State<ParentApp> with WidgetsBindingObserver {
                                 navigatorKey: _navKeys[1],
                                 child: MessagesTab(
                                   child: child,
-                                  onRead: () => setState(() => _unread = 0),
+                                  onRead: () => unawaited(_refreshUnread()),
+                                  onOpenAlert: _openAlert,
+                                  focus: _messagesFocus,
                                 ),
                               ),
                               TabHost(
