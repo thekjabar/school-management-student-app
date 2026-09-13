@@ -321,21 +321,6 @@ class _MapCard extends StatelessWidget {
                 children: [
                   MapTiles.layer(),
 
-                  if (bus.hasFix && hasStop)
-                    PolylineLayer(
-                      polylines: [
-                        Polyline(
-                          points: [
-                            LatLng(bus.lat!, bus.lon!),
-                            LatLng(bus.stopLat!, bus.stopLon!),
-                          ],
-                          strokeWidth: 3,
-                          pattern: const StrokePattern.dotted(),
-                          color: tint.withValues(alpha: 0.55),
-                        ),
-                      ],
-                    ),
-
                   MarkerLayer(
                     markers: [
                       if (hasStop)
