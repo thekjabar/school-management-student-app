@@ -551,7 +551,7 @@ class AttitudeSummary {
   }
 
   factory AttitudeSummary.fromJson(Map<String, dynamic> j) {
-    final s = (j['summary'] ?? const {}) as Map<String, dynamic>;
+    final s = (j['summary'] as Map<String, dynamic>?) ?? const <String, dynamic>{};
     return AttitudeSummary(
       merits: (s['merits'] as num?)?.toInt() ?? 0,
       concerns: (s['concerns'] as num?)?.toInt() ?? 0,
@@ -659,7 +659,7 @@ class ExamResultItem {
   final DateTime date;
 
   factory ExamResultItem.fromJson(Map<String, dynamic> j) {
-    final exam = (j['exam'] ?? {}) as Map<String, dynamic>;
+    final exam = ((j['exam'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
     return ExamResultItem(
       id: j['id'] as String,
       score: j['score'] as num?,
@@ -2115,7 +2115,7 @@ class LiveBus {
   }
 
   factory LiveBus.fromJson(Map<String, dynamic> j) {
-    final student = (j['student'] ?? {}) as Map<String, dynamic>;
+    final student = ((j['student'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
     final position = j['position'] as Map<String, dynamic>?;
     final stop = j['stop'] as Map<String, dynamic>?;
     final child = j['child'] as Map<String, dynamic>?;
@@ -2232,7 +2232,7 @@ class DropoffOption {
   final String? landmark;
 
   factory DropoffOption.fromJson(Map<String, dynamic> j) {
-    final stop = (j['stop'] ?? {}) as Map<String, dynamic>;
+    final stop = ((j['stop'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
     return DropoffOption(
       id: j['id'] as String,
       label: (j['label'] ?? '') as String,

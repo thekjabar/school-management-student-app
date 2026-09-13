@@ -24,8 +24,8 @@ class TeacherProfile {
   final List<String> homeroomClassIds;
 
   factory TeacherProfile.fromJson(Map<String, dynamic> j) {
-    final person = (j['person'] ?? {}) as Map<String, dynamic>;
-    final school = (j['school'] ?? {}) as Map<String, dynamic>;
+    final person = ((j['person'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
+    final school = ((j['school'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
     return TeacherProfile(
       name: (person['name'] ?? '') as String,
       phone: (person['phone'] ?? '') as String,
@@ -64,8 +64,8 @@ class TeachingSlot {
   final num maxScore;
 
   factory TeachingSlot.fromJson(Map<String, dynamic> j) {
-    final subject = (j['subject'] ?? {}) as Map<String, dynamic>;
-    final cls = (j['class'] ?? {}) as Map<String, dynamic>;
+    final subject = ((j['subject'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
+    final cls = ((j['class'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
     return TeachingSlot(
       assignmentId: (j['assignmentId'] ?? '') as String,
       classId: (cls['id'] ?? '') as String,
@@ -104,7 +104,7 @@ class TeacherSlot {
 
   factory TeacherSlot.fromJson(Map<String, dynamic> j) {
     final subject = j['subject'] as Map<String, dynamic>?;
-    final cls = (j['class'] ?? {}) as Map<String, dynamic>;
+    final cls = ((j['class'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
     return TeacherSlot(
       weekday: (j['weekday'] ?? '') as String,
       period: (j['period'] as num?)?.toInt() ?? 0,
@@ -204,8 +204,8 @@ class TeacherHomework {
   final int submissions;
 
   factory TeacherHomework.fromJson(Map<String, dynamic> j) {
-    final subject = (j['subject'] ?? {}) as Map<String, dynamic>;
-    final cls = (j['class'] ?? {}) as Map<String, dynamic>;
+    final subject = ((j['subject'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
+    final cls = ((j['class'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
     return TeacherHomework(
       id: j['id'] as String,
       title: (j['title'] ?? '') as String,
@@ -215,7 +215,7 @@ class TeacherHomework {
       subjectName: (subject['name'] ?? '') as String,
       colorHex: subject['colorHex'] as String?,
       className: (cls['name'] ?? '') as String,
-      submissions: ((j['_count'] ?? {}) as Map<String, dynamic>)['submissions'] as int? ?? 0,
+      submissions: (((j['_count'] as Map<String, dynamic>?) ?? const <String, dynamic>{}))['submissions'] as int? ?? 0,
     );
   }
 }
@@ -252,8 +252,8 @@ class TeacherExam {
   final DateTime? publishedAt;
 
   factory TeacherExam.fromJson(Map<String, dynamic> j) {
-    final subject = (j['subject'] ?? {}) as Map<String, dynamic>;
-    final cls = (j['class'] ?? {}) as Map<String, dynamic>;
+    final subject = ((j['subject'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
+    final cls = ((j['class'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
     return TeacherExam(
       id: j['id'] as String,
       title: (j['title'] ?? 'Test') as String,
@@ -266,7 +266,7 @@ class TeacherExam {
       subjectName: (subject['name'] ?? '') as String,
       colorHex: subject['colorHex'] as String?,
       className: (cls['name'] ?? '') as String,
-      resultCount: ((j['_count'] ?? {}) as Map<String, dynamic>)['results'] as int? ?? 0,
+      resultCount: (((j['_count'] as Map<String, dynamic>?) ?? const <String, dynamic>{}))['results'] as int? ?? 0,
       publishedAt:
           j['resultsPublishedAt'] == null ? null : DateTime.parse(j['resultsPublishedAt'] as String).toLocal(),
     );
@@ -467,7 +467,7 @@ class TeacherApi {
 
   Future<({bool published, num maxScore, List<MarkRow> rows})> marks(String examId) async {
     final json = await _api.get('/teacher/exams/$examId/marks') as Map<String, dynamic>;
-    final exam = (json['exam'] ?? {}) as Map<String, dynamic>;
+    final exam = ((json['exam'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
     return (
       published: (json['published'] ?? false) as bool,
       maxScore: (exam['maxScore'] as num?) ?? 100,

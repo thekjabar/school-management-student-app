@@ -193,7 +193,7 @@ class CrewTrip {
   static DateTime? _at(dynamic v) => v == null ? null : DateTime.parse(v as String).toLocal();
 
   factory CrewTrip.fromJson(Map<String, dynamic> j) {
-    final route = (j['route'] ?? {}) as Map<String, dynamic>;
+    final route = ((j['route'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
     return CrewTrip(
       id: j['id'] as String,
       leg: (j['leg'] ?? 'OUT') as String,
@@ -463,7 +463,7 @@ class TripPlan {
   factory TripPlan.fromJson(Map<String, dynamic> j) => TripPlan(
         ordering: (j['ordering'] ?? 'planned') as String,
         orderingNote: (j['orderingNote'] ?? '') as String,
-        counts: Headcount.fromJson((j['counts'] ?? {}) as Map<String, dynamic>),
+        counts: Headcount.fromJson(((j['counts'] as Map<String, dynamic>?) ?? const <String, dynamic>{})),
         stops: ((j['stops'] as List?) ?? [])
             .map((e) => PlannedStop.fromJson(e as Map<String, dynamic>))
             .toList(),

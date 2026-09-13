@@ -36,7 +36,7 @@ class CrewPapersScreen extends StatelessWidget {
       tint: Role.driver.tint,
       load: () => CrewApi.instance.me(),
       builder: (context, data) {
-        final person = (data['person'] ?? {}) as Map<String, dynamic>;
+        final person = ((data['person'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
         final roles = ((data['roles'] as List?) ?? []).cast<Map<String, dynamic>>();
         final offboarding = data['offboardingInProgress'];
 

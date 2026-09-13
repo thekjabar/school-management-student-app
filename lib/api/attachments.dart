@@ -31,7 +31,7 @@ class AttachedFile {
   }
 
   factory AttachedFile.fromJson(Map<String, dynamic> j) {
-    final asset = (j['mediaAsset'] ?? const {}) as Map<String, dynamic>;
+    final asset = ((j['mediaAsset'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
     return AttachedFile(
       id: (j['id'] ?? '') as String,
       caption: j['caption'] as String?,
