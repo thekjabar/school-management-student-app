@@ -326,6 +326,25 @@ class PlannedStop {
   bool get done => departedAt != null || skipped;
   int get remaining => students.where((s) => !s.accountedFor).length;
 
+  PlannedStop withMetresAway(int? metres) => PlannedStop(
+        stopId: stopId,
+        name: name,
+        landmark: landmark,
+        lat: lat,
+        lon: lon,
+        plannedSequence: plannedSequence,
+        metresAway: metres,
+        students: students,
+        arrivedAt: arrivedAt,
+        departedAt: departedAt,
+        skipped: skipped,
+        skippedReason: skippedReason,
+        etaAt: etaAt,
+        etaIsActual: etaIsActual,
+        dwellSeconds: dwellSeconds,
+        driveSeconds: driveSeconds,
+      );
+
   factory PlannedStop.fromJson(Map<String, dynamic> j) => PlannedStop(
         stopId: j['stopId'] as String,
         name: (j['name'] ?? '') as String,
@@ -346,6 +365,46 @@ class PlannedStop {
         dwellSeconds: (j['dwellSeconds'] as num?)?.toInt() ?? 0,
         driveSeconds: (j['driveSeconds'] as num?)?.toInt() ?? 0,
       );
+}
+
+class SchoolGate {
+  const SchoolGate({required this.stopId, required this.name, required this.lat, required this.lon});
+
+  final String? stopId;
+
+  final String? name;
+
+  final double? lat;
+  final double? lon;
+
+  bool get placed {
+    final la = lat;
+    final lo = lon;
+    if (la == null || lo == null) return false;
+    if (la == 0 && lo == 0) return false;
+    return la.abs() <= 90 && lo.abs() <= 180;
+  }
+
+  static double? _number(Object? v) => v is num ? v.toDouble() : double.tryParse('${v ?? ''}');
+
+  factory SchoolGate.fromPack(Map<String, dynamic> pack) {
+    Map<String, dynamic>? gate;
+    for (final row in (pack['stopProgress'] as List?) ?? const []) {
+      final stop = (row as Map<String, dynamic>)['stop'] as Map<String, dynamic>?;
+      if (stop != null && stop['isCampusGate'] == true) gate = stop;
+    }
+    final campus = pack['campus'] as Map<String, dynamic>?;
+    final gateLat = _number(gate?['lat']);
+    final gateLon = _number(gate?['lon']);
+    final useGate = gateLat != null && gateLon != null;
+    final campusName = (campus?['name'] as String?)?.trim();
+    return SchoolGate(
+      stopId: gate?['id'] as String?,
+      name: campusName != null && campusName.isNotEmpty ? campusName : gate?['name'] as String?,
+      lat: useGate ? gateLat : _number(campus?['lat']),
+      lon: useGate ? gateLon : _number(campus?['lon']),
+    );
+  }
 }
 
 class Headcount {
@@ -779,17 +838,11 @@ class CrewApi {
     return SweepState.fromJson(json as Map<String, dynamic>);
   }
 
-  Future<String?> terminalStopId(String tripId) async {
+  Future<String?> terminalStopId(String tripId) async => (await schoolGate(tripId)).stopId;
+
+  Future<SchoolGate> schoolGate(String tripId) async {
     final json = await _api.get('/crew/trips/$tripId/pack') as Map<String, dynamic>;
-    final progress = (json['stopProgress'] as List?) ?? const [];
-    String? gate;
-    for (final row in progress) {
-      final stop = (row as Map<String, dynamic>)['stop'] as Map<String, dynamic>?;
-      if (stop != null && stop['isCampusGate'] == true) {
-        gate = stop['id'] as String?;
-      }
-    }
-    return gate;
+    return SchoolGate.fromPack(json);
   }
 
   Future<String> uploadPhoto({

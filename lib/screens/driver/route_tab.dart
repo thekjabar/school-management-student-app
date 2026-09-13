@@ -9,6 +9,7 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import 'home_tab.dart' show loadDutyTrip;
 import 'route_map.dart';
+import 'run_order.dart';
 import 'trip_screen.dart';
 
 class DriverRoute extends StatelessWidget {
@@ -21,8 +22,16 @@ class DriverRoute extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 18),
       load: () async {
         final trip = await loadDutyTrip();
-        if (trip == null) return _Run(trip: null, plan: null);
-        return _Run(trip: trip, plan: await CrewApi.instance.plan(trip.id));
+        if (trip == null) return _Run(trip: null, plan: null, run: null, school: null);
+        final plan = await CrewApi.instance.plan(trip.id);
+        final school = await RunOrder.school(trip.id);
+        final run = await RunOrder.resolve(
+          tripId: trip.id,
+          leg: trip.leg,
+          stops: plan.stops,
+          school: school,
+        );
+        return _Run(trip: trip, plan: plan, run: run, school: school);
       },
       builder: (context, run) {
         final trip = run.trip;
@@ -38,8 +47,9 @@ class DriverRoute extends StatelessWidget {
           );
         }
 
-        final stops = run.plan?.stops ?? const <PlannedStop>[];
-        final liveIndex = stops.indexWhere((s) => s.departedAt == null);
+        final stops = run.run?.stops ?? const <PlannedStop>[];
+        final next = run.run?.next;
+        final liveIndex = stops.indexWhere((s) => identical(s, next));
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -90,6 +100,7 @@ class DriverRoute extends StatelessWidget {
                         stops: stops,
                         tint: Role.driver.tint,
                         leg: trip.leg,
+                        school: run.school,
                       ),
                     ),
                   ),
@@ -146,10 +157,12 @@ void _openRun(BuildContext context, CrewTrip trip) {
 }
 
 class _Run {
-  _Run({required this.trip, required this.plan});
+  _Run({required this.trip, required this.plan, required this.run, required this.school});
 
   final CrewTrip? trip;
   final TripPlan? plan;
+  final RunArrangement? run;
+  final SchoolGate? school;
 }
 
 class _StopRow extends StatelessWidget {

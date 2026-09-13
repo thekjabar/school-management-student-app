@@ -8,9 +8,9 @@ import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
-import '../../api/bus_location.dart';
 import 'credentials_screen.dart';
 import 'route_map.dart';
+import 'run_order.dart';
 import 'trip_screen.dart';
 
 Future<CrewTrip?> loadDutyTrip() async {
@@ -90,11 +90,16 @@ class _DriverHomeState extends State<DriverHome> {
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
       load: () async {
         final live = await loadDutyTrip();
-        final me = BusLocation.instance.here.value;
-        final plan = live == null
-            ? null
-            : await CrewApi.instance.plan(live.id, lat: me?.latitude, lon: me?.longitude);
-        return _Duty(trip: live, plan: plan);
+        if (live == null) return _Duty(trip: null, plan: null, run: null, school: null);
+        final plan = await CrewApi.instance.plan(live.id);
+        final school = await RunOrder.school(live.id);
+        final run = await RunOrder.resolve(
+          tripId: live.id,
+          leg: live.leg,
+          stops: plan.stops,
+          school: school,
+        );
+        return _Duty(trip: live, plan: plan, run: run, school: school);
       },
       builder: (context, duty) {
         final trip = duty.trip;
@@ -123,7 +128,13 @@ class _DriverHomeState extends State<DriverHome> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const CredentialWarning(),
-            _DutyCard(trip: trip, plan: duty.plan, onOpen: () => _open(context, trip)),
+            _DutyCard(
+              trip: trip,
+              plan: duty.plan,
+              run: duty.run,
+              school: duty.school,
+              onOpen: () => _open(context, trip),
+            ),
             const SizedBox(height: kCardGap),
 
             if (counts != null) ...[
@@ -268,25 +279,31 @@ class _DriverHomeState extends State<DriverHome> {
 }
 
 class _Duty {
-  _Duty({required this.trip, required this.plan});
+  _Duty({required this.trip, required this.plan, required this.run, required this.school});
 
   final CrewTrip? trip;
   final TripPlan? plan;
 
-  PlannedStop? get nextStop {
-    final stops = plan?.stops ?? const <PlannedStop>[];
-    for (final s in stops) {
-      if (s.departedAt == null) return s;
-    }
-    return null;
-  }
+  final RunArrangement? run;
+
+  final SchoolGate? school;
+
+  PlannedStop? get nextStop => run?.next;
 }
 
 class _DutyCard extends StatelessWidget {
-  const _DutyCard({required this.trip, required this.plan, required this.onOpen});
+  const _DutyCard({
+    required this.trip,
+    required this.plan,
+    required this.run,
+    required this.school,
+    required this.onOpen,
+  });
 
   final CrewTrip trip;
   final TripPlan? plan;
+  final RunArrangement? run;
+  final SchoolGate? school;
   final VoidCallback onOpen;
 
   @override
@@ -308,9 +325,10 @@ class _DutyCard extends StatelessWidget {
                 bottom: 0,
                 width: box.maxWidth * 0.46,
                 child: RouteMap(
-                  stops: plan?.stops ?? const [],
+                  stops: run?.stops ?? plan?.stops ?? const [],
                   tint: tint,
                   leg: trip.leg,
+                  school: this.school,
                   compact: true,
                 ),
               ),
@@ -655,10 +673,7 @@ class _NextStopCard extends StatelessWidget {
                                   Icon(Icons.place_rounded, size: 12, color: tint),
                                   const SizedBox(width: 4),
                                   Text(
-                                    s.metresAway! >= 1000
-                                        ? tn('driver.kmAway',
-                                            (s.metresAway! / 100).round() / 10)
-                                        : tn('driver.metresAway', s.metresAway!),
+                                    distanceAway(s.metresAway!),
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,

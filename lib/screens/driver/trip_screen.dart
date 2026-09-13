@@ -18,6 +18,7 @@ import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
 import 'roster_kit.dart';
 import 'route_map.dart';
+import 'run_order.dart';
 
 const List<(String, String)> _serverSays = [
   ('not been started', 'driver.mustSetOff'),
@@ -63,8 +64,9 @@ class TripScreen extends StatefulWidget {
 
 class _TripScreenState extends State<TripScreen> {
   final _loaderKey = GlobalKey<LoaderState<_TripData>>();
-  bool _nearestFirst = false;
   String? _busy;
+
+  bool _orderedWithoutBus = false;
 
   final TextEditingController _search = TextEditingController();
   String _query = '';
@@ -83,45 +85,47 @@ class _TripScreenState extends State<TripScreen> {
     return CrewApi.instance.trips(date: stamp);
   }
 
-  String? _terminalStopId;
-  bool _gateKnown = false;
-
   final ValueNotifier<CrewTrip?> _headerTrip = ValueNotifier<CrewTrip?>(null);
 
   @override
+  void initState() {
+    super.initState();
+    BusLocation.instance.here.addListener(_onFirstFix);
+  }
+
+  @override
   void dispose() {
+    BusLocation.instance.here.removeListener(_onFirstFix);
     _headerTrip.dispose();
     _search.dispose();
     super.dispose();
   }
 
-  Future<String?> _gate() async {
-    if (_gateKnown) return _terminalStopId;
-    try {
-      _terminalStopId = await CrewApi.instance.terminalStopId(widget.tripId);
-      _gateKnown = true;
-    } catch (_) {
-      return null;
-    }
-    return _terminalStopId;
+  void _onFirstFix() {
+    if (!_orderedWithoutBus || BusLocation.instance.here.value == null) return;
+    _orderedWithoutBus = false;
+    _loaderKey.currentState?.reload();
   }
 
   Future<_TripData> _load() async {
     final api = CrewApi.instance;
-    final me = BusLocation.instance.here.value;
     final results = await Future.wait([
       _dutyList(),
-      api.plan(
-        widget.tripId,
-        nearest: _nearestFirst,
-        lat: me?.latitude,
-        lon: me?.longitude,
-      ),
+      api.plan(widget.tripId),
       api.sweepState(widget.tripId),
-      _gate(),
+      RunOrder.school(widget.tripId),
     ]);
     final trips = results[0] as List<CrewTrip>;
     _headerTrip.value = trips.where((t) => t.id == widget.tripId).firstOrNull;
+    final plan = results[1] as TripPlan;
+    final school = results[3] as SchoolGate?;
+    final run = await RunOrder.resolve(
+      tripId: widget.tripId,
+      leg: _headerTrip.value?.leg ?? 'OUT',
+      stops: plan.stops,
+      school: school,
+    );
+    _orderedWithoutBus = run.basis != RunBasis.fromBus && run.basis != RunBasis.office;
 
     final live = _headerTrip.value;
     if (live != null && live.startedAt != null && live.endedAt == null) {
@@ -133,9 +137,10 @@ class _TripScreenState extends State<TripScreen> {
     }
     return _TripData(
       trip: trips.where((t) => t.id == widget.tripId).firstOrNull,
-      plan: results[1] as TripPlan,
+      plan: plan,
+      run: run,
       sweep: results[2] as SweepState,
-      terminalStopId: results[3] as String?,
+      school: school,
     );
   }
 
@@ -358,8 +363,9 @@ class _TripScreenState extends State<TripScreen> {
 
                   final aboard = _stillAboard(data.plan);
 
-                  final currentStop =
-                      data.plan.stops.where((s) => !s.done).firstOrNull?.plannedSequence;
+                  final stops = data.run.stops;
+                  final numbers = runNumbers(stops, data.school?.stopId);
+                  final currentStop = data.run.next;
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -396,10 +402,12 @@ class _TripScreenState extends State<TripScreen> {
                       ],
                       SectionHead(t('driver.stops')),
                       _OrderToggle(
-                        nearestFirst: _nearestFirst,
-                        note: data.plan.orderingNote,
-                        onChanged: (v) {
-                          setState(() => _nearestFirst = v);
+                        nearestFirst: RunOrder.nearest.value,
+                        note: data.run.note(trip?.leg ?? 'OUT'),
+                        onChanged: (v) async {
+                          await RunOrder.choose(v);
+                          if (!mounted) return;
+                          setState(() {});
                           _loaderKey.currentState?.reload();
                         },
                       ),
@@ -411,39 +419,11 @@ class _TripScreenState extends State<TripScreen> {
                           borderRadius: BorderRadius.circular(AppTheme.radius),
                           child: SizedBox(
                             height: 230,
-                            child: Stack(
-                              children: [
-                                Positioned.fill(
-                                  child: RouteMap(
-                                    stops: data.plan.stops,
-                                    tint: Role.driver.tint,
-                                    leg: trip?.leg ?? 'OUT',
-                                    terminalStopId: data.terminalStopId,
-                                  ),
-                                ),
-                                if (data.plan.stops
-                                    .where((s) => s.departedAt == null)
-                                    .isNotEmpty)
-                                  Positioned(
-                                    top: 10,
-                                    right: 10,
-                                    child: _NextStopPanel(
-                                      stop: data.plan.stops
-                                          .firstWhere((s) => s.departedAt == null),
-                                      leg: trip?.leg ?? 'OUT',
-                                      onOpenMap: () => Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => RouteMapScreen(
-                                            stops: data.plan.stops,
-                                            tint: Role.driver.tint,
-                                            leg: trip?.leg ?? 'OUT',
-                                            terminalStopId: data.terminalStopId,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                            child: RouteMap(
+                              stops: stops,
+                              tint: Role.driver.tint,
+                              leg: trip?.leg ?? 'OUT',
+                              school: data.school,
                             ),
                           ),
                         ),
@@ -478,14 +458,12 @@ class _TripScreenState extends State<TripScreen> {
                         }),
                       ],
                       const SizedBox(height: 6),
-                      ...data.plan.stops
-                          .where((s) =>
-                              _query.isEmpty ||
-                              s.students.any((r) => _matches(r, _query)))
-                          .map(
-                        (s) => StopCard(
-                          key: ValueKey('stop-${s.plannedSequence}'),
-                          current: s.plannedSequence == currentStop,
+                      for (final (i, s) in stops.indexed)
+                        if (_query.isEmpty || s.students.any((r) => _matches(r, _query)))
+                          StopCard(
+                          key: ValueKey('stop-${s.stopId}-${s.students.firstOrNull?.studentId ?? ''}'),
+                          current: identical(s, currentStop),
+                          number: numbers[i],
                           query: _query,
                           stop: s,
                           tripId: widget.tripId,
@@ -496,7 +474,6 @@ class _TripScreenState extends State<TripScreen> {
                           started: started,
                           onChanged: () => _loaderKey.currentState?.reload(),
                         ),
-                      ),
                       SectionHead(t('driver.beforeYouLeave')),
                       _SweepCard(
                         sweep: data.sweep,
@@ -528,15 +505,20 @@ class _TripData {
   _TripData({
     required this.trip,
     required this.plan,
+    required this.run,
     required this.sweep,
-    required this.terminalStopId,
+    required this.school,
   });
 
   final CrewTrip? trip;
   final TripPlan plan;
+
+  final RunArrangement run;
   final SweepState sweep;
 
-  final String? terminalStopId;
+  final SchoolGate? school;
+
+  String? get terminalStopId => school?.stopId;
 }
 
 class _LeaveByCard extends StatefulWidget {
@@ -1003,31 +985,54 @@ class _OrderToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tint = Role.driver.tint;
     return Panel(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(14, 10, 10, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
+              Icon(
+                nearestFirst ? Icons.near_me_rounded : Icons.format_list_numbered_rounded,
+                size: 18,
+                color: nearestFirst ? tint : AppTheme.textMuted,
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  t('driver.nearestFirst'),
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                  t(nearestFirst ? 'driver.nearestFirst' : 'driver.order.office'),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    color: AppTheme.text,
+                  ),
                 ),
               ),
-              Switch(
-                value: nearestFirst,
-                activeTrackColor: Role.driver.tint,
-                onChanged: onChanged,
+              const SizedBox(width: 8),
+              Semantics(
+                label: t('driver.nearestFirst'),
+                toggled: nearestFirst,
+                child: Switch(
+                  value: nearestFirst,
+                  onChanged: onChanged,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  thumbColor: const WidgetStatePropertyAll(Colors.white),
+                  trackColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected) ? tint : AppTheme.textFaint,
+                  ),
+                  trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+                ),
               ),
             ],
           ),
-          if (note.isNotEmpty)
+          if (note.isNotEmpty) ...[
+            const SizedBox(height: 4),
             Text(
               note,
-              style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted, height: 1.45),
+              style: TextStyle(fontSize: 12, color: AppTheme.textMuted, height: 1.45),
             ),
+          ],
         ],
       ),
     );
@@ -1047,9 +1052,12 @@ class StopCard extends StatefulWidget {
     required this.onChanged,
     this.query = '',
     this.current = false,
+    this.number,
   });
 
   final PlannedStop stop;
+
+  final int? number;
   final String tripId;
   final String leg;
 
@@ -1252,6 +1260,7 @@ class _StopCardState extends State<StopCard> {
           children: [
             _StopHeader(
               stop: widget.stop,
+              number: widget.number,
               open: open,
               onTap: () => setState(() => _openChoice = !(_openChoice ?? widget.current)),
             ),
@@ -1505,9 +1514,11 @@ class _StopCardState extends State<StopCard> {
 }
 
 class _StopHeader extends StatelessWidget {
-  const _StopHeader({required this.stop, required this.open, required this.onTap});
+  const _StopHeader({required this.stop, required this.open, required this.onTap, this.number});
 
   final PlannedStop stop;
+
+  final int? number;
   final bool open;
   final VoidCallback onTap;
 
@@ -1518,7 +1529,7 @@ class _StopHeader extends StatelessWidget {
     final settled = s.done || remaining == 0;
     final place = [
       if (s.landmark != null && s.landmark!.isNotEmpty) s.landmark!,
-      if (s.metresAway != null) tn('driver.metresAway', s.metresAway!),
+      if (s.metresAway != null && !s.done) distanceAway(s.metresAway!),
     ].join(' · ');
 
     return InkWell(
@@ -1551,7 +1562,7 @@ class _StopHeader extends StatelessWidget {
                           child: Padding(
                             padding: const EdgeInsets.all(3),
                             child: Text(
-                              '${s.plannedSequence}',
+                              '${number ?? s.plannedSequence}',
                               style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 16,
@@ -2506,177 +2517,6 @@ class _LocationNotice extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _NextStopPanel extends StatelessWidget {
-  const _NextStopPanel({
-    required this.stop,
-    required this.leg,
-    required this.onOpenMap,
-  });
-
-  final PlannedStop stop;
-  final String leg;
-  final VoidCallback onOpenMap;
-
-  @override
-  Widget build(BuildContext context) {
-    final tint = Role.driver.tint;
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.sizeOf(context).width * 0.44,
-      ),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(11, 10, 11, 10),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              t('driver.nextStop'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.2,
-                color: tint,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 26,
-                  height: 26,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: tint.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Text(
-                    '${stop.plannedSequence}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: tint,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        stop.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      if (stop.landmark != null && stop.landmark!.isNotEmpty)
-                        Text(
-                          stop.landmark!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (stop.remaining > 0) ...[
-              const SizedBox(height: 7),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppTheme.amberSoft,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  leg == 'RETURN'
-                      ? tn('driver.nToDropOff', stop.remaining)
-                      : tn('driver.nToPickUp', stop.remaining),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.amber,
-                  ),
-                ),
-              ),
-            ],
-            if (stop.metresAway != null) ...[
-              const SizedBox(height: 7),
-              Row(
-                children: [
-                  Icon(Icons.navigation_rounded, size: 13, color: tint),
-                  const SizedBox(width: 5),
-                  Flexible(
-                    child: Text(
-                      stop.metresAway! >= 1000
-                          ? tn('driver.kmAway', (stop.metresAway! / 100).round() / 10)
-                          : tn('driver.metresAway', stop.metresAway!),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: tint,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 4),
-            GestureDetector(
-              onTap: onOpenMap,
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Icon(Icons.list_alt_rounded, size: 13, color: AppTheme.textMuted),
-                    const SizedBox(width: 5),
-                    Flexible(
-                      child: Text(
-                        t('driver.viewFullRoute'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textMuted,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

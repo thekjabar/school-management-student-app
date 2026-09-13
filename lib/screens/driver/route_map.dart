@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -16,14 +18,7 @@ import '../../ui/home_kit.dart';
 import '../../ui/map_tiles.dart';
 import '../../ui/screen_kit.dart';
 import 'roster_kit.dart';
-
-bool stopIsPlaced(PlannedStop s) {
-  final lat = s.lat;
-  final lon = s.lon;
-  if (lat == null || lon == null) return false;
-  if (lat == 0 && lon == 0) return false;
-  return lat.abs() <= 90 && lon.abs() <= 180;
-}
+import 'run_order.dart';
 
 class RouteMap extends StatefulWidget {
   const RouteMap({
@@ -31,7 +26,7 @@ class RouteMap extends StatefulWidget {
     required this.stops,
     required this.tint,
     required this.leg,
-    this.terminalStopId,
+    this.school,
     this.compact = false,
     this.fullScreen = false,
   });
@@ -42,7 +37,7 @@ class RouteMap extends StatefulWidget {
 
   final String leg;
 
-  final String? terminalStopId;
+  final SchoolGate? school;
 
   final bool compact;
 
@@ -57,31 +52,34 @@ class _RouteMapState extends State<RouteMap> {
 
   String? _touched;
 
-  List<LatLng>? _road;
+  List<List<LatLng>>? _road;
 
   String? _roadFor;
 
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
-  void _wantRoad(List<LatLng> points) {
-    final key = points
-        .map((p) => '${p.latitude.toStringAsFixed(5)},${p.longitude.toStringAsFixed(5)}')
-        .join(';');
+  void _wantRoad(List<RunWaypoint> waypoints) {
+    final points = [for (final w in waypoints) w.at];
+    final schoolIndex = waypoints.indexWhere((w) => w.school);
+    final key = [
+      for (final p in points) '${p.latitude.toStringAsFixed(5)},${p.longitude.toStringAsFixed(5)}',
+      '$schoolIndex',
+    ].join(';');
     if (_roadFor == key) return;
     _roadFor = key;
 
-    final ready = Directions.cached(points);
+    if (points.length < 2) {
+      _road = null;
+      return;
+    }
+    final school = schoolIndex < 0 ? null : schoolIndex;
+    final ready = Directions.cachedRun(points, schoolIndex: school);
     if (ready != null) {
       _road = ready;
       return;
     }
     _road = null;
-    Directions.road(points).then((line) {
-      if (!mounted || _roadFor != key) return;
-      setState(() => _road = line);
+    Directions.runLegs(points, schoolIndex: school).then((legs) {
+      if (!mounted || _roadFor != key || legs == null) return;
+      setState(() => _road = legs);
     });
   }
 
@@ -101,8 +99,10 @@ class _RouteMapState extends State<RouteMap> {
       );
     }
 
+    final waypoints = runWaypoints(stops: widget.stops, leg: widget.leg, school: widget.school);
+    _wantRoad(waypoints);
+
     final points = [for (final p in pins) p.at];
-    _wantRoad(points);
 
     final spread = <String>{
       for (final p in points)
@@ -115,6 +115,7 @@ class _RouteMapState extends State<RouteMap> {
 
     final map = _MapboxCanvas(
       pins: pins,
+      waypoints: waypoints,
       road: _road,
       tint: widget.tint,
       compact: widget.compact,
@@ -123,7 +124,7 @@ class _RouteMapState extends State<RouteMap> {
       onReady: (m) => _mapbox = m,
       onPinTap: widget.compact
           ? null
-          : (stopId) => setState(() => _touched = stopId),
+          : (key) => setState(() => _touched = key),
     );
 
     if (widget.compact) {
@@ -167,7 +168,7 @@ class _RouteMapState extends State<RouteMap> {
                         stops: widget.stops,
                         tint: widget.tint,
                         leg: widget.leg,
-                        terminalStopId: widget.terminalStopId,
+                        school: widget.school,
                       ),
                     ),
                   );
@@ -237,9 +238,9 @@ class _RouteMapState extends State<RouteMap> {
                         ],
                       ),
                       child: Icon(
-                        Icons.my_location_rounded,
+                        Icons.directions_bus_rounded,
                         size: 21,
-                        color: AppTheme.blue,
+                        color: widget.tint,
                       ),
                     ),
                   ),
@@ -255,18 +256,7 @@ class _RouteMapState extends State<RouteMap> {
   Future<void> _fitAll(List<LatLng> points) async {
     final map = _mapbox;
     if (map == null || points.isEmpty) return;
-    final camera = await map.cameraForCoordinates(
-      [for (final p in points) Point(coordinates: Position(p.longitude, p.latitude))],
-      widget.compact
-          ? MbxEdgeInsets(top: 26, left: 26, bottom: 26, right: 26)
-          : widget.fullScreen
-              ? MbxEdgeInsets(top: 96, left: 54, bottom: 70, right: 54)
-              : MbxEdgeInsets(top: 74, left: 46, bottom: 46, right: 46),
-      null,
-      null,
-    );
-    final zoom = camera.zoom;
-    if (zoom != null && zoom > 16.5) camera.zoom = 16.5;
+    final camera = await cameraToFit(map, points, compact: widget.compact, fullScreen: widget.fullScreen);
     await map.flyTo(camera, MapAnimationOptions(duration: 600));
   }
 
@@ -281,26 +271,59 @@ class _RouteMapState extends State<RouteMap> {
   }
 
   List<_Stop> _pins() {
-    final next = widget.stops.indexWhere((s) => s.departedAt == null);
+    final schoolId = widget.school?.stopId;
+    final numbers = runNumbers(widget.stops, schoolId);
+    final next = widget.stops.indexWhere((s) => !s.done && !isSchoolStop(s, schoolId));
 
     final out = <_Stop>[];
     for (var i = 0; i < widget.stops.length; i++) {
       final s = widget.stops[i];
-      if (!stopIsPlaced(s)) continue;
+      if (isSchoolStop(s, schoolId) || !stopIsPlaced(s)) continue;
       out.add(_Stop(
+        key: 'pin-$i',
         stop: s,
-        order: i + 1,
+        order: numbers[i] ?? i + 1,
         at: LatLng(s.lat!, s.lon!),
         next: i == next,
-        school: widget.terminalStopId != null && s.stopId == widget.terminalStopId,
+        school: false,
+      ));
+    }
+
+    final gate = widget.school;
+    if (gate != null && gate.placed) {
+      out.add(_Stop(
+        key: 'school',
+        stop: _schoolStop(gate),
+        order: 0,
+        at: LatLng(gate.lat!, gate.lon!),
+        next: next == -1 && widget.leg != 'RETURN',
+        school: true,
       ));
     }
     return out;
   }
 
+  PlannedStop _schoolStop(SchoolGate gate) => PlannedStop(
+        stopId: gate.stopId ?? 'school',
+        name: (gate.name ?? '').trim().isEmpty ? t('driver.school') : gate.name!.trim(),
+        landmark: null,
+        lat: gate.lat,
+        lon: gate.lon,
+        plannedSequence: 0,
+        metresAway: null,
+        students: const [],
+        arrivedAt: null,
+        departedAt: null,
+        skipped: false,
+        etaAt: null,
+        etaIsActual: false,
+        dwellSeconds: 0,
+        driveSeconds: 0,
+      );
+
   _Stop? _shown(List<_Stop> pins) {
     for (final p in pins) {
-      if (p.stop.stopId == _touched) return p;
+      if (p.key == _touched) return p;
     }
     for (final p in pins) {
       if (p.next) return p;
@@ -309,19 +332,37 @@ class _RouteMapState extends State<RouteMap> {
   }
 }
 
+Future<CameraOptions> cameraToFit(
+  MapboxMap map,
+  List<LatLng> points, {
+  required bool compact,
+  required bool fullScreen,
+}) =>
+    map.cameraForCoordinatesPadding(
+      [for (final p in points) Point(coordinates: Position(p.longitude, p.latitude))],
+      CameraOptions(),
+      compact
+          ? MbxEdgeInsets(top: 26, left: 26, bottom: 26, right: 26)
+          : fullScreen
+              ? MbxEdgeInsets(top: 96, left: 54, bottom: 70, right: 54)
+              : MbxEdgeInsets(top: 74, left: 46, bottom: 46, right: 46),
+      16.5,
+      null,
+    );
+
 class RouteMapScreen extends StatelessWidget {
   const RouteMapScreen({
     super.key,
     required this.stops,
     required this.tint,
     required this.leg,
-    this.terminalStopId,
+    this.school,
   });
 
   final List<PlannedStop> stops;
   final Color tint;
   final String leg;
-  final String? terminalStopId;
+  final SchoolGate? school;
 
   @override
   Widget build(BuildContext context) {
@@ -343,7 +384,7 @@ class RouteMapScreen extends StatelessWidget {
                     stops: stops,
                     tint: tint,
                     leg: leg,
-                    terminalStopId: terminalStopId,
+                    school: school,
                     fullScreen: true,
                   ),
                 ),
@@ -358,12 +399,15 @@ class RouteMapScreen extends StatelessWidget {
 
 class _Stop {
   const _Stop({
+    required this.key,
     required this.stop,
     required this.order,
     required this.at,
     required this.next,
     required this.school,
   });
+
+  final String key;
 
   final PlannedStop stop;
 
@@ -391,6 +435,7 @@ class _Callout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = pin;
+    final metres = p == null || p.school ? null : p.stop.metresAway;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(9, 8, 13, 8),
@@ -472,6 +517,26 @@ class _Callout extends StatelessWidget {
                           color: p.next ? tint : AppTheme.textMuted,
                         ),
                       ),
+                      if (metres != null && !p.stop.done)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.navigation_rounded, size: 11, color: AppTheme.textMuted),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                distanceAway(metres),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textMuted,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
@@ -526,8 +591,9 @@ class _Callout extends StatelessWidget {
 
   String _line(_Stop p) => [
         if (p.next) t('driver.nextStop'),
-        if (p.school) t('driver.school'),
-        if (p.stop.done)
+        if (p.school)
+          t('driver.school')
+        else if (p.stop.done)
           t('driver.done')
         else
           leg == 'RETURN'
@@ -711,9 +777,23 @@ class RouteMapNote extends StatelessWidget {
   }
 }
 
+const _routeSource = 'ksp-run-route';
+const _arrowImage = 'ksp-run-arrow';
+const _casingLayer = 'ksp-run-casing';
+const _lineLayer = 'ksp-run-line';
+const _linkLayer = 'ksp-run-link';
+const _arrowLayer = 'ksp-run-arrows';
+
+const double _linkMinMetres = 12;
+
+const double _liveRefetchMetres = 120;
+
+const double _liveTrimMetres = 50;
+
 class _MapboxCanvas extends StatefulWidget {
   const _MapboxCanvas({
     required this.pins,
+    required this.waypoints,
     required this.road,
     required this.tint,
     required this.compact,
@@ -725,7 +805,9 @@ class _MapboxCanvas extends StatefulWidget {
 
   final List<_Stop> pins;
 
-  final List<LatLng>? road;
+  final List<RunWaypoint> waypoints;
+
+  final List<List<LatLng>>? road;
 
   final Color tint;
   final bool compact;
@@ -734,7 +816,7 @@ class _MapboxCanvas extends StatefulWidget {
   final List<LatLng>? initialFit;
 
   final void Function(MapboxMap map) onReady;
-  final void Function(String stopId)? onPinTap;
+  final void Function(String key)? onPinTap;
 
   @override
   State<_MapboxCanvas> createState() => _MapboxCanvasState();
@@ -743,19 +825,25 @@ class _MapboxCanvas extends StatefulWidget {
 class _MapboxCanvasState extends State<_MapboxCanvas> {
   MapboxMap? _map;
   PointAnnotationManager? _points;
-  PolylineAnnotationManager? _lines;
+  bool _tapsWired = false;
+  bool _layersReady = false;
+  bool _listening = false;
 
-  final Map<String, String> _stopForAnnotation = {};
+  final Map<String, String> _pinForAnnotation = {};
 
-  String? _drawnFor;
+  String? _pinsDrawnFor;
+  String? _linesDrawnFor;
 
-  StreamSubscription<geo.Position>? _live;
   List<LatLng>? _liveLeg;
-  String? _liveLegFor;
+  LatLng? _liveOrigin;
+  String? _liveNext;
+  LatLng? _bus;
+
+  double _dpr = 2;
 
   @override
   void dispose() {
-    _live?.cancel();
+    if (_listening) BusLocation.instance.here.removeListener(_onFix);
     super.dispose();
   }
 
@@ -774,12 +862,25 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
       ),
     );
 
+    final bus = await _busImage(_dpr, widget.compact ? 0.8 : 1.0);
+    final blank = await _blankImage();
+
     await map.location.updateSettings(
       LocationComponentSettings(
         enabled: true,
         pulsingEnabled: false,
-        showAccuracyRing: true,
+        showAccuracyRing: !widget.compact,
+        accuracyRingColor: widget.tint.withValues(alpha: 0.12).toARGB32(),
+        accuracyRingBorderColor: widget.tint.withValues(alpha: 0.35).toARGB32(),
         puckBearingEnabled: true,
+        puckBearing: PuckBearing.COURSE,
+        locationPuck: LocationPuck(
+          locationPuck2D: LocationPuck2D(
+            topImage: blank,
+            bearingImage: bus,
+            shadowImage: blank,
+          ),
+        ),
       ),
     );
 
@@ -792,104 +893,277 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
   Future<void> _onStyleLoaded(StyleLoadedEventData _) async {
     final map = _map;
     if (map == null) return;
+    _layersReady = false;
+    _linesDrawnFor = null;
+    _pinsDrawnFor = null;
+    await _ensureLayers(map);
     _points ??= await map.annotations.createPointAnnotationManager();
-    _lines ??= await map.annotations.createPolylineAnnotationManager();
 
-    _points?.tapEvents(
-      onTap: (annotation) {
-        final stopId = _stopForAnnotation[annotation.id];
-        if (stopId != null) widget.onPinTap?.call(stopId);
-      },
-    );
+    if (!_tapsWired) {
+      _tapsWired = true;
+      _points?.tapEvents(
+        onTap: (annotation) {
+          final key = _pinForAnnotation[annotation.id];
+          if (key != null) widget.onPinTap?.call(key);
+        },
+      );
+    }
 
     _watchLive();
-    await _draw();
+    await _fitOnce(map);
+    await _drawLines();
+    await _drawPins();
+  }
+
+  static String _hex(Color c) =>
+      '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+
+  Future<void> _ensureLayers(MapboxMap map) async {
+    final style = map.style;
+    final tint = widget.tint;
+    final later = Color.lerp(tint, Colors.white, 0.38)!;
+    final done = AppTheme.dark ? const Color(0xFF5B6475) : const Color(0xFFA6ACB8);
+    final nextWidth = widget.compact ? 4.0 : 6.5;
+    final laterWidth = widget.compact ? 3.0 : 5.0;
+    final doneWidth = widget.compact ? 2.5 : 4.0;
+
+    try {
+      if (!await style.styleSourceExists(_routeSource)) {
+        await style.addStyleSource(
+          _routeSource,
+          jsonEncode({
+            'type': 'geojson',
+            'data': {'type': 'FeatureCollection', 'features': <Object>[]},
+          }),
+        );
+      }
+
+      if (!await style.hasStyleImage(_arrowImage)) {
+        final dpr = _dpr;
+        final size = widget.compact ? 9.0 : 12.0;
+        final png = await _arrowPng(dpr, size);
+        final px = (size * dpr).round();
+        await style.addStyleImage(
+          _arrowImage,
+          dpr,
+          MbxImage(width: px, height: px, data: png),
+          false,
+          [],
+          [],
+          null,
+        );
+      }
+
+      final layers = <Map<String, Object>>[
+        {
+          'id': _casingLayer,
+          'type': 'line',
+          'source': _routeSource,
+          'filter': ['in', ['get', 'state'], ['literal', ['next', 'later']]],
+          'layout': {
+            'line-join': 'round',
+            'line-cap': 'round',
+            'line-sort-key': ['match', ['get', 'state'], 'next', 2, 1],
+          },
+          'paint': {
+            'line-color': AppTheme.dark ? '#0A1324' : '#FFFFFF',
+            'line-width': ['match', ['get', 'state'], 'next', nextWidth + 3, laterWidth + 2.5],
+          },
+        },
+        {
+          'id': _lineLayer,
+          'type': 'line',
+          'source': _routeSource,
+          'filter': ['!=', ['get', 'state'], 'link'],
+          'layout': {
+            'line-join': 'round',
+            'line-cap': 'round',
+            'line-sort-key': ['match', ['get', 'state'], 'next', 3, 'later', 2, 1],
+          },
+          'paint': {
+            'line-color': ['match', ['get', 'state'], 'done', _hex(done), 'next', _hex(tint), _hex(later)],
+            'line-width': ['match', ['get', 'state'], 'done', doneWidth, 'next', nextWidth, laterWidth],
+          },
+        },
+        {
+          'id': _linkLayer,
+          'type': 'line',
+          'source': _routeSource,
+          'filter': ['==', ['get', 'state'], 'link'],
+          'layout': {'line-cap': 'round'},
+          'paint': {
+            'line-color': _hex(done),
+            'line-width': widget.compact ? 1.5 : 2.5,
+            'line-dasharray': [0.1, 2.0],
+          },
+        },
+        {
+          'id': _arrowLayer,
+          'type': 'symbol',
+          'source': _routeSource,
+          'filter': ['in', ['get', 'state'], ['literal', ['next', 'later']]],
+          'layout': {
+            'symbol-placement': 'line',
+            'symbol-spacing': widget.compact ? 48 : 64,
+            'icon-image': _arrowImage,
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true,
+            'icon-rotation-alignment': 'map',
+            'icon-keep-upright': false,
+          },
+        },
+      ];
+
+      for (final layer in layers) {
+        if (!await style.styleLayerExists(layer['id']! as String)) {
+          await style.addStyleLayer(jsonEncode(layer), null);
+        }
+      }
+      _layersReady = true;
+    } catch (_) {
+      _layersReady = false;
+    }
   }
 
   void _watchLive() {
-    _live?.cancel();
-    _live = null;
-    if (widget.compact) return;
+    if (widget.compact || _listening) return;
+    _listening = true;
     BusLocation.instance.here.addListener(_onFix);
     _onFix();
   }
 
+  RunWaypoint? get _nextWaypoint => widget.waypoints.where((w) => !w.done).firstOrNull;
+
   void _onFix() {
+    if (!mounted) return;
     final me = BusLocation.instance.here.value;
     if (me == null) return;
-    final next = widget.pins.where((p) => p.stop.departedAt == null).firstOrNull;
-    if (next == null) return;
+    final bus = LatLng(me.latitude, me.longitude);
+    _bus = bus;
 
-    final from = LatLng(
-      double.parse(me.latitude.toStringAsFixed(3)),
-      double.parse(me.longitude.toStringAsFixed(3)),
-    );
-    final key = '${from.latitude},${from.longitude}>${next.stop.stopId}';
-    if (_liveLegFor == key) return;
-    _liveLegFor = key;
+    final next = _nextWaypoint;
+    if (next == null) {
+      if (_liveLeg != null) {
+        _liveLeg = null;
+        _liveNext = null;
+        unawaited(_drawLines());
+      }
+      return;
+    }
 
-    final ready = Directions.cached([from, next.at]);
-    _liveLeg = ready ?? [from, next.at];
-    unawaited(_draw());
+    final nextKey = '${next.key}@${next.at.latitude},${next.at.longitude}';
+    final origin = _liveOrigin;
+    final stale = _liveNext != nextKey ||
+        origin == null ||
+        metresBetween(origin, bus) > _liveRefetchMetres;
 
-    if (ready == null) {
-      Directions.road([from, next.at]).then((line) {
-        if (!mounted || _liveLegFor != key) return;
-        _liveLeg = line;
-        unawaited(_draw());
+    if (stale) {
+      _liveOrigin = bus;
+      _liveNext = nextKey;
+      final heading = me.heading.isFinite && me.heading >= 0 && me.speed.isFinite && me.speed > 1.5
+          ? me.heading
+          : null;
+      final points = [bus, next.at];
+      final school = next.school ? 1 : null;
+      final ready = Directions.cachedRun(points, startBearing: heading, schoolIndex: school);
+      _liveLeg = ready?.first ?? [bus, next.at];
+      if (ready == null) {
+        Directions.runLegs(points, startBearing: heading, schoolIndex: school).then((legs) {
+          if (!mounted || _liveNext != nextKey || legs == null || legs.isEmpty) return;
+          _liveLeg = legs.first;
+          unawaited(_drawLines());
+        });
+      }
+    }
+    unawaited(_drawLines());
+  }
+
+  List<LatLng>? _liveFromBus() {
+    final leg = _liveLeg;
+    final bus = _bus;
+    if (leg == null || leg.length < 2 || bus == null) return leg;
+    final i = Directions.nearestIndex(leg, bus);
+    if (metresBetween(leg[i], bus) > _liveTrimMetres) return leg;
+    final rest = leg.sublist(math.min(i + 1, leg.length - 1));
+    return [bus, ...rest];
+  }
+
+  Future<void> _drawLines() async {
+    final map = _map;
+    if (map == null || !_layersReady) return;
+
+    final waypoints = widget.waypoints;
+    final states = legStates(waypoints);
+    final road = widget.road;
+    final roadFits = road != null && road.length == states.length;
+    final live = _liveFromBus();
+
+    final features = <Map<String, Object>>[];
+
+    void add(String state, List<LatLng> line) {
+      if (line.length < 2) return;
+      features.add({
+        'type': 'Feature',
+        'properties': {'state': state},
+        'geometry': {
+          'type': 'LineString',
+          'coordinates': [
+            for (final p in line) [p.longitude, p.latitude],
+          ],
+        },
       });
+    }
+
+    for (var i = 0; i < states.length; i++) {
+      final state = states[i];
+      if (state == LegState.next && live != null) continue;
+      final line = roadFits ? road[i] : [waypoints[i].at, waypoints[i + 1].at];
+      add(state.name, line);
+    }
+    if (live != null) add(LegState.next.name, live);
+
+    if (roadFits) {
+      for (var j = 0; j < waypoints.length; j++) {
+        final end = j > 0 ? road[j - 1].last : road[0].first;
+        if (metresBetween(end, waypoints[j].at) >= _linkMinMetres) {
+          add('link', [end, waypoints[j].at]);
+        }
+      }
+    }
+
+    final signature = [
+      for (final f in features)
+        '${(f['properties'] as Map)['state']}:${((f['geometry'] as Map)['coordinates'] as List).length}',
+      if (live != null) '${live.first.latitude},${live.first.longitude}',
+    ].join('|');
+    if (_linesDrawnFor == signature) return;
+    _linesDrawnFor = signature;
+
+    try {
+      await map.style.setStyleSourceProperty(
+        _routeSource,
+        'data',
+        jsonEncode({'type': 'FeatureCollection', 'features': features}),
+      );
+    } catch (_) {
+      _linesDrawnFor = null;
     }
   }
 
-  Future<void> _draw() async {
+  Future<void> _drawPins() async {
     final points = _points;
-    final lines = _lines;
-    if (points == null || lines == null) return;
+    if (points == null) return;
 
     final signature = [
       for (final p in widget.pins)
-        '${p.stop.stopId}:${p.stop.departedAt != null}:${p.stop.skipped}:${p.school}',
-      'road:${widget.road?.length ?? 0}',
-      'live:${_liveLeg?.length ?? 0}',
+        '${p.key}:${p.stop.stopId}:${p.order}:${p.next}:${p.stop.done}:${p.stop.name}:'
+            '${p.at.latitude},${p.at.longitude}',
     ].join('|');
-    if (_drawnFor == signature) return;
-    _drawnFor = signature;
+    if (_pinsDrawnFor == signature) return;
+    _pinsDrawnFor = signature;
 
     await points.deleteAll();
-    await lines.deleteAll();
-    _stopForAnnotation.clear();
-
-    final route = widget.road ?? [for (final p in widget.pins) p.at];
-    if (route.length >= 2) {
-      await lines.create(
-        PolylineAnnotationOptions(
-          geometry: LineString(
-            coordinates: [
-              for (final p in route) Position(p.longitude, p.latitude),
-            ],
-          ),
-          lineColor: widget.tint.toARGB32(),
-          lineWidth: widget.compact ? 3.5 : 5.0,
-          lineJoin: LineJoin.ROUND,
-        ),
-      );
-    }
-
-    final leg = _liveLeg;
-    if (leg != null && leg.length >= 2) {
-      await lines.create(
-        PolylineAnnotationOptions(
-          geometry: LineString(
-            coordinates: [
-              for (final p in leg) Position(p.longitude, p.latitude),
-            ],
-          ),
-          lineColor: AppTheme.blue.toARGB32(),
-          lineWidth: widget.compact ? 2.5 : 3.5,
-          lineJoin: LineJoin.ROUND,
-        ),
-      );
-    }
+    _pinForAnnotation.clear();
 
     for (final pin in widget.pins) {
       final image = await _pinImage(pin);
@@ -899,36 +1173,144 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
           image: image,
           iconSize: 1,
           iconAnchor: IconAnchor.CENTER,
+          symbolSortKey: pin.school ? 3 : pin.next ? 2 : 1,
         ),
       );
-      _stopForAnnotation[made.id] = pin.stop.stopId;
+      _pinForAnnotation[made.id] = pin.key;
     }
   }
+
   static final Map<String, Uint8List> _images = {};
 
+  static Future<Uint8List> _png(ui.Picture picture, double width, double height, double dpr) async {
+    final image = await picture.toImage((width * dpr).round(), (height * dpr).round());
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    return bytes!.buffer.asUint8List();
+  }
+
+  static Future<Uint8List> _blankImage() async {
+    final key = 'blank';
+    final cached = _images[key];
+    if (cached != null) return cached;
+    final recorder = ui.PictureRecorder();
+    Canvas(recorder);
+    final out = await _png(recorder.endRecording(), 2, 2, 1);
+    _images[key] = out;
+    return out;
+  }
+
+  Future<Uint8List> _busImage(double dpr, double scale) async {
+    final tint = widget.tint;
+    final key = 'bus:${tint.toARGB32()}:$dpr:$scale';
+    final cached = _images[key];
+    if (cached != null) return cached;
+
+    final bodyW = 24.0 * scale;
+    final bodyH = 42.0 * scale;
+    final pad = 6.0 * scale;
+    final side = bodyH + pad * 2;
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)..scale(dpr);
+    final centre = Offset(side / 2, side / 2);
+    final body = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: centre, width: bodyW, height: bodyH),
+      Radius.circular(6 * scale),
+    );
+
+    canvas.drawRRect(
+      body.shift(Offset(0, 1.5 * scale)),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.32)
+        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, 3 * scale),
+    );
+    canvas.drawRRect(body, Paint()..color = tint);
+    canvas.drawRRect(
+      body.deflate(1.1 * scale),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2 * scale
+        ..color = Colors.white,
+    );
+
+    final glass = Paint()..color = const Color(0xFF1F2937).withValues(alpha: 0.88);
+    final left = centre.dx - bodyW / 2;
+    final top = centre.dy - bodyH / 2;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(left + 4 * scale, top + 4 * scale, bodyW - 8 * scale, 8 * scale),
+        Radius.circular(2.5 * scale),
+      ),
+      glass,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(left + 5 * scale, top + bodyH - 7 * scale, bodyW - 10 * scale, 3 * scale),
+        Radius.circular(1.5 * scale),
+      ),
+      glass,
+    );
+    final roof = Paint()..color = Colors.white.withValues(alpha: 0.55);
+    for (var i = 0; i < 3; i++) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(left + 6 * scale, top + (16 + i * 6) * scale, bodyW - 12 * scale, 2.4 * scale),
+          Radius.circular(1.2 * scale),
+        ),
+        roof,
+      );
+    }
+
+    final out = await _png(recorder.endRecording(), side, side, dpr);
+    _images[key] = out;
+    return out;
+  }
+
+  static Future<Uint8List> _arrowPng(double dpr, double size) async {
+    final key = 'arrow:$dpr:$size';
+    final cached = _images[key];
+    if (cached != null) return cached;
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)..scale(dpr);
+    final path = Path()
+      ..moveTo(size * 0.32, size * 0.2)
+      ..lineTo(size * 0.68, size * 0.5)
+      ..lineTo(size * 0.32, size * 0.8);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = size * 0.17
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..color = Colors.white,
+    );
+
+    final out = await _png(recorder.endRecording(), size, size, dpr);
+    _images[key] = out;
+    return out;
+  }
+
   Future<Uint8List> _pinImage(_Stop pin) async {
+    if (pin.school) return _schoolImage(pin);
+
     final tint = widget.tint;
     final done = pin.stop.done;
-    final plain = !pin.school && !done && !pin.next;
+    final plain = !done && !pin.next;
     final size = widget.compact ? (pin.next ? 32.0 : 25.0) : (pin.next ? 52.0 : 40.0);
 
-    final fill = pin.school
-        ? AppTheme.blue
-        : done
-            ? AppTheme.green
-            : pin.next
-                ? tint
-                : AppTheme.surface;
+    final fill = done
+        ? AppTheme.green
+        : pin.next
+            ? tint
+            : AppTheme.surface;
     final ink = plain ? tint : Colors.white;
 
-    final label = pin.school
-        ? null
-        : done
-            ? null
-            : '${pin.order}';
-    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final label = done ? null : '${pin.order}';
+    final dpr = _dpr;
 
-    final key = '${fill.toARGB32()}:${ink.toARGB32()}:$size:${pin.school}:$done:'
+    final key = '${fill.toARGB32()}:${ink.toARGB32()}:$size:$done:'
         '${pin.next}:${label ?? ''}:$dpr';
     final cached = _images[key];
     if (cached != null) return cached;
@@ -951,7 +1333,6 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
 
     final border = size > 34 ? 3.0 : 2.4;
     final half = size / 2;
-    final rect = Rect.fromCenter(center: centre, width: size, height: size);
 
     final shadow = Paint()
       ..color = Colors.black.withValues(alpha: 0.28)
@@ -962,31 +1343,18 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
       ..strokeWidth = border
       ..color = plain ? tint : Colors.white;
 
-    if (pin.school) {
-      final r = RRect.fromRectAndRadius(rect, Radius.circular(size * 0.3));
-      canvas.drawRRect(r.shift(const Offset(0, 2)), shadow);
-      canvas.drawRRect(r, body);
-      canvas.drawRRect(r.deflate(border / 2), stroke);
-    } else {
-      canvas.drawCircle(centre.translate(0, 2), half, shadow);
-      canvas.drawCircle(centre, half, body);
-      canvas.drawCircle(centre, half - border / 2, stroke);
-    }
-
-    final icon = pin.school
-        ? Icons.school_rounded
-        : done
-            ? Icons.check_rounded
-            : null;
+    canvas.drawCircle(centre.translate(0, 2), half, shadow);
+    canvas.drawCircle(centre, half, body);
+    canvas.drawCircle(centre, half - border / 2, stroke);
 
     final painter = TextPainter(textDirection: TextDirection.ltr);
-    if (icon != null) {
+    if (done) {
       painter.text = TextSpan(
-        text: String.fromCharCode(icon.codePoint),
+        text: String.fromCharCode(Icons.check_rounded.codePoint),
         style: TextStyle(
-          fontSize: size * (pin.school ? 0.5 : 0.55),
-          fontFamily: icon.fontFamily,
-          package: icon.fontPackage,
+          fontSize: size * 0.55,
+          fontFamily: Icons.check_rounded.fontFamily,
+          package: Icons.check_rounded.fontPackage,
           color: Colors.white,
           height: 1,
         ),
@@ -1008,34 +1376,142 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
       centre - Offset(painter.width / 2, painter.height / 2),
     );
 
-    final picture = recorder.endRecording();
-    final image = await picture.toImage(
-      (canvasSize * dpr).round(),
-      (canvasSize * dpr).round(),
-    );
-    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-    final out = bytes!.buffer.asUint8List();
+    final out = await _png(recorder.endRecording(), canvasSize, canvasSize, dpr);
     _images[key] = out;
     return out;
   }
 
+  Future<Uint8List> _schoolImage(_Stop pin) async {
+    final dpr = _dpr;
+    final blue = AppTheme.blue;
+    final compact = widget.compact;
+    final icon = compact ? 30.0 : 46.0;
+    final name = pin.stop.name;
+    final key = 'school:${blue.toARGB32()}:$compact:$dpr:$name:${AppTheme.dark}';
+    final cached = _images[key];
+    if (cached != null) return cached;
+
+    TextPainter? label;
+    if (!compact) {
+      label = TextPainter(
+        text: TextSpan(
+          text: name,
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, height: 1.2, color: blue),
+        ),
+        textDirection: _isRtl(name) ? TextDirection.rtl : TextDirection.ltr,
+        maxLines: 1,
+        ellipsis: '…',
+      )..layout(maxWidth: 150);
+    }
+
+    const pad = 6.0;
+    const gap = 4.0;
+    final pillH = label == null ? 0.0 : label.height + 8;
+    final pillW = label == null ? 0.0 : label.width + 16;
+    final width = math.max(icon + pad * 2, pillW + 4);
+    final extra = label == null ? 0.0 : pillH + gap;
+    final height = icon + pad * 2 + extra * 2;
+    final centre = Offset(width / 2, height / 2);
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)..scale(dpr);
+
+    final square = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: centre, width: icon, height: icon),
+      Radius.circular(icon * 0.28),
+    );
+    canvas.drawRRect(
+      square.shift(const Offset(0, 2)),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.3)
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 3.5),
+    );
+    canvas.drawRRect(square, Paint()..color = blue);
+    canvas.drawRRect(
+      square.deflate(1.5),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..color = Colors.white,
+    );
+
+    final glyph = TextPainter(
+      text: TextSpan(
+        text: String.fromCharCode(Icons.school_rounded.codePoint),
+        style: TextStyle(
+          fontSize: icon * 0.56,
+          fontFamily: Icons.school_rounded.fontFamily,
+          package: Icons.school_rounded.fontPackage,
+          color: Colors.white,
+          height: 1,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    glyph.paint(canvas, centre - Offset(glyph.width / 2, glyph.height / 2));
+
+    if (label != null) {
+      final pill = RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: Offset(centre.dx, centre.dy + icon / 2 + gap + pillH / 2),
+          width: pillW,
+          height: pillH,
+        ),
+        Radius.circular(pillH / 2),
+      );
+      canvas.drawRRect(
+        pill.shift(const Offset(0, 1)),
+        Paint()
+          ..color = Colors.black.withValues(alpha: 0.18)
+          ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 2.5),
+      );
+      canvas.drawRRect(pill, Paint()..color = AppTheme.surface);
+      label.paint(canvas, Offset(pill.left + 8, pill.top + 4));
+    }
+
+    final out = await _png(recorder.endRecording(), width, height, dpr);
+    _images[key] = out;
+    return out;
+  }
+
+  static bool _isRtl(String text) => RegExp(r'[֐-ࣿ]').hasMatch(text);
+
   @override
   void didUpdateWidget(covariant _MapboxCanvas old) {
     super.didUpdateWidget(old);
-    unawaited(_draw());
+    unawaited(_drawLines());
+    unawaited(_drawPins());
+    if (!widget.compact) _onFix();
+  }
+
+  late final ViewportState _start = CameraViewportState(
+    center: Point(coordinates: Position(widget.pins.first.at.longitude, widget.pins.first.at.latitude)),
+    zoom: 14.5,
+    padding: const EdgeInsets.fromLTRB(40, 56, 40, 40),
+  );
+
+  bool _fitted = false;
+
+  Future<void> _fitOnce(MapboxMap map) async {
+    final fit = widget.initialFit;
+    if (_fitted || fit == null) return;
+    _fitted = true;
+    try {
+      await map.setCamera(
+        await cameraToFit(map, fit, compact: widget.compact, fullScreen: widget.fullScreen),
+      );
+    } catch (_) {
+      _fitted = false;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final first = widget.pins.first.at;
+    _dpr = MediaQuery.devicePixelRatioOf(context);
     return MapWidget(
       key: const ValueKey('run-map'),
       styleUri: MapTiles.styleUri,
-      cameraOptions: CameraOptions(
-        center: Point(coordinates: Position(first.longitude, first.latitude)),
-        zoom: 14.5,
-        padding: MbxEdgeInsets(top: 56, left: 40, bottom: 40, right: 40),
-      ),
+      viewport: _start,
       onMapCreated: _onMapCreated,
       onStyleLoadedListener: _onStyleLoaded,
     );
