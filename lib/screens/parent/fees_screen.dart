@@ -293,22 +293,29 @@ class _BalanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final unbilled = summary.invoices.isEmpty;
     final settled = summary.outstandingIqd <= 0;
     final overdue = summary.overdueIqd > 0;
 
-    final colour = settled
+    final colour = unbilled
+        ? AppTheme.textMuted
+        : settled
         ? AppTheme.green
         : overdue
             ? AppTheme.rose
             : AppTheme.amber;
-    final ground = settled
+    final ground = unbilled
+        ? AppTheme.surface
+        : settled
         ? AppTheme.greenSoft
         : overdue
             ? AppTheme.roseSoft
             : AppTheme.amberSoft;
 
     final days = summary.daysUntilDue;
-    final when = settled
+    final when = unbilled
+        ? t('fees.notBilled')
+        : settled
         ? t('fees.paid')
         : overdue
             ? t('fees.overdue')
@@ -318,7 +325,9 @@ class _BalanceCard extends StatelessWidget {
                     ? t('fees.dueTomorrow')
                     : tn('fees.dueInDays', days);
 
-    final line = settled
+    final line = unbilled
+        ? t('fees.notBilledLine')
+        : settled
         ? t('fees.upToDate')
         : overdue
             ? tn('fees.overdueAmount', iqd(summary.overdueIqd))
@@ -335,7 +344,9 @@ class _BalanceCard extends StatelessWidget {
           Row(
             children: [
               Chip36(
-                icon: settled
+                icon: unbilled
+                    ? Icons.receipt_long_outlined
+                    : settled
                     ? Icons.check_circle_rounded
                     : Icons.account_balance_wallet_rounded,
                 color: colour,
@@ -365,7 +376,9 @@ class _BalanceCard extends StatelessWidget {
                         fit: BoxFit.scaleDown,
                         alignment: AlignmentDirectional.centerStart,
                         child: Text(
-                          settled
+                          unbilled
+                              ? t('fees.noBills')
+                              : settled
                               ? t('fees.nothingOwed')
                               : iqd(summary.outstandingIqd),
                           maxLines: 1,

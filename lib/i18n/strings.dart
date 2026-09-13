@@ -923,6 +923,9 @@ const Map<String, String> _en = {
 
   'fees.title': 'Fees & payments',
   'fees.nothingOwed': 'Nothing owed',
+  'fees.noBills': 'No bills yet',
+  'fees.notBilled': 'Not billed',
+  'fees.notBilledLine': 'You have no bills, so the KSP package is not active yet.',
   'fees.upToDate': 'Your account is up to date. Thank you.',
   'fees.overdueAmount': '{n} of this is overdue',
   'fees.dueNow': 'Due now',
@@ -3015,6 +3018,9 @@ const Map<String, String> _ckb = {
 
   'fees.title': 'کرێ و پارەدان',
   'fees.nothingOwed': 'هیچ نەماوە',
+  'fees.noBills': 'هیچ پسوولەیەک نییە',
+  'fees.notBilled': 'پسوولە نەکراوە',
+  'fees.notBilledLine': 'هیچ پسوولەیەکت نییە، بۆیە پاکێجی KSP هێشتا چالاک نییە.',
   'fees.upToDate': 'حسابەکەت ڕێکە. سوپاس.',
   'fees.overdueAmount': '{n} لەمە دواکەوتووە',
   'fees.dueNow': 'ئێستا',
@@ -5101,6 +5107,9 @@ const Map<String, String> _ar = {
 
   'fees.title': 'الرسوم والدفعات',
   'fees.nothingOwed': 'لا شيء مستحق',
+  'fees.noBills': 'لا توجد فواتير بعد',
+  'fees.notBilled': 'لم تُصدر فاتورة',
+  'fees.notBilledLine': 'لا توجد لديك فواتير، لذلك باقة KSP غير مفعّلة بعد.',
   'fees.upToDate': 'حسابك محدّث. شكراً لك.',
   'fees.overdueAmount': '{n} منها متأخرة',
   'fees.dueNow': 'مستحق الآن',
