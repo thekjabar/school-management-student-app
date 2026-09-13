@@ -128,6 +128,7 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
                 message: errorText(error),
                 onRetry: reload,
                 tint: tint,
+                locked: error is SectionLockedException,
               ),
             );
           }
@@ -177,11 +178,18 @@ class _Waiting extends StatelessWidget {
 }
 
 class _Failed extends StatelessWidget {
-  const _Failed({required this.message, required this.onRetry, required this.tint});
+  const _Failed({
+    required this.message,
+    required this.onRetry,
+    required this.tint,
+    required this.locked,
+  });
 
   final String message;
   final VoidCallback onRetry;
   final Color tint;
+
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
@@ -192,14 +200,14 @@ class _Failed extends StatelessWidget {
           Row(
             children: [
               IconChip(
-                icon: Icons.wifi_off_rounded,
-                color: AppTheme.rose,
-                background: AppTheme.roseSoft,
+                icon: locked ? Icons.lock_rounded : Icons.wifi_off_rounded,
+                color: locked ? AppTheme.amber : AppTheme.rose,
+                background: locked ? AppTheme.amber.withValues(alpha: 0.14) : AppTheme.roseSoft,
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  t('common.didNotLoad'),
+                  locked ? t('section.inPackage') : t('common.didNotLoad'),
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                 ),
               ),

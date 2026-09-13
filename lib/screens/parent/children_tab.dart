@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'student_info_screen.dart';
 
+import '../../api/client.dart';
 import '../../api/parent_api.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
@@ -11,6 +12,7 @@ import '../../ui/kit.dart';
 import '../../ui/motion.dart';
 import 'attendance_screen.dart';
 import 'leave_screen.dart';
+import 'section_gate.dart';
 
 class ChildrenTab extends StatelessWidget {
   const ChildrenTab({super.key, required this.children, required this.selected});
@@ -20,45 +22,65 @@ class ChildrenTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Loader<Map<String, _Snapshot>>(
-      tint: Role.parent.tint,
-      padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20),
-      load: () async {
-        final entries = await Future.wait(
-          children.map((c) async {
-            final r = await Future.wait([
-              ParentApi.instance.attendance(c.studentId, tenantId: c.tenantId),
-              ParentApi.instance.transport(c.studentId, tenantId: c.tenantId),
-              ParentApi.instance.homework(c.studentId, tenantId: c.tenantId),
-              ParentApi.instance.attendanceTrend(c.studentId, tenantId: c.tenantId),
-            ]);
-            return MapEntry(
-              c.studentId,
-              _Snapshot(
-                attendance: r[0] as AttendanceSummary,
-                transport: r[1] as TransportInfo,
-                homework: r[2] as List<HomeworkItem>,
-                trend: r[3] as AttendanceTrend,
+    return ValueListenableBuilder<PackageEntitlements>(
+      valueListenable: Entitlements.instance.current,
+      builder: (context, ent, _) => Loader<Map<String, _Snapshot>>(
+        tint: Role.parent.tint,
+        watch: [for (final c in children) '${c.studentId}|${ent.lockSignature(c.studentId)}'].join(';'),
+        padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20),
+        load: () async {
+          await Entitlements.instance.ensureLoaded();
+          final now = Entitlements.instance.current.value;
+          final entries = await Future.wait(
+            children.map((c) async {
+              Future<T?> when<T>(String section, Future<T> Function() load) async {
+                if (now.access(c.studentId, section) != SectionAccess.open) return null;
+                try {
+                  return await load();
+                } on SectionLockedException {
+                  return null;
+                }
+              }
+
+              final attendance = when(
+                ParentSection.attendance,
+                () => ParentApi.instance.attendanceTrend(c.studentId, tenantId: c.tenantId),
+              );
+              final transport = when(
+                ParentSection.bus,
+                () => ParentApi.instance.transport(c.studentId, tenantId: c.tenantId),
+              );
+              final homework = when(
+                ParentSection.assignments,
+                () => ParentApi.instance.homework(c.studentId, tenantId: c.tenantId),
+              );
+              return MapEntry(
+                c.studentId,
+                _Snapshot(
+                  trend: await attendance,
+                  transport: await transport,
+                  homework: await homework,
+                ),
+              );
+            }),
+          );
+          return Map.fromEntries(entries);
+        },
+        builder: (context, snaps) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0) const SizedBox(height: kCardGap),
+              Rise(
+                index: i,
+                child: _ChildCard(
+                  child: children[i],
+                  snap: snaps[children[i].studentId],
+                ),
               ),
-            );
-          }),
-        );
-        return Map.fromEntries(entries);
-      },
-      builder: (context, snaps) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) const SizedBox(height: kCardGap),
-            Rise(
-              index: i,
-              child: _ChildCard(
-                child: children[i],
-                snap: snaps[children[i].studentId],
-              ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -66,18 +88,18 @@ class ChildrenTab extends StatelessWidget {
 
 class _Snapshot {
   _Snapshot({
-    required this.attendance,
     required this.transport,
     required this.homework,
     required this.trend,
   });
 
-  final AttendanceSummary attendance;
-  final TransportInfo transport;
-  final List<HomeworkItem> homework;
-  final AttendanceTrend trend;
+  final TransportInfo? transport;
+  final List<HomeworkItem>? homework;
+  final AttendanceTrend? trend;
 
   String get busLine {
+    final transport = this.transport;
+    if (transport == null) return t('section.inPackage');
     if (!transport.ridesTheBus) return t('children.notOnBus');
     if (transport.today.isEmpty) return t('children.noBusToday');
     final out = transport.today.where((t) => t.leg == 'OUT').firstOrNull;
@@ -92,9 +114,19 @@ class _Snapshot {
   int get dueSoon {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    return homework.where((h) => h.dueDate.difference(today).inDays <= 2).length;
+    return (homework ?? const <HomeworkItem>[])
+        .where((h) => h.dueDate.difference(today).inDays <= 2)
+        .length;
   }
 }
+
+IconFigure _lockedFigure(String label) => IconFigure(
+      icon: Icons.lock_rounded,
+      label: label,
+      value: '—',
+      caption: t('section.lockedShort'),
+      color: AppTheme.textFaint,
+    );
 
 class _ChildCard extends StatelessWidget {
   const _ChildCard({required this.child, required this.snap});
@@ -163,33 +195,42 @@ class _ChildCard extends StatelessWidget {
           const SizedBox(height: 12),
           IconFigureStrip(
             figures: [
-              IconFigure(
-                icon: Icons.verified_user_outlined,
-                label: t('home.attendance'),
-                value: percent(trend?.attendanceRate),
-                caption: marked
-                    ? tv('att.missedShort', {'n': percent(trend!.missedPercent)})
-                    : t('home.notMarked'),
-                color: marked ? look.colour : AppTheme.textMuted,
-              ),
-              IconFigure(
-                icon: Icons.assignment_outlined,
-                label: t('children.homework'),
-                value: '${snap?.homework.length ?? 0}',
-                caption: dueSoon > 0
-                    ? tn('children.dueSoon', dueSoon)
-                    : t('children.nothingUrgent'),
-                color: dueSoon > 0 ? AppTheme.amber : AppTheme.blue,
-              ),
-              IconFigure(
-                icon: Icons.directions_bus_rounded,
-                label: t('children.bus'),
-                value: snap?.transport.ridesTheBus == true
-                    ? t('children.yes')
-                    : t('children.no'),
-                caption: snap?.transport.routeName?.split('—').last.trim() ?? '—',
-                color: tint,
-              ),
+              if (snap != null && trend == null)
+                _lockedFigure(t('home.attendance'))
+              else
+                IconFigure(
+                  icon: Icons.verified_user_outlined,
+                  label: t('home.attendance'),
+                  value: percent(trend?.attendanceRate),
+                  caption: marked
+                      ? tv('att.missedShort', {'n': percent(trend!.missedPercent)})
+                      : t('home.notMarked'),
+                  color: marked ? look.colour : AppTheme.textMuted,
+                ),
+              if (snap != null && snap!.homework == null)
+                _lockedFigure(t('children.homework'))
+              else
+                IconFigure(
+                  icon: Icons.assignment_outlined,
+                  label: t('children.homework'),
+                  value: '${snap?.homework?.length ?? 0}',
+                  caption: dueSoon > 0
+                      ? tn('children.dueSoon', dueSoon)
+                      : t('children.nothingUrgent'),
+                  color: dueSoon > 0 ? AppTheme.amber : AppTheme.blue,
+                ),
+              if (snap != null && snap!.transport == null)
+                _lockedFigure(t('children.bus'))
+              else
+                IconFigure(
+                  icon: Icons.directions_bus_rounded,
+                  label: t('children.bus'),
+                  value: snap?.transport?.ridesTheBus == true
+                      ? t('children.yes')
+                      : t('children.no'),
+                  caption: snap?.transport?.routeName?.split('—').last.trim() ?? '—',
+                  color: tint,
+                ),
             ],
           ),
           const SizedBox(height: 12),
@@ -236,8 +277,11 @@ class _ChildCard extends StatelessWidget {
               Expanded(
                 child: _CardAction(
                   label: t('children.askLeave'),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => LeaveScreen(child: child)),
+                  onTap: () => openSection<void>(
+                    context,
+                    childId: child.studentId,
+                    section: ParentSection.leave,
+                    builder: (_) => LeaveScreen(child: child),
                   ),
                 ),
               ),

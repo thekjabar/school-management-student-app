@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../api/client.dart';
 import '../../api/offline_cache.dart';
 import '../../api/parent_api.dart';
 import '../../api/session.dart';
@@ -18,6 +19,7 @@ import 'home_tab.dart';
 import 'leave_screen.dart';
 import 'messages_tab.dart';
 import 'parent_profile_tab.dart';
+import 'section_gate.dart';
 
 class ParentApp extends StatefulWidget {
   const ParentApp({super.key});
@@ -26,7 +28,7 @@ class ParentApp extends StatefulWidget {
   State<ParentApp> createState() => _ParentAppState();
 }
 
-class _ParentAppState extends State<ParentApp> {
+class _ParentAppState extends State<ParentApp> with WidgetsBindingObserver {
   List<GlobalKey<NavigatorState>> _navKeys = List.generate(4, (_) => GlobalKey<NavigatorState>());
 
   int _tab = 0;
@@ -49,13 +51,35 @@ class _ParentAppState extends State<ParentApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    Entitlements.instance.forget();
+    ApiClient.instance.onSectionLocked = _serverSaysLocked;
     _load();
   }
 
-  Future<void> _load() async {
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    if (ApiClient.instance.onSectionLocked == _serverSaysLocked) {
+      ApiClient.instance.onSectionLocked = null;
+    }
+    super.dispose();
+  }
+
+  static void _serverSaysLocked(SectionLockedException locked) {
     unawaited(Entitlements.instance.refresh());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(Entitlements.instance.refresh());
+  }
+
+  Future<void> _load() async {
     try {
       final children = await ParentApi.instance.children();
+      Entitlements.instance.watchTenants(children.map((c) => c.tenantId));
+      unawaited(Entitlements.instance.refresh());
       final start = _pickFrom(children, _selectedId) ??
           (children.isNotEmpty ? children.first : null);
       if (start != null && !await _openSchoolOf(start)) return;
@@ -67,6 +91,7 @@ class _ParentAppState extends State<ParentApp> {
         _switching = false;
       });
     } catch (e) {
+      unawaited(Entitlements.instance.refresh());
       if (!mounted) return;
       setState(() {
         _error = errorText(e);
@@ -151,6 +176,7 @@ class _ParentAppState extends State<ParentApp> {
       _switching = true;
     });
     if (!await _openSchoolOf(next)) return;
+    unawaited(Entitlements.instance.refresh());
     if (!mounted) return;
     setState(() {
       _selectedId = id;
@@ -252,11 +278,19 @@ class _ParentAppState extends State<ParentApp> {
                               ),
                               TabHost(
                                 navigatorKey: _navKeys[1],
-                                child: MessagesTab(onRead: () => setState(() => _unread = 0)),
+                                child: MessagesTab(
+                                  child: child,
+                                  onRead: () => setState(() => _unread = 0),
+                                ),
                               ),
                               TabHost(
                                 navigatorKey: _navKeys[2],
-                                child: CalendarTab(child: child),
+                                child: SectionGate(
+                                  childId: child.studentId,
+                                  section: ParentSection.calendar,
+                                  frame: SectionFrame.page,
+                                  builder: (_) => CalendarTab(child: child),
+                                ),
                               ),
                               TabHost(
                                 navigatorKey: _navKeys[3],
@@ -294,8 +328,11 @@ class _ParentAppState extends State<ParentApp> {
             );
             return;
           }
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => LeaveScreen(child: child)),
+          openSection<void>(
+            context,
+            childId: child.studentId,
+            section: ParentSection.leave,
+            builder: (_) => LeaveScreen(child: child),
           );
         },
         badges: {1: _unread > 0},

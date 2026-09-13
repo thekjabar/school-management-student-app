@@ -15,6 +15,7 @@ import 'attitude_screen.dart';
 import 'fees_screen.dart';
 import 'marks_screen.dart';
 import 'reports_screen.dart';
+import 'section_gate.dart';
 import 'settings_screen.dart';
 import 'timetable_screen.dart';
 
@@ -80,14 +81,16 @@ class ProfileDrawer extends StatelessWidget {
                     label: t('quick.bus'),
                     tint: tint,
                     enabled: child != null,
-                    onTap: () => _push(context, BusScreen(child: child!)),
+                    locked: child != null && sectionLocked(child.studentId, ParentSection.bus),
+                    onTap: () => _gated(context, ParentSection.bus, (_) => BusScreen(child: child!)),
                   ),
                   _Row(
                     icon: Icons.calendar_today_outlined,
                     label: t('quick.timetable'),
                     tint: tint,
                     enabled: child != null,
-                    onTap: () => _push(context, TimetableScreen(child: child!)),
+                    locked: child != null && sectionLocked(child.studentId, ParentSection.timetable),
+                    onTap: () => _gated(context, ParentSection.timetable, (_) => TimetableScreen(child: child!)),
                   ),
 
                   const _Rule(),
@@ -97,21 +100,24 @@ class ProfileDrawer extends StatelessWidget {
                     label: t('quick.assignments'),
                     tint: AppTheme.violet,
                     enabled: child != null,
-                    onTap: () => _push(context, AssignmentsScreen(child: child!)),
+                    locked: child != null && sectionLocked(child.studentId, ParentSection.assignments),
+                    onTap: () => _gated(context, ParentSection.assignments, (_) => AssignmentsScreen(child: child!)),
                   ),
                   _Row(
                     icon: Icons.verified_user_outlined,
                     label: t('quick.attendance'),
                     tint: AppTheme.green,
                     enabled: child != null,
-                    onTap: () => _push(context, AttendanceScreen(child: child!)),
+                    locked: child != null && sectionLocked(child.studentId, ParentSection.attendance),
+                    onTap: () => _gated(context, ParentSection.attendance, (_) => AttendanceScreen(child: child!)),
                   ),
                   _Row(
                     icon: Icons.bar_chart_rounded,
                     label: t('quick.marks'),
                     tint: AppTheme.blue,
                     enabled: child != null,
-                    onTap: () => _push(context, MarksScreen(child: child!)),
+                    locked: child != null && sectionLocked(child.studentId, ParentSection.marks),
+                    onTap: () => _gated(context, ParentSection.marks, (_) => MarksScreen(child: child!)),
                   ),
                   _Row(
                     icon: Icons.favorite_border_rounded,
@@ -119,7 +125,8 @@ class ProfileDrawer extends StatelessWidget {
                     label: t('quick.attitude'),
                     tint: AppTheme.rose,
                     enabled: child != null,
-                    onTap: () => _push(context, AttitudeScreen(child: child!)),
+                    locked: child != null && sectionLocked(child.studentId, ParentSection.attitude),
+                    onTap: () => _gated(context, ParentSection.attitude, (_) => AttitudeScreen(child: child!)),
                   ),
 
                   const _Rule(),
@@ -135,14 +142,16 @@ class ProfileDrawer extends StatelessWidget {
                     icon: Icons.credit_card_outlined,
                     label: t('drawer.fees'),
                     tint: AppTheme.amber,
-                    onTap: () => _push(context, const FeesScreen()),
+                    locked: Entitlements.instance.current.value.lockedForAll([for (final c in children) c.studentId], ParentSection.fees),
+                    onTap: () => _household(context, ParentSection.fees, (_) => const FeesScreen()),
                   ),
                   _Row(
                     icon: Icons.pie_chart_outline_rounded,
                     label: t('quick.reports'),
                     tint: AppTheme.violet,
                     enabled: child != null,
-                    onTap: () => _push(context, ReportsScreen(child: child!)),
+                    locked: child != null && sectionLocked(child.studentId, ParentSection.reports),
+                    onTap: () => _gated(context, ParentSection.reports, (_) => ReportsScreen(child: child!)),
                   ),
                   _Row(
                     icon: Icons.settings_outlined,
@@ -174,6 +183,23 @@ class ProfileDrawer extends StatelessWidget {
   void _push(BuildContext context, Widget screen) {
     Navigator.of(context).pop();
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+  }
+
+  void _gated(BuildContext context, String section, WidgetBuilder builder) {
+    final nav = Navigator.of(context);
+    nav.pop();
+    openSection<void>(nav.context, childId: selected!.studentId, section: section, builder: builder);
+  }
+
+  void _household(BuildContext context, String section, WidgetBuilder builder) {
+    final nav = Navigator.of(context);
+    nav.pop();
+    openHouseholdSection<void>(
+      nav.context,
+      childIds: [for (final c in children) c.studentId],
+      section: section,
+      builder: builder,
+    );
   }
 
   Future<void> _pickChild(BuildContext context) async {
@@ -398,7 +424,10 @@ class _Row extends StatelessWidget {
     this.badge = 0,
     this.enabled = true,
     this.glyph,
+    this.locked = false,
   });
+
+  final bool locked;
 
   final IconData icon;
 
@@ -461,6 +490,7 @@ class _Row extends StatelessWidget {
                 ),
               ),
             ),
+            if (locked) Icon(Icons.lock_rounded, size: 16, color: AppTheme.textFaint),
             if (badge > 0)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),

@@ -10,6 +10,7 @@ import '../../ui/motion.dart';
 import '../../ui/screen_kit.dart';
 import 'driver_feedback_screen.dart';
 import 'leave_screen.dart';
+import 'section_gate.dart';
 
 class HelpScreen extends StatelessWidget {
   const HelpScreen({super.key, this.child});
@@ -120,10 +121,11 @@ class HelpScreen extends StatelessWidget {
                             color: AppTheme.blue,
                             title: t('leave.ask'),
                             subtitle: t('help.leaveSub'),
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => LeaveScreen(child: kid),
-                              ),
+                            onTap: () => openSection<void>(
+                              context,
+                              childId: kid.studentId,
+                              section: ParentSection.leave,
+                              builder: (_) => LeaveScreen(child: kid),
                             ),
                           ),
                           TileRow(
@@ -132,10 +134,11 @@ class HelpScreen extends StatelessWidget {
                             title: t('crew.title'),
                             subtitle: t('help.crewSub'),
                             last: true,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => DriverFeedbackScreen(child: kid),
-                              ),
+                            onTap: () => openSection<void>(
+                              context,
+                              childId: kid.studentId,
+                              section: ParentSection.driverFeedback,
+                              builder: (_) => DriverFeedbackScreen(child: kid),
                             ),
                           ),
                         ],

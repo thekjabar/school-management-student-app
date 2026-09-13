@@ -502,7 +502,7 @@ class _Tile extends StatelessWidget {
     final tint = on ? action.color : AppTheme.textFaint;
 
     return GestureDetector(
-      onTap: on
+      onTap: action.enabled && action.onTap != null
           ? action.onTap
           : action.note == null
               ? null

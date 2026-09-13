@@ -3648,46 +3648,104 @@ class ThreadMessage {
       );
 }
 
+abstract final class ParentSection {
+  static const track = 'parent.track';
+  static const bus = 'parent.bus';
+  static const attendance = 'parent.attendance';
+  static const messages = 'parent.messages';
+  static const assignments = 'parent.assignments';
+  static const marks = 'parent.marks';
+  static const reports = 'parent.reports';
+  static const attitude = 'parent.attitude';
+  static const timetable = 'parent.timetable';
+  static const memories = 'parent.memories';
+  static const driverFeedback = 'parent.driverFeedback';
+  static const calendar = 'parent.calendar';
+  static const skipRide = 'parent.skipRide';
+  static const collectionRequest = 'parent.collectionRequest';
+  static const leave = 'parent.leave';
+  static const fees = 'parent.fees';
+  static const consents = 'parent.consents';
+  static const routeSafety = 'parent.routeSafety';
+  static const dropoff = 'parent.dropoff';
+}
+
+enum SectionAccess { open, locked, unknown }
+
 class PackageEntitlements {
   const PackageEntitlements({
+    required this.loaded,
     required this.paidSections,
+    required this.names,
     required this.blurbs,
     required this.lockedByChild,
   });
 
+  final bool loaded;
+
   final Set<String> paidSections;
+
+  final Map<String, Map<String, String>> names;
 
   final Map<String, Map<String, String>> blurbs;
 
   final Map<String, Set<String>> lockedByChild;
 
   static const PackageEntitlements none = PackageEntitlements(
+    loaded: false,
     paidSections: <String>{},
+    names: <String, Map<String, String>>{},
     blurbs: <String, Map<String, String>>{},
     lockedByChild: <String, Set<String>>{},
   );
 
+  SectionAccess access(String childId, String sectionKey) {
+    if (!loaded) return SectionAccess.unknown;
+    if (!paidSections.contains(sectionKey)) return SectionAccess.open;
+    final locked = lockedByChild[childId];
+    if (locked == null || locked.contains(sectionKey)) return SectionAccess.locked;
+    return SectionAccess.open;
+  }
+
   bool isLocked(String childId, String sectionKey) =>
-      lockedByChild[childId]?.contains(sectionKey) ?? false;
+      access(childId, sectionKey) == SectionAccess.locked;
+
+  bool lockedForAll(Iterable<String> childIds, String sectionKey) {
+    if (!loaded || !paidSections.contains(sectionKey)) return false;
+    return childIds.every((id) => isLocked(id, sectionKey));
+  }
+
+  String lockSignature(String childId) {
+    final locked = [
+      for (final key in paidSections)
+        if (isLocked(childId, key)) key,
+    ]..sort();
+    return '$loaded|${locked.join(',')}';
+  }
+
+  String? nameFor(String sectionKey, String lang) =>
+      names[sectionKey]?[lang] ?? names[sectionKey]?['en'];
 
   String blurbFor(String sectionKey, String lang) =>
       blurbs[sectionKey]?[lang] ?? blurbs[sectionKey]?['en'] ?? '';
 
+  static Map<String, String> _texts(Object? raw) => {
+        if (raw is Map)
+          for (final e in raw.entries)
+            if (e.key is String && e.value is String) e.key as String: e.value as String,
+      };
+
   factory PackageEntitlements.fromJson(Map<String, dynamic> j) {
     final paid = <String>{};
+    final names = <String, Map<String, String>>{};
     final blurbs = <String, Map<String, String>>{};
     for (final raw in (j['sections'] as List?) ?? const []) {
       final s = raw as Map<String, dynamic>;
       final key = (s['key'] ?? '') as String;
       if (key.isEmpty) continue;
       if ((s['paid'] ?? false) as bool) paid.add(key);
-      final b = s['blurb'] as Map<String, dynamic>?;
-      if (b != null) {
-        blurbs[key] = {
-          for (final e in b.entries)
-            if (e.value is String) e.key: e.value as String,
-        };
-      }
+      names[key] = _texts(s['name']);
+      blurbs[key] = _texts(s['blurb']);
     }
 
     final locked = <String, Set<String>>{};
@@ -3702,11 +3760,21 @@ class PackageEntitlements {
     }
 
     return PackageEntitlements(
+      loaded: true,
       paidSections: paid,
+      names: names,
       blurbs: blurbs,
       lockedByChild: locked,
     );
   }
+
+  PackageEntitlements withChildrenFrom(PackageEntitlements other) => PackageEntitlements(
+        loaded: true,
+        paidSections: paidSections,
+        names: names,
+        blurbs: blurbs,
+        lockedByChild: {...other.lockedByChild, ...lockedByChild},
+      );
 }
 
 class Entitlements {
@@ -3714,19 +3782,77 @@ class Entitlements {
 
   static final Entitlements instance = Entitlements._();
 
-  final ApiClient _api = ApiClient.instance;
-
   final ValueNotifier<PackageEntitlements> current =
       ValueNotifier<PackageEntitlements>(PackageEntitlements.none);
 
-  Future<void> refresh() async {
+  Set<String> _tenantIds = <String>{};
+
+  Future<void>? _running;
+
+  int _generation = 0;
+
+  void watchTenants(Iterable<String> tenantIds) {
+    _tenantIds = {
+      for (final id in tenantIds)
+        if (id.isNotEmpty) id,
+    };
+  }
+
+  Future<void> refresh() {
+    final running = _running;
+    if (running != null) return running;
+    late final Future<void> next;
+    next = _fetch().whenComplete(() {
+      if (identical(_running, next)) _running = null;
+    });
+    _running = next;
+    return next;
+  }
+
+  Future<void> ensureLoaded() async {
+    if (current.value.loaded) return;
+    await refresh();
+  }
+
+  Future<void> _fetch() async {
+    final generation = _generation;
+    final active = Session.instance.me?.active.tenantId;
+    final sources = <String?>{
+      if (active == null || active.isEmpty) null else active,
+      ..._tenantIds,
+    }.toList();
+    final results = await Future.wait(sources.map(_one));
+    if (generation != _generation) return;
+
+    PackageEntitlements? merged;
+    for (final got in results) {
+      if (got == null) continue;
+      merged = merged == null ? got : merged.withChildrenFrom(got);
+    }
+    if (merged == null) return;
+    if (results.contains(null) && current.value.loaded) {
+      merged = merged.withChildrenFrom(current.value);
+    }
+    current.value = merged;
+  }
+
+  Future<PackageEntitlements?> _one(String? tenantId) async {
     try {
-      final json = await _api.get('/parent/entitlements');
-      current.value = PackageEntitlements.fromJson(json as Map<String, dynamic>);
-    } catch (_) {
-      current.value = PackageEntitlements.none;
+      return await ParentApi.instance._keepable(
+        '/parent/entitlements',
+        (json) => PackageEntitlements.fromJson(json as Map<String, dynamic>),
+        tenantId: tenantId,
+      );
+    } catch (e) {
+      debugPrint('entitlements: could not load for ${tenantId ?? 'the active school'}: $e');
+      return null;
     }
   }
 
-  void forget() => current.value = PackageEntitlements.none;
+  void forget() {
+    _generation++;
+    _tenantIds = <String>{};
+    _running = null;
+    current.value = PackageEntitlements.none;
+  }
 }

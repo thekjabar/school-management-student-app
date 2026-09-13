@@ -35,6 +35,17 @@ class OfflineException extends ApiException {
       : super('No connection. Check the phone is on the network and try again.', 0);
 }
 
+class SectionLockedException extends ApiException {
+  SectionLockedException({required this.section, required this.studentId})
+      : super(t('quick.locked'), 403);
+
+  static const code = 'SECTION_LOCKED';
+
+  final String section;
+
+  final String? studentId;
+}
+
 class ApiClient {
   ApiClient._();
 
@@ -265,7 +276,31 @@ class ApiClient {
       return jsonDecode(utf8.decode(res.bodyBytes));
     }
 
-    throw ApiException(_messageFrom(res), res.statusCode);
+    throw _failure(res);
+  }
+
+  void Function(SectionLockedException locked)? onSectionLocked;
+
+  ApiException _failure(http.Response res) {
+    final locked = res.statusCode == 403 ? _lockedFrom(res) : null;
+    if (locked == null) return ApiException(_messageFrom(res), res.statusCode);
+    onSectionLocked?.call(locked);
+    return locked;
+  }
+
+  SectionLockedException? _lockedFrom(http.Response res) {
+    try {
+      final body = jsonDecode(utf8.decode(res.bodyBytes));
+      if (body is! Map || body['code'] != SectionLockedException.code) return null;
+      final section = body['section'];
+      final studentId = body['studentId'];
+      return SectionLockedException(
+        section: section is String ? section : '',
+        studentId: studentId is String ? studentId : null,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<dynamic> upload(
@@ -343,7 +378,7 @@ class ApiClient {
       return jsonDecode(utf8.decode(res.bodyBytes));
     }
 
-    throw ApiException(_messageFrom(res), res.statusCode);
+    throw _failure(res);
   }
 
   String _messageFrom(http.Response res) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/client.dart';
 import '../../api/parent_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
@@ -10,6 +11,7 @@ import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import 'assignments_screen.dart';
 import 'homework_detail.dart';
+import 'section_gate.dart';
 import 'timetable_screen.dart';
 
 class CalendarTab extends StatefulWidget {
@@ -30,17 +32,35 @@ class _CalendarTabState extends State<CalendarTab> {
   Widget build(BuildContext context) {
     final tint = Role.parent.tint;
 
+    return ValueListenableBuilder<PackageEntitlements>(
+      valueListenable: Entitlements.instance.current,
+      builder: (context, ent, _) => _diary(tint, ent),
+    );
+  }
+
+  Widget _diary(Color tint, PackageEntitlements ent) {
+    final id = widget.child.studentId;
+
+    Future<Object> when(String section, Future<Object> Function() load, Object closed) async {
+      if (ent.access(id, section) != SectionAccess.open) return closed;
+      try {
+        return await load();
+      } on SectionLockedException {
+        return closed;
+      }
+    }
+
     return Loader<_Diary>(
       tint: tint,
-      watch: widget.child.studentId,
+      watch: '$id|${ent.lockSignature(id)}',
       padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20),
       load: () async {
-        final r = await Future.wait([
-          ParentApi.instance.timetable(widget.child.studentId),
-          ParentApi.instance.homework(widget.child.studentId),
-          ParentApi.instance.results(widget.child.studentId),
+        final r = await Future.wait<Object>([
+          when(ParentSection.timetable, () => ParentApi.instance.timetable(id), const <DayOfLessons>[]),
+          when(ParentSection.assignments, () => ParentApi.instance.homework(id), const <HomeworkItem>[]),
+          when(ParentSection.marks, () => ParentApi.instance.results(id), const <ExamResultItem>[]),
           ParentApi.instance.announcements(),
-          ParentApi.instance.upcomingExams(widget.child.studentId),
+          when(ParentSection.calendar, () => ParentApi.instance.upcomingExams(id), const <UpcomingExam>[]),
         ]);
         return _Diary(
           week: r[0] as List<DayOfLessons>,
@@ -654,16 +674,25 @@ class _EventRow extends StatelessWidget {
   void _open(BuildContext context) {
     final hw = event.homework;
     if (hw != null) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => HomeworkDetail(item: hw, childName: child.name)),
+      openSection<void>(
+        context,
+        childId: child.studentId,
+        section: ParentSection.assignments,
+        builder: (_) => HomeworkDetail(item: hw, childName: child.name),
       );
     } else if (event.kind == EventKind.lesson) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => TimetableScreen(child: child)),
+      openSection<void>(
+        context,
+        childId: child.studentId,
+        section: ParentSection.timetable,
+        builder: (_) => TimetableScreen(child: child),
       );
     } else if (event.kind == EventKind.assignment) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => AssignmentsScreen(child: child)),
+      openSection<void>(
+        context,
+        childId: child.studentId,
+        section: ParentSection.assignments,
+        builder: (_) => AssignmentsScreen(child: child),
       );
     }
   }

@@ -8,6 +8,7 @@ import '../../ui/async.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
+import 'section_gate.dart';
 
 class ChildDropoff {
   ChildDropoff({
@@ -35,8 +36,10 @@ class _DropoffScreenState extends State<DropoffScreen> {
 
   Future<List<ChildDropoff>> _load() async {
     final children = await ParentApi.instance.children();
+    await Entitlements.instance.ensureLoaded();
     final out = <ChildDropoff>[];
     for (final child in children) {
+      if (sectionLocked(child.studentId, ParentSection.dropoff)) continue;
       try {
         final options = await ParentApi.instance.dropoffOptions(
           child.studentId,
@@ -48,6 +51,8 @@ class _DropoffScreenState extends State<DropoffScreen> {
           options: options.options,
           note: options.note,
         ));
+      } on SectionLockedException {
+        continue;
       } on ApiException {
         out.add(ChildDropoff(child: child, usualStop: null, options: const [], note: ''));
       }

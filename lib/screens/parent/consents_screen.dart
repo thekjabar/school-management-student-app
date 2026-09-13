@@ -8,6 +8,7 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import 'consent_form_screen.dart';
+import 'section_gate.dart';
 
 class ConsentsScreen extends StatelessWidget {
   const ConsentsScreen({super.key});
@@ -82,10 +83,11 @@ class _Book extends StatelessWidget {
             body: t('consent.subtitle'),
           ),
         if (anyForms) const SizedBox(height: kCardGap),
-        for (final child in book.children) ...[
-          _Child(child: child),
-          const SizedBox(height: kCardGap),
-        ],
+        for (final child in book.children)
+          if (!sectionLocked(child.studentId, ParentSection.consents)) ...[
+            _Child(child: child),
+            const SizedBox(height: kCardGap),
+          ],
       ],
     );
   }
@@ -171,13 +173,14 @@ class _FormRow extends StatelessWidget {
     final answered = consentAnsweredLine(form);
 
     return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ConsentFormScreen(
-            studentId: child.studentId,
-            childName: child.name,
-            policyVersionId: form.policyVersionId,
-          ),
+      onTap: () => openSection<void>(
+        context,
+        childId: child.studentId,
+        section: ParentSection.consents,
+        builder: (_) => ConsentFormScreen(
+          studentId: child.studentId,
+          childName: child.name,
+          policyVersionId: form.policyVersionId,
         ),
       ),
       behavior: HitTestBehavior.opaque,

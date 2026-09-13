@@ -9,6 +9,7 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import 'homework_detail.dart';
+import 'section_gate.dart';
 
 class AssignmentsScreen extends StatefulWidget {
   const AssignmentsScreen({super.key, required this.child});
@@ -297,8 +298,11 @@ class _Row extends StatelessWidget {
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => HomeworkDetail(item: item, childName: child.name)),
+      onTap: () => openSection<void>(
+        context,
+        childId: child.studentId,
+        section: ParentSection.assignments,
+        builder: (_) => HomeworkDetail(item: item, childName: child.name),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 11),

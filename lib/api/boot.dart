@@ -98,16 +98,28 @@ class HomePayload {
 
   final List<UpcomingExam> exams;
 
-  static Future<HomePayload> fetch(String studentId) async {
+  static Future<HomePayload> fetch(
+    String studentId, {
+    required bool Function(String section) open,
+  }) async {
     final api = ParentApi.instance;
-    final r = await Future.wait([
-      api.transport(studentId),
-      api.timetable(studentId),
-      api.attendance(studentId),
-      api.homework(studentId),
-      api.attitude(studentId),
+    Future<Object> when(String section, Future<Object> Function() load, Object closed) async {
+      if (!open(section)) return closed;
+      try {
+        return await load();
+      } on SectionLockedException {
+        return closed;
+      }
+    }
+
+    final r = await Future.wait<Object>([
+      when(ParentSection.bus, () => api.transport(studentId), TransportInfo.fromJson(const {})),
+      when(ParentSection.timetable, () => api.timetable(studentId), const <DayOfLessons>[]),
+      when(ParentSection.attendance, () => api.attendance(studentId), AttendanceSummary.fromJson(const {})),
+      when(ParentSection.assignments, () => api.homework(studentId), const <HomeworkItem>[]),
+      when(ParentSection.attitude, () => api.attitude(studentId), AttitudeSummary.fromJson(const {})),
       api.announcements(),
-      api.upcomingExams(studentId),
+      when(ParentSection.calendar, () => api.upcomingExams(studentId), const <UpcomingExam>[]),
     ]);
     return HomePayload(
       studentId: studentId,

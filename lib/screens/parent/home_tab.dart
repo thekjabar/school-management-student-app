@@ -20,6 +20,7 @@ import 'homework_detail.dart';
 import 'marks_screen.dart';
 import 'memories_screen.dart';
 import 'reports_screen.dart';
+import 'section_gate.dart';
 import 'student_info_screen.dart';
 import 'timetable_screen.dart';
 import 'track_screen.dart';
@@ -33,214 +34,269 @@ class HomeTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Loader<_Home>(
-      tint: Role.parent.tint,
-      watch: child.studentId,
-      padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
-      load: () async {
-        final payload = await HomePayload.fetch(child.studentId);
-        return _Home.from(payload);
+    return ValueListenableBuilder<PackageEntitlements>(
+      valueListenable: Entitlements.instance.current,
+      builder: (context, ent, _) {
+        bool shut(String section) => ent.access(child.studentId, section) != SectionAccess.open;
+
+        void open(String section, WidgetBuilder builder) => openSection<void>(
+              context,
+              childId: child.studentId,
+              section: section,
+              builder: builder,
+            );
+
+        QuickAction action({
+          required IconData icon,
+          required String label,
+          required Color color,
+          required String section,
+          required WidgetBuilder builder,
+          Widget Function(Color colour, double size)? glyph,
+        }) =>
+            QuickAction(
+              icon: icon,
+              glyph: glyph,
+              label: label,
+              locked: shut(section),
+              color: color,
+              onTap: () => open(section, builder),
+            );
+
+        return Loader<_Home>(
+          tint: Role.parent.tint,
+          watch: '${child.studentId}|${ent.lockSignature(child.studentId)}',
+          padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
+          load: () async {
+            await Entitlements.instance.ensureLoaded();
+            final now = Entitlements.instance.current.value;
+            final payload = await HomePayload.fetch(
+              child.studentId,
+              open: (section) => now.access(child.studentId, section) == SectionAccess.open,
+            );
+            return _Home.from(payload);
+          },
+          builder: (context, home) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Rise(
+                child: shut(ParentSection.bus)
+                    ? const LockedSectionCard(
+                        section: ParentSection.bus,
+                        icon: Icons.directions_bus_rounded,
+                      )
+                    : _BusCard(
+                        child: child,
+                        transport: home.transport,
+                        onTap: () => open(ParentSection.bus, (_) => BusScreen(child: child)),
+                      ),
+              ),
+              const SizedBox(height: kCardGap),
+
+              Rise(
+                index: 1,
+                child: QuickActions(
+                  actions: [
+                    QuickAction(
+                      icon: Icons.videocam_outlined,
+                      label: t('quick.liveVideo'),
+                      color: AppTheme.blue,
+                      enabled: false,
+                      note: t('quick.liveVideoSoon'),
+                    ),
+                    QuickAction(
+                      icon: Icons.cast_for_education_outlined,
+                      label: t('quick.liveClassVideo'),
+                      color: AppTheme.blue,
+                      enabled: false,
+                      note: t('quick.liveClassVideoSoon'),
+                    ),
+                    action(
+                      icon: Icons.my_location_rounded,
+                      label: t('quick.track'),
+                      color: AppTheme.green,
+                      section: ParentSection.track,
+                      builder: (_) => TrackScreen(child: child),
+                    ),
+                    action(
+                      icon: Icons.directions_bus_outlined,
+                      label: t('quick.bus'),
+                      color: AppTheme.violet,
+                      section: ParentSection.bus,
+                      builder: (_) => BusScreen(child: child),
+                    ),
+                    action(
+                      icon: Icons.description_outlined,
+                      label: t('quick.assignments'),
+                      color: AppTheme.violet,
+                      section: ParentSection.assignments,
+                      builder: (_) => AssignmentsScreen(child: child),
+                    ),
+                    action(
+                      icon: Icons.verified_user_outlined,
+                      label: t('quick.attendance'),
+                      color: AppTheme.green,
+                      section: ParentSection.attendance,
+                      builder: (_) => AttendanceScreen(child: child),
+                    ),
+                    action(
+                      icon: Icons.bar_chart_rounded,
+                      label: t('quick.marks'),
+                      color: AppTheme.blue,
+                      section: ParentSection.marks,
+                      builder: (_) => MarksScreen(child: child),
+                    ),
+                    action(
+                      icon: Icons.favorite_border_rounded,
+                      glyph: (colour, size) => HeartPersonIcon(color: colour, size: size),
+                      label: t('quick.attitude'),
+                      color: AppTheme.rose,
+                      section: ParentSection.attitude,
+                      builder: (_) => AttitudeScreen(child: child),
+                    ),
+                    action(
+                      icon: Icons.calendar_today_outlined,
+                      label: t('quick.timetable'),
+                      color: AppTheme.amber,
+                      section: ParentSection.timetable,
+                      builder: (_) => TimetableScreen(child: child),
+                    ),
+                    action(
+                      icon: Icons.pie_chart_outline_rounded,
+                      label: t('quick.reports'),
+                      color: AppTheme.violet,
+                      section: ParentSection.reports,
+                      builder: (_) => ReportsScreen(child: child),
+                    ),
+                    QuickAction(
+                      icon: Icons.badge_outlined,
+                      label: t('quick.info'),
+                      color: AppTheme.blue,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(builder: (_) => StudentInfoScreen(child: child)),
+                      ),
+                    ),
+                    action(
+                      icon: Icons.photo_library_outlined,
+                      label: t('quick.memories'),
+                      color: AppTheme.rose,
+                      section: ParentSection.memories,
+                      builder: (_) => MemoriesScreen(child: child),
+                    ),
+                    action(
+                      icon: Icons.rate_review_outlined,
+                      label: t('quick.driverFeedback'),
+                      color: AppTheme.green,
+                      section: ParentSection.driverFeedback,
+                      builder: (_) => DriverFeedbackScreen(child: child),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: kCardGap),
+
+              Rise(
+                index: 2,
+                child: shut(ParentSection.timetable)
+                    ? const LockedSectionCard(
+                        section: ParentSection.timetable,
+                        icon: Icons.calendar_today_outlined,
+                      )
+                    : Card16(
+                        padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SectionRow(
+                              title: t('home.todaySchedule'),
+                              actionLabel: t('home.fullTimetable'),
+                              onAction: () => open(
+                                ParentSection.timetable,
+                                (_) => TimetableScreen(child: child),
+                              ),
+                            ),
+                            if (home.today.isEmpty)
+                              _Quiet(text: t('home.nothingToday'))
+                            else
+                              ScheduleTimeline(
+                                onTap: (_) => open(
+                                  ParentSection.timetable,
+                                  (_) => TimetableScreen(child: child),
+                                ),
+                                entries: [
+                                  for (final l in home.today)
+                                    ScheduleEntry(
+                                      time: clock(l.startMinute),
+                                      subject: l.subject,
+                                      teacher: l.teacher,
+                                      room: l.room,
+                                      color: parseHex(l.colorHex, AppTheme.violet),
+                                    ),
+                                ],
+                              ),
+                          ],
+                        ),
+                      ),
+              ),
+              const SizedBox(height: kCardGap),
+
+              Rise(
+                index: 3,
+                child: shut(ParentSection.calendar)
+                    ? const LockedSectionCard(
+                        section: ParentSection.calendar,
+                        icon: Icons.edit_calendar_rounded,
+                      )
+                    : _ExamsCard(exams: home.exams, onSeeAll: () => onOpenTab(2)),
+              ),
+              const SizedBox(height: kCardGap),
+
+              Rise(
+                index: 4,
+                child: _ChildCard(child: child, home: home, shut: shut, open: open),
+              ),
+              const SizedBox(height: kCardGap),
+
+              Rise(
+                index: 5,
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: shut(ParentSection.attendance)
+                            ? const LockedSectionCard(
+                                section: ParentSection.attendance,
+                                icon: Icons.verified_user_outlined,
+                                compact: true,
+                              )
+                            : _AttendanceCard(child: child, summary: home.attendance),
+                      ),
+                      const SizedBox(width: kCardGap),
+                      Expanded(
+                        child: _UpdatesCard(
+                          home: home,
+                          child: child,
+                          shut: shut,
+                          open: open,
+                          onSeeAll: () => onOpenTab(1),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
       },
-      builder: (context, home) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Rise(
-            child: _BusCard(
-              child: child,
-              transport: home.transport,
-              onTap: () => _push(context, BusScreen(child: child)),
-            ),
-          ),
-          const SizedBox(height: kCardGap),
-
-          ValueListenableBuilder<PackageEntitlements>(
-            valueListenable: Entitlements.instance.current,
-            builder: (context, ent, _) => Rise(
-            index: 1,
-            child: QuickActions(
-              actions: [
-                QuickAction(
-                  icon: Icons.videocam_outlined,
-                  label: t('quick.liveVideo'),
-                  color: AppTheme.blue,
-                  enabled: false,
-                  note: t('quick.liveVideoSoon'),
-                ),
-                QuickAction(
-                  icon: Icons.cast_for_education_outlined,
-                  label: t('quick.liveClassVideo'),
-                  color: AppTheme.blue,
-                  enabled: false,
-                  note: t('quick.liveClassVideoSoon'),
-                ),
-                QuickAction(
-                  icon: Icons.my_location_rounded,
-                  label: t('quick.track'),
-                  locked: ent.isLocked(child.studentId, 'parent.track'),
-                  note: t('quick.locked'),
-                  color: AppTheme.green,
-                  onTap: () => _push(context, TrackScreen(child: child)),
-                ),
-                QuickAction(
-                  icon: Icons.directions_bus_outlined,
-                  label: t('quick.bus'),
-                  locked: ent.isLocked(child.studentId, 'parent.bus'),
-                  note: t('quick.locked'),
-                  color: AppTheme.violet,
-                  onTap: () => _push(context, BusScreen(child: child)),
-                ),
-                QuickAction(
-                  icon: Icons.description_outlined,
-                  label: t('quick.assignments'),
-                  locked: ent.isLocked(child.studentId, 'parent.assignments'),
-                  note: t('quick.locked'),
-                  color: AppTheme.violet,
-                  onTap: () => _push(context, AssignmentsScreen(child: child)),
-                ),
-                QuickAction(
-                  icon: Icons.verified_user_outlined,
-                  label: t('quick.attendance'),
-                  locked: ent.isLocked(child.studentId, 'parent.attendance'),
-                  note: t('quick.locked'),
-                  color: AppTheme.green,
-                  onTap: () => _push(context, AttendanceScreen(child: child)),
-                ),
-                QuickAction(
-                  icon: Icons.bar_chart_rounded,
-                  label: t('quick.marks'),
-                  locked: ent.isLocked(child.studentId, 'parent.marks'),
-                  note: t('quick.locked'),
-                  color: AppTheme.blue,
-                  onTap: () => _push(context, MarksScreen(child: child)),
-                ),
-                QuickAction(
-                  icon: Icons.favorite_border_rounded,
-                  glyph: (colour, size) => HeartPersonIcon(color: colour, size: size),
-                  label: t('quick.attitude'),
-                  locked: ent.isLocked(child.studentId, 'parent.attitude'),
-                  note: t('quick.locked'),
-                  color: AppTheme.rose,
-                  onTap: () => _push(context, AttitudeScreen(child: child)),
-                ),
-                QuickAction(
-                  icon: Icons.calendar_today_outlined,
-                  label: t('quick.timetable'),
-                  locked: ent.isLocked(child.studentId, 'parent.timetable'),
-                  note: t('quick.locked'),
-                  color: AppTheme.amber,
-                  onTap: () => _push(context, TimetableScreen(child: child)),
-                ),
-                QuickAction(
-                  icon: Icons.pie_chart_outline_rounded,
-                  label: t('quick.reports'),
-                  locked: ent.isLocked(child.studentId, 'parent.reports'),
-                  note: t('quick.locked'),
-                  color: AppTheme.violet,
-                  onTap: () => _push(context, ReportsScreen(child: child)),
-                ),
-                QuickAction(
-                  icon: Icons.badge_outlined,
-                  label: t('quick.info'),
-                  locked: ent.isLocked(child.studentId, 'parent.studentInfo'),
-                  note: t('quick.locked'),
-                  color: AppTheme.blue,
-                  onTap: () => _push(context, StudentInfoScreen(child: child)),
-                ),
-                QuickAction(
-                  icon: Icons.photo_library_outlined,
-                  label: t('quick.memories'),
-                  locked: ent.isLocked(child.studentId, 'parent.memories'),
-                  note: t('quick.locked'),
-                  color: AppTheme.rose,
-                  onTap: () => _push(context, MemoriesScreen(child: child)),
-                ),
-                QuickAction(
-                  icon: Icons.rate_review_outlined,
-                  label: t('quick.driverFeedback'),
-                  locked: ent.isLocked(child.studentId, 'parent.driverFeedback'),
-                  note: t('quick.locked'),
-                  color: AppTheme.green,
-                  onTap: () => _push(context, DriverFeedbackScreen(child: child)),
-                ),
-              ],
-            ),
-          ),
-          ),
-          const SizedBox(height: kCardGap),
-
-          Rise(
-            index: 2,
-            child: Card16(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SectionRow(
-                    title: t('home.todaySchedule'),
-                    actionLabel: t('home.fullTimetable'),
-                    onAction: () => _push(context, TimetableScreen(child: child)),
-                  ),
-                  if (home.today.isEmpty)
-                    _Quiet(text: t('home.nothingToday'))
-                  else
-                    ScheduleTimeline(
-                      onTap: (_) => _push(context, TimetableScreen(child: child)),
-                      entries: [
-                        for (final l in home.today)
-                          ScheduleEntry(
-                            time: clock(l.startMinute),
-                            subject: l.subject,
-                            teacher: l.teacher,
-                            room: l.room,
-                            color: parseHex(l.colorHex, AppTheme.violet),
-                          ),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: kCardGap),
-
-          Rise(
-            index: 3,
-            child: _ExamsCard(exams: home.exams, onSeeAll: () => onOpenTab(2)),
-          ),
-          const SizedBox(height: kCardGap),
-
-          Rise(index: 4, child: _ChildCard(child: child, home: home)),
-          const SizedBox(height: kCardGap),
-
-          Rise(
-            index: 5,
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _AttendanceCard(child: child, summary: home.attendance),
-                  ),
-                  const SizedBox(width: kCardGap),
-                  Expanded(
-                    child: _UpdatesCard(
-                      home: home,
-                      child: child,
-                      onSeeAll: () => onOpenTab(1),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
-
-  void _push(BuildContext context, Widget screen) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
-  }
 }
+
+typedef _Shut = bool Function(String section);
+
+typedef _Open = void Function(String section, WidgetBuilder builder);
 
 class _Home {
   _Home({
@@ -478,10 +534,35 @@ class _BusCard extends StatelessWidget {
 }
 
 class _ChildCard extends StatelessWidget {
-  const _ChildCard({required this.child, required this.home});
+  const _ChildCard({
+    required this.child,
+    required this.home,
+    required this.shut,
+    required this.open,
+  });
 
   final Child child;
   final _Home home;
+  final _Shut shut;
+  final _Open open;
+
+  IconFigure _figure({
+    required String section,
+    required IconData icon,
+    required String label,
+    required String value,
+    required String caption,
+    required Color color,
+  }) =>
+      shut(section)
+          ? IconFigure(
+              icon: Icons.lock_rounded,
+              label: label,
+              value: '—',
+              caption: t('section.lockedShort'),
+              color: AppTheme.textFaint,
+            )
+          : IconFigure(icon: icon, label: label, value: value, caption: caption, color: color);
 
   @override
   Widget build(BuildContext context) {
@@ -530,7 +611,7 @@ class _ChildCard extends StatelessWidget {
               const SizedBox(width: 6),
               _ProfileButton(
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => StudentInfoScreen(child: child)),
+                  MaterialPageRoute<void>(builder: (_) => StudentInfoScreen(child: child)),
                 ),
               ),
             ],
@@ -540,7 +621,8 @@ class _ChildCard extends StatelessWidget {
           const SizedBox(height: 12),
           IconFigureStrip(
             figures: [
-              IconFigure(
+              _figure(
+                section: ParentSection.attendance,
                 icon: Icons.verified_user_outlined,
                 label: t('quick.attendance'),
                 value: percent(home.attendance.ratePercent),
@@ -551,21 +633,24 @@ class _ChildCard extends StatelessWidget {
                 ),
                 color: AppTheme.green,
               ),
-              IconFigure(
+              _figure(
+                section: ParentSection.assignments,
                 icon: Icons.assignment_turned_in_outlined,
                 label: t('quick.assignments'),
                 value: '${home.dueSoon}',
                 caption: t('home.pending'),
                 color: AppTheme.blue,
               ),
-              IconFigure(
+              _figure(
+                section: ParentSection.assignments,
                 icon: Icons.trending_up_rounded,
                 label: t('home.average'),
                 value: home.averageMark == null ? '—' : '${home.averageMark}%',
                 caption: t('home.thisTerm'),
                 color: AppTheme.violet,
               ),
-              IconFigure(
+              _figure(
+                section: ParentSection.attitude,
                 icon: Icons.sentiment_satisfied_alt_rounded,
                 label: t('quick.attitude'),
                 value: t('attitude.${home.attitude.verdict}'),
@@ -970,39 +1055,50 @@ class _ExamRow extends StatelessWidget {
 }
 
 class _UpdatesCard extends StatelessWidget {
-  const _UpdatesCard({required this.home, required this.child, required this.onSeeAll});
+  const _UpdatesCard({
+    required this.home,
+    required this.child,
+    required this.shut,
+    required this.open,
+    required this.onSeeAll,
+  });
 
   final _Home home;
   final Child child;
+  final _Shut shut;
+  final _Open open;
   final VoidCallback onSeeAll;
 
   @override
   Widget build(BuildContext context) {
     final entries = <UpdateEntry>[];
 
-    for (final a in home.attitude.notes.take(1)) {
-      entries.add(UpdateEntry(
-        icon: a.isMerit ? Icons.star_rounded : Icons.error_outline_rounded,
-        category: t('quick.attitude'),
-        title: a.note ?? t('attitude.${a.category.toLowerCase()}'),
-        when: longDate(a.occurredAt),
-        color: a.isMerit ? AppTheme.green : AppTheme.amber,
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => AttitudeScreen(child: child)),
-        ),
-      ));
+    if (!shut(ParentSection.attitude)) {
+      for (final a in home.attitude.notes.take(1)) {
+        entries.add(UpdateEntry(
+          icon: a.isMerit ? Icons.star_rounded : Icons.error_outline_rounded,
+          category: t('quick.attitude'),
+          title: a.note ?? t('attitude.${a.category.toLowerCase()}'),
+          when: longDate(a.occurredAt),
+          color: a.isMerit ? AppTheme.green : AppTheme.amber,
+          onTap: () => open(ParentSection.attitude, (_) => AttitudeScreen(child: child)),
+        ));
+      }
     }
-    for (final h in home.homework.take(1)) {
-      entries.add(UpdateEntry(
-        icon: Icons.description_outlined,
-        category: t('quick.assignments'),
-        title: h.title,
-        when: tn('home.dueOn', longDate(h.dueDate)),
-        color: AppTheme.blue,
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => HomeworkDetail(item: h, childName: child.name)),
-        ),
-      ));
+    if (!shut(ParentSection.assignments)) {
+      for (final h in home.homework.take(1)) {
+        entries.add(UpdateEntry(
+          icon: Icons.description_outlined,
+          category: t('quick.assignments'),
+          title: h.title,
+          when: tn('home.dueOn', longDate(h.dueDate)),
+          color: AppTheme.blue,
+          onTap: () => open(
+            ParentSection.assignments,
+            (_) => HomeworkDetail(item: h, childName: child.name),
+          ),
+        ));
+      }
     }
     for (final a in home.announcements.take(1)) {
       entries.add(UpdateEntry(

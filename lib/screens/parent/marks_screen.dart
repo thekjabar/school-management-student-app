@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../ui/screen_kit.dart';
 
+import '../../api/client.dart';
 import '../../api/parent_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
@@ -8,11 +9,21 @@ import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
+import 'section_gate.dart';
 
 class MarksScreen extends StatelessWidget {
   const MarksScreen({super.key, required this.child});
 
   final Child child;
+
+  Future<List<HomeworkItem>> _markedWork() async {
+    if (sectionLocked(child.studentId, ParentSection.assignments)) return const <HomeworkItem>[];
+    try {
+      return await ParentApi.instance.homework(child.studentId);
+    } on SectionLockedException {
+      return const <HomeworkItem>[];
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +41,7 @@ class MarksScreen extends StatelessWidget {
                 load: () async {
                   final r = await Future.wait([
                     ParentApi.instance.results(child.studentId),
-                    ParentApi.instance.homework(child.studentId),
+                    _markedWork(),
                   ]);
                   return _Marks(
                     exams: r[0] as List<ExamResultItem>,

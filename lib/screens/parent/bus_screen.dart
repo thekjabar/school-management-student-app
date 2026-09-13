@@ -6,6 +6,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 
+import '../../api/client.dart';
 import '../../api/directions.dart';
 import '../../api/parent_api.dart';
 import '../../api/push.dart';
@@ -21,6 +22,7 @@ import '../../ui/screen_kit.dart';
 import 'collection_request_screen.dart';
 import 'contact_school_screen.dart';
 import 'route_safety_screen.dart';
+import 'section_gate.dart';
 import 'skip_ride_screen.dart';
 import 'stop_correction_screen.dart';
 import 'track_screen.dart';
@@ -60,10 +62,9 @@ class _BusScreenState extends State<BusScreen> {
 
   Widget _collectCard(BuildContext context, {required bool rides}) {
     return Card16(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => CollectionRequestScreen(child: widget.child, ridesTheBus: rides),
-        ),
+      onTap: () => _openSection(
+        ParentSection.collectionRequest,
+        (_) => CollectionRequestScreen(child: widget.child, ridesTheBus: rides),
       ),
       child: Row(
         children: [
@@ -133,7 +134,7 @@ class _BusScreenState extends State<BusScreen> {
                 load: () async {
                   final r = await Future.wait<Object?>([
                     ParentApi.instance.transport(widget.child.studentId),
-                    ParentApi.instance.live(),
+                    _liveBuses(),
                     _assignedStops(),
                     _homeArrivals(),
                   ]);
@@ -194,10 +195,9 @@ class _BusScreenState extends State<BusScreen> {
                       _Tiles(bus: bus, trip: trip),
                       const SizedBox(height: kCardGap),
                       Card16(
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => RouteSafetyScreen(child: widget.child),
-                          ),
+                        onTap: () => _openSection(
+                          ParentSection.routeSafety,
+                          (_) => RouteSafetyScreen(child: widget.child),
                         ),
                         child: Row(
                           children: [
@@ -241,10 +241,9 @@ class _BusScreenState extends State<BusScreen> {
                       ),
                       const SizedBox(height: kCardGap),
                       Card16(
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => SkipRideScreen(child: widget.child),
-                          ),
+                        onTap: () => _openSection(
+                          ParentSection.skipRide,
+                          (_) => SkipRideScreen(child: widget.child),
                         ),
                         child: Row(
                           children: [
@@ -420,6 +419,24 @@ class _BusScreenState extends State<BusScreen> {
     return _stops;
   }
 
+  void _openSection(String section, WidgetBuilder builder) {
+    openSection<void>(
+      context,
+      childId: widget.child.studentId,
+      section: section,
+      builder: builder,
+    );
+  }
+
+  Future<List<LiveBus>> _liveBuses() async {
+    if (sectionLocked(widget.child.studentId, ParentSection.track)) return const <LiveBus>[];
+    try {
+      return await ParentApi.instance.live();
+    } on SectionLockedException {
+      return const <LiveBus>[];
+    }
+  }
+
   Future<List<HomeArrival>> _homeArrivals() async {
     try {
       return await ParentApi.instance.homeArrivals(studentId: widget.child.studentId);
@@ -446,11 +463,7 @@ class _BusScreenState extends State<BusScreen> {
     );
   }
 
-  void _openTrack() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => TrackScreen(child: widget.child)),
-    );
-  }
+  void _openTrack() => _openSection(ParentSection.track, (_) => TrackScreen(child: widget.child));
 
   Future<void> _enableAlerts() async {
     final ok = await Push.askPermission();

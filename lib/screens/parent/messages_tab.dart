@@ -13,9 +13,12 @@ import '../../ui/pickers.dart';
 import '../../ui/sheets.dart';
 import '../../ui/screen_kit.dart';
 import 'conversation_screen.dart';
+import 'section_gate.dart';
 
 class MessagesTab extends StatefulWidget {
-  const MessagesTab({super.key, required this.onRead});
+  const MessagesTab({super.key, required this.child, required this.onRead});
+
+  final Child child;
 
   final VoidCallback onRead;
 
@@ -182,7 +185,12 @@ class _MessagesTabState extends State<MessagesTab> {
             const SizedBox(height: kCardGap),
 
             if (_tab == 4)
-              const _Conversations()
+              SectionGate(
+                childId: widget.child.studentId,
+                section: ParentSection.messages,
+                frame: SectionFrame.inline,
+                builder: (_) => const _Conversations(),
+              )
             else if (rows.isEmpty)
               Card16(
                 padding: const EdgeInsets.symmetric(vertical: 34),
@@ -605,7 +613,10 @@ class _ConversationsState extends State<_Conversations> {
                   ),
                 );
               }
-              final rows = snap.data ?? const <ThreadSummary>[];
+              final rows = [
+                for (final thread in snap.data ?? const <ThreadSummary>[])
+                  if (!sectionLocked(thread.studentId, ParentSection.messages)) thread,
+              ];
               if (rows.isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 26),
@@ -625,10 +636,11 @@ class _ConversationsState extends State<_Conversations> {
                       thread: rows[i],
                       tint: tint,
                       onTap: () async {
-                        await Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => ConversationScreen(thread: rows[i]),
-                          ),
+                        await openSection<void>(
+                          context,
+                          childId: rows[i].studentId,
+                          section: ParentSection.messages,
+                          builder: (_) => ConversationScreen(thread: rows[i]),
                         );
                         if (mounted) _reload();
                       },
@@ -710,10 +722,20 @@ class _ThreadRow extends StatelessWidget {
 }
 
 Future<void> _startConversation(BuildContext context) async {
-  final children = await ParentApi.instance.children();
+  final all = await ParentApi.instance.children();
   if (!context.mounted) return;
-  if (children.isEmpty) {
+  if (all.isEmpty) {
     showNote(context, t('conv.none'), bad: true);
+    return;
+  }
+  await Entitlements.instance.ensureLoaded();
+  if (!context.mounted) return;
+  final children = [
+    for (final c in all)
+      if (!sectionLocked(c.studentId, ParentSection.messages)) c,
+  ];
+  if (children.isEmpty) {
+    await showSectionLocked(context, ParentSection.messages);
     return;
   }
   final opened = await showAppSheet<ThreadSummary>(
@@ -721,8 +743,11 @@ Future<void> _startConversation(BuildContext context) async {
     builder: (_) => _NewConversationSheet(children: children),
   );
   if (opened == null || !context.mounted) return;
-  await Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => ConversationScreen(thread: opened)),
+  await openSection<void>(
+    context,
+    childId: opened.studentId,
+    section: ParentSection.messages,
+    builder: (_) => ConversationScreen(thread: opened),
   );
 }
 

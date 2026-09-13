@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_address_screen.dart';
 
+import '../../api/client.dart';
 import '../../api/parent_api.dart';
 import '../../api/push.dart';
 import '../../api/session.dart';
@@ -20,6 +21,7 @@ import 'household_screen.dart';
 import 'fees_screen.dart';
 import 'help_screen.dart';
 import 'personal_info_screen.dart';
+import 'section_gate.dart';
 import 'settings_screen.dart';
 
 class ParentProfileTab extends StatelessWidget {
@@ -40,27 +42,40 @@ class ParentProfileTab extends StatelessWidget {
     final me = Session.instance.me;
     final child = selected ?? (children.isEmpty ? null : children.first);
 
-    return Loader<AttitudeSummary?>(
-      tint: tint,
-      watch: child?.studentId,
-      padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20),
-      load: () async {
-        if (child == null) return null;
-        return ParentApi.instance.attitude(child.studentId, tenantId: child.tenantId);
-      },
-      builder: (context, attitude) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _Overview(me: me, tint: tint),
-          const SizedBox(height: kCardGap),
-          _Children(children: children, selected: child, onOpen: onOpenChild),
-          const SizedBox(height: kCardGap),
-          _Settings(children: children, selected: child),
-          const SizedBox(height: kCardGap),
-          _Figures(children: children, attitude: attitude),
-          const SizedBox(height: kCardGap),
-          _LogOut(onTap: () => _signOut(context)),
-        ],
+    return ValueListenableBuilder<PackageEntitlements>(
+      valueListenable: Entitlements.instance.current,
+      builder: (context, ent, _) => Loader<AttitudeSummary?>(
+        tint: tint,
+        watch: child == null ? null : '${child.studentId}|${ent.lockSignature(child.studentId)}',
+        padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20),
+        load: () async {
+          if (child == null) return null;
+          await Entitlements.instance.ensureLoaded();
+          if (sectionLocked(child.studentId, ParentSection.attitude)) return null;
+          try {
+            return await ParentApi.instance.attitude(child.studentId, tenantId: child.tenantId);
+          } on SectionLockedException {
+            return null;
+          }
+        },
+        builder: (context, attitude) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _Overview(me: me, tint: tint),
+            const SizedBox(height: kCardGap),
+            _Children(children: children, selected: child, onOpen: onOpenChild),
+            const SizedBox(height: kCardGap),
+            _Settings(children: children, selected: child),
+            const SizedBox(height: kCardGap),
+            _Figures(
+              children: children,
+              attitude: attitude,
+              attitudeLocked: child != null && attitude == null,
+            ),
+            const SizedBox(height: kCardGap),
+            _LogOut(onTap: () => _signOut(context)),
+          ],
+        ),
       ),
     );
   }
@@ -380,6 +395,8 @@ class _Settings extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tint = Role.parent.tint;
+    final ent = Entitlements.instance.current.value;
+    final ids = [for (final c in children) c.studentId];
 
     return Card16(
       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -432,14 +449,18 @@ class _Settings extends StatelessWidget {
                     ),
           ),
           Divider(height: 1, color: AppTheme.border),
-          const _ConsentsRow(),
+          _ConsentsRow(childIds: ids),
           Divider(height: 1, color: AppTheme.border),
           _Row(
             icon: Icons.pin_drop_outlined,
             title: t('profile.dropoff'),
             sub: t('profile.dropoffSub'),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const DropoffScreen()),
+            locked: ent.lockedForAll(ids, ParentSection.dropoff),
+            onTap: () => openHouseholdSection<void>(
+              context,
+              childIds: ids,
+              section: ParentSection.dropoff,
+              builder: (_) => const DropoffScreen(),
             ),
           ),
           Divider(height: 1, color: AppTheme.border),
@@ -475,8 +496,12 @@ class _Settings extends StatelessWidget {
             icon: Icons.receipt_long_rounded,
             title: t('fees.title'),
             sub: t('profile.paymentsSub'),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const FeesScreen()),
+            locked: ent.lockedForAll(ids, ParentSection.fees),
+            onTap: () => openHouseholdSection<void>(
+              context,
+              childIds: ids,
+              section: ParentSection.fees,
+              builder: (_) => const FeesScreen(),
             ),
           ),
           Divider(height: 1, color: AppTheme.border),
@@ -486,7 +511,9 @@ class _Settings extends StatelessWidget {
             sub: t('profile.helpSub'),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => HelpScreen(child: children.isEmpty ? null : children.first),
+                builder: (_) => HelpScreen(
+                  child: selected ?? (children.isEmpty ? null : children.first),
+                ),
               ),
             ),
             last: true,
@@ -498,7 +525,9 @@ class _Settings extends StatelessWidget {
 }
 
 class _ConsentsRow extends StatefulWidget {
-  const _ConsentsRow();
+  const _ConsentsRow({required this.childIds});
+
+  final List<String> childIds;
 
   @override
   State<_ConsentsRow> createState() => _ConsentsRowState();
@@ -506,6 +535,9 @@ class _ConsentsRow extends StatefulWidget {
 
 class _ConsentsRowState extends State<_ConsentsRow> {
   int _awaiting = 0;
+
+  bool get _locked =>
+      Entitlements.instance.current.value.lockedForAll(widget.childIds, ParentSection.consents);
 
   @override
   void initState() {
@@ -515,17 +547,24 @@ class _ConsentsRowState extends State<_ConsentsRow> {
 
   Future<void> _count() async {
     var awaiting = 0;
-    try {
-      awaiting = (await ParentApi.instance.consents()).awaitingCount;
-    } catch (e) {
-      debugPrint('profile: could not count the forms waiting for an answer: $e');
+    if (!_locked) {
+      try {
+        awaiting = (await ParentApi.instance.consents()).awaitingCount;
+      } on SectionLockedException {
+        awaiting = 0;
+      } catch (e) {
+        debugPrint('profile: could not count the forms waiting for an answer: $e');
+      }
     }
     if (mounted && awaiting != _awaiting) setState(() => _awaiting = awaiting);
   }
 
   Future<void> _open() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const ConsentsScreen()),
+    await openHouseholdSection<void>(
+      context,
+      childIds: widget.childIds,
+      section: ParentSection.consents,
+      builder: (_) => const ConsentsScreen(),
     );
     await _count();
   }
@@ -535,7 +574,8 @@ class _ConsentsRowState extends State<_ConsentsRow> {
         icon: Icons.fact_check_outlined,
         title: t('profile.consents'),
         sub: t('profile.consentsSub'),
-        badge: _awaiting,
+        badge: _locked ? 0 : _awaiting,
+        locked: _locked,
         onTap: _open,
       );
 }
@@ -548,6 +588,7 @@ class _Row extends StatelessWidget {
     required this.onTap,
     this.badge = 0,
     this.last = false,
+    this.locked = false,
   });
 
   final IconData icon;
@@ -556,6 +597,8 @@ class _Row extends StatelessWidget {
   final VoidCallback? onTap;
   final int badge;
   final bool last;
+
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
@@ -606,7 +649,11 @@ class _Row extends StatelessWidget {
               Pill('$badge', color: AppTheme.amber),
               const SizedBox(width: 6),
             ],
-            Icon(Icons.chevron_right_rounded, size: 19, color: AppTheme.textFaint),
+            Icon(
+              locked ? Icons.lock_rounded : Icons.chevron_right_rounded,
+              size: locked ? 16 : 19,
+              color: AppTheme.textFaint,
+            ),
           ],
         ),
       ),
@@ -615,10 +662,24 @@ class _Row extends StatelessWidget {
 }
 
 class _Figures extends StatelessWidget {
-  const _Figures({required this.children, required this.attitude});
+  const _Figures({
+    required this.children,
+    required this.attitude,
+    required this.attitudeLocked,
+  });
 
   final List<Child> children;
   final AttitudeSummary? attitude;
+
+  final bool attitudeLocked;
+
+  IconFigure _locked(String label) => IconFigure(
+        icon: Icons.lock_rounded,
+        label: label,
+        value: '—',
+        caption: t('section.lockedShort'),
+        color: AppTheme.textFaint,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -633,27 +694,33 @@ class _Figures extends StatelessWidget {
             caption: t('profile.onAccount'),
             color: Role.parent.tint,
           ),
-          IconFigure(
-            icon: Icons.star_rounded,
-            label: t('attitude.merits'),
-            value: '${attitude?.merits ?? 0}',
-            caption: t('att.thisTerm'),
-            color: AppTheme.green,
-          ),
-          IconFigure(
-            icon: Icons.error_outline_rounded,
-            label: t('attitude.concerns'),
-            value: '${attitude?.concerns ?? 0}',
-            caption: t('att.thisTerm'),
-            color: AppTheme.amber,
-          ),
-          IconFigure(
-            icon: Icons.military_tech_rounded,
-            label: t('attitude.points'),
-            value: '${attitude?.points ?? 0}',
-            caption: t('attitude.running'),
-            color: AppTheme.blue,
-          ),
+          if (attitudeLocked) ...[
+            _locked(t('attitude.merits')),
+            _locked(t('attitude.concerns')),
+            _locked(t('attitude.points')),
+          ] else ...[
+            IconFigure(
+              icon: Icons.star_rounded,
+              label: t('attitude.merits'),
+              value: '${attitude?.merits ?? 0}',
+              caption: t('att.thisTerm'),
+              color: AppTheme.green,
+            ),
+            IconFigure(
+              icon: Icons.error_outline_rounded,
+              label: t('attitude.concerns'),
+              value: '${attitude?.concerns ?? 0}',
+              caption: t('att.thisTerm'),
+              color: AppTheme.amber,
+            ),
+            IconFigure(
+              icon: Icons.military_tech_rounded,
+              label: t('attitude.points'),
+              value: '${attitude?.points ?? 0}',
+              caption: t('attitude.running'),
+              color: AppTheme.blue,
+            ),
+          ],
         ],
       ),
     );

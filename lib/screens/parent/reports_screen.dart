@@ -13,6 +13,7 @@ import '../../ui/sheets.dart';
 import 'attendance_screen.dart';
 import 'attitude_screen.dart';
 import 'marks_screen.dart';
+import 'section_gate.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key, required this.child});
@@ -51,7 +52,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   final id = widget.child.studentId;
                   final cards = _slot(api.reportCards(id));
                   final terms = _slot(api.termGrades(id));
-                  final exams = _slot(api.results(id));
+                  final exams = sectionLocked(id, ParentSection.marks)
+                      ? Future.value(_Slot<List<ExamResultItem>>.ok(const []))
+                      : _slot(api.results(id));
                   final report = _Report(
                     cards: await cards,
                     terms: await terms,
@@ -133,7 +136,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           const SizedBox(height: kCardGap),
                           _Cards(report: report, onOpen: _open, onRetry: _retry),
                           const SizedBox(height: kCardGap),
-                          _Recent(report: report, child: widget.child, onRetry: _retry),
+                          if (sectionLocked(widget.child.studentId, ParentSection.marks))
+                            const LockedSectionCard(
+                              section: ParentSection.marks,
+                              icon: Icons.bar_chart_rounded,
+                            )
+                          else
+                            _Recent(report: report, child: widget.child, onRetry: _retry),
                           const SizedBox(height: kCardGap),
                           NoticeBanner(
                             icon: Icons.info_outline_rounded,
@@ -164,12 +173,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
       setState(() => _tab = 0);
       return;
     }
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => i == 1
-            ? AttendanceScreen(child: widget.child)
-            : AttitudeScreen(child: widget.child),
-      ),
+    openSection<void>(
+      context,
+      childId: widget.child.studentId,
+      section: i == 1 ? ParentSection.attendance : ParentSection.attitude,
+      builder: (_) => i == 1
+          ? AttendanceScreen(child: widget.child)
+          : AttitudeScreen(child: widget.child),
     );
   }
 
@@ -182,6 +192,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (gone == true) showNote(context, t('rep.cardGone'), bad: true);
     _loader.currentState?.reload(quiet: true);
   }
+}
+
+void _openMarks(BuildContext context, Child child) {
+  openSection<void>(
+    context,
+    childId: child.studentId,
+    section: ParentSection.marks,
+    builder: (_) => MarksScreen(child: child),
+  );
 }
 
 class _Slot<T> {
@@ -1309,9 +1328,7 @@ class _Recent extends StatelessWidget {
           SectionRow(
             title: t('rep.recent'),
             actionLabel: rows.isEmpty ? null : t('home.viewAll'),
-            onAction: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => MarksScreen(child: child)),
-            ),
+            onAction: () => _openMarks(context, child),
           ),
           if (report.examsError != null)
             _SectionFailed(onRetry: onRetry)
@@ -1351,9 +1368,7 @@ class _ResultRow extends StatelessWidget {
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => MarksScreen(child: child)),
-      ),
+      onTap: () => _openMarks(context, child),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 11),
         child: Row(
