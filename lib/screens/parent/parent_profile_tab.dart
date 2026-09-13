@@ -14,7 +14,6 @@ import 'student_info_screen.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/settings_widgets.dart';
 import '../../ui/sheets.dart';
-import 'children_tab.dart';
 import 'consents_screen.dart';
 import 'dropoff_screen.dart';
 import 'household_screen.dart';
@@ -283,25 +282,12 @@ class _Children extends StatelessWidget {
         children: [
           SectionRow(
             title: t('more.yourChildren'),
-            actionLabel: children.length > 3 ? t('home.viewAll') : null,
+            actionLabel: children.isEmpty ? null : t('home.viewAll'),
             onAction: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => Scaffold(
-                  backgroundColor: AppTheme.canvas,
-                  body: SafeArea(
-                    bottom: false,
-                    child: Column(
-                      children: [
-                        ScreenHeader(title: t('more.yourChildren')),
-                        Expanded(
-                          child: ChildrenTab(
-                            children: children,
-                            selected: selected ?? children.first,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              MaterialPageRoute<void>(
+                builder: (_) => HouseholdScreen(
+                  children: children,
+                  selected: selected ?? children.first,
                 ),
               ),
             ),
@@ -420,35 +406,6 @@ class _Settings extends StatelessWidget {
             ),
           ),
           Divider(height: 1, color: AppTheme.border),
-          _Row(
-            icon: Icons.groups_outlined,
-            title: t('nav.children'),
-            sub: t('profile.childrenSub'),
-            onTap: children.isEmpty
-                ? null
-                : () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => Scaffold(
-                          backgroundColor: AppTheme.canvas,
-                          body: SafeArea(
-                            bottom: false,
-                            child: Column(
-                              children: [
-                                ScreenHeader(title: t('nav.children')),
-                                Expanded(
-                                  child: ChildrenTab(
-                                    children: children,
-                                    selected: selected ?? children.first,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-          ),
-          Divider(height: 1, color: AppTheme.border),
           _ConsentsRow(childIds: ids),
           Divider(height: 1, color: AppTheme.border),
           _Row(
@@ -461,15 +418,6 @@ class _Settings extends StatelessWidget {
               childIds: ids,
               section: ParentSection.dropoff,
               builder: (_) => const DropoffScreen(),
-            ),
-          ),
-          Divider(height: 1, color: AppTheme.border),
-          _Row(
-            icon: Icons.family_restroom_outlined,
-            title: t('profile.household'),
-            sub: t('profile.householdSub'),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const HouseholdScreen()),
             ),
           ),
           Divider(height: 1, color: AppTheme.border),

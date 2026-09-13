@@ -10,9 +10,13 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
+import 'children_tab.dart';
 
 class HouseholdScreen extends StatefulWidget {
-  const HouseholdScreen({super.key});
+  const HouseholdScreen({super.key, required this.children, required this.selected});
+
+  final List<Child> children;
+  final Child selected;
 
   @override
   State<HouseholdScreen> createState() => _HouseholdScreenState();
@@ -20,6 +24,17 @@ class HouseholdScreen extends StatefulWidget {
 
 class _HouseholdScreenState extends State<HouseholdScreen> {
   int _tab = 0;
+
+  Widget _body() {
+    switch (_tab) {
+      case 0:
+        return ChildrenTab(children: widget.children, selected: widget.selected);
+      case 1:
+        return const _DayTab();
+      default:
+        return const _FamilyTab();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,14 +54,13 @@ class _HouseholdScreenState extends State<HouseholdScreen> {
                 index: _tab,
                 onChanged: (i) => setState(() => _tab = i),
                 tabs: [
+                  TabSpec(label: t('household.tabChildren'), icon: Icons.groups_outlined),
                   TabSpec(label: t('household.tabDay'), icon: Icons.today_outlined),
                   TabSpec(label: t('household.tabFamily'), icon: Icons.family_restroom_outlined),
                 ],
               ),
             ),
-            Expanded(
-              child: _tab == 0 ? const _DayTab() : const _FamilyTab(),
-            ),
+            Expanded(child: _body()),
           ],
         ),
       ),
