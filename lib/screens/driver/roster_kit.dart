@@ -7,6 +7,13 @@ import '../../ui/format.dart';
 
 enum RosterFilter { all, toPickUp, aboard, done }
 
+bool schoolCheckOpen(String leg, List<PlannedStop> stops) =>
+    leg == 'RETURN' && stops.any((s) => s.students.any((r) => !r.accountedFor));
+
+bool mustDropAtSchool(String leg, List<PlannedStop> stops) =>
+    leg == 'OUT' &&
+    stops.any((s) => s.students.any((r) => r.boardedAt != null && r.alightedAt == null));
+
 ({String text, Color tone}) riderStatus(
   RiderOnStop r, {
   required String leg,

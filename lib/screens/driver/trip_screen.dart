@@ -36,20 +36,123 @@ String _driverWords(String message) {
 
 String _driverError(Object? e) => _driverWords(errorText(e));
 
-class _Aboard {
-  const _Aboard({required this.rider, required this.stopId, required this.stopName});
+class _RiderAt {
+  const _RiderAt({required this.rider, required this.stopId, required this.stopName});
 
   final RiderOnStop rider;
   final String stopId;
   final String stopName;
 }
 
-List<_Aboard> _stillAboard(TripPlan plan) => [
+List<_RiderAt> _stillAboard(TripPlan plan) => [
       for (final stop in plan.stops)
         for (final rider in stop.students)
           if (rider.boardedAt != null && rider.alightedAt == null)
-            _Aboard(rider: rider, stopId: stop.stopId, stopName: stop.name),
+            _RiderAt(rider: rider, stopId: stop.stopId, stopName: stop.name),
     ];
+
+List<_RiderAt> _uncheckedAtSchool(TripPlan plan) => [
+      for (final stop in plan.stops)
+        for (final rider in stop.students)
+          if (!rider.accountedFor)
+            _RiderAt(rider: rider, stopId: stop.stopId, stopName: stop.name),
+    ];
+
+Future<void> _markRider(
+  BuildContext context, {
+  required String tripId,
+  required String leg,
+  required RiderOnStop rider,
+  required String riderStopId,
+  required String? terminalStopId,
+  required String eventType,
+  required String label,
+  required VoidCallback onChanged,
+}) async {
+  try {
+    final verdict = await CrewApi.instance.recordCustody(
+      tripId: tripId,
+      studentId: rider.studentId,
+      eventType: eventType,
+      stopId: custodyStopId(
+        leg: leg,
+        eventType: eventType,
+        riderStopId: riderStopId,
+        terminalStopId: terminalStopId,
+      ),
+    );
+    onChanged();
+    if (!context.mounted) return;
+    final first = rider.name.split(' ').first;
+    if (!verdict.accepted) {
+      final reason = verdict.reason;
+      showNote(
+        context,
+        reason == null ? tv('driver.notRecorded', {'name': first}) : _driverWords(reason),
+        bad: true,
+      );
+    } else if (verdict.rewrittenTo != null) {
+      showNote(context, tv('driver.recordedAs', {'name': first}), bad: true);
+    } else {
+      showNote(context, '$first — $label');
+    }
+  } catch (e) {
+    if (context.mounted) showNote(context, _driverError(e), bad: true);
+  }
+}
+
+Future<void> _correctRider(
+  BuildContext context, {
+  required String tripId,
+  required String leg,
+  required RiderOnStop rider,
+  required String riderStopId,
+  required String? terminalStopId,
+  required VoidCallback onBusy,
+  required VoidCallback onChanged,
+}) async {
+  final answer = await showAppSheet<({String type, String reason})>(
+    context,
+    builder: (_) => _CorrectionSheet(rider: rider, leg: leg),
+  );
+  if (answer == null || !context.mounted) return;
+
+  onBusy();
+  try {
+    final events = await CrewApi.instance.tripCustodyEvents(tripId);
+    final theirs = events
+        .where((e) => e['studentId'] == rider.studentId && e['correctsEventId'] == null)
+        .toList()
+      ..sort((a, b) => ((b['effectiveTime'] ?? '') as String)
+          .compareTo((a['effectiveTime'] ?? '') as String));
+    final original = theirs.firstOrNull;
+    if (original == null) {
+      if (context.mounted) showNote(context, t('driver.nothingToCorrect'), bad: true);
+      return;
+    }
+
+    final verdict = await CrewApi.instance.correctCustody(
+      eventId: (original['id'] ?? '') as String,
+      correctedType: answer.type,
+      correctionReason: answer.reason,
+      stopId: custodyStopId(
+        leg: leg,
+        eventType: answer.type,
+        riderStopId: riderStopId,
+        terminalStopId: terminalStopId,
+      ),
+    );
+    onChanged();
+    if (!context.mounted) return;
+    if (!verdict.accepted) {
+      showNote(context, verdict.reason ?? t('driver.correctionRefused'), bad: true);
+      return;
+    }
+    showNote(context, t('driver.corrected'));
+  } catch (e) {
+    if (context.mounted) showNote(context, _driverError(e), bad: true);
+  }
+}
 
 class TripScreen extends StatefulWidget {
   const TripScreen({super.key, required this.tripId, this.serviceDate});
@@ -65,6 +168,10 @@ class TripScreen extends StatefulWidget {
 class _TripScreenState extends State<TripScreen> {
   final _loaderKey = GlobalKey<LoaderState<_TripData>>();
   String? _busy;
+
+  String? _busyStudent;
+
+  DateTime? _schoolArrivedAt;
 
   bool _orderedWithoutBus = false;
 
@@ -205,9 +312,16 @@ class _TripScreenState extends State<TripScreen> {
     final aboard = _stillAboard(data.plan);
     if (aboard.isEmpty) return;
 
-    final picked = await showAppSheet<List<_Aboard>>(
+    final picked = await showAppSheet<List<_RiderAt>>(
       context,
-      builder: (_) => _RecordAllOffSheet(aboard: aboard, leg: leg),
+      builder: (_) => _RecordAllOffSheet(
+        aboard: aboard,
+        title: leg == 'OUT'
+            ? t('driver.recordAllOffTitleOut')
+            : t('driver.recordAllOffTitleReturn'),
+        how: t('driver.recordAllOffHow'),
+        confirmKey: 'driver.recordTickedOff',
+      ),
     );
     if (picked == null || picked.isEmpty || !mounted) return;
 
@@ -241,6 +355,117 @@ class _TripScreenState extends State<TripScreen> {
       if (mounted) setState(() => _busy = null);
     }
   }
+
+  Future<void> _allOnBus(_TripData data) async {
+    final unchecked = _uncheckedAtSchool(data.plan);
+    if (unchecked.isEmpty) return;
+
+    final picked = await showAppSheet<List<_RiderAt>>(
+      context,
+      builder: (_) => _RecordAllOffSheet(
+        aboard: unchecked,
+        title: t('driver.gate.whoOnBus'),
+        how: t('driver.gate.whoOnBusHow'),
+        confirmKey: 'driver.gate.recordOnBus',
+      ),
+    );
+    if (picked == null || picked.isEmpty || !mounted) return;
+
+    setState(() => _busy = t('driver.gate.recordingOnBus'));
+    try {
+      final outcomes = await CrewApi.instance.recordCustodyBatch(
+        tripId: widget.tripId,
+        manualReason: kCrewAllOnBusReason,
+        entries: [
+          for (final a in picked)
+            CustodyEntry(
+              studentId: a.rider.studentId,
+              eventType: 'BOARDED',
+              stopId: custodyStopId(
+                leg: 'RETURN',
+                eventType: 'BOARDED',
+                riderStopId: a.stopId,
+                terminalStopId: data.terminalStopId,
+              ),
+            ),
+        ],
+      );
+      _loaderKey.currentState?.reload();
+      if (!mounted) return;
+      final said = _boardingNote(outcomes);
+      showNote(context, said.text, bad: said.bad);
+    } catch (e) {
+      if (mounted) showNote(context, _driverError(e), bad: true);
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
+  ({String text, bool bad}) _boardingNote(List<CustodyOutcome> outcomes) {
+    final refused = outcomes.where((o) => !o.verdict.accepted).toList();
+    final ok = outcomes.length - refused.length;
+    if (refused.isEmpty) return (text: tn('driver.gate.onBusRecorded', ok), bad: false);
+    final why = refused.map((o) => o.verdict.reason).whereType<String>().firstOrNull;
+    return (
+      text: why == null
+          ? tv('driver.gate.someOnRefused', {'ok': ok, 'bad': refused.length})
+          : tv('driver.gate.someOnRefusedWhy', {
+              'ok': ok,
+              'bad': refused.length,
+              'why': _driverWords(why),
+            }),
+      bad: true,
+    );
+  }
+
+  Future<void> _markAtSchool(
+    _TripData data,
+    RiderOnStop rider,
+    PlannedStop stop,
+    String eventType,
+    String label,
+  ) async {
+    if (_busyStudent != null) return;
+    setState(() => _busyStudent = rider.studentId);
+    try {
+      await _markRider(
+        context,
+        tripId: widget.tripId,
+        leg: data.trip?.leg ?? 'OUT',
+        rider: rider,
+        riderStopId: stop.stopId,
+        terminalStopId: data.terminalStopId,
+        eventType: eventType,
+        label: label,
+        onChanged: () => _loaderKey.currentState?.reload(),
+      );
+    } finally {
+      if (mounted) setState(() => _busyStudent = null);
+    }
+  }
+
+  Future<void> _correctAtSchool(_TripData data, RiderOnStop rider, PlannedStop stop) async {
+    if (_busyStudent != null) return;
+    try {
+      await _correctRider(
+        context,
+        tripId: widget.tripId,
+        leg: data.trip?.leg ?? 'OUT',
+        rider: rider,
+        riderStopId: stop.stopId,
+        terminalStopId: data.terminalStopId,
+        onBusy: () => setState(() => _busyStudent = rider.studentId),
+        onChanged: () => _loaderKey.currentState?.reload(),
+      );
+    } finally {
+      if (mounted) setState(() => _busyStudent = null);
+    }
+  }
+
+  Future<void> _arriveAtSchool(int sequence) => _act(t('driver.arrived'), () async {
+        await CrewApi.instance.arriveAtStop(widget.tripId, sequence);
+        _schoolArrivedAt ??= DateTime.now();
+      });
 
   ({String text, bool bad}) _batchNote(List<CustodyOutcome> outcomes) {
     final refused = outcomes.where((o) => !o.verdict.accepted).toList();
@@ -363,6 +588,15 @@ class _TripScreenState extends State<TripScreen> {
 
                   final aboard = _stillAboard(data.plan);
 
+                  final leg = trip?.leg ?? 'OUT';
+                  final checkOpen = schoolCheckOpen(leg, data.plan.stops);
+                  final homeLocked = checkOpen && running;
+                  final endBlocked = running && mustDropAtSchool(leg, data.plan.stops);
+                  final schoolName = data.school?.name ?? Session.instance.me?.schoolName ?? t('driver.school');
+                  final schoolArrivedAt =
+                      data.plan.terminalArrivedAt ?? _schoolArrivedAt ?? data.school?.arrivedAt;
+                  final hasRiders = data.plan.stops.any((s) => s.students.isNotEmpty);
+
                   final stops = data.run.stops;
                   final numbers = runNumbers(stops, data.school?.stopId);
                   final currentStop = data.run.next;
@@ -379,6 +613,7 @@ class _TripScreenState extends State<TripScreen> {
                           onStart: () => _startShift(trip),
                           onDepart: () => _act(t('driver.departed'), () => CrewApi.instance.depart(trip.id)),
                           onEnd: () => _endRun(trip, counts.stillOnBoard),
+                          endBlocked: endBlocked ? t('driver.gate.dropFirst') : null,
                         ),
                         const SizedBox(height: 12),
                       ],
@@ -391,7 +626,7 @@ class _TripScreenState extends State<TripScreen> {
                         const SizedBox(height: 12),
                       ],
                       _HeadcountCard(counts: counts),
-                      if (started && aboard.isNotEmpty) ...[
+                      if (leg == 'RETURN' && started && aboard.isNotEmpty && !homeLocked) ...[
                         const SizedBox(height: 12),
                         _RecordAllOffButton(
                           count: aboard.length,
@@ -458,6 +693,19 @@ class _TripScreenState extends State<TripScreen> {
                         }),
                       ],
                       const SizedBox(height: 6),
+                      if (leg == 'RETURN' && hasRiders)
+                        BoardingCheckCard(
+                          stops: data.plan.stops,
+                          schoolName: schoolName,
+                          running: running,
+                          query: _query,
+                          busyStudent: _busyStudent,
+                          busyAll: _busy != null,
+                          onBoard: (r, s) => _markAtSchool(data, r, s, 'BOARDED', t('driver.onBoard')),
+                          onNotHere: (r, s) => _markAtSchool(data, r, s, 'NO_SHOW', t('driver.notRiding')),
+                          onCorrect: (r, s) => _correctAtSchool(data, r, s),
+                          onAllOnBus: () => _allOnBus(data),
+                        ),
                       for (final (i, s) in stops.indexed)
                         if (_query.isEmpty || s.students.any((r) => _matches(r, _query)))
                           StopCard(
@@ -472,7 +720,29 @@ class _TripScreenState extends State<TripScreen> {
                           schoolReached: data.plan.terminalArrivedAt != null,
                           running: running,
                           started: started,
+                          locked: homeLocked && !isSchoolStop(s, data.school?.stopId),
                           onChanged: () => _loaderKey.currentState?.reload(),
+                        ),
+                      if (leg == 'OUT' && hasRiders)
+                        SchoolArrivalCard(
+                          stops: data.plan.stops,
+                          schoolName: schoolName,
+                          running: running,
+                          started: started,
+                          canArrive: data.school?.sequence != null,
+                          arrivedAt: schoolArrivedAt,
+                          query: _query,
+                          busyStudent: _busyStudent,
+                          busyAll: _busy != null,
+                          onArrive: () => _arriveAtSchool(data.school!.sequence!),
+                          onDrop: (r, s) => _markAtSchool(
+                            data,
+                            r,
+                            s,
+                            'ALIGHTED',
+                            schoolArrivedAt != null ? t('driver.atSchool') : t('driver.setDownEarly'),
+                          ),
+                          onAllOff: () => _recordAllOff(data),
                         ),
                       SectionHead(t('driver.beforeYouLeave')),
                       _SweepCard(
@@ -729,9 +999,12 @@ class _RunControls extends StatelessWidget {
     required this.onStart,
     required this.onDepart,
     required this.onEnd,
+    this.endBlocked,
   });
 
   final CrewTrip trip;
+
+  final String? endBlocked;
 
   final TripTiming timing;
   final String? busy;
@@ -941,7 +1214,33 @@ class _RunControls extends StatelessWidget {
             ),
             const SizedBox(height: 12),
           ],
-          if (action == null)
+          if (identical(action, onEnd) && endBlocked != null) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.lock_outline_rounded, size: 18, color: AppTheme.rose),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    endBlocked!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.rose,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            BigButton(
+              label: label,
+              color: Role.driver.tint,
+              height: 52,
+              onPressed: null,
+            ),
+          ] else if (action == null)
             Row(
               children: [
                 Icon(
@@ -1053,9 +1352,12 @@ class StopCard extends StatefulWidget {
     this.query = '',
     this.current = false,
     this.number,
+    this.locked = false,
   });
 
   final PlannedStop stop;
+
+  final bool locked;
 
   final int? number;
   final String tripId;
@@ -1135,46 +1437,17 @@ class _StopCardState extends State<StopCard> {
   }
 
   Future<void> _correct(RiderOnStop rider) async {
-    final answer = await showAppSheet<({String type, String reason})>(
-      context,
-      builder: (_) => _CorrectionSheet(rider: rider, leg: widget.leg),
-    );
-    if (answer == null) return;
-
-    setState(() => _busyStudent = rider.studentId);
     try {
-      final events = await CrewApi.instance.tripCustodyEvents(widget.tripId);
-      final theirs = events
-          .where((e) => e['studentId'] == rider.studentId && e['correctsEventId'] == null)
-          .toList()
-        ..sort((a, b) => ((b['effectiveTime'] ?? '') as String)
-            .compareTo((a['effectiveTime'] ?? '') as String));
-      final original = theirs.firstOrNull;
-      if (original == null) {
-        if (mounted) showNote(context, t('driver.nothingToCorrect'), bad: true);
-        return;
-      }
-
-      final verdict = await CrewApi.instance.correctCustody(
-        eventId: (original['id'] ?? '') as String,
-        correctedType: answer.type,
-        correctionReason: answer.reason,
-        stopId: custodyStopId(
-          leg: widget.leg,
-          eventType: answer.type,
-          riderStopId: widget.stop.stopId,
-          terminalStopId: widget.terminalStopId,
-        ),
+      await _correctRider(
+        context,
+        tripId: widget.tripId,
+        leg: widget.leg,
+        rider: rider,
+        riderStopId: widget.stop.stopId,
+        terminalStopId: widget.terminalStopId,
+        onBusy: () => setState(() => _busyStudent = rider.studentId),
+        onChanged: widget.onChanged,
       );
-      widget.onChanged();
-      if (!mounted) return;
-      if (!verdict.accepted) {
-        showNote(context, verdict.reason ?? t('driver.correctionRefused'), bad: true);
-        return;
-      }
-      showNote(context, t('driver.corrected'));
-    } catch (e) {
-      if (mounted) showNote(context, _driverError(e), bad: true);
     } finally {
       if (mounted) setState(() => _busyStudent = null);
     }
@@ -1183,34 +1456,17 @@ class _StopCardState extends State<StopCard> {
   Future<void> _mark(RiderOnStop rider, String eventType, String label) async {
     setState(() => _busyStudent = rider.studentId);
     try {
-      final verdict = await CrewApi.instance.recordCustody(
+      await _markRider(
+        context,
         tripId: widget.tripId,
-        studentId: rider.studentId,
+        leg: widget.leg,
+        rider: rider,
+        riderStopId: widget.stop.stopId,
+        terminalStopId: widget.terminalStopId,
         eventType: eventType,
-        stopId: custodyStopId(
-          leg: widget.leg,
-          eventType: eventType,
-          riderStopId: widget.stop.stopId,
-          terminalStopId: widget.terminalStopId,
-        ),
+        label: label,
+        onChanged: widget.onChanged,
       );
-      widget.onChanged();
-      if (!mounted) return;
-      final first = rider.name.split(' ').first;
-      if (!verdict.accepted) {
-        final reason = verdict.reason;
-        showNote(
-          context,
-          reason == null ? tv('driver.notRecorded', {'name': first}) : _driverWords(reason),
-          bad: true,
-        );
-      } else if (verdict.rewrittenTo != null) {
-        showNote(context, tv('driver.recordedAs', {'name': first}), bad: true);
-      } else {
-        showNote(context, '$first — $label');
-      }
-    } catch (e) {
-      if (mounted) showNote(context, _driverError(e), bad: true);
     } finally {
       if (mounted) setState(() => _busyStudent = null);
     }
@@ -1298,6 +1554,13 @@ class _StopCardState extends State<StopCard> {
         wash: AppTheme.neutralSoft,
       );
     }
+    if (widget.locked) {
+      return _FlowBanner(
+        text: t('driver.gate.checkFirst'),
+        colour: AppTheme.amber,
+        wash: AppTheme.amberSoft,
+      );
+    }
     if (s.done) return null;
     return _FlowBanner(
       text: s.students.length > 1 ? t('driver.flow.guideMany') : t('driver.flow.guide'),
@@ -1308,7 +1571,7 @@ class _StopCardState extends State<StopCard> {
 
   List<Widget> _flow() {
     final s = widget.stop;
-    final running = widget.running;
+    final running = widget.running && !widget.locked;
     final canSkip = !s.done && s.arrivedAt == null;
     final holdLeft = _holdLeft;
     final holding = holdLeft > 0;
@@ -1494,8 +1757,8 @@ class _StopCardState extends State<StopCard> {
             schoolReached: widget.schoolReached,
             named: s.students.length > 1 || r.name.trim() != s.name.trim(),
             busy: _busyStudent == r.studentId,
-            canPickUp: widget.running,
-            canSetDown: widget.started,
+            canPickUp: widget.running && !widget.locked,
+            canSetDown: widget.started && !widget.locked,
             onBoard: () => _mark(r, 'BOARDED', t('driver.onBoard')),
             onOff: () => _mark(
               r,
@@ -2140,7 +2403,7 @@ class _ChildActions extends StatelessWidget {
               ),
             ),
           )
-        else if (off)
+        else if (off || (notRiding && leg == 'RETURN'))
           _FlowButton(
             label: t('driver.wrong'),
             icon: Icons.edit_note_rounded,
@@ -2201,6 +2464,573 @@ class _ChildActions extends StatelessWidget {
       ],
     );
   }
+}
+
+typedef RiderAction = void Function(RiderOnStop rider, PlannedStop stop);
+
+List<({RiderOnStop rider, PlannedStop stop})> _ridersIn(List<PlannedStop> stops) => [
+      for (final s in stops)
+        for (final r in s.students) (rider: r, stop: s),
+    ];
+
+DateTime? _latest(Iterable<DateTime?> times) {
+  DateTime? out;
+  for (final at in times) {
+    if (at != null && (out == null || at.isAfter(out))) out = at;
+  }
+  return out;
+}
+
+class BoardingCheckCard extends StatefulWidget {
+  const BoardingCheckCard({
+    super.key,
+    required this.stops,
+    required this.schoolName,
+    required this.running,
+    required this.busyStudent,
+    required this.busyAll,
+    required this.onBoard,
+    required this.onNotHere,
+    required this.onCorrect,
+    required this.onAllOnBus,
+    this.query = '',
+  });
+
+  final List<PlannedStop> stops;
+  final String schoolName;
+  final bool running;
+  final String? busyStudent;
+  final bool busyAll;
+  final RiderAction onBoard;
+  final RiderAction onNotHere;
+  final RiderAction onCorrect;
+  final VoidCallback onAllOnBus;
+  final String query;
+
+  @override
+  State<BoardingCheckCard> createState() => _BoardingCheckCardState();
+}
+
+class _BoardingCheckCardState extends State<BoardingCheckCard> {
+  bool? _openChoice;
+
+  @override
+  Widget build(BuildContext context) {
+    final riders = _ridersIn(widget.stops);
+    final all = riders.length;
+    final checked = riders.where((e) => e.rider.accountedFor).length;
+    final remaining = all - checked;
+    final complete = remaining == 0;
+    final onBus = riders.where((e) => e.rider.boardedAt != null).length;
+    final away = riders.where((e) => e.rider.boardedAt == null && e.rider.notTravelling).length;
+    final lastAt = _latest(riders.map((e) => e.rider.boardedAt));
+    final open = widget.query.isNotEmpty || (_openChoice ?? !complete);
+    final shown = riders.where((e) => _TripScreenState._matches(e.rider, widget.query)).toList();
+
+    final summary = [
+      tv('driver.gate.boardingDone', {'on': onBus, 'away': away}),
+      if (lastAt != null) hhmm(lastAt),
+    ].join(' · ');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Panel(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            _GateHeader(
+              title: t('driver.gate.boardingTitle'),
+              lines: [widget.schoolName, if (complete) summary],
+              pill: complete ? t('driver.done') : tv('driver.gate.checked', {'done': checked, 'all': all}),
+              done: complete,
+              open: open,
+              onTap: () => setState(() => _openChoice = !open),
+            ),
+            if (open) ...[
+              Divider(height: 1, color: AppTheme.border),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (!widget.running)
+                      _FlowBanner(
+                        text: t('driver.tickAfterSetOff'),
+                        colour: AppTheme.textMuted,
+                        wash: AppTheme.neutralSoft,
+                      )
+                    else if (!complete)
+                      _FlowBanner(
+                        text: t('driver.gate.boardingHow'),
+                        colour: AppTheme.blue,
+                        wash: AppTheme.blueSoft,
+                      ),
+                    _FlowStep(
+                      number: 1,
+                      label: t('driver.flow.children'),
+                      done: complete,
+                      child: _GateProgress(done: checked, all: all),
+                    ),
+                    for (final (i, e) in shown.indexed) ...[
+                      SizedBox(height: i == 0 ? 10 : 8),
+                      if (i > 0) ...[
+                        Divider(height: 1, color: AppTheme.border),
+                        const SizedBox(height: 8),
+                      ],
+                      _boardingRow(e.rider, e.stop),
+                    ],
+                    if (!complete) ...[
+                      const SizedBox(height: 12),
+                      _FlowButton(
+                        label: tn('driver.gate.allOnBus', remaining),
+                        icon: Icons.how_to_reg_rounded,
+                        colour: Colors.white,
+                        fill: AppTheme.green,
+                        height: 48,
+                        busy: widget.busyAll,
+                        onPressed: widget.running && widget.busyStudent == null
+                            ? widget.onAllOnBus
+                            : null,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _boardingRow(RiderOnStop r, PlannedStop s) {
+    final resolved = r.accountedFor;
+    final status = riderStatus(r, leg: 'RETURN', schoolReached: false);
+    final live = widget.running && !widget.busyAll;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _GateWho(
+          rider: r,
+          line: resolved ? status.text : (s.landmark ?? ''),
+          tone: resolved ? status.tone : AppTheme.textMuted,
+        ),
+        const SizedBox(height: 6),
+        if (widget.busyStudent == r.studentId)
+          const _RowSpinner()
+        else if (resolved)
+          _FlowButton(
+            label: t('driver.wrong'),
+            icon: Icons.edit_note_rounded,
+            colour: AppTheme.textMuted,
+            fill: AppTheme.neutralSoft,
+            onPressed: widget.busyAll ? null : () => widget.onCorrect(r, s),
+          )
+        else
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _FlowButton(
+                    label: t('driver.gate.onTheBus'),
+                    icon: Icons.login_rounded,
+                    mirror: true,
+                    colour: Role.driver.tint,
+                    fill: Role.driver.wash,
+                    onPressed: live ? () => widget.onBoard(r, s) : null,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _FlowButton(
+                    label: t('driver.notHere'),
+                    icon: Icons.close_rounded,
+                    colour: AppTheme.text,
+                    fill: AppTheme.neutralSoft,
+                    onPressed: live ? () => widget.onNotHere(r, s) : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class SchoolArrivalCard extends StatefulWidget {
+  const SchoolArrivalCard({
+    super.key,
+    required this.stops,
+    required this.schoolName,
+    required this.running,
+    required this.started,
+    required this.canArrive,
+    required this.arrivedAt,
+    required this.busyStudent,
+    required this.busyAll,
+    required this.onArrive,
+    required this.onDrop,
+    required this.onAllOff,
+    this.query = '',
+  });
+
+  final List<PlannedStop> stops;
+  final String schoolName;
+  final bool running;
+  final bool started;
+
+  final bool canArrive;
+  final DateTime? arrivedAt;
+  final String? busyStudent;
+  final bool busyAll;
+  final VoidCallback onArrive;
+  final RiderAction onDrop;
+  final VoidCallback onAllOff;
+  final String query;
+
+  @override
+  State<SchoolArrivalCard> createState() => _SchoolArrivalCardState();
+}
+
+class _SchoolArrivalCardState extends State<SchoolArrivalCard> {
+  bool? _openChoice;
+
+  @override
+  Widget build(BuildContext context) {
+    final riders = _ridersIn(widget.stops);
+    final aboard = riders.where((e) => e.rider.boardedAt != null && e.rider.alightedAt == null).toList();
+    final rode = riders.where((e) => e.rider.boardedAt != null).length;
+    final off = riders.where((e) => e.rider.alightedAt != null).length;
+    final complete = aboard.isEmpty && off > 0;
+    final lastOff = _latest(riders.map((e) => e.rider.alightedAt));
+    final open = widget.query.isNotEmpty || (_openChoice ?? aboard.isNotEmpty);
+    final shown = aboard.where((e) => _TripScreenState._matches(e.rider, widget.query)).toList();
+
+    final arrived = widget.arrivedAt != null;
+    final canDrop = widget.started && (arrived || !widget.canArrive || !widget.running) && !widget.busyAll;
+
+    final summary = [
+      tn('driver.gate.offAtSchool', off),
+      if (lastOff != null) hhmm(lastOff),
+    ].join(' · ');
+
+    var step = 0;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Panel(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            _GateHeader(
+              title: t('driver.gate.arrivalTitle'),
+              lines: [widget.schoolName, if (complete) summary],
+              pill: complete
+                  ? t('driver.done')
+                  : tv('driver.gate.offChecked', {'done': off, 'all': rode}),
+              done: complete,
+              open: open,
+              onTap: () => setState(() => _openChoice = !open),
+            ),
+            if (open) ...[
+              Divider(height: 1, color: AppTheme.border),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (!widget.started)
+                      _FlowBanner(
+                        text: t('driver.tickAfterSetOff'),
+                        colour: AppTheme.textMuted,
+                        wash: AppTheme.neutralSoft,
+                      )
+                    else if (aboard.isNotEmpty)
+                      _FlowBanner(
+                        text: t('driver.gate.arrivalHow'),
+                        colour: AppTheme.blue,
+                        wash: AppTheme.blueSoft,
+                      ),
+                    if (widget.canArrive)
+                      _FlowStep(
+                        number: ++step,
+                        label: t('driver.flow.arrive'),
+                        done: arrived,
+                        child: arrived
+                            ? _FlowDone(
+                                icon: Icons.location_on_rounded,
+                                text: tn('driver.arrivedAt', hhmm(widget.arrivedAt)),
+                                colour: AppTheme.green,
+                              )
+                            : _FlowButton(
+                                label: t('driver.arrived'),
+                                icon: Icons.location_on_rounded,
+                                colour: Colors.white,
+                                fill: Role.driver.tint,
+                                busy: widget.busyAll,
+                                onPressed: widget.running ? widget.onArrive : null,
+                              ),
+                      ),
+                    _FlowStep(
+                      number: ++step,
+                      label: t('driver.flow.children'),
+                      done: complete,
+                      child: complete
+                          ? _FlowDone(
+                              icon: Icons.check_circle_rounded,
+                              text: summary,
+                              colour: AppTheme.green,
+                            )
+                          : aboard.isEmpty
+                              ? Text(
+                                  t('driver.gate.nobodyAboard'),
+                                  style: TextStyle(fontSize: 12.5, height: 1.4, color: AppTheme.textMuted),
+                                )
+                              : _GateProgress(done: off, all: rode),
+                    ),
+                    for (final (i, e) in shown.indexed) ...[
+                      SizedBox(height: i == 0 ? 10 : 8),
+                      if (i > 0) ...[
+                        Divider(height: 1, color: AppTheme.border),
+                        const SizedBox(height: 8),
+                      ],
+                      _GateWho(
+                        rider: e.rider,
+                        line: tn('driver.onBoardSince', hhmm(e.rider.boardedAt)),
+                        tone: AppTheme.blue,
+                      ),
+                      const SizedBox(height: 6),
+                      if (widget.busyStudent == e.rider.studentId)
+                        const _RowSpinner()
+                      else
+                        _FlowButton(
+                          label: t('driver.setDown'),
+                          icon: Icons.logout_rounded,
+                          mirror: true,
+                          colour: AppTheme.green,
+                          fill: AppTheme.greenSoft,
+                          onPressed: canDrop ? () => widget.onDrop(e.rider, e.stop) : null,
+                        ),
+                    ],
+                    if (aboard.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _FlowButton(
+                        label: tn('driver.recordAllOffOut', aboard.length),
+                        icon: Icons.logout_rounded,
+                        mirror: true,
+                        colour: Colors.white,
+                        fill: AppTheme.green,
+                        height: 48,
+                        busy: widget.busyAll,
+                        onPressed: canDrop && widget.busyStudent == null ? widget.onAllOff : null,
+                      ),
+                      if (widget.running) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.lock_outline_rounded, size: 14, color: AppTheme.rose),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                t('driver.gate.dropFirst'),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.rose,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GateHeader extends StatelessWidget {
+  const _GateHeader({
+    required this.title,
+    required this.lines,
+    required this.pill,
+    required this.done,
+    required this.open,
+    required this.onTap,
+  });
+
+  final String title;
+  final List<String> lines;
+  final String pill;
+  final bool done;
+  final bool open;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = done ? AppTheme.green : Role.driver.tint;
+    final wash = done ? AppTheme.greenSoft : Role.driver.wash;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppTheme.radius),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: wash, borderRadius: BorderRadius.circular(11)),
+              child: Icon(done ? Icons.check_rounded : Icons.school_rounded, size: 20, color: tone),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      height: 1.25,
+                      color: AppTheme.text,
+                    ),
+                  ),
+                  for (final (i, line) in lines.indexed)
+                    if (line.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        line,
+                        style: TextStyle(
+                          fontSize: i == 0 ? 12.5 : 12,
+                          height: 1.3,
+                          fontWeight: i == 0 ? FontWeight.w400 : FontWeight.w700,
+                          color: i == 0 ? AppTheme.textMuted : AppTheme.green,
+                        ),
+                      ),
+                    ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.3),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: wash, borderRadius: BorderRadius.circular(999)),
+                child: Text(
+                  pill,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: tone),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+              size: 24,
+              color: AppTheme.textMuted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GateProgress extends StatelessWidget {
+  const _GateProgress({required this.done, required this.all});
+
+  final int done;
+  final int all;
+
+  @override
+  Widget build(BuildContext context) {
+    final complete = all > 0 && done >= all;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: LinearProgressIndicator(
+        value: all == 0 ? 0 : done / all,
+        minHeight: 6,
+        backgroundColor: AppTheme.neutralSoft,
+        valueColor: AlwaysStoppedAnimation<Color>(complete ? AppTheme.green : Role.driver.tint),
+      ),
+    );
+  }
+}
+
+class _GateWho extends StatelessWidget {
+  const _GateWho({required this.rider, required this.line, required this.tone});
+
+  final RiderOnStop rider;
+  final String line;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SeatChip(rider: rider, size: 30),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      rider.name,
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppTheme.text),
+                    ),
+                  ),
+                  if (rider.requiresAssistance) ...[
+                    const SizedBox(width: 6),
+                    Icon(Icons.accessible_rounded, size: 16, color: AppTheme.amber),
+                  ],
+                ],
+              ),
+              if (line.isNotEmpty)
+                Text(
+                  line,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: tone),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RowSpinner extends StatelessWidget {
+  const _RowSpinner();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(
+        height: 44,
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+        ),
+      );
 }
 
 class _SweepCard extends StatefulWidget {
@@ -3665,10 +4495,18 @@ class _RecordAllOffButton extends StatelessWidget {
 }
 
 class _RecordAllOffSheet extends StatefulWidget {
-  const _RecordAllOffSheet({required this.aboard, required this.leg});
+  const _RecordAllOffSheet({
+    required this.aboard,
+    required this.title,
+    required this.how,
+    required this.confirmKey,
+  });
 
-  final List<_Aboard> aboard;
-  final String leg;
+  final List<_RiderAt> aboard;
+  final String title;
+  final String how;
+
+  final String confirmKey;
 
   @override
   State<_RecordAllOffSheet> createState() => _RecordAllOffSheetState();
@@ -3708,14 +4546,12 @@ class _RecordAllOffSheetState extends State<_RecordAllOffSheet> {
             ),
           ),
           Text(
-            widget.leg == 'OUT'
-                ? t('driver.recordAllOffTitleOut')
-                : t('driver.recordAllOffTitleReturn'),
+            widget.title,
             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.text),
           ),
           const SizedBox(height: 4),
           Text(
-            t('driver.recordAllOffHow'),
+            widget.how,
             style: TextStyle(fontSize: 13, height: 1.45, color: AppTheme.textMuted),
           ),
           const SizedBox(height: 6),
@@ -3763,7 +4599,7 @@ class _RecordAllOffSheetState extends State<_RecordAllOffSheet> {
           BigButton(
             label: picked.isEmpty
                 ? t('driver.recordNobody')
-                : tn('driver.recordTickedOff', picked.length),
+                : tn(widget.confirmKey, picked.length),
             color: AppTheme.green,
             height: 54,
             onPressed: picked.isEmpty ? null : () => Navigator.of(context).pop(picked),

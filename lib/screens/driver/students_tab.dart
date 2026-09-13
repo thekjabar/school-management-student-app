@@ -98,10 +98,11 @@ class _DriverStudentsState extends State<DriverStudents> {
     _Rider entry,
     String leg,
     String? terminalStopId,
+    bool checkFirst,
   ) async {
     final choice = await showAppSheet<_Mark>(
       context,
-      builder: (_) => _MarkSheet(entry: entry, leg: leg),
+      builder: (_) => _MarkSheet(entry: entry, leg: leg, checkFirst: checkFirst),
     );
     if (choice == null || !mounted) return;
     switch (choice) {
@@ -268,6 +269,7 @@ class _DriverStudentsState extends State<DriverStudents> {
                                   shown[i],
                                   roster.trip!.leg,
                                   roster.terminalStopId,
+                                  roster.checkFirst,
                                 ),
                       ),
                     ],
@@ -290,6 +292,12 @@ class _Roster {
   final List<_Rider> riders;
 
   final String? terminalStopId;
+
+  bool get checkFirst =>
+      trip != null &&
+      trip!.leg == 'RETURN' &&
+      trip!.running &&
+      riders.any((r) => !r.rider.accountedFor);
 }
 
 class _Rider {
@@ -463,10 +471,12 @@ class _RiderRow extends StatelessWidget {
 enum _Mark { boarded, dropped, handover, noShow }
 
 class _MarkSheet extends StatelessWidget {
-  const _MarkSheet({required this.entry, required this.leg});
+  const _MarkSheet({required this.entry, required this.leg, required this.checkFirst});
 
   final _Rider entry;
   final String leg;
+
+  final bool checkFirst;
 
   @override
   Widget build(BuildContext context) {
@@ -536,14 +546,36 @@ class _MarkSheet extends StatelessWidget {
               ),
               const SizedBox(height: 10),
             ],
-            if (leg == 'RETURN' && !entry.isDone) ...[
-              BigButton(
-                label: t('handover.open'),
-                color: tint,
-                height: 56,
-                onPressed: () => Navigator.of(context).pop(_Mark.handover),
-              ),
-              const SizedBox(height: 10),
+            if (leg == 'RETURN') ...[
+              if (entry.isOnBoard && checkFirst) ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.lock_outline_rounded, size: 16, color: AppTheme.amber),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        t('driver.gate.checkFirst'),
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.4,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+              ] else if (entry.isOnBoard) ...[
+                BigButton(
+                  label: t('handover.open'),
+                  color: tint,
+                  height: 56,
+                  onPressed: () => Navigator.of(context).pop(_Mark.handover),
+                ),
+                const SizedBox(height: 10),
+              ],
             ] else if (entry.isOnBoard) ...[
               BigButton(
                 label: t('driver.markDropped'),

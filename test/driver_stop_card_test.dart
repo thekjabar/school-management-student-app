@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:student_app/api/crew_api.dart';
 import 'package:student_app/i18n/strings.dart';
+import 'package:student_app/screens/driver/roster_kit.dart';
 import 'package:student_app/screens/driver/trip_screen.dart';
 
 RiderOnStop _rider(
@@ -30,9 +31,10 @@ PlannedStop _stop({
   bool skipped = false,
   String? skippedReason,
   String name = 'Ari Hawre Ahmed Mohammed Karim',
+  String stopId = 'ckstopaaaaaaaaaaaaaaaaaaa',
 }) =>
     PlannedStop(
-      stopId: 'ckstopaaaaaaaaaaaaaaaaaaa',
+      stopId: stopId,
       name: name,
       landmark: 'Ankawa, near the church of Mar Yousif on the main road',
       lat: 36.2,
@@ -54,8 +56,43 @@ class _Case {
   const _Case(this.label, this.card, this.expects);
 
   final String label;
-  final StopCard Function() card;
+  final Widget Function() card;
   final List<String> expects;
+}
+
+Future<void> _pump(WidgetTester tester, Lang lang, Widget child) async {
+  AppLocale.current.value = lang;
+  tester.view.physicalSize = const Size(360, 2600);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Directionality(
+        textDirection: lang.direction,
+        child: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(360, 2600),
+            textScaler: TextScaler.linear(1.3),
+          ),
+          child: Scaffold(
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pump();
+}
+
+bool _live(WidgetTester tester, String label) {
+  final ink = tester.widget<InkWell>(
+    find.ancestor(of: find.text(label), matching: find.byType(InkWell)).first,
+  );
+  return ink.onTap != null;
 }
 
 void main() {
@@ -68,6 +105,7 @@ void main() {
     bool running = true,
     bool started = true,
     bool current = true,
+    bool locked = false,
   }) =>
       StopCard(
         stop: stop,
@@ -78,7 +116,75 @@ void main() {
         running: running,
         started: started,
         current: current,
+        locked: locked,
         onChanged: () {},
+      );
+
+  List<PlannedStop> returnRun({required bool checked}) => [
+        _stop(
+          stopId: 'ckstopbbbbbbbbbbbbbbbbbbb',
+          name: 'Lana Azad Hassan Omar',
+          students: [_rider('ckb', 'Lana Azad Hassan Omar', boardedAt: earlier)],
+        ),
+        _stop(
+          stopId: 'ckstopccccccccccccccccccc',
+          name: 'Rebin Dler Rasul Mahmood',
+          students: [
+            _rider('ckc', 'Rebin Dler Rasul Mahmood', resolution: checked ? 'NO_SHOW' : null),
+          ],
+        ),
+        _stop(
+          stopId: 'ckstopddddddddddddddddddd',
+          name: 'Shvan Kamaran Aziz',
+          students: [
+            _rider('ckd', 'Shvan Kamaran Aziz', boardedAt: checked ? earlier : null),
+          ],
+        ),
+      ];
+
+  BoardingCheckCard boarding(List<PlannedStop> stops, {bool running = true}) => BoardingCheckCard(
+        stops: stops,
+        schoolName: 'Sunrise International School of Erbil',
+        running: running,
+        busyStudent: null,
+        busyAll: false,
+        onBoard: (_, _) {},
+        onNotHere: (_, _) {},
+        onCorrect: (_, _) {},
+        onAllOnBus: () {},
+      );
+
+  List<PlannedStop> outRun({required bool allOff}) => [
+        _stop(
+          stopId: 'ckstopbbbbbbbbbbbbbbbbbbb',
+          arrivedAt: earlier,
+          departedAt: earlier,
+          students: [
+            _rider('ckb', 'Lana Azad Hassan Omar', boardedAt: earlier, alightedAt: allOff ? justNow : null),
+          ],
+        ),
+        _stop(
+          stopId: 'ckstopccccccccccccccccccc',
+          arrivedAt: earlier,
+          departedAt: earlier,
+          students: [
+            _rider('ckc', 'Rebin Dler Rasul Mahmood', boardedAt: earlier, alightedAt: allOff ? justNow : null),
+          ],
+        ),
+      ];
+
+  SchoolArrivalCard arrival(List<PlannedStop> stops, {DateTime? arrivedAt}) => SchoolArrivalCard(
+        stops: stops,
+        schoolName: 'Sunrise International School of Erbil',
+        running: true,
+        started: true,
+        canArrive: true,
+        arrivedAt: arrivedAt,
+        busyStudent: null,
+        busyAll: false,
+        onArrive: () {},
+        onDrop: (_, _) {},
+        onAllOff: () {},
       );
 
   final cases = <_Case>[
@@ -167,36 +273,117 @@ void main() {
       ),
       ['driver.tickAfterSetOff', 'driver.arrived'],
     ),
+    _Case(
+      'RETURN home stop locked until the school check',
+      () => card(
+        leg: 'RETURN',
+        locked: true,
+        stop: _stop(students: [_rider('cka', 'Ari Hawre', boardedAt: earlier)]),
+      ),
+      ['driver.gate.checkFirst', 'driver.handOver', 'driver.movingOn'],
+    ),
+    _Case(
+      'boarding at school, part checked',
+      () => boarding(returnRun(checked: false)),
+      ['driver.gate.boardingTitle', 'driver.gate.boardingHow', 'driver.gate.onTheBus', 'driver.notHere', 'driver.wrong', 'driver.gate.allOnBus'],
+    ),
+    _Case(
+      'boarding at school, before setting off',
+      () => boarding(returnRun(checked: false), running: false),
+      ['driver.tickAfterSetOff', 'driver.gate.onTheBus'],
+    ),
+    _Case(
+      'boarding at school, done',
+      () => boarding(returnRun(checked: true)),
+      ['driver.gate.boardingTitle', 'driver.done'],
+    ),
+    _Case(
+      'arrived at school, children still aboard',
+      () => arrival(outRun(allOff: false)),
+      ['driver.gate.arrivalTitle', 'driver.gate.arrivalHow', 'driver.arrived', 'driver.setDown', 'driver.recordAllOffOut', 'driver.gate.dropFirst'],
+    ),
+    _Case(
+      'arrived at school, everyone off',
+      () => arrival(outRun(allOff: true), arrivedAt: earlier),
+      ['driver.gate.arrivalTitle', 'driver.done'],
+    ),
   ];
+
+  group('boarding check at school', () {
+    testWidgets('incomplete: home stops locked, nothing handed over', (tester) async {
+      final stops = returnRun(checked: false);
+      expect(schoolCheckOpen('RETURN', stops), isTrue);
+      expect(schoolCheckOpen('OUT', stops), isFalse);
+
+      await _pump(tester, Lang.en, boarding(stops));
+      expect(find.text(tv('driver.gate.checked', {'done': 1, 'all': 3})), findsOneWidget);
+      expect(_live(tester, tn('driver.gate.allOnBus', 2)), isTrue);
+      expect(_live(tester, t('driver.gate.onTheBus')), isTrue);
+
+      await _pump(
+        tester,
+        Lang.en,
+        card(leg: 'RETURN', locked: true, stop: stops.first),
+      );
+      expect(find.text(t('driver.gate.checkFirst')), findsOneWidget);
+      expect(_live(tester, t('driver.handOver')), isFalse);
+      expect(_live(tester, t('driver.movingOn')), isFalse);
+      expect(_live(tester, t('driver.arrived')), isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('complete: home stops unlocked, not-here child is not handed over', (tester) async {
+      final stops = returnRun(checked: true);
+      expect(schoolCheckOpen('RETURN', stops), isFalse);
+
+      await _pump(tester, Lang.en, boarding(stops));
+      expect(
+        find.textContaining(tv('driver.gate.boardingDone', {'on': 2, 'away': 1})),
+        findsWidgets,
+      );
+      expect(find.text(tn('driver.gate.allOnBus', 0)), findsNothing);
+
+      await _pump(tester, Lang.en, card(leg: 'RETURN', stop: stops.first));
+      expect(find.text(t('driver.gate.checkFirst')), findsNothing);
+      expect(_live(tester, t('driver.handOver')), isTrue);
+
+      await _pump(tester, Lang.en, card(leg: 'RETURN', stop: stops[1]));
+      expect(find.text(t('driver.handOver')), findsNothing);
+      expect(find.text(t('driver.pickUp')), findsNothing);
+      expect(find.text(t('driver.notRiding')), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
+
+  group('arrived at school on the way in', () {
+    testWidgets('the run cannot end until every child is off', (tester) async {
+      final aboard = outRun(allOff: false);
+      expect(mustDropAtSchool('OUT', aboard), isTrue);
+      expect(mustDropAtSchool('RETURN', aboard), isFalse);
+
+      await _pump(tester, Lang.en, arrival(aboard));
+      expect(find.text(t('driver.gate.dropFirst')), findsOneWidget);
+      expect(_live(tester, t('driver.arrived')), isTrue);
+      expect(_live(tester, t('driver.setDown')), isFalse);
+      expect(_live(tester, tn('driver.recordAllOffOut', 2)), isFalse);
+
+      await _pump(tester, Lang.en, arrival(aboard, arrivedAt: justNow));
+      expect(_live(tester, t('driver.setDown')), isTrue);
+      expect(_live(tester, tn('driver.recordAllOffOut', 2)), isTrue);
+
+      final off = outRun(allOff: true);
+      expect(mustDropAtSchool('OUT', off), isFalse);
+      await _pump(tester, Lang.en, arrival(off, arrivedAt: justNow));
+      expect(find.text(t('driver.gate.dropFirst')), findsNothing);
+      expect(find.textContaining(tn('driver.gate.offAtSchool', 2)), findsWidgets);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
 
   for (final lang in Lang.values) {
     for (final c in cases) {
       testWidgets('${c.label} fits 360dp at 1.3x in ${lang.code}', (tester) async {
-        AppLocale.current.value = lang;
-        tester.view.physicalSize = const Size(360, 2600);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.reset);
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Directionality(
-              textDirection: lang.direction,
-              child: MediaQuery(
-                data: const MediaQueryData(
-                  size: Size(360, 2600),
-                  textScaler: TextScaler.linear(1.3),
-                ),
-                child: Scaffold(
-                  body: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: c.card(),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-        await tester.pump();
+        await _pump(tester, lang, c.card());
 
         expect(tester.takeException(), isNull);
 

@@ -9,6 +9,7 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import 'credentials_screen.dart';
+import 'roster_kit.dart';
 import 'route_map.dart';
 import 'run_order.dart';
 import 'trip_screen.dart';
@@ -123,6 +124,8 @@ class _DriverHomeState extends State<DriverHome> {
 
         final counts = duty.plan?.counts;
         final next = duty.nextStop;
+        final checkFirst =
+            trip.running && schoolCheckOpen(trip.leg, duty.plan?.stops ?? const []);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,8 +183,9 @@ class _DriverHomeState extends State<DriverHome> {
               stop: next,
               leg: trip.leg,
               busy: _busy,
+              lockNote: checkFirst ? t('driver.gate.checkFirst') : null,
               onOpen: () => _open(context, trip),
-              onStopAction: next == null || !trip.running
+              onStopAction: next == null || !trip.running || checkFirst
                   ? null
                   : () => next.arrivedAt == null
                       ? _stopAction(
@@ -576,11 +580,14 @@ class _NextStopCard extends StatelessWidget {
     required this.busy,
     required this.onOpen,
     required this.onStopAction,
+    this.lockNote,
   });
 
   final PlannedStop? stop;
   final String leg;
   final bool busy;
+
+  final String? lockNote;
   final VoidCallback onOpen;
 
   final VoidCallback? onStopAction;
@@ -688,6 +695,27 @@ class _NextStopCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (lockNote != null) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.lock_outline_rounded, size: 14, color: AppTheme.amber),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            lockNote!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.35,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.text,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 11),
                   Row(
                     children: [

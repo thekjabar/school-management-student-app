@@ -82,6 +82,10 @@ class CustodyVerdict {
 
 const int kMaxCustodyBatchEvents = 200;
 
+const String kCrewAllOffReason = 'Marked off together by the crew as the bus emptied.';
+
+const String kCrewAllOnBusReason = 'Checked onto the bus together by the crew at school.';
+
 class CustodyEntry {
   const CustodyEntry({
     required this.studentId,
@@ -368,9 +372,20 @@ class PlannedStop {
 }
 
 class SchoolGate {
-  const SchoolGate({required this.stopId, required this.name, required this.lat, required this.lon});
+  const SchoolGate({
+    required this.stopId,
+    required this.name,
+    required this.lat,
+    required this.lon,
+    this.sequence,
+    this.arrivedAt,
+  });
 
   final String? stopId;
+
+  final int? sequence;
+
+  final DateTime? arrivedAt;
 
   final String? name;
 
@@ -389,10 +404,15 @@ class SchoolGate {
 
   factory SchoolGate.fromPack(Map<String, dynamic> pack) {
     Map<String, dynamic>? gate;
+    Map<String, dynamic>? gateRow;
     for (final row in (pack['stopProgress'] as List?) ?? const []) {
       final stop = (row as Map<String, dynamic>)['stop'] as Map<String, dynamic>?;
-      if (stop != null && stop['isCampusGate'] == true) gate = stop;
+      if (stop != null && stop['isCampusGate'] == true) {
+        gate = stop;
+        gateRow = row;
+      }
     }
+    final arrived = gateRow?['actualArrivalAt'];
     final campus = pack['campus'] as Map<String, dynamic>?;
     final gateLat = _number(gate?['lat']);
     final gateLon = _number(gate?['lon']);
@@ -403,6 +423,8 @@ class SchoolGate {
       name: campusName != null && campusName.isNotEmpty ? campusName : gate?['name'] as String?,
       lat: useGate ? gateLat : _number(campus?['lat']),
       lon: useGate ? gateLon : _number(campus?['lon']),
+      sequence: (gateRow?['sequence'] as num?)?.toInt(),
+      arrivedAt: arrived is String ? DateTime.tryParse(arrived)?.toLocal() : null,
     );
   }
 }
@@ -1005,6 +1027,7 @@ class CrewApi {
   Future<List<CustodyOutcome>> recordCustodyBatch({
     required String tripId,
     required List<CustodyEntry> entries,
+    String manualReason = kCrewAllOffReason,
   }) async {
     final out = <CustodyOutcome>[];
     for (var from = 0; from < entries.length; from += kMaxCustodyBatchEvents) {
@@ -1013,7 +1036,7 @@ class CrewApi {
         min(from + kMaxCustodyBatchEvents, entries.length),
       );
       try {
-        out.addAll(await _sendCustodyBatch(tripId, chunk));
+        out.addAll(await _sendCustodyBatch(tripId, chunk, manualReason));
       } catch (e) {
         if (out.isEmpty) rethrow;
         out.addAll([
@@ -1031,6 +1054,7 @@ class CrewApi {
   Future<List<CustodyOutcome>> _sendCustodyBatch(
     String tripId,
     List<CustodyEntry> chunk,
+    String manualReason,
   ) async {
     final now = DateTime.now().toUtc().toIso8601String();
     final ids = [for (final _ in chunk) uuidV4()];
@@ -1047,7 +1071,7 @@ class CrewApi {
             'deviceTime': now,
             'stopId': ?chunk[i].stopId,
             'captureMethod': 'MANUAL_WITH_REASON',
-            'manualReason': 'Marked off together by the crew as the bus emptied.',
+            'manualReason': manualReason,
           },
       ],
     }) as Map<String, dynamic>;
