@@ -22,6 +22,10 @@ enum BusLocationState {
 
 const double kCoarseAccuracyM = 150;
 
+const Duration kStillFixRefresh = Duration(seconds: 10);
+
+const Duration kStillFixAge = Duration(seconds: 20);
+
 class BusLocation {
   BusLocation._();
   static final BusLocation instance = BusLocation._();
@@ -33,6 +37,8 @@ class BusLocation {
 
   StreamSubscription<Position>? _stream;
   Timer? _flush;
+  Timer? _still;
+  bool _refreshing = false;
   String? _tripId;
   TelemetryPolicy _policy = TelemetryPolicy.fallback;
 
@@ -84,6 +90,8 @@ class BusLocation {
       Duration(seconds: _policy.activeTripIntervalSeconds.clamp(5, 300)),
       (_) => _send(),
     );
+
+    _still = Timer.periodic(kStillFixRefresh, (_) => _refreshWhileStill());
   }
 
   LocationSettings _settings() {
@@ -105,6 +113,8 @@ class BusLocation {
     _stream = null;
     _flush?.cancel();
     _flush = null;
+    _still?.cancel();
+    _still = null;
     if (flush) await _send();
     _tripId = null;
     state.value = BusLocationState.off;
@@ -134,6 +144,25 @@ class BusLocation {
       if (p.altitude.isFinite)
         'altitudeM': p.altitude.round().clamp(-500, 9000),
     });
+  }
+
+  Future<void> _refreshWhileStill() async {
+    if (_stream == null || _refreshing) return;
+    final last = here.value;
+    if (last != null && DateTime.now().difference(last.timestamp) < kStillFixAge) return;
+    _refreshing = true;
+    try {
+      final p = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+      if (_stream != null) _take(p);
+    } catch (_) {
+    } finally {
+      _refreshing = false;
+    }
   }
 
   Future<void> _send() async {

@@ -18,7 +18,10 @@ import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
 import 'roster_kit.dart';
 import 'route_map.dart';
+import 'run_driving.dart';
 import 'run_order.dart';
+import 'stop_announcer.dart';
+import 'stop_presence.dart';
 
 const List<(String, String)> _serverSays = [
   ('not been started', 'driver.mustSetOff'),
@@ -26,6 +29,12 @@ const List<(String, String)> _serverSays = [
   ('pre-trip check', 'driver.mustCheckBus'),
   ('check everyone at school first', 'driver.gate.checkFirst'),
   ('mark everyone off at school first', 'driver.gate.dropFirst'),
+  ('get closer to the stop first', 'driver.presence.farServer'),
+  ('get closer to the school gate first', 'driver.presence.farSchoolServer'),
+  ('bus position is not known yet', 'driver.presence.noFixServer'),
+  ('arrive at the stop first', 'driver.notHere.arriveFirst'),
+  ('wait at the stop a little longer', 'driver.notHere.waitServer'),
+  ('pick up every child at this stop', 'driver.flow.resolveFirst'),
 ];
 
 String _driverWords(String message) {
@@ -72,6 +81,7 @@ Future<void> _markRider(
   required VoidCallback onChanged,
 }) async {
   try {
+    final fix = reportedFix(BusLocation.instance.here.value);
     final verdict = await CrewApi.instance.recordCustody(
       tripId: tripId,
       studentId: rider.studentId,
@@ -82,6 +92,10 @@ Future<void> _markRider(
         riderStopId: riderStopId,
         terminalStopId: terminalStopId,
       ),
+      lat: fix?.lat,
+      lon: fix?.lon,
+      gpsAccuracyM: fix?.accuracyM,
+      positionAgeMs: fix?.ageMs,
     );
     onChanged();
     if (!context.mounted) return;
@@ -196,6 +210,32 @@ class _TripScreenState extends State<TripScreen> {
 
   final ValueNotifier<CrewTrip?> _headerTrip = ValueNotifier<CrewTrip?>(null);
 
+  late final RunDriving _driving = RunDriving(
+    stopPanel: (context, run, stop) {
+      final data = _data;
+      if (data == null) return const SizedBox.shrink();
+      return _stopCard(data, stop, onMap: true);
+    },
+    schoolPanel: (context, run) {
+      final data = _data;
+      if (data == null) return null;
+      return data.trip?.leg == 'RETURN' ? _boardingCard(data) : _arrivalCard(data);
+    },
+    runBar: (context, run) {
+      final data = _data;
+      final trip = data?.trip;
+      if (data == null || trip == null) return null;
+      return _runBar(data, trip);
+    },
+    sos: (context, run) {
+      final trip = _data?.trip;
+      if (trip == null || trip.startedAt == null || trip.endedAt != null) return null;
+      return _PanicChip(busy: _busy != null, onPressed: () => _panic(trip));
+    },
+  );
+
+  _TripData? _data;
+
   @override
   void initState() {
     super.initState();
@@ -205,9 +245,139 @@ class _TripScreenState extends State<TripScreen> {
   @override
   void dispose() {
     BusLocation.instance.here.removeListener(_onFirstFix);
+    StopAnnouncer.instance.release(widget.tripId);
+    _driving.dispose();
     _headerTrip.dispose();
     _search.dispose();
     super.dispose();
+  }
+
+  void _publish(_TripData data) {
+    _data = data;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !identical(_data, data)) return;
+      final trip = data.trip;
+      final leg = trip?.leg ?? 'OUT';
+      _driving.publish(RunSnapshot(
+        trip: trip,
+        leg: leg,
+        stops: data.run.stops,
+        planStops: data.plan.stops,
+        school: data.school,
+      ));
+      if (trip != null) {
+        StopAnnouncer.instance.track(
+          tripId: trip.id,
+          leg: leg,
+          stops: data.run.stops,
+          school: data.school,
+          running: trip.startedAt != null && trip.endedAt == null,
+        );
+      }
+    });
+  }
+
+  Widget _stopCard(_TripData data, PlannedStop s, {bool onMap = false}) {
+    final trip = data.trip;
+    final stops = data.run.stops;
+    final numbers = runNumbers(stops, data.school?.stopId);
+    final i = stops.indexWhere((x) => identical(x, s));
+    final running = trip != null && trip.startedAt != null && trip.endedAt == null;
+    final started = trip != null && trip.startedAt != null;
+    final leg = trip?.leg ?? 'OUT';
+    final homeLocked = schoolCheckOpen(leg, data.plan.stops) && running;
+    return StopCard(
+      key: ValueKey('${onMap ? 'map-' : ''}stop-${s.stopId}-${s.students.firstOrNull?.studentId ?? ''}'),
+      current: onMap || identical(s, data.run.next),
+      number: i < 0 ? null : numbers[i],
+      query: onMap ? '' : _query,
+      stop: s,
+      tripId: widget.tripId,
+      leg: leg,
+      terminalStopId: data.terminalStopId,
+      schoolReached: data.plan.terminalArrivedAt != null,
+      running: running,
+      started: started,
+      locked: homeLocked && !isSchoolStop(s, data.school?.stopId),
+      onChanged: () => _loaderKey.currentState?.reload(),
+    );
+  }
+
+  String _schoolName(_TripData data) =>
+      data.school?.name ?? Session.instance.me?.schoolName ?? t('driver.school');
+
+  Widget _boardingCard(_TripData data, {String query = ''}) {
+    final trip = data.trip;
+    final schoolCheckLive = canCheckAtSchool(trip);
+    return BoardingCheckCard(
+      stops: data.plan.stops,
+      schoolName: _schoolName(data),
+      canCheck: schoolCheckLive,
+      lockedNoteKey: schoolCheckLive
+          ? null
+          : (const {'PLANNED', 'ROSTERED', 'BLOCKED'}.contains(trip?.status)
+              ? 'driver.mustCheckBus'
+              : 'driver.tickAfterSetOff'),
+      query: query,
+      busyStudent: _busyStudent,
+      busyAll: _busy != null,
+      onBoard: (r, s) => _markAtSchool(data, r, s, 'BOARDED', t('driver.onBoard')),
+      onNotHere: (r, s) => _markAtSchool(data, r, s, 'NO_SHOW', t('driver.notRiding')),
+      onCorrect: (r, s) => _correctAtSchool(data, r, s),
+      onAllOnBus: () => _allOnBus(data),
+    );
+  }
+
+  Widget _arrivalCard(_TripData data, {String query = ''}) {
+    final trip = data.trip;
+    final running = trip != null && trip.startedAt != null && trip.endedAt == null;
+    final started = trip != null && trip.startedAt != null;
+    final schoolArrivedAt = data.plan.terminalArrivedAt ?? _schoolArrivedAt ?? data.school?.arrivedAt;
+    return SchoolArrivalCard(
+      stops: data.plan.stops,
+      schoolName: _schoolName(data),
+      running: running,
+      started: started,
+      canArrive: data.school?.sequence != null,
+      arrivedAt: schoolArrivedAt,
+      gate: data.school,
+      query: query,
+      busyStudent: _busyStudent,
+      busyAll: _busy != null,
+      onArrive: () => _arriveAtSchool(data.school!.sequence!),
+      onDrop: (r, s) => _markAtSchool(
+        data,
+        r,
+        s,
+        'ALIGHTED',
+        schoolArrivedAt != null ? t('driver.atSchool') : t('driver.setDownEarly'),
+      ),
+      onAllOff: () => _recordAllOff(data),
+    );
+  }
+
+  ({String? end, String? depart}) _runLocks(_TripData data) {
+    final trip = data.trip;
+    final leg = trip?.leg ?? 'OUT';
+    final running = trip != null && trip.startedAt != null && trip.endedAt == null;
+    final started = trip != null && trip.startedAt != null;
+    return (
+      end: running && mustDropAtSchool(leg, data.plan.stops) ? t('driver.gate.dropFirst') : null,
+      depart: mustCheckBeforeSetOff(leg, started, data.plan.stops) ? t('driver.gate.checkFirst') : null,
+    );
+  }
+
+  Widget _runBar(_TripData data, CrewTrip trip) {
+    final locks = _runLocks(data);
+    return RunActionBar(
+      trip: trip,
+      busy: _busy,
+      onStart: () => _startShift(trip),
+      onDepart: () => _act(t('driver.departed'), () => CrewApi.instance.depart(trip.id)),
+      onEnd: () => _endRun(trip, data.plan.counts.stillOnBoard),
+      endBlocked: locks.end,
+      departBlocked: locks.depart,
+    );
   }
 
   void _onFirstFix() {
@@ -465,7 +635,11 @@ class _TripScreenState extends State<TripScreen> {
   }
 
   Future<void> _arriveAtSchool(int sequence) => _act(t('driver.arrived'), () async {
-        await CrewApi.instance.arriveAtStop(widget.tripId, sequence);
+        await CrewApi.instance.arriveAtStop(
+          widget.tripId,
+          sequence,
+          fix: reportedFix(BusLocation.instance.here.value),
+        );
         _schoolArrivedAt ??= DateTime.now();
       });
 
@@ -581,6 +755,7 @@ class _TripScreenState extends State<TripScreen> {
                 tint: Role.driver.tint,
                 load: _load,
                 builder: (context, data) {
+                  _publish(data);
                   final counts = data.plan.counts;
                   final trip = data.trip;
 
@@ -593,22 +768,19 @@ class _TripScreenState extends State<TripScreen> {
                   final leg = trip?.leg ?? 'OUT';
                   final checkOpen = schoolCheckOpen(leg, data.plan.stops);
                   final homeLocked = checkOpen && running;
-                  final endBlocked = running && mustDropAtSchool(leg, data.plan.stops);
-                  final departBlocked = mustCheckBeforeSetOff(leg, started, data.plan.stops);
-                  final schoolCheckLive = canCheckAtSchool(trip);
-                  final schoolName = data.school?.name ?? Session.instance.me?.schoolName ?? t('driver.school');
-                  final schoolArrivedAt =
-                      data.plan.terminalArrivedAt ?? _schoolArrivedAt ?? data.school?.arrivedAt;
+                  final locks = _runLocks(data);
                   final hasRiders = data.plan.stops.any((s) => s.students.isNotEmpty);
 
                   final stops = data.run.stops;
-                  final numbers = runNumbers(stops, data.school?.stopId);
-                  final currentStop = data.run.next;
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 12),
+                      if (running) ...[
+                        const VoiceBanner(),
+                        const SizedBox(height: 12),
+                      ],
                       if (trip != null) ...[
                         _RunControls(
                           trip: trip,
@@ -617,8 +789,8 @@ class _TripScreenState extends State<TripScreen> {
                           onStart: () => _startShift(trip),
                           onDepart: () => _act(t('driver.departed'), () => CrewApi.instance.depart(trip.id)),
                           onEnd: () => _endRun(trip, counts.stillOnBoard),
-                          endBlocked: endBlocked ? t('driver.gate.dropFirst') : null,
-                          departBlocked: departBlocked ? t('driver.gate.checkFirst') : null,
+                          endBlocked: locks.end,
+                          departBlocked: locks.depart,
                         ),
                         const SizedBox(height: 12),
                       ],
@@ -665,6 +837,8 @@ class _TripScreenState extends State<TripScreen> {
                               tint: Role.driver.tint,
                               leg: trip?.leg ?? 'OUT',
                               school: data.school,
+                              live: running,
+                              driving: _driving,
                             ),
                           ),
                         ),
@@ -699,62 +873,11 @@ class _TripScreenState extends State<TripScreen> {
                         }),
                       ],
                       const SizedBox(height: 6),
-                      if (leg == 'RETURN' && hasRiders)
-                        BoardingCheckCard(
-                          stops: data.plan.stops,
-                          schoolName: schoolName,
-                          canCheck: schoolCheckLive,
-                          lockedNoteKey: schoolCheckLive
-                              ? null
-                              : (const {'PLANNED', 'ROSTERED', 'BLOCKED'}.contains(trip?.status)
-                                  ? 'driver.mustCheckBus'
-                                  : 'driver.tickAfterSetOff'),
-                          query: _query,
-                          busyStudent: _busyStudent,
-                          busyAll: _busy != null,
-                          onBoard: (r, s) => _markAtSchool(data, r, s, 'BOARDED', t('driver.onBoard')),
-                          onNotHere: (r, s) => _markAtSchool(data, r, s, 'NO_SHOW', t('driver.notRiding')),
-                          onCorrect: (r, s) => _correctAtSchool(data, r, s),
-                          onAllOnBus: () => _allOnBus(data),
-                        ),
-                      for (final (i, s) in stops.indexed)
+                      if (leg == 'RETURN' && hasRiders) _boardingCard(data, query: _query),
+                      for (final s in stops)
                         if (_query.isEmpty || s.students.any((r) => _matches(r, _query)))
-                          StopCard(
-                          key: ValueKey('stop-${s.stopId}-${s.students.firstOrNull?.studentId ?? ''}'),
-                          current: identical(s, currentStop),
-                          number: numbers[i],
-                          query: _query,
-                          stop: s,
-                          tripId: widget.tripId,
-                          leg: trip?.leg ?? 'OUT',
-                          terminalStopId: data.terminalStopId,
-                          schoolReached: data.plan.terminalArrivedAt != null,
-                          running: running,
-                          started: started,
-                          locked: homeLocked && !isSchoolStop(s, data.school?.stopId),
-                          onChanged: () => _loaderKey.currentState?.reload(),
-                        ),
-                      if (leg == 'OUT' && hasRiders)
-                        SchoolArrivalCard(
-                          stops: data.plan.stops,
-                          schoolName: schoolName,
-                          running: running,
-                          started: started,
-                          canArrive: data.school?.sequence != null,
-                          arrivedAt: schoolArrivedAt,
-                          query: _query,
-                          busyStudent: _busyStudent,
-                          busyAll: _busy != null,
-                          onArrive: () => _arriveAtSchool(data.school!.sequence!),
-                          onDrop: (r, s) => _markAtSchool(
-                            data,
-                            r,
-                            s,
-                            'ALIGHTED',
-                            schoolArrivedAt != null ? t('driver.atSchool') : t('driver.setDownEarly'),
-                          ),
-                          onAllOff: () => _recordAllOff(data),
-                        ),
+                          _stopCard(data, s),
+                      if (leg == 'OUT' && hasRiders) _arrivalCard(data, query: _query),
                       SectionHead(t('driver.beforeYouLeave')),
                       _SweepCard(
                         sweep: data.sweep,
@@ -1002,6 +1125,93 @@ class _HeadcountCard extends StatelessWidget {
   }
 }
 
+({String label, VoidCallback? action, String? how, int? step}) runStepFor(
+  String status, {
+  required VoidCallback onStart,
+  required VoidCallback onDepart,
+  required VoidCallback onEnd,
+}) =>
+    switch (status) {
+      'PLANNED' || 'ROSTERED' => (label: t('driver.startShift'), action: onStart, how: t('driver.step.check'), step: 1),
+      'BLOCKED' => (label: t('driver.startShift'), action: onStart, how: t('driver.step.check'), step: 1),
+      'BOARDING' => (label: t('driver.setOff'), action: onDepart, how: t('driver.step.setOff'), step: 2),
+      'IN_PROGRESS' => (label: t('driver.endRun'), action: onEnd, how: t('driver.step.atStops'), step: 3),
+      'ARRIVED' => (label: t('driver.endRun'), action: onEnd, how: t('driver.step.endRun'), step: 4),
+      'SWEEP_PENDING' || 'SWEEP_OVERDUE' =>
+        (label: t('driver.sweepOutstanding'), action: null, how: t('driver.step.sweep'), step: 5),
+      'CANCELLED' || 'VOID' || 'ABANDONED' => (label: t('driver.runCalledOff'), action: null, how: null, step: null),
+      _ => (label: t('driver.runFinished'), action: null, how: t('driver.step.done'), step: 5),
+    };
+
+String? runLockFor(
+  VoidCallback? action, {
+  required VoidCallback onDepart,
+  required VoidCallback onEnd,
+  String? endBlocked,
+  String? departBlocked,
+}) =>
+    identical(action, onEnd)
+        ? endBlocked
+        : identical(action, onDepart)
+            ? departBlocked
+            : null;
+
+class RunActionBar extends StatelessWidget {
+  const RunActionBar({
+    super.key,
+    required this.trip,
+    required this.busy,
+    required this.onStart,
+    required this.onDepart,
+    required this.onEnd,
+    this.endBlocked,
+    this.departBlocked,
+  });
+
+  final CrewTrip trip;
+  final String? busy;
+  final VoidCallback onStart;
+  final VoidCallback onDepart;
+  final VoidCallback onEnd;
+  final String? endBlocked;
+  final String? departBlocked;
+
+  @override
+  Widget build(BuildContext context) {
+    final step = runStepFor(trip.status, onStart: onStart, onDepart: onDepart, onEnd: onEnd);
+    final lock = runLockFor(
+      step.action,
+      onDepart: onDepart,
+      onEnd: onEnd,
+      endBlocked: endBlocked,
+      departBlocked: departBlocked,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (lock != null) ...[
+          FlowNote(icon: Icons.lock_outline_rounded, text: lock, colour: AppTheme.rose),
+          const SizedBox(height: 8),
+        ],
+        if (step.action == null)
+          FlowNote(
+            icon: trip.status == 'COMPLETED' ? Icons.check_circle_rounded : Icons.error_outline_rounded,
+            text: step.label,
+            colour: trip.status == 'COMPLETED' ? AppTheme.textMuted : AppTheme.rose,
+          )
+        else
+          BigButton(
+            label: step.label,
+            color: Role.driver.tint,
+            busy: busy != null,
+            height: 50,
+            onPressed: lock == null ? step.action : null,
+          ),
+      ],
+    );
+  }
+}
+
 class _RunControls extends StatelessWidget {
   const _RunControls({
     required this.trip,
@@ -1028,18 +1238,8 @@ class _RunControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (String label, VoidCallback? action, String? how, int? step) =
-        switch (trip.status) {
-      'PLANNED' || 'ROSTERED' => (t('driver.startShift'), onStart, t('driver.step.check'), 1),
-      'BLOCKED' => (t('driver.startShift'), onStart, t('driver.step.check'), 1),
-      'BOARDING' => (t('driver.setOff'), onDepart, t('driver.step.setOff'), 2),
-      'IN_PROGRESS' => (t('driver.endRun'), onEnd, t('driver.step.atStops'), 3),
-      'ARRIVED' => (t('driver.endRun'), onEnd, t('driver.step.endRun'), 4),
-      'SWEEP_PENDING' || 'SWEEP_OVERDUE' =>
-        (t('driver.sweepOutstanding'), null, t('driver.step.sweep'), 5),
-      'CANCELLED' || 'VOID' || 'ABANDONED' => (t('driver.runCalledOff'), null, null, null),
-      _ => (t('driver.runFinished'), null, t('driver.step.done'), 5),
-    };
+    final (:label, :action, :how, :step) =
+        runStepFor(trip.status, onStart: onStart, onDepart: onDepart, onEnd: onEnd);
 
     final statusWord = switch (trip.status) {
       'PLANNED' || 'ROSTERED' => t('driver.statusNotStarted'),
@@ -1054,11 +1254,13 @@ class _RunControls extends StatelessWidget {
 
     final school = Session.instance.me?.schoolName ?? '';
 
-    final lock = identical(action, onEnd)
-        ? endBlocked
-        : identical(action, onDepart)
-            ? departBlocked
-            : null;
+    final lock = runLockFor(
+      action,
+      onDepart: onDepart,
+      onEnd: onEnd,
+      endBlocked: endBlocked,
+      departBlocked: departBlocked,
+    );
 
     final settled = trip.status == 'COMPLETED';
     final blocked = trip.status == 'BLOCKED';
@@ -1410,9 +1612,10 @@ class _StopCardState extends State<StopCard> {
 
   Timer? _hold;
 
-  int get _holdSeconds => widget.stop.dwellSeconds.clamp(20, 90);
+  int get _holdSeconds => requiredWaitSeconds(widget.stop);
 
   int get _holdLeft {
+    if (widget.leg == 'OUT') return 0;
     final at = widget.stop.arrivedAt;
     if (at == null || widget.stop.departedAt != null) return 0;
     if (widget.stop.remaining == 0) return 0;
@@ -1421,9 +1624,20 @@ class _StopCardState extends State<StopCard> {
     return left > _holdSeconds ? _holdSeconds : left;
   }
 
+  bool get _school => isSchoolStop(widget.stop, widget.terminalStopId);
+
+  Presence get _presence => stopPresence(
+        widget.stop,
+        school: _school,
+        fix: BusLocation.instance.here.value,
+      );
+
+  bool get _ticking => widget.running && !widget.stop.done;
+
   @override
   void initState() {
     super.initState();
+    BusLocation.instance.here.addListener(_onFix);
     _syncHold();
   }
 
@@ -1435,17 +1649,22 @@ class _StopCardState extends State<StopCard> {
 
   @override
   void dispose() {
+    BusLocation.instance.here.removeListener(_onFix);
     _hold?.cancel();
     super.dispose();
   }
 
+  void _onFix() {
+    if (mounted && _ticking) setState(() {});
+  }
+
   void _syncHold() {
-    final wanted = _holdLeft > 0;
+    final wanted = _ticking;
     if (wanted && _hold == null) {
       _hold = Timer.periodic(const Duration(seconds: 1), (_) {
         if (!mounted) return;
         setState(() {});
-        if (_holdLeft <= 0) {
+        if (!_ticking) {
           _hold?.cancel();
           _hold = null;
         }
@@ -1597,6 +1816,10 @@ class _StopCardState extends State<StopCard> {
     final holding = holdLeft > 0;
     final banner = _banner();
     final hasChildren = s.students.isNotEmpty;
+    final presence = _presence;
+    final out = widget.leg == 'OUT';
+    final moveBlocked = out && !mayMoveOnOut(s);
+    final presenceNote = running && !s.done && !presence.allowed ? presence.note : null;
 
     return [
       ?banner,
@@ -1646,10 +1869,13 @@ class _StopCardState extends State<StopCard> {
                             colour: Colors.white,
                             fill: Role.driver.tint,
                             busy: _busyStop,
-                            onPressed: running
+                            onPressed: running && presence.allowed
                                 ? () => _stopAction(
-                                      () => CrewApi.instance
-                                          .arriveAtStop(widget.tripId, s.plannedSequence),
+                                      () => CrewApi.instance.arriveAtStop(
+                                        widget.tripId,
+                                        s.plannedSequence,
+                                        fix: reportedFix(BusLocation.instance.here.value),
+                                      ),
                                       t('driver.arrived'),
                                     )
                                 : null,
@@ -1678,6 +1904,17 @@ class _StopCardState extends State<StopCard> {
                 ],
               ),
             ),
+            if (presenceNote != null) ...[
+              const SizedBox(height: 6),
+              FlowNote(
+                key: const ValueKey('presence-note'),
+                icon: presence.state == PresenceState.noFix
+                    ? Icons.gps_not_fixed_rounded
+                    : Icons.near_me_rounded,
+                text: presenceNote,
+                colour: AppTheme.amber,
+              ),
+            ],
           ],
         ),
       ),
@@ -1713,13 +1950,21 @@ class _StopCardState extends State<StopCard> {
                     colour: Colors.white,
                     fill: AppTheme.blue,
                     busy: _busyStop,
-                    onPressed: running && !holding
+                    onPressed: running && !holding && !moveBlocked
                         ? () => _stopAction(
                               () => CrewApi.instance.leaveStop(widget.tripId, s.plannedSequence),
                               t('driver.movingOn'),
                             )
                         : null,
                   ),
+                  if (running && moveBlocked) ...[
+                    const SizedBox(height: 6),
+                    FlowNote(
+                      icon: Icons.lock_outline_rounded,
+                      text: t('driver.flow.resolveFirst'),
+                      colour: AppTheme.textMuted,
+                    ),
+                  ],
                   if (holding) ...[
                     const SizedBox(height: 6),
                     Row(
@@ -1748,6 +1993,17 @@ class _StopCardState extends State<StopCard> {
 
   Widget _childActions() {
     final s = widget.stop;
+    final out = widget.leg == 'OUT';
+    final presence = _presence;
+    final live = widget.running && !widget.locked;
+    final waitLeft = notHereWaitLeft(s);
+    final notHereNote = !out || !live || s.done || s.remaining == 0
+        ? null
+        : waitLeft == null
+            ? t('driver.notHere.arriveFirst')
+            : waitLeft > 0
+                ? tn('driver.notHere.waitNote', waitClock(waitLeft))
+                : null;
     final riders = RosterFilters.apply(
       s.students,
       widget.query.isEmpty ? _show : RosterFilter.all,
@@ -1765,6 +2021,15 @@ class _StopCardState extends State<StopCard> {
               onChanged: (f) => setState(() => _show = f),
             ),
           ),
+        if (notHereNote != null) ...[
+          FlowNote(
+            key: const ValueKey('not-here-note'),
+            icon: Icons.timer_outlined,
+            text: notHereNote,
+            colour: AppTheme.textMuted,
+          ),
+          const SizedBox(height: 8),
+        ],
         for (final (i, r) in riders.indexed) ...[
           if (i > 0) ...[
             const SizedBox(height: 8),
@@ -1777,8 +2042,10 @@ class _StopCardState extends State<StopCard> {
             schoolReached: widget.schoolReached,
             named: s.students.length > 1 || r.name.trim() != s.name.trim(),
             busy: _busyStudent == r.studentId,
-            canPickUp: widget.running && !widget.locked,
-            canSetDown: widget.started && !widget.locked,
+            canPickUp: live && (!out || presence.allowed),
+            canSetDown: widget.started && !widget.locked && (out || presence.allowed),
+            canNotHere: live && (!out || mayMarkNotHere(s)),
+            notHereLeft: out && live ? (waitLeft ?? 0) : 0,
             onBoard: () => _mark(r, 'BOARDED', t('driver.onBoard')),
             onOff: () => _mark(
               r,
@@ -1946,6 +2213,36 @@ class _StopHeader extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class FlowNote extends StatelessWidget {
+  const FlowNote({super.key, required this.icon, required this.text, required this.colour});
+
+  final IconData icon;
+  final String text;
+  final Color colour;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 14, color: colour),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.35,
+              fontWeight: FontWeight.w700,
+              color: colour,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -2332,6 +2629,8 @@ class _ChildActions extends StatelessWidget {
     required this.busy,
     required this.canPickUp,
     required this.canSetDown,
+    this.canNotHere = true,
+    this.notHereLeft = 0,
     required this.onBoard,
     required this.onOff,
     required this.onNoShow,
@@ -2348,6 +2647,8 @@ class _ChildActions extends StatelessWidget {
 
   final bool canPickUp;
   final bool canSetDown;
+  final bool canNotHere;
+  final int notHereLeft;
   final VoidCallback onBoard;
   final VoidCallback onOff;
   final VoidCallback onNoShow;
@@ -2470,12 +2771,14 @@ class _ChildActions extends StatelessWidget {
                           onPressed: onCorrect,
                         )
                       : _FlowButton(
-                          label: t('driver.notHere'),
+                          label: notHereLeft > 0
+                              ? '${t('driver.notHere')} · ${waitClock(notHereLeft)}'
+                              : t('driver.notHere'),
                           icon: Icons.close_rounded,
                           colour: AppTheme.text,
                           fill: AppTheme.neutralSoft,
                           height: 40,
-                          onPressed: canPickUp ? onNoShow : null,
+                          onPressed: canNotHere ? onNoShow : null,
                         ),
                 ),
               ],
@@ -2697,12 +3000,15 @@ class SchoolArrivalCard extends StatefulWidget {
     required this.onDrop,
     required this.onAllOff,
     this.query = '',
+    this.gate,
   });
 
   final List<PlannedStop> stops;
   final String schoolName;
   final bool running;
   final bool started;
+
+  final SchoolGate? gate;
 
   final bool canArrive;
   final DateTime? arrivedAt;
@@ -2720,6 +3026,43 @@ class SchoolArrivalCard extends StatefulWidget {
 class _SchoolArrivalCardState extends State<SchoolArrivalCard> {
   bool? _openChoice;
 
+  Timer? _tick;
+
+  bool get _watching => widget.running && widget.arrivedAt == null && widget.canArrive;
+
+  @override
+  void initState() {
+    super.initState();
+    BusLocation.instance.here.addListener(_onFix);
+    _syncTick();
+  }
+
+  @override
+  void didUpdateWidget(covariant SchoolArrivalCard old) {
+    super.didUpdateWidget(old);
+    _syncTick();
+  }
+
+  @override
+  void dispose() {
+    BusLocation.instance.here.removeListener(_onFix);
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  void _onFix() {
+    if (mounted && _watching) setState(() {});
+  }
+
+  void _syncTick() {
+    if (_watching && _tick == null) {
+      _tick = Timer.periodic(const Duration(seconds: 2), (_) => _onFix());
+    } else if (!_watching && _tick != null) {
+      _tick!.cancel();
+      _tick = null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final riders = _ridersIn(widget.stops);
@@ -2732,6 +3075,8 @@ class _SchoolArrivalCardState extends State<SchoolArrivalCard> {
     final shown = aboard.where((e) => _TripScreenState._matches(e.rider, widget.query)).toList();
 
     final arrived = widget.arrivedAt != null;
+    final presence = gatePresence(widget.gate, fix: BusLocation.instance.here.value);
+    final presenceNote = widget.running && !arrived && !presence.allowed ? presence.note : null;
     final canDrop = widget.started && (arrived || !widget.canArrive || !widget.running) && !widget.busyAll;
 
     final summary = [
@@ -2793,9 +3138,20 @@ class _SchoolArrivalCardState extends State<SchoolArrivalCard> {
                                 colour: Colors.white,
                                 fill: Role.driver.tint,
                                 busy: widget.busyAll,
-                                onPressed: widget.running ? widget.onArrive : null,
+                                onPressed: widget.running && presence.allowed ? widget.onArrive : null,
                               ),
                       ),
+                    if (widget.canArrive && presenceNote != null) ...[
+                      const SizedBox(height: 6),
+                      FlowNote(
+                        key: const ValueKey('gate-presence-note'),
+                        icon: presence.state == PresenceState.noFix
+                            ? Icons.gps_not_fixed_rounded
+                            : Icons.near_me_rounded,
+                        text: presenceNote,
+                        colour: AppTheme.amber,
+                      ),
+                    ],
                     _FlowStep(
                       number: ++step,
                       label: t('driver.flow.children'),

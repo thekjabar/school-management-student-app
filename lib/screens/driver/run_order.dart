@@ -30,6 +30,57 @@ double metresBetween(LatLng a, LatLng b) {
   return 2 * earth * math.asin(math.min(1.0, math.sqrt(s)));
 }
 
+double bearingBetween(LatLng a, LatLng b) {
+  double rad(double d) => d * math.pi / 180;
+  final dLon = rad(b.longitude - a.longitude);
+  final y = math.sin(dLon) * math.cos(rad(b.latitude));
+  final x = math.cos(rad(a.latitude)) * math.sin(rad(b.latitude)) -
+      math.sin(rad(a.latitude)) * math.cos(rad(b.latitude)) * math.cos(dLon);
+  return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
+}
+
+double angleGap(double a, double b) {
+  final d = ((a - b) % 360 + 360) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+const double kCourseMinSpeedMs = 2.5;
+
+const double kAheadMinMetres = 30;
+
+double? followBearing({
+  required double heading,
+  required double speed,
+  required LatLng bus,
+  List<LatLng>? road,
+  LatLng? next,
+}) {
+  if (speed.isFinite && speed >= kCourseMinSpeedMs && heading.isFinite && heading >= 0) {
+    return heading % 360;
+  }
+  LatLng? ahead;
+  if (road != null && road.length >= 2) {
+    var nearest = 0;
+    var gap = double.infinity;
+    for (var i = 0; i < road.length; i++) {
+      final d = metresBetween(road[i], bus);
+      if (d < gap) {
+        gap = d;
+        nearest = i;
+      }
+    }
+    for (var j = nearest + 1; j < road.length; j++) {
+      if (metresBetween(bus, road[j]) >= kAheadMinMetres) {
+        ahead = road[j];
+        break;
+      }
+    }
+  }
+  ahead ??= next;
+  if (ahead == null || metresBetween(bus, ahead) < 8) return null;
+  return bearingBetween(bus, ahead);
+}
+
 String distanceAway(int metres) {
   if (metres < 1000) return tn('driver.metresAway', metres);
   final km = metres / 1000;

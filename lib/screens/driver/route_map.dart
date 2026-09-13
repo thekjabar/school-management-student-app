@@ -17,9 +17,51 @@ import '../../theme/app_theme.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/map_tiles.dart';
 import '../../ui/screen_kit.dart';
+import 'approach_prompts.dart';
 import 'roster_kit.dart';
+import 'run_driving.dart';
 import 'run_order.dart';
 import 'run_route_cache.dart';
+
+enum MapCameraMode { overview, follow, free }
+
+class MapCamera extends ChangeNotifier {
+  MapCameraMode _mode = MapCameraMode.overview;
+  double _bearing = 0;
+  int _overviews = 0;
+
+  MapCameraMode get mode => _mode;
+
+  double get bearing => _bearing;
+
+  int get overviews => _overviews;
+
+  bool get rotated => angleGap(_bearing, 0) > 2;
+
+  void follow() {
+    _mode = MapCameraMode.follow;
+    notifyListeners();
+  }
+
+  void overview() {
+    _mode = MapCameraMode.overview;
+    _overviews++;
+    notifyListeners();
+  }
+
+  void userMoved() {
+    if (_mode == MapCameraMode.free) return;
+    _mode = MapCameraMode.free;
+    notifyListeners();
+  }
+
+  void noteBearing(double bearing) {
+    final was = rotated;
+    final turned = angleGap(bearing, _bearing) >= 1;
+    _bearing = bearing;
+    if (was != rotated || (rotated && turned)) notifyListeners();
+  }
+}
 
 class RouteMap extends StatefulWidget {
   const RouteMap({
@@ -31,9 +73,15 @@ class RouteMap extends StatefulWidget {
     this.school,
     this.compact = false,
     this.fullScreen = false,
+    this.live = false,
+    this.driving,
   });
 
   final String tripId;
+
+  final bool live;
+
+  final RunDriving? driving;
 
   final List<PlannedStop> stops;
 
@@ -55,6 +103,26 @@ class _RouteMapState extends State<RouteMap> {
   MapboxMap? _mapbox;
 
   String? _touched;
+
+  String? _selected;
+
+  final MapCamera _camera = MapCamera();
+
+  bool get _driven => widget.driving != null && widget.fullScreen;
+
+  @override
+  void dispose() {
+    _camera.dispose();
+    super.dispose();
+  }
+
+  void _select(_Stop? pin) {
+    if (pin == null) return;
+    setState(() {
+      _touched = pin.key;
+      _selected = pin.school ? kSchoolTargetKey : runStopKey(pin.stop);
+    });
+  }
 
   List<List<LatLng>>? _road;
 
@@ -129,11 +197,18 @@ class _RouteMapState extends State<RouteMap> {
       compact: widget.compact,
       fullScreen: widget.fullScreen,
       initialFit: spread ? points : null,
+      overview: points,
+      camera: _camera,
+      canFollow: widget.fullScreen && widget.live,
+      bottomInset: _driven ? (_selected == null ? 140.0 : 0.0) : 0.0,
       onReady: (m) => _mapbox = m,
       onPinTap: widget.compact
           ? null
-          : (key) => setState(() => _touched = key),
+          : _driven
+              ? (key) => _select(pins.where((p) => p.key == key).firstOrNull)
+              : (key) => setState(() => _touched = key),
     );
+    final shown = _shown(pins, target);
 
     if (widget.compact) {
       return IgnorePointer(
@@ -152,16 +227,30 @@ class _RouteMapState extends State<RouteMap> {
           end: 62,
           child: Align(
             alignment: AlignmentDirectional.centerStart,
-            child: ValueListenableBuilder<geo.Position?>(
-              valueListenable: BusLocation.instance.here,
-              builder: (context, me, _) => _Callout(
-                pin: _shown(pins, target),
-                target: target,
-                bus: me == null ? null : LatLng(me.latitude, me.longitude),
-                tint: widget.tint,
-                leg: widget.leg,
-                expanded: _touched != null,
-              ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _driven ? () => _select(shown) : null,
+                  child: ValueListenableBuilder<geo.Position?>(
+                    valueListenable: BusLocation.instance.here,
+                    builder: (context, me, _) => _Callout(
+                      pin: shown,
+                      target: target,
+                      bus: me == null ? null : LatLng(me.latitude, me.longitude),
+                      tint: widget.tint,
+                      leg: widget.leg,
+                      expanded: _touched != null && !_driven,
+                    ),
+                  ),
+                ),
+                if (widget.fullScreen && widget.live) ...[
+                  const SizedBox(height: 8),
+                  const VoiceBanner(),
+                ],
+              ],
             ),
           ),
         ),
@@ -183,95 +272,102 @@ class _RouteMapState extends State<RouteMap> {
                         tint: widget.tint,
                         leg: widget.leg,
                         school: widget.school,
+                        live: widget.live,
+                        driving: widget.driving,
                       ),
                     ),
                   );
                   return;
                 }
                 setState(() => _touched = null);
-                if (spread) {
-                  unawaited(_fitAll(points));
-                } else {
-                  unawaited(_moveTo(points.first, 15.5));
-                }
+                _camera.overview();
               },
-              child: Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppTheme.surface.withValues(alpha: 0.94),
-                  borderRadius: BorderRadius.circular(13),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: AppTheme.dark ? 0.4 : 0.12),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  widget.fullScreen ? Icons.zoom_out_map_rounded : Icons.open_in_full_rounded,
-                  size: 21,
-                  color: widget.tint,
-                ),
+              child: MapRoundButton(
+                icon: widget.fullScreen ? Icons.zoom_out_map_rounded : Icons.open_in_full_rounded,
+                colour: widget.tint,
               ),
             ),
           ),
         ),
-        if (widget.fullScreen)
-          PositionedDirectional(
-            end: 10,
-            top: 64,
-            child: ValueListenableBuilder<geo.Position?>(
-              valueListenable: BusLocation.instance.here,
-              builder: (context, me, _) {
-                if (me == null) return const SizedBox.shrink();
-                return Semantics(
-                  button: true,
-                  label: t('driver.map.centreOnMe'),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      setState(() => _touched = null);
-                      unawaited(_moveTo(LatLng(me.latitude, me.longitude), 16.5));
-                    },
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface.withValues(alpha: 0.94),
-                        borderRadius: BorderRadius.circular(13),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: AppTheme.dark ? 0.4 : 0.12),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
+        PositionedDirectional(
+          end: 10,
+          top: 64,
+          child: ListenableBuilder(
+            listenable: _camera,
+            builder: (context, _) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.fullScreen)
+                  ValueListenableBuilder<geo.Position?>(
+                    valueListenable: BusLocation.instance.here,
+                    builder: (context, me, _) {
+                      if (me == null) return const SizedBox.shrink();
+                      if (widget.live && _camera.mode == MapCameraMode.follow) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Semantics(
+                          button: true,
+                          label: t(widget.live ? 'driver.map.recentre' : 'driver.map.centreOnMe'),
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              setState(() => _touched = null);
+                              if (widget.live) {
+                                _camera.follow();
+                              } else {
+                                unawaited(_moveTo(LatLng(me.latitude, me.longitude), 16.5));
+                              }
+                            },
+                            child: MapRoundButton(
+                              icon: widget.live ? Icons.my_location_rounded : Icons.directions_bus_rounded,
+                              colour: widget.tint,
+                            ),
                           ),
-                        ],
-                      ),
-                      child: Icon(
-                        Icons.directions_bus_rounded,
-                        size: 21,
-                        color: widget.tint,
+                        ),
+                      );
+                    },
+                  ),
+                if (_camera.rotated)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Semantics(
+                      button: true,
+                      label: t('driver.map.northUp'),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _camera.overview,
+                        child: MapRoundButton(
+                          icon: Icons.navigation_rounded,
+                          colour: AppTheme.rose,
+                          turns: -_camera.bearing * math.pi / 180,
+                        ),
                       ),
                     ),
                   ),
-                );
-              },
+                if (widget.fullScreen && widget.live) VoiceToggle(tint: widget.tint),
+              ],
             ),
           ),
+        ),
         const _Credit(),
+        if (_driven)
+          PositionedDirectional(
+            start: 0,
+            end: 0,
+            bottom: 0,
+            child: RunMapSheet(
+              driving: widget.driving!,
+              selection: _selected,
+              onClose: () => setState(() {
+                _selected = null;
+                _touched = null;
+              }),
+            ),
+          ),
       ],
     );
-  }
-
-  Future<void> _fitAll(List<LatLng> points) async {
-    final map = _mapbox;
-    if (map == null || points.isEmpty) return;
-    final camera = await cameraToFit(map, points, compact: widget.compact, fullScreen: widget.fullScreen);
-    await map.flyTo(camera, MapAnimationOptions(duration: 600));
   }
 
   Future<void> _moveTo(LatLng at, double zoom) async {
@@ -382,6 +478,8 @@ class RouteMapScreen extends StatelessWidget {
     required this.tint,
     required this.leg,
     this.school,
+    this.live = false,
+    this.driving,
   });
 
   final String tripId;
@@ -389,16 +487,42 @@ class RouteMapScreen extends StatelessWidget {
   final Color tint;
   final String leg;
   final SchoolGate? school;
+  final bool live;
+  final RunDriving? driving;
 
   @override
   Widget build(BuildContext context) {
+    final driving = this.driving;
+    Widget map(RunSnapshot? run) => RouteMap(
+          tripId: tripId,
+          stops: run?.stops ?? stops,
+          tint: tint,
+          leg: run?.leg ?? leg,
+          school: run?.school ?? school,
+          live: run?.running ?? live,
+          driving: driving,
+          fullScreen: true,
+        );
+
     return Scaffold(
       backgroundColor: AppTheme.canvas,
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            ScreenHeader(title: t('driver.map.title')),
+            if (driving == null)
+              ScreenHeader(title: t('driver.map.title'))
+            else
+              ListenableBuilder(
+                listenable: driving,
+                builder: (context, _) {
+                  final run = driving.run;
+                  return ScreenHeader(
+                    title: t('driver.map.title'),
+                    action: run == null ? null : driving.sos(context, run),
+                  );
+                },
+              ),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 0),
@@ -406,14 +530,12 @@ class RouteMapScreen extends StatelessWidget {
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(AppTheme.radius),
                   ),
-                  child: RouteMap(
-                    tripId: tripId,
-                    stops: stops,
-                    tint: tint,
-                    leg: leg,
-                    school: school,
-                    fullScreen: true,
-                  ),
+                  child: driving == null
+                      ? map(null)
+                      : ListenableBuilder(
+                          listenable: driving,
+                          builder: (context, _) => map(driving.run),
+                        ),
                 ),
               ),
             ),
@@ -843,9 +965,21 @@ class _MapboxCanvas extends StatefulWidget {
     required this.compact,
     required this.fullScreen,
     required this.initialFit,
+    required this.overview,
+    required this.camera,
+    required this.canFollow,
+    required this.bottomInset,
     required this.onReady,
     required this.onPinTap,
   });
+
+  final List<LatLng> overview;
+
+  final MapCamera camera;
+
+  final bool canFollow;
+
+  final double bottomInset;
 
   final String tripId;
 
@@ -888,10 +1022,137 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
 
   double _dpr = 2;
 
+  double _height = 640;
+
+  static const Duration _followEvery = Duration(milliseconds: 1000);
+
+  static const Duration _followEase = Duration(milliseconds: 900);
+
+  static const double _followZoom = 16.5;
+
+  static const double _followPitch = 45;
+
+  DateTime? _followedAt;
+  DateTime _commandedUntil = DateTime.fromMillisecondsSinceEpoch(0);
+  double _commandedBearing = 0;
+  int _overviewsSeen = 0;
+  bool _autoFollowed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.camera.addListener(_onCamera);
+  }
+
   @override
   void dispose() {
+    widget.camera.removeListener(_onCamera);
     if (_listening) BusLocation.instance.here.removeListener(_onFix);
     super.dispose();
+  }
+
+  void _onCamera() {
+    final camera = widget.camera;
+    if (camera.overviews != _overviewsSeen) {
+      _overviewsSeen = camera.overviews;
+      unawaited(_overviewNow());
+      return;
+    }
+    if (camera.mode == MapCameraMode.follow) {
+      _followedAt = null;
+      unawaited(_followTick());
+    }
+  }
+
+  void _syncFollow() {
+    final camera = widget.camera;
+    if (widget.canFollow && !_autoFollowed) {
+      _autoFollowed = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.canFollow && camera.mode == MapCameraMode.overview) camera.follow();
+      });
+    } else if (!widget.canFollow && camera.mode == MapCameraMode.follow) {
+      _autoFollowed = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !widget.canFollow && camera.mode == MapCameraMode.follow) camera.overview();
+      });
+    }
+  }
+
+  Future<void> _overviewNow() async {
+    final map = _map;
+    final points = widget.overview;
+    if (map == null || points.isEmpty) return;
+    _commandedBearing = 0;
+    _commandedUntil = DateTime.now().add(const Duration(milliseconds: 900));
+    try {
+      final CameraOptions camera;
+      if (points.length > 1) {
+        camera = await cameraToFit(map, points, compact: widget.compact, fullScreen: widget.fullScreen);
+      } else {
+        camera = CameraOptions(
+          center: Point(coordinates: Position(points.first.longitude, points.first.latitude)),
+          zoom: 15.5,
+        );
+      }
+      camera
+        ..bearing = 0
+        ..pitch = 0;
+      await map.flyTo(camera, MapAnimationOptions(duration: 600));
+    } catch (_) {
+    }
+  }
+
+  Future<void> _followTick() async {
+    final map = _map;
+    final me = BusLocation.instance.here.value;
+    if (map == null || me == null || widget.compact) return;
+    if (widget.camera.mode != MapCameraMode.follow) return;
+    final now = DateTime.now();
+    final last = _followedAt;
+    if (last != null && now.difference(last) < _followEvery) return;
+    _followedAt = now;
+
+    final bus = LatLng(me.latitude, me.longitude);
+    final bearing = followBearing(
+          heading: me.heading,
+          speed: me.speed,
+          bus: bus,
+          road: _liveLeg,
+          next: _nextWaypoint?.at,
+        ) ??
+        _commandedBearing;
+    _commandedBearing = bearing;
+    _commandedUntil = now.add(_followEase + const Duration(milliseconds: 400));
+    final height = _height;
+    try {
+      await map.easeTo(
+        CameraOptions(
+          center: Point(coordinates: Position(bus.longitude, bus.latitude)),
+          zoom: _followZoom,
+          bearing: bearing,
+          pitch: _followPitch,
+          padding: MbxEdgeInsets(
+            top: height * 0.45,
+            left: 0,
+            bottom: math.min(widget.bottomInset, height * 0.25),
+            right: 0,
+          ),
+        ),
+        MapAnimationOptions(duration: _followEase.inMilliseconds),
+      );
+    } catch (_) {
+    }
+  }
+
+  void _onCameraChanged(CameraChangedEventData event) {
+    final bearing = event.cameraState.bearing;
+    widget.camera.noteBearing(bearing);
+    if (widget.camera.mode == MapCameraMode.follow &&
+        DateTime.now().isAfter(_commandedUntil) &&
+        angleGap(bearing, _commandedBearing) > 25) {
+      widget.camera.userMoved();
+    }
   }
 
   Future<void> _onMapCreated(MapboxMap map) async {
@@ -900,8 +1161,8 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
 
     await map.gestures.updateSettings(
       GesturesSettings(
-        rotateEnabled: false,
-        pitchEnabled: false,
+        rotateEnabled: !widget.compact,
+        pitchEnabled: !widget.compact,
         scrollEnabled: !widget.compact,
         pinchToZoomEnabled: !widget.compact,
         doubleTapToZoomInEnabled: !widget.compact,
@@ -960,6 +1221,7 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
     await _fitOnce(map);
     await _drawLines();
     await _drawPins();
+    _syncFollow();
   }
 
   static String _hex(Color c) =>
@@ -1139,6 +1401,7 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
       }
     }
     unawaited(_drawLines());
+    unawaited(_followTick());
   }
 
   List<LatLng>? _liveFromBus() {
@@ -1546,9 +1809,14 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
   @override
   void didUpdateWidget(covariant _MapboxCanvas old) {
     super.didUpdateWidget(old);
+    if (!identical(old.camera, widget.camera)) {
+      old.camera.removeListener(_onCamera);
+      widget.camera.addListener(_onCamera);
+    }
     unawaited(_drawLines());
     unawaited(_drawPins());
     _onFix();
+    if (_map != null) _syncFollow();
   }
 
   late final ViewportState _start = CameraViewportState(
@@ -1575,12 +1843,20 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
   @override
   Widget build(BuildContext context) {
     _dpr = MediaQuery.devicePixelRatioOf(context);
-    return MapWidget(
-      key: const ValueKey('run-map'),
-      styleUri: MapTiles.styleUri,
-      viewport: _start,
-      onMapCreated: _onMapCreated,
-      onStyleLoadedListener: _onStyleLoaded,
+    return LayoutBuilder(
+      builder: (context, box) {
+        _height = box.maxHeight.isFinite ? box.maxHeight : _height;
+        return MapWidget(
+          key: const ValueKey('run-map'),
+          styleUri: MapTiles.styleUri,
+          viewport: _start,
+          onMapCreated: _onMapCreated,
+          onStyleLoadedListener: _onStyleLoaded,
+          onCameraChangeListener: widget.compact ? null : _onCameraChanged,
+          onScrollListener: widget.compact ? null : (_) => widget.camera.userMoved(),
+          onZoomListener: widget.compact ? null : (_) => widget.camera.userMoved(),
+        );
+      },
     );
   }
 }

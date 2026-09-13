@@ -1,9 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:student_app/api/bus_location.dart';
 import 'package:student_app/api/crew_api.dart';
 import 'package:student_app/i18n/strings.dart';
+import 'package:student_app/screens/driver/approach_prompts.dart';
 import 'package:student_app/screens/driver/roster_kit.dart';
+import 'package:student_app/screens/driver/run_driving.dart';
+import 'package:student_app/screens/driver/run_order.dart';
 import 'package:student_app/screens/driver/trip_screen.dart';
+import 'package:student_app/ui/kit.dart';
+
+Position _fixAt(double lat, double lon, {double accuracy = 8, Duration age = Duration.zero}) => Position(
+      latitude: lat,
+      longitude: lon,
+      timestamp: DateTime.now().subtract(age),
+      accuracy: accuracy,
+      altitude: 0,
+      altitudeAccuracy: 0,
+      heading: 0,
+      headingAccuracy: 0,
+      speed: 0,
+      speedAccuracy: 0,
+    );
+
+Position _fixNorthOf(double lat, double lon, double metres, {double accuracy = 8, Duration age = Duration.zero}) =>
+    _fixAt(lat + metres / 111195, lon, accuracy: accuracy, age: age);
 
 RiderOnStop _rider(
   String id,
@@ -32,6 +54,8 @@ PlannedStop _stop({
   String? skippedReason,
   String name = 'Ari Hawre Ahmed Mohammed Karim',
   String stopId = 'ckstopaaaaaaaaaaaaaaaaaaa',
+  int dwellSeconds = 60,
+  int? radiusM,
 }) =>
     PlannedStop(
       stopId: stopId,
@@ -48,8 +72,9 @@ PlannedStop _stop({
       skippedReason: skippedReason,
       etaAt: DateTime(2026, 9, 13, 6, 54),
       etaIsActual: false,
-      dwellSeconds: 60,
+      dwellSeconds: dwellSeconds,
       driveSeconds: 120,
+      radiusM: radiusM,
     );
 
 class _Case {
@@ -216,7 +241,7 @@ void main() {
           ],
         ),
       ),
-      ['driver.flow.guideMany', 'driver.flow.children', 'driver.holdAtStop', 'driver.setDown', 'driver.wrong'],
+      ['driver.flow.guideMany', 'driver.flow.children', 'driver.notHere.waitNote', 'driver.flow.resolveFirst', 'driver.setDown', 'driver.wrong'],
     ),
     _Case(
       'current RETURN',
@@ -345,9 +370,11 @@ void main() {
       );
       expect(find.text(tn('driver.gate.allOnBus', 0)), findsNothing);
 
+      BusLocation.instance.here.value = _fixAt(36.2, 44.0);
       await _pump(tester, Lang.en, card(leg: 'RETURN', stop: stops.first));
       expect(find.text(t('driver.gate.checkFirst')), findsNothing);
       expect(_live(tester, t('driver.handOver')), isTrue);
+      BusLocation.instance.here.value = null;
 
       await _pump(tester, Lang.en, card(leg: 'RETURN', stop: stops[1]));
       expect(find.text(t('driver.handOver')), findsNothing);
@@ -423,6 +450,269 @@ void main() {
       await _pump(tester, Lang.en, arrival(off, arrivedAt: justNow));
       expect(find.text(t('driver.gate.dropFirst')), findsNothing);
       expect(find.textContaining(tn('driver.gate.offAtSchool', 2)), findsWidgets);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
+
+  group('the bus has to be at the stop', () {
+    tearDown(() => BusLocation.instance.here.value = null);
+
+    PlannedStop waitingStop({DateTime? arrivedAt}) => _stop(
+          arrivedAt: arrivedAt,
+          students: [_rider('cka', 'Ari Hawre Ahmed Mohammed Karim')],
+        );
+
+    testWidgets('with no GPS fix, Arrived and Pick up stay off and say they are waiting for GPS', (tester) async {
+      await _pump(tester, Lang.en, card(stop: waitingStop()));
+      expect(_live(tester, t('driver.arrived')), isFalse);
+      expect(_live(tester, t('driver.pickUp')), isFalse);
+      expect(find.text(t('driver.presence.noFix')), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('a stale fix counts as no fix', (tester) async {
+      BusLocation.instance.here.value = _fixAt(36.2, 44.0, age: const Duration(seconds: 40));
+      await _pump(tester, Lang.en, card(stop: waitingStop()));
+      expect(_live(tester, t('driver.arrived')), isFalse);
+      expect(find.text(t('driver.presence.noFix')), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('350 m away the buttons stay off with a live distance note', (tester) async {
+      BusLocation.instance.here.value = _fixNorthOf(36.2, 44.0, 350);
+      await _pump(tester, Lang.en, card(stop: waitingStop()));
+      expect(_live(tester, t('driver.arrived')), isFalse);
+      expect(_live(tester, t('driver.pickUp')), isFalse);
+      expect(find.text(tn('driver.presence.far', distanceAway(350))), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('at the pickup point Arrived and Pick up come on, with accuracy credited up to 50 m', (tester) async {
+      BusLocation.instance.here.value = _fixNorthOf(36.2, 44.0, 20);
+      await _pump(tester, Lang.en, card(stop: waitingStop()));
+      expect(_live(tester, t('driver.arrived')), isTrue);
+      expect(_live(tester, t('driver.pickUp')), isTrue);
+      expect(find.byKey(const ValueKey('presence-note')), findsNothing);
+
+      BusLocation.instance.here.value = _fixNorthOf(36.2, 44.0, 140, accuracy: 45);
+      await _pump(tester, Lang.en, card(stop: waitingStop()));
+      expect(_live(tester, t('driver.arrived')), isTrue);
+
+      BusLocation.instance.here.value = _fixNorthOf(36.2, 44.0, 160, accuracy: 400);
+      await _pump(tester, Lang.en, card(stop: waitingStop()));
+      expect(_live(tester, t('driver.arrived')), isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('a wide stop radius widens the reach, and the school gate never reaches less than 150 m', (tester) async {
+      BusLocation.instance.here.value = _fixNorthOf(36.2, 44.0, 140);
+      await _pump(tester, Lang.en, card(stop: _stop(radiusM: 160, students: [_rider('cka', 'Ari Hawre')])));
+      expect(_live(tester, t('driver.arrived')), isTrue);
+
+      await _pump(
+        tester,
+        Lang.en,
+        card(stop: _stop(stopId: 'ckgateaaaaaaaaaaaaaaaaaaa', radiusM: 120, students: const [])),
+      );
+      expect(_live(tester, t('driver.arrived')), isTrue);
+
+      BusLocation.instance.here.value = _fixNorthOf(36.2, 44.0, 190);
+      await _pump(
+        tester,
+        Lang.en,
+        card(stop: _stop(stopId: 'ckgateaaaaaaaaaaaaaaaaaaa', radiusM: 120, students: const [])),
+      );
+      expect(_live(tester, t('driver.arrived')), isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('handing over on the way home also needs the bus at the home', (tester) async {
+      final aboard = _stop(arrivedAt: earlier, students: [_rider('cka', 'Ari Hawre', boardedAt: earlier)]);
+      BusLocation.instance.here.value = _fixNorthOf(36.2, 44.0, 400);
+      await _pump(tester, Lang.en, card(leg: 'RETURN', stop: aboard));
+      expect(_live(tester, t('driver.handOver')), isFalse);
+
+      BusLocation.instance.here.value = _fixNorthOf(36.2, 44.0, 30);
+      await _pump(tester, Lang.en, card(leg: 'RETURN', stop: aboard));
+      expect(_live(tester, t('driver.handOver')), isTrue);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('Arrived at school waits for the gate', (tester) async {
+      const gate = SchoolGate(stopId: 'ckgateaaaaaaaaaaaaaaaaaaa', name: 'Gate', lat: 36.3, lon: 44.1, sequence: 5, radiusM: 100);
+      Widget school() => SchoolArrivalCard(
+            stops: outRun(allOff: false),
+            schoolName: 'Sunrise International School of Erbil',
+            running: true,
+            started: true,
+            canArrive: true,
+            arrivedAt: null,
+            gate: gate,
+            busyStudent: null,
+            busyAll: false,
+            onArrive: () {},
+            onDrop: (_, _) {},
+            onAllOff: () {},
+          );
+      BusLocation.instance.here.value = _fixNorthOf(36.3, 44.1, 600);
+      await _pump(tester, Lang.en, school());
+      expect(_live(tester, t('driver.arrived')), isFalse);
+      expect(find.byKey(const ValueKey('gate-presence-note')), findsOneWidget);
+
+      BusLocation.instance.here.value = _fixNorthOf(36.3, 44.1, 140);
+      await _pump(tester, Lang.en, school());
+      expect(_live(tester, t('driver.arrived')), isTrue);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
+
+  group('waiting at the stop before moving on', () {
+    setUp(() => BusLocation.instance.here.value = _fixAt(36.2, 44.0));
+    tearDown(() => BusLocation.instance.here.value = null);
+
+    testWidgets('Not here is off before arriving and during the wait, and counts down', (tester) async {
+      await _pump(tester, Lang.en, card(stop: _stop(students: [_rider('cka', 'Ari Hawre')])));
+      expect(_live(tester, t('driver.notHere')), isFalse);
+      expect(find.text(t('driver.notHere.arriveFirst')), findsOneWidget);
+
+      final arrived = DateTime.now().subtract(const Duration(seconds: 10));
+      await _pump(tester, Lang.en, card(stop: _stop(arrivedAt: arrived, dwellSeconds: 60, students: [_rider('cka', 'Ari Hawre')])));
+      final label = find.textContaining('${t('driver.notHere')} · 0:');
+      expect(label, findsOneWidget);
+      final ink = tester.widget<InkWell>(find.ancestor(of: label, matching: find.byType(InkWell)).first);
+      expect(ink.onTap, isNull);
+      expect(find.byKey(const ValueKey('not-here-note')), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('the wait follows the stop dwell, clamped to 20..90 seconds', (tester) async {
+      final arrived = DateTime.now().subtract(const Duration(seconds: 25));
+      await _pump(tester, Lang.en, card(stop: _stop(arrivedAt: arrived, dwellSeconds: 5, students: [_rider('cka', 'Ari Hawre')])));
+      expect(_live(tester, t('driver.notHere')), isTrue);
+
+      final longAgo = DateTime.now().subtract(const Duration(seconds: 95));
+      await _pump(tester, Lang.en, card(stop: _stop(arrivedAt: longAgo, dwellSeconds: 600, students: [_rider('cka', 'Ari Hawre')])));
+      expect(_live(tester, t('driver.notHere')), isTrue);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('Moving on stays off while a child is still waiting, even after the wait', (tester) async {
+      final arrived = DateTime.now().subtract(const Duration(seconds: 120));
+      await _pump(tester, Lang.en, card(stop: _stop(arrivedAt: arrived, students: [_rider('cka', 'Ari Hawre')])));
+      expect(_live(tester, t('driver.notHere')), isTrue);
+      expect(_live(tester, t('driver.movingOn')), isFalse);
+      expect(find.text(t('driver.flow.resolveFirst')), findsOneWidget);
+
+      await _pump(
+        tester,
+        Lang.en,
+        card(
+          stop: _stop(
+            arrivedAt: arrived,
+            students: [
+              _rider('cka', 'Ari Hawre', boardedAt: justNow),
+              _rider('ckb', 'Lana Azad', resolution: 'NO_SHOW'),
+            ],
+          ),
+        ),
+      );
+      expect(_live(tester, t('driver.movingOn')), isTrue);
+      expect(find.text(t('driver.flow.resolveFirst')), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('picked up straight away, Moving on comes on without waiting', (tester) async {
+      await _pump(
+        tester,
+        Lang.en,
+        card(stop: _stop(arrivedAt: justNow, students: [_rider('cka', 'Ari Hawre', boardedAt: justNow)])),
+      );
+      expect(_live(tester, t('driver.movingOn')), isTrue);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
+
+  group('the map sheet drives the same run', () {
+    tearDown(() => BusLocation.instance.here.value = null);
+
+    CrewTrip liveTrip(String status) => CrewTrip.fromJson({
+          'id': 'cktripaaaaaaaaaaaaaaaaaaa',
+          'leg': 'OUT',
+          'status': status,
+          'serviceDate': '2026-09-13',
+          'startedAt': status == 'IN_PROGRESS' ? '2026-09-13T05:00:00Z' : null,
+        });
+
+    RunDriving driving({required CrewTrip trip, required List<PlannedStop> stops}) {
+      final d = RunDriving(
+        stopPanel: (context, run, stop) => card(stop: stop),
+        schoolPanel: (context, run) => arrival(run.planStops),
+        runBar: (context, run) => RunActionBar(
+          trip: run.trip!,
+          busy: null,
+          onStart: () {},
+          onDepart: () {},
+          onEnd: () {},
+          endBlocked: mustDropAtSchool(run.leg, run.planStops) ? t('driver.gate.dropFirst') : null,
+        ),
+        sos: (context, run) => null,
+      );
+      d.publish(RunSnapshot(trip: trip, leg: 'OUT', stops: stops, planStops: stops, school: null));
+      return d;
+    }
+
+    Future<void> pumpSheet(WidgetTester tester, RunDriving d, String? selection) =>
+        _pump(tester, Lang.en, RunMapSheet(driving: d, selection: selection, onClose: () {}, maxHeightFraction: 1));
+
+    testWidgets('with nothing chosen it shows the run button; a chosen stop shows the numbered flow', (tester) async {
+      BusLocation.instance.here.value = _fixAt(36.2, 44.0);
+      final stop = _stop(students: [_rider('cka', 'Ari Hawre')]);
+      final d = driving(trip: liveTrip('IN_PROGRESS'), stops: [stop]);
+
+      await pumpSheet(tester, d, null);
+      expect(find.text(t('driver.endRun')), findsOneWidget);
+      expect(find.text(t('driver.map.tapStopHint')), findsOneWidget);
+
+      await pumpSheet(tester, d, runStopKey(stop));
+      for (final key in ['driver.arrived', 'driver.skipStop', 'driver.pickUp', 'driver.notHere', 'driver.movingOn']) {
+        expect(find.text(t(key)), findsOneWidget, reason: key);
+      }
+      expect(_live(tester, t('driver.arrived')), isTrue);
+      expect(_live(tester, t('driver.movingOn')), isFalse);
+      expect(find.byTooltip(t('common.close')), findsOneWidget);
+
+      d.publish(RunSnapshot(
+        trip: liveTrip('IN_PROGRESS'),
+        leg: 'OUT',
+        stops: [_stop(arrivedAt: justNow, students: [_rider('cka', 'Ari Hawre', boardedAt: justNow)])],
+        planStops: [stop],
+        school: null,
+      ));
+      await tester.pump();
+      expect(find.text(t('driver.wrong')), findsOneWidget);
+      expect(_live(tester, t('driver.movingOn')), isTrue);
+      d.dispose();
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('the school pin opens the arrived at school card', (tester) async {
+      final d = driving(trip: liveTrip('IN_PROGRESS'), stops: outRun(allOff: false));
+      await pumpSheet(tester, d, kSchoolTargetKey);
+      expect(find.text(t('driver.gate.arrivalTitle')), findsOneWidget);
+      expect(find.text(t('driver.setDown')), findsWidgets);
+      d.dispose();
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('the run button carries the same gating as the run screen', (tester) async {
+      final d = driving(trip: liveTrip('IN_PROGRESS'), stops: outRun(allOff: false));
+      await pumpSheet(tester, d, null);
+      expect(find.text(t('driver.gate.dropFirst')), findsOneWidget);
+      final button = tester.widget<BigButton>(find.byType(BigButton));
+      expect(button.onPressed, isNull);
+      expect(runStepFor('BOARDING', onStart: () {}, onDepart: () {}, onEnd: () {}).label, t('driver.setOff'));
+      expect(runStepFor('SWEEP_PENDING', onStart: () {}, onDepart: () {}, onEnd: () {}).action, isNull);
+      d.dispose();
       await tester.pumpWidget(const SizedBox.shrink());
     });
   });

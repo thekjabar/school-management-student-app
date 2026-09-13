@@ -60,6 +60,20 @@ String? custodyStopId({
   return atOwnStop ? riderStopId : terminalStopId;
 }
 
+class ReportedFix {
+  const ReportedFix({
+    required this.lat,
+    required this.lon,
+    required this.accuracyM,
+    required this.ageMs,
+  });
+
+  final double lat;
+  final double lon;
+  final int accuracyM;
+  final int ageMs;
+}
+
 class CustodyVerdict {
   const CustodyVerdict({
     required this.accepted,
@@ -303,6 +317,7 @@ class PlannedStop {
     required this.etaIsActual,
     required this.dwellSeconds,
     required this.driveSeconds,
+    this.radiusM,
   });
 
   final String stopId;
@@ -327,6 +342,8 @@ class PlannedStop {
 
   final int driveSeconds;
 
+  final int? radiusM;
+
   bool get done => departedAt != null || skipped;
   int get remaining => students.where((s) => !s.accountedFor).length;
 
@@ -347,6 +364,7 @@ class PlannedStop {
         etaIsActual: etaIsActual,
         dwellSeconds: dwellSeconds,
         driveSeconds: driveSeconds,
+        radiusM: radiusM,
       );
 
   factory PlannedStop.fromJson(Map<String, dynamic> j) => PlannedStop(
@@ -368,6 +386,7 @@ class PlannedStop {
         etaIsActual: (j['etaIsActual'] ?? false) as bool,
         dwellSeconds: (j['dwellSeconds'] as num?)?.toInt() ?? 0,
         driveSeconds: (j['driveSeconds'] as num?)?.toInt() ?? 0,
+        radiusM: (j['radiusM'] as num?)?.toInt(),
       );
 }
 
@@ -379,9 +398,12 @@ class SchoolGate {
     required this.lon,
     this.sequence,
     this.arrivedAt,
+    this.radiusM,
   });
 
   final String? stopId;
+
+  final int? radiusM;
 
   final int? sequence;
 
@@ -425,6 +447,7 @@ class SchoolGate {
       lon: useGate ? gateLon : _number(campus?['lon']),
       sequence: (gateRow?['sequence'] as num?)?.toInt(),
       arrivedAt: arrived is String ? DateTime.tryParse(arrived)?.toLocal() : null,
+      radiusM: _number(useGate ? (gate?['radiusM']) : (campus?['radiusM']))?.round(),
     );
   }
 }
@@ -914,8 +937,15 @@ class CrewApi {
     return (json['unaccounted'] as num?)?.toInt() ?? 0;
   }
 
-  Future<void> arriveAtStop(String tripId, int sequence) =>
-      _api.post('/crew/trips/$tripId/stops/$sequence/arrive');
+  Future<void> arriveAtStop(String tripId, int sequence, {ReportedFix? fix}) =>
+      _api.post('/crew/trips/$tripId/stops/$sequence/arrive', {
+        if (fix != null) ...{
+          'lat': fix.lat,
+          'lon': fix.lon,
+          'accuracyM': fix.accuracyM,
+          'positionAgeMs': fix.ageMs,
+        },
+      });
 
   Future<void> leaveStop(String tripId, int sequence) =>
       _api.post('/crew/trips/$tripId/stops/$sequence/depart');
