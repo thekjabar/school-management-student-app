@@ -1245,7 +1245,7 @@ class _StopCardState extends State<StopCard> {
     final open = widget.query.isNotEmpty || (_openChoice ?? widget.current);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Panel(
         padding: EdgeInsets.zero,
         child: Column(
@@ -1258,7 +1258,7 @@ class _StopCardState extends State<StopCard> {
             if (open) ...[
               Divider(height: 1, color: AppTheme.border),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: _flow(),
@@ -1308,51 +1308,86 @@ class _StopCardState extends State<StopCard> {
 
     return [
       ?banner,
-      _FlowStep(
-        number: 1,
-        label: t('driver.flow.arrive'),
-        done: s.arrivedAt != null,
-        first: banner == null,
-        child: s.arrivedAt != null
-            ? _FlowDone(
-                icon: Icons.location_on_rounded,
-                text: tn('driver.arrivedAt', hhmm(s.arrivedAt)),
-                colour: AppTheme.green,
-              )
-            : _FlowButton(
-                label: t('driver.arrived'),
-                icon: Icons.location_on_rounded,
-                colour: Colors.white,
-                fill: Role.driver.tint,
-                busy: _busyStop,
-                onPressed: running
-                    ? () => _stopAction(
-                          () => CrewApi.instance.arriveAtStop(widget.tripId, s.plannedSequence),
-                          t('driver.arrived'),
-                        )
-                    : null,
+      Padding(
+        padding: EdgeInsets.only(top: banner == null ? 0 : 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: _StepLabel(
+                    number: 1,
+                    label: t('driver.flow.arrive'),
+                    done: s.arrivedAt != null,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 3,
+                  child: _StepLabel(
+                    number: 2,
+                    label: t('driver.flow.skip'),
+                    done: s.skipped,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: s.arrivedAt != null
+                        ? _FlowDone(
+                            icon: Icons.location_on_rounded,
+                            text: tn('driver.arrivedAt', hhmm(s.arrivedAt)),
+                            colour: AppTheme.green,
+                          )
+                        : _FlowButton(
+                            label: t('driver.arrived'),
+                            icon: Icons.location_on_rounded,
+                            colour: Colors.white,
+                            fill: Role.driver.tint,
+                            busy: _busyStop,
+                            onPressed: running
+                                ? () => _stopAction(
+                                      () => CrewApi.instance
+                                          .arriveAtStop(widget.tripId, s.plannedSequence),
+                                      t('driver.arrived'),
+                                    )
+                                : null,
+                          ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 3,
+                    child: s.skipped
+                        ? _FlowDone(
+                            icon: Icons.skip_next_rounded,
+                            text: t('driver.skipped'),
+                            colour: AppTheme.amber,
+                            mirror: true,
+                          )
+                        : _FlowButton(
+                            label: t('driver.skipStop'),
+                            icon: Icons.skip_next_rounded,
+                            mirror: true,
+                            colour: AppTheme.text,
+                            fill: AppTheme.surface,
+                            outline: true,
+                            onPressed: canSkip && running && !_busyStop ? _skipStop : null,
+                          ),
+                  ),
+                ],
               ),
-      ),
-      _FlowStep(
-        number: 2,
-        label: t('driver.flow.skip'),
-        done: s.skipped,
-        child: s.skipped
-            ? _FlowDone(
-                icon: Icons.skip_next_rounded,
-                text: t('driver.skipped'),
-                colour: AppTheme.amber,
-                mirror: true,
-              )
-            : _FlowButton(
-                label: t('driver.skipStop'),
-                icon: Icons.skip_next_rounded,
-                mirror: true,
-                colour: AppTheme.text,
-                fill: AppTheme.surface,
-                outline: true,
-                onPressed: canSkip && running && !_busyStop ? _skipStop : null,
-              ),
+            ),
+          ],
+        ),
       ),
       if (hasChildren)
         _FlowStep(
@@ -1394,18 +1429,18 @@ class _StopCardState extends State<StopCard> {
                         : null,
                   ),
                   if (holding) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.timer_outlined, size: 16, color: AppTheme.textMuted),
-                        const SizedBox(width: 7),
+                        Icon(Icons.timer_outlined, size: 14, color: AppTheme.textMuted),
+                        const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             t('driver.holdAtStop'),
                             style: TextStyle(
-                              fontSize: 12.5,
-                              height: 1.45,
+                              fontSize: 12,
+                              height: 1.35,
                               color: AppTheme.textMuted,
                             ),
                           ),
@@ -1431,7 +1466,7 @@ class _StopCardState extends State<StopCard> {
       children: [
         if (widget.query.isEmpty && s.students.length > 3)
           Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 8),
             child: RosterFilters(
               riders: s.students,
               value: _show,
@@ -1440,9 +1475,9 @@ class _StopCardState extends State<StopCard> {
           ),
         for (final (i, r) in riders.indexed) ...[
           if (i > 0) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Divider(height: 1, color: AppTheme.border),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
           ],
           _ChildActions(
             rider: r,
@@ -1490,12 +1525,12 @@ class _StopHeader extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppTheme.radius),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
+        padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
         child: Row(
           children: [
             Container(
-              width: 46,
-              height: 46,
+              width: 40,
+              height: 40,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: s.skipped
@@ -1503,30 +1538,30 @@ class _StopHeader extends StatelessWidget {
                     : settled
                         ? AppTheme.greenSoft
                         : Role.driver.wash,
-                borderRadius: BorderRadius.circular(13),
+                borderRadius: BorderRadius.circular(11),
               ),
               child: s.skipped
                   ? _Mirrored(
-                      child: Icon(Icons.skip_next_rounded, size: 22, color: AppTheme.amber),
+                      child: Icon(Icons.skip_next_rounded, size: 20, color: AppTheme.amber),
                     )
                   : settled
-                      ? Icon(Icons.check_rounded, size: 22, color: AppTheme.green)
+                      ? Icon(Icons.check_rounded, size: 20, color: AppTheme.green)
                       : FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Padding(
-                            padding: const EdgeInsets.all(4),
+                            padding: const EdgeInsets.all(3),
                             child: Text(
                               '${s.plannedSequence}',
                               style: TextStyle(
                                 fontWeight: FontWeight.w800,
-                                fontSize: 18,
+                                fontSize: 16,
                                 color: Role.driver.tint,
                               ),
                             ),
                           ),
                         ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1535,40 +1570,40 @@ class _StopHeader extends StatelessWidget {
                     s.name,
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      height: 1.3,
+                      fontSize: 15,
+                      height: 1.25,
                       color: AppTheme.text,
                     ),
                   ),
                   if (place.isNotEmpty) ...[
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 2),
                     Text(
                       place,
-                      style: TextStyle(fontSize: 13, height: 1.35, color: AppTheme.textMuted),
+                      style: TextStyle(fontSize: 12.5, height: 1.3, color: AppTheme.textMuted),
                     ),
                   ],
                   if (s.skippedReason != null) ...[
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 2),
                     Text(
                       s.skippedReason!,
-                      style: TextStyle(fontSize: 12.5, height: 1.35, color: AppTheme.amber),
+                      style: TextStyle(fontSize: 12, height: 1.3, color: AppTheme.amber),
                     ),
                   ],
                   if (s.etaAt != null) ...[
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 3),
                     Row(
                       children: [
                         Icon(
                           s.etaIsActual ? Icons.check_circle_rounded : Icons.schedule_rounded,
-                          size: 16,
+                          size: 13,
                           color: s.etaIsActual ? AppTheme.green : AppTheme.textMuted,
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 4),
                         Flexible(
                           child: Text(
                             stopEtaText(s),
                             style: TextStyle(
-                              fontSize: 13.5,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: s.etaIsActual ? AppTheme.green : AppTheme.textMuted,
                             ),
@@ -1582,7 +1617,7 @@ class _StopHeader extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: s.skipped
                     ? AppTheme.amberSoft
@@ -1598,7 +1633,7 @@ class _StopHeader extends StatelessWidget {
                         ? t('driver.done')
                         : tn('driver.nLeft', remaining),
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: s.skipped
                       ? AppTheme.amber
@@ -1611,7 +1646,7 @@ class _StopHeader extends StatelessWidget {
             const SizedBox(width: 4),
             Icon(
               open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-              size: 28,
+              size: 24,
               color: AppTheme.textMuted,
             ),
           ],
@@ -1631,24 +1666,55 @@ class _FlowBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: wash,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline_rounded, size: 20, color: colour),
-          const SizedBox(width: 10),
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(Icons.info_outline_rounded, size: 16, color: colour),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(fontSize: 13.5, height: 1.45, color: AppTheme.text),
+              style: TextStyle(fontSize: 12.5, height: 1.35, color: AppTheme.text),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _StepLabel extends StatelessWidget {
+  const _StepLabel({required this.number, required this.label, required this.done});
+
+  final int number;
+  final String label;
+  final bool done;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = done ? AppTheme.green : AppTheme.textMuted;
+    final style = TextStyle(fontSize: 12, height: 1.3, fontWeight: FontWeight.w600, color: tone);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (done)
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(Icons.check_circle_rounded, size: 14, color: tone),
+          )
+        else
+          Text('$number.', style: style),
+        const SizedBox(width: 4),
+        Expanded(child: Text(label, style: style)),
+      ],
     );
   }
 }
@@ -1659,54 +1725,22 @@ class _FlowStep extends StatelessWidget {
     required this.label,
     required this.done,
     required this.child,
-    this.first = false,
   });
 
   final int number;
   final String label;
   final bool done;
   final Widget child;
-  final bool first;
 
   @override
   Widget build(BuildContext context) {
-    final tone = done ? AppTheme.green : AppTheme.textMuted;
     return Padding(
-      padding: EdgeInsets.only(top: first ? 0 : 14),
+      padding: const EdgeInsets.only(top: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (done)
-                Padding(
-                  padding: const EdgeInsets.only(top: 1),
-                  child: Icon(Icons.check_circle_rounded, size: 17, color: tone),
-                )
-              else
-                Text(
-                  '$number.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: tone,
-                  ),
-                ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: tone,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
+          _StepLabel(number: number, label: label, done: done),
+          const SizedBox(height: 4),
           child,
         ],
       ),
@@ -1741,21 +1775,22 @@ class _FlowDone extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final glyph = Icon(icon, size: 18, color: colour);
+    final glyph = Icon(icon, size: 16, color: colour);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      constraints: const BoxConstraints(minHeight: 44),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: AppTheme.neutralSoft,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           mirror ? _Mirrored(child: glyph) : glyph,
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: colour),
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: colour),
             ),
           ),
         ],
@@ -1774,6 +1809,7 @@ class _FlowButton extends StatelessWidget {
     this.busy = false,
     this.outline = false,
     this.mirror = false,
+    this.height = 44,
   });
 
   final String label;
@@ -1784,6 +1820,7 @@ class _FlowButton extends StatelessWidget {
   final bool busy;
   final bool outline;
   final bool mirror;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -1791,7 +1828,7 @@ class _FlowButton extends StatelessWidget {
     final dim = !live && !busy;
     final tone = dim ? colour.withValues(alpha: outline ? 0.4 : 0.55) : colour;
     final ground = dim && !outline ? fill.withValues(alpha: 0.5) : fill;
-    final glyph = Icon(icon, size: 22, color: tone);
+    final glyph = Icon(icon, size: 18, color: tone);
 
     return Semantics(
       button: true,
@@ -1800,7 +1837,7 @@ class _FlowButton extends StatelessWidget {
         color: ground,
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           side: outline
               ? BorderSide(color: AppTheme.textFaint.withValues(alpha: dim ? 0.35 : 0.6), width: 1.2)
               : BorderSide.none,
@@ -1808,28 +1845,28 @@ class _FlowButton extends StatelessWidget {
         child: InkWell(
           onTap: live ? onPressed : null,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 56),
+            constraints: BoxConstraints(minHeight: height),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               child: Center(
                 child: busy
                     ? SizedBox(
-                        width: 22,
-                        height: 22,
+                        width: 18,
+                        height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2.4, color: colour),
                       )
                     : Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           mirror ? _Mirrored(child: glyph) : glyph,
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 6),
                           Flexible(
                             child: Text(
                               label,
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                fontSize: 16,
-                                height: 1.25,
+                                fontSize: 14.5,
+                                height: 1.2,
                                 fontWeight: FontWeight.w700,
                                 color: tone,
                               ),
@@ -2040,8 +2077,8 @@ class _ChildActions extends StatelessWidget {
         if (showWho) ...[
           Row(
             children: [
-              SeatChip(rider: rider, size: 34),
-              const SizedBox(width: 10),
+              SeatChip(rider: rider, size: 30),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2055,7 +2092,7 @@ class _ChildActions extends StatelessWidget {
                                 rider.name,
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 14.5,
+                                  fontSize: 13.5,
                                   color: AppTheme.text,
                                 ),
                               ),
@@ -2069,7 +2106,7 @@ class _ChildActions extends StatelessWidget {
                       Text(
                         status.text,
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 12,
                           fontWeight: notRiding ? FontWeight.w600 : FontWeight.w500,
                           color: status.tone,
                         ),
@@ -2079,15 +2116,15 @@ class _ChildActions extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
         ],
         if (busy)
           const SizedBox(
-            height: 56,
+            height: 40,
             child: Center(
               child: SizedBox(
-                width: 22,
-                height: 22,
+                width: 18,
+                height: 18,
                 child: CircularProgressIndicator(strokeWidth: 2.4),
               ),
             ),
@@ -2098,6 +2135,7 @@ class _ChildActions extends StatelessWidget {
             icon: Icons.edit_note_rounded,
             colour: AppTheme.textMuted,
             fill: AppTheme.neutralSoft,
+            height: 40,
             onPressed: onCorrect,
           )
         else
@@ -2113,6 +2151,7 @@ class _ChildActions extends StatelessWidget {
                           mirror: true,
                           colour: AppTheme.green,
                           fill: AppTheme.greenSoft,
+                          height: 40,
                           onPressed: canSetDown ? onOff : null,
                         )
                       : _FlowButton(
@@ -2121,10 +2160,11 @@ class _ChildActions extends StatelessWidget {
                           mirror: true,
                           colour: Role.driver.tint,
                           fill: Role.driver.wash,
+                          height: 40,
                           onPressed: canPickUp ? onBoard : null,
                         ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
                   child: onBus || notRiding
                       ? _FlowButton(
@@ -2132,6 +2172,7 @@ class _ChildActions extends StatelessWidget {
                           icon: Icons.edit_note_rounded,
                           colour: AppTheme.textMuted,
                           fill: AppTheme.neutralSoft,
+                          height: 40,
                           onPressed: onCorrect,
                         )
                       : _FlowButton(
@@ -2139,6 +2180,7 @@ class _ChildActions extends StatelessWidget {
                           icon: Icons.close_rounded,
                           colour: AppTheme.text,
                           fill: AppTheme.neutralSoft,
+                          height: 40,
                           onPressed: canPickUp ? onNoShow : null,
                         ),
                 ),
