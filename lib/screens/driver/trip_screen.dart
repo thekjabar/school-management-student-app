@@ -24,6 +24,8 @@ const List<(String, String)> _serverSays = [
   ('not been started', 'driver.mustSetOff'),
   ('is not running', 'driver.mustSetOff'),
   ('pre-trip check', 'driver.mustCheckBus'),
+  ('check everyone at school first', 'driver.gate.checkFirst'),
+  ('mark everyone off at school first', 'driver.gate.dropFirst'),
 ];
 
 String _driverWords(String message) {
@@ -592,6 +594,8 @@ class _TripScreenState extends State<TripScreen> {
                   final checkOpen = schoolCheckOpen(leg, data.plan.stops);
                   final homeLocked = checkOpen && running;
                   final endBlocked = running && mustDropAtSchool(leg, data.plan.stops);
+                  final departBlocked = mustCheckBeforeSetOff(leg, started, data.plan.stops);
+                  final schoolCheckLive = canCheckAtSchool(trip);
                   final schoolName = data.school?.name ?? Session.instance.me?.schoolName ?? t('driver.school');
                   final schoolArrivedAt =
                       data.plan.terminalArrivedAt ?? _schoolArrivedAt ?? data.school?.arrivedAt;
@@ -614,6 +618,7 @@ class _TripScreenState extends State<TripScreen> {
                           onDepart: () => _act(t('driver.departed'), () => CrewApi.instance.depart(trip.id)),
                           onEnd: () => _endRun(trip, counts.stillOnBoard),
                           endBlocked: endBlocked ? t('driver.gate.dropFirst') : null,
+                          departBlocked: departBlocked ? t('driver.gate.checkFirst') : null,
                         ),
                         const SizedBox(height: 12),
                       ],
@@ -697,7 +702,12 @@ class _TripScreenState extends State<TripScreen> {
                         BoardingCheckCard(
                           stops: data.plan.stops,
                           schoolName: schoolName,
-                          running: running,
+                          canCheck: schoolCheckLive,
+                          lockedNoteKey: schoolCheckLive
+                              ? null
+                              : (const {'PLANNED', 'ROSTERED', 'BLOCKED'}.contains(trip?.status)
+                                  ? 'driver.mustCheckBus'
+                                  : 'driver.tickAfterSetOff'),
                           query: _query,
                           busyStudent: _busyStudent,
                           busyAll: _busy != null,
@@ -1000,11 +1010,14 @@ class _RunControls extends StatelessWidget {
     required this.onDepart,
     required this.onEnd,
     this.endBlocked,
+    this.departBlocked,
   });
 
   final CrewTrip trip;
 
   final String? endBlocked;
+
+  final String? departBlocked;
 
   final TripTiming timing;
   final String? busy;
@@ -1039,6 +1052,12 @@ class _RunControls extends StatelessWidget {
     };
 
     final school = Session.instance.me?.schoolName ?? '';
+
+    final lock = identical(action, onEnd)
+        ? endBlocked
+        : identical(action, onDepart)
+            ? departBlocked
+            : null;
 
     final settled = trip.status == 'COMPLETED';
     final blocked = trip.status == 'BLOCKED';
@@ -1214,7 +1233,7 @@ class _RunControls extends StatelessWidget {
             ),
             const SizedBox(height: 12),
           ],
-          if (identical(action, onEnd) && endBlocked != null) ...[
+          if (lock != null) ...[
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1222,7 +1241,7 @@ class _RunControls extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    endBlocked!,
+                    lock,
                     style: TextStyle(
                       fontSize: 13,
                       height: 1.4,
@@ -2486,7 +2505,8 @@ class BoardingCheckCard extends StatefulWidget {
     super.key,
     required this.stops,
     required this.schoolName,
-    required this.running,
+    required this.canCheck,
+    this.lockedNoteKey,
     required this.busyStudent,
     required this.busyAll,
     required this.onBoard,
@@ -2498,7 +2518,8 @@ class BoardingCheckCard extends StatefulWidget {
 
   final List<PlannedStop> stops;
   final String schoolName;
-  final bool running;
+  final bool canCheck;
+  final String? lockedNoteKey;
   final String? busyStudent;
   final bool busyAll;
   final RiderAction onBoard;
@@ -2553,9 +2574,9 @@ class _BoardingCheckCardState extends State<BoardingCheckCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (!widget.running)
+                    if (!widget.canCheck && !complete)
                       _FlowBanner(
-                        text: t('driver.tickAfterSetOff'),
+                        text: t(widget.lockedNoteKey ?? 'driver.tickAfterSetOff'),
                         colour: AppTheme.textMuted,
                         wash: AppTheme.neutralSoft,
                       )
@@ -2588,7 +2609,7 @@ class _BoardingCheckCardState extends State<BoardingCheckCard> {
                         fill: AppTheme.green,
                         height: 48,
                         busy: widget.busyAll,
-                        onPressed: widget.running && widget.busyStudent == null
+                        onPressed: widget.canCheck && widget.busyStudent == null
                             ? widget.onAllOnBus
                             : null,
                       ),
@@ -2606,7 +2627,7 @@ class _BoardingCheckCardState extends State<BoardingCheckCard> {
   Widget _boardingRow(RiderOnStop r, PlannedStop s) {
     final resolved = r.accountedFor;
     final status = riderStatus(r, leg: 'RETURN', schoolReached: false);
-    final live = widget.running && !widget.busyAll;
+    final live = widget.canCheck && !widget.busyAll;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

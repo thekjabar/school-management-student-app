@@ -14,6 +14,14 @@ bool mustDropAtSchool(String leg, List<PlannedStop> stops) =>
     leg == 'OUT' &&
     stops.any((s) => s.students.any((r) => r.boardedAt != null && r.alightedAt == null));
 
+bool mustCheckBeforeSetOff(String leg, bool started, List<PlannedStop> stops) =>
+    !started && schoolCheckOpen(leg, stops);
+
+const Set<String> _schoolCheckStatuses = {'BOARDING', 'IN_PROGRESS', 'ARRIVED'};
+
+bool canCheckAtSchool(CrewTrip? trip) =>
+    trip != null && trip.endedAt == null && _schoolCheckStatuses.contains(trip.status);
+
 ({String text, Color tone}) riderStatus(
   RiderOnStop r, {
   required String leg,

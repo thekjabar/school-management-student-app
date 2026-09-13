@@ -142,10 +142,12 @@ void main() {
         ),
       ];
 
-  BoardingCheckCard boarding(List<PlannedStop> stops, {bool running = true}) => BoardingCheckCard(
+  BoardingCheckCard boarding(List<PlannedStop> stops, {bool canCheck = true, String? lockedNoteKey}) =>
+      BoardingCheckCard(
         stops: stops,
         schoolName: 'Sunrise International School of Erbil',
-        running: running,
+        canCheck: canCheck,
+        lockedNoteKey: lockedNoteKey,
         busyStudent: null,
         busyAll: false,
         onBoard: (_, _) {},
@@ -288,9 +290,9 @@ void main() {
       ['driver.gate.boardingTitle', 'driver.gate.boardingHow', 'driver.gate.onTheBus', 'driver.notHere', 'driver.wrong', 'driver.gate.allOnBus'],
     ),
     _Case(
-      'boarding at school, before setting off',
-      () => boarding(returnRun(checked: false), running: false),
-      ['driver.tickAfterSetOff', 'driver.gate.onTheBus'],
+      'boarding at school, before the bus check',
+      () => boarding(returnRun(checked: false), canCheck: false, lockedNoteKey: 'driver.mustCheckBus'),
+      ['driver.mustCheckBus', 'driver.gate.onTheBus'],
     ),
     _Case(
       'boarding at school, done',
@@ -351,6 +353,51 @@ void main() {
       expect(find.text(t('driver.handOver')), findsNothing);
       expect(find.text(t('driver.pickUp')), findsNothing);
       expect(find.text(t('driver.notRiding')), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
+
+  group('boarding check before Set off on the way home', () {
+    CrewTrip trip(String status, {bool started = false, bool ended = false}) => CrewTrip.fromJson({
+          'id': 'cktripaaaaaaaaaaaaaaaaaaa',
+          'leg': 'RETURN',
+          'status': status,
+          'serviceDate': '2026-09-13',
+          'startedAt': started ? '2026-09-13T11:00:00Z' : null,
+          'endedAt': ended ? '2026-09-13T12:00:00Z' : null,
+        });
+
+    testWidgets('the check is live once the bus check is done, and Set off waits for it', (tester) async {
+      final open = returnRun(checked: false);
+      final done = returnRun(checked: true);
+
+      expect(canCheckAtSchool(trip('ROSTERED')), isFalse);
+      expect(canCheckAtSchool(trip('BLOCKED')), isFalse);
+      expect(canCheckAtSchool(trip('BOARDING')), isTrue);
+      expect(canCheckAtSchool(trip('IN_PROGRESS', started: true)), isTrue);
+      expect(canCheckAtSchool(trip('COMPLETED', started: true, ended: true)), isFalse);
+      expect(canCheckAtSchool(null), isFalse);
+
+      expect(mustCheckBeforeSetOff('RETURN', false, open), isTrue);
+      expect(mustCheckBeforeSetOff('RETURN', false, done), isFalse);
+      expect(mustCheckBeforeSetOff('RETURN', true, open), isFalse);
+      expect(mustCheckBeforeSetOff('OUT', false, open), isFalse);
+
+      await _pump(tester, Lang.en, boarding(open, canCheck: canCheckAtSchool(trip('BOARDING'))));
+      expect(find.text(t('driver.tickAfterSetOff')), findsNothing);
+      expect(find.text(t('driver.gate.boardingHow')), findsOneWidget);
+      expect(_live(tester, t('driver.gate.onTheBus')), isTrue);
+      expect(_live(tester, t('driver.notHere')), isTrue);
+      expect(_live(tester, tn('driver.gate.allOnBus', 2)), isTrue);
+
+      await _pump(
+        tester,
+        Lang.en,
+        boarding(open, canCheck: canCheckAtSchool(trip('ROSTERED')), lockedNoteKey: 'driver.mustCheckBus'),
+      );
+      expect(find.text(t('driver.mustCheckBus')), findsOneWidget);
+      expect(_live(tester, t('driver.gate.onTheBus')), isFalse);
+      expect(_live(tester, tn('driver.gate.allOnBus', 2)), isFalse);
       await tester.pumpWidget(const SizedBox.shrink());
     });
   });
