@@ -3809,8 +3809,13 @@ class Entitlements {
     return next;
   }
 
+  DateTime? _fetchedAt;
+
+  static const Duration _fresh = Duration(seconds: 15);
+
   Future<void> ensureLoaded() async {
-    if (current.value.loaded) return;
+    final at = _fetchedAt;
+    if (current.value.loaded && at != null && DateTime.now().difference(at) < _fresh) return;
     await refresh();
   }
 
@@ -3833,6 +3838,7 @@ class Entitlements {
     if (results.contains(null) && current.value.loaded) {
       merged = merged.withChildrenFrom(current.value);
     }
+    _fetchedAt = DateTime.now();
     current.value = merged;
   }
 
@@ -3853,6 +3859,7 @@ class Entitlements {
     _generation++;
     _tenantIds = <String>{};
     _running = null;
+    _fetchedAt = null;
     current.value = PackageEntitlements.none;
   }
 }
