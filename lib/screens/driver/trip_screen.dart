@@ -338,7 +338,7 @@ class _TripScreenState extends State<TripScreen> {
                     ? t('driver.theRun')
                     : (trip.leg == 'RETURN' ? t('driver.legReturn') : t('driver.legOut')),
                 subtitle: trip?.routeName,
-                trailing: (trip != null &&
+                leading: (trip != null &&
                         trip.startedAt != null &&
                         trip.endedAt == null)
                     ? _PanicChip(
@@ -3595,29 +3595,25 @@ class _PanicChip extends StatelessWidget {
     return GestureDetector(
       onTap: busy ? null : onPressed,
       behavior: HitTestBehavior.opaque,
-      child: Container(
-        height: 44,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppTheme.roseSoft,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.rose.withValues(alpha: 0.35)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.emergency_share_rounded, size: 17, color: AppTheme.rose),
-            const SizedBox(width: 7),
-            Text(
-              t('driver.sos'),
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.rose,
+      child: Semantics(
+        button: true,
+        label: t('driver.sos'),
+        child: Container(
+          width: 42,
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppTheme.rose,
+            borderRadius: BorderRadius.circular(13),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.rose.withValues(alpha: 0.35),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
-            ),
-          ],
+            ],
+          ),
+          child: const Icon(Icons.sos_rounded, size: 26, color: Colors.white),
         ),
       ),
     );
