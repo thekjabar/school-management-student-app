@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../api/crew_api.dart';
 import '../../api/session.dart';
@@ -181,6 +182,7 @@ class _DriverHomeState extends State<DriverHome> {
 
             _NextStopCard(
               stop: next,
+              school: duty.schoolTarget,
               leg: trip.leg,
               busy: _busy,
               lockNote: checkFirst ? t('driver.gate.checkFirst') : null,
@@ -293,6 +295,22 @@ class _Duty {
   final SchoolGate? school;
 
   PlannedStop? get nextStop => run?.next;
+
+  ({String name, int students, int? metres})? get schoolTarget {
+    final stops = run?.stops ?? plan?.stops;
+    final trip = this.trip;
+    final gate = school;
+    if (stops == null || trip == null || gate == null) return null;
+    final target = runTarget(stops: stops, leg: trip.leg, school: gate);
+    if (target == null || !target.school) return null;
+    final bus = run?.bus;
+    final name = (gate.name ?? '').trim();
+    return (
+      name: name.isNotEmpty ? name : (Session.instance.me?.schoolName ?? t('driver.school')),
+      students: target.students,
+      metres: bus != null && gate.placed ? metresBetween(bus, LatLng(gate.lat!, gate.lon!)).round() : null,
+    );
+  }
 }
 
 class _DutyCard extends StatelessWidget {
@@ -329,6 +347,7 @@ class _DutyCard extends StatelessWidget {
                 bottom: 0,
                 width: box.maxWidth * 0.46,
                 child: RouteMap(
+                  tripId: trip.id,
                   stops: run?.stops ?? plan?.stops ?? const [],
                   tint: tint,
                   leg: trip.leg,
@@ -576,6 +595,7 @@ class _Fact extends StatelessWidget {
 class _NextStopCard extends StatelessWidget {
   const _NextStopCard({
     required this.stop,
+    required this.school,
     required this.leg,
     required this.busy,
     required this.onOpen,
@@ -584,6 +604,9 @@ class _NextStopCard extends StatelessWidget {
   });
 
   final PlannedStop? stop;
+
+  final ({String name, int students, int? metres})? school;
+
   final String leg;
   final bool busy;
 
@@ -596,6 +619,7 @@ class _NextStopCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tint = Role.driver.tint;
     final s = stop;
+    final gate = school;
 
     return Card16(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
@@ -607,7 +631,7 @@ class _NextStopCard extends StatelessWidget {
             actionLabel: t('driver.viewAllStops'),
             onAction: onOpen,
           ),
-          if (s == null)
+          if (s == null && gate == null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
               child: Text(
@@ -624,77 +648,80 @@ class _NextStopCard extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: AppTheme.surface,
-                          borderRadius: BorderRadius.circular(12),
+                  if (gate != null)
+                    _SchoolTargetRow(school: gate, leg: leg)
+                  else if (s != null)
+                    Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: AppTheme.surface,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.flag_rounded, size: 19, color: tint),
                         ),
-                        child: Icon(Icons.flag_rounded, size: 19, color: tint),
-                      ),
-                      const SizedBox(width: 11),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              s.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.3,
-                                color: AppTheme.text,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              leg == 'RETURN'
-                                  ? tn('driver.nToDropOff', s.students.length)
-                                  : tn('driver.nToPickUp', s.students.length),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                            ),
-                            if (s.landmark != null && s.landmark!.isNotEmpty) ...[
-                              const SizedBox(height: 2),
+                        const SizedBox(width: 11),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                s.landmark!,
+                                s.name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 11, color: AppTheme.textFaint),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.3,
+                                  color: AppTheme.text,
+                                ),
                               ),
-                            ],
-                            if (s.etaAt != null) ...[
-                              const SizedBox(height: 4),
-                              StopEta(stop: s),
-                            ],
-                            if (s.metresAway != null) ...[
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Icon(Icons.place_rounded, size: 12, color: tint),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    distanceAway(s.metresAway!),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: tint,
+                              const SizedBox(height: 2),
+                              Text(
+                                leg == 'RETURN'
+                                    ? tn('driver.nToDropOff', s.students.length)
+                                    : tn('driver.nToPickUp', s.students.length),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                              ),
+                              if (s.landmark != null && s.landmark!.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  s.landmark!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 11, color: AppTheme.textFaint),
+                                ),
+                              ],
+                              if (s.etaAt != null) ...[
+                                const SizedBox(height: 4),
+                                StopEta(stop: s),
+                              ],
+                              if (s.metresAway != null) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(Icons.place_rounded, size: 12, color: tint),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      distanceAway(s.metresAway!),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: tint,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
+                                  ],
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                   if (lockNote != null) ...[
                     const SizedBox(height: 10),
                     Row(
@@ -719,20 +746,22 @@ class _NextStopCard extends StatelessWidget {
                   const SizedBox(height: 11),
                   Row(
                     children: [
-                      Expanded(
-                        child: _Button(
-                          icon: s.arrivedAt == null
-                              ? Icons.check_circle_outline_rounded
-                              : Icons.directions_bus_rounded,
-                          label: s.arrivedAt == null
-                              ? t('driver.iveArrived')
-                              : t('driver.movingOn'),
-                          filled: true,
-                          busy: busy,
-                          onTap: onStopAction,
+                      if (s != null && (gate == null || onStopAction != null)) ...[
+                        Expanded(
+                          child: _Button(
+                            icon: s.arrivedAt == null
+                                ? Icons.check_circle_outline_rounded
+                                : Icons.directions_bus_rounded,
+                            label: s.arrivedAt == null
+                                ? t('driver.iveArrived')
+                                : t('driver.movingOn'),
+                            filled: true,
+                            busy: busy,
+                            onTap: onStopAction,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
+                        const SizedBox(width: 8),
+                      ],
                       Expanded(
                         child: _Button(
                           icon: Icons.list_alt_rounded,
@@ -748,6 +777,76 @@ class _NextStopCard extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _SchoolTargetRow extends StatelessWidget {
+  const _SchoolTargetRow({required this.school, required this.leg});
+
+  final ({String name, int students, int? metres}) school;
+  final String leg;
+
+  @override
+  Widget build(BuildContext context) {
+    final metres = school.metres;
+    return Row(
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(Icons.school_rounded, size: 19, color: AppTheme.blue),
+        ),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                school.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                  color: AppTheme.text,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                leg == 'RETURN'
+                    ? tn('driver.pickUpAtSchool', school.students)
+                    : tn('driver.dropOffAtSchool', school.students),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+              ),
+              if (metres != null) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.place_rounded, size: 12, color: Role.driver.tint),
+                    const SizedBox(width: 4),
+                    Text(
+                      distanceAway(metres),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Role.driver.tint,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

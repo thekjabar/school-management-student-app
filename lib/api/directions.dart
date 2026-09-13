@@ -84,9 +84,6 @@ class Directions {
 
   static const double _schoolSnapMetres = 250;
 
-  static List<List<LatLng>>? cachedRun(List<LatLng> points, {double? startBearing, int? schoolIndex}) =>
-      _runCache[_runKey(points, startBearing, schoolIndex)];
-
   static String _runKey(List<LatLng> points, double? startBearing, int? schoolIndex) =>
       '${_key(points)}|${startBearing == null ? '' : (startBearing / 15).round()}|${schoolIndex ?? ''}';
 
@@ -224,6 +221,30 @@ class Directions {
     return out;
   }
 
+  static String encodePolyline6(List<LatLng> line) {
+    final out = StringBuffer();
+    var lat = 0;
+    var lon = 0;
+    void write(int delta) {
+      var value = delta < 0 ? ~(delta << 1) : delta << 1;
+      while (value >= 0x20) {
+        out.writeCharCode((0x20 | (value & 0x1f)) + 63);
+        value >>= 5;
+      }
+      out.writeCharCode(value + 63);
+    }
+
+    for (final p in line) {
+      final nextLat = (p.latitude * 1e6).round();
+      final nextLon = (p.longitude * 1e6).round();
+      write(nextLat - lat);
+      write(nextLon - lon);
+      lat = nextLat;
+      lon = nextLon;
+    }
+    return out.toString();
+  }
+
   static (int, int) _nextValue(String encoded, int start) {
     var index = start;
     var result = 0;
@@ -275,17 +296,32 @@ class Directions {
 
   static double? metres(LatLng from, LatLng to) => _metres[_pair(from, to)];
 
-  static Future<bool> travelTimes(List<LatLng> points, {bool fromFirstOnly = false}) {
+  static Map<String, List<double?>> matrixAmong(List<LatLng> points) => {
+        for (final a in points)
+          for (final b in points)
+            if (!identical(a, b) && _seconds.containsKey(_pair(a, b)))
+              _pair(a, b): [_seconds[_pair(a, b)], _metres[_pair(a, b)]],
+      };
+
+  static void rememberMatrix(Map<String, List<double?>> cells) {
+    cells.forEach((pair, cell) {
+      final seconds = cell.isEmpty ? null : cell[0];
+      if (seconds == null) return;
+      _seconds[pair] ??= seconds;
+      final length = cell.length > 1 ? cell[1] : null;
+      if (length != null) _metres[pair] ??= length;
+    });
+  }
+
+  static Future<bool> travelTimes(List<LatLng> points) {
     if (points.length < 2 || points.length > _maxMatrix || !MapTiles.configured) {
       return Future.value(false);
     }
-    final known = fromFirstOnly
-        ? points.skip(1).every((p) => _seconds.containsKey(_pair(points.first, p)))
-        : points.every((a) => points.every((b) => identical(a, b) || _seconds.containsKey(_pair(a, b))));
+    final known = points.every((a) => points.every((b) => identical(a, b) || _seconds.containsKey(_pair(a, b))));
     if (known) return Future.value(true);
 
-    final key = '${fromFirstOnly ? 'row' : 'all'}|${_key(points)}';
-    return _matrixRunning[key] ??= _fetchMatrix(points, fromFirstOnly).then((ok) {
+    final key = _key(points);
+    return _matrixRunning[key] ??= _fetchMatrix(points).then((ok) {
       _matrixRunning.remove(key);
       return ok;
     }).catchError((Object _) {
@@ -294,12 +330,11 @@ class Directions {
     });
   }
 
-  static Future<bool> _fetchMatrix(List<LatLng> points, bool fromFirstOnly) async {
+  static Future<bool> _fetchMatrix(List<LatLng> points) async {
     final coords = points.map((p) => '${p.longitude},${p.latitude}').join(';');
     final url = Uri.parse(
       'https://api.mapbox.com/directions-matrix/v1/mapbox/driving/$coords'
       '?annotations=duration,distance'
-      '${fromFirstOnly ? '&sources=0' : ''}'
       '&access_token=${MapTiles.token}',
     );
     final res = await http.get(url).timeout(const Duration(seconds: 8));

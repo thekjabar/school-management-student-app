@@ -4,16 +4,17 @@ import 'package:student_app/api/crew_api.dart';
 import 'package:student_app/api/directions.dart';
 import 'package:student_app/i18n/strings.dart';
 import 'package:student_app/screens/driver/run_order.dart';
+import 'package:student_app/screens/driver/run_route_cache.dart';
 
-RiderOnStop _rider(String id) => RiderOnStop(
+RiderOnStop _rider(String id, {DateTime? boardedAt, DateTime? alightedAt, String? resolution}) => RiderOnStop(
       studentId: id,
       name: 'Child $id',
       pickup: null,
       seatNumber: null,
       requiresAssistance: false,
-      boardedAt: null,
-      alightedAt: null,
-      resolution: null,
+      boardedAt: boardedAt,
+      alightedAt: alightedAt,
+      resolution: resolution,
     );
 
 PlannedStop _stop(
@@ -25,6 +26,7 @@ PlannedStop _stop(
   DateTime? departedAt,
   bool skipped = false,
   bool noRiders = false,
+  List<RiderOnStop>? riders,
 }) =>
     PlannedStop(
       stopId: id,
@@ -34,7 +36,7 @@ PlannedStop _stop(
       lon: lon,
       plannedSequence: sequence,
       metresAway: null,
-      students: noRiders ? const [] : [_rider('ck$id')],
+      students: riders ?? (noRiders ? const [] : [_rider('ck$id')]),
       arrivedAt: arrivedAt,
       departedAt: departedAt,
       skipped: skipped,
@@ -229,14 +231,232 @@ void main() {
 
       final back = runWaypoints(stops: [next, later], leg: 'RETURN', school: _gate);
       expect(back.first.school, isTrue);
-      expect(legStates(back), [LegState.next, LegState.later]);
+      expect(back.first.done, isFalse);
+      expect(legStates(back), [LegState.later, LegState.later]);
+
+      final boarded = [
+        _stop('next', 2, lat: 36.25, lon: 44.0, riders: [_rider('ck1', boardedAt: DateTime(2026, 9, 13, 14))]),
+        _stop('later', 3, lat: 36.22, lon: 44.0, riders: [_rider('ck2', resolution: 'NO_SHOW'), _rider('ck3', boardedAt: DateTime(2026, 9, 13, 14))]),
+      ];
+      final home = runWaypoints(stops: boarded, leg: 'RETURN', school: _gate);
+      expect(home.first.done, isTrue);
+      expect(legStates(home), [LegState.next, LegState.later]);
     });
 
     test('once every stop is served the leg into school is the next one', () {
       final a = _stop('a', 1, lat: 36.3, lon: 44.0, departedAt: DateTime(2026, 9, 13, 7));
       final b = _stop('b', 2, lat: 36.25, lon: 44.0, skipped: true);
-      final out = runWaypoints(stops: [a, b], leg: 'OUT', school: _gate);
+      final c = _stop('c', 3, lat: 36.22, lon: 44.0, departedAt: DateTime(2026, 9, 13, 7, 5));
+      final out = runWaypoints(stops: [a, b, c], leg: 'OUT', school: _gate);
+      expect([for (final w in out) w.id], ['a', 'c', 'school']);
       expect(legStates(out), [LegState.done, LegState.next]);
+    });
+  });
+
+  group('run target', () {
+    final boardedAt = DateTime(2026, 9, 13, 14);
+    final gateRow = _stop('ckgate', 0, lat: 36.20, lon: 44.0, noRiders: true);
+
+    test('afternoon, before the boarding check is complete, the only target is school', () {
+      final stops = [
+        gateRow,
+        _stop('home1', 1, lat: 36.25, lon: 44.0, riders: [_rider('ck1'), _rider('ck2', boardedAt: boardedAt)]),
+        _stop('home2', 2, lat: 36.30, lon: 44.0, riders: [_rider('ck3')]),
+      ];
+      final target = runTarget(stops: stops, leg: 'RETURN', school: _gate)!;
+      expect(target.school, isTrue);
+      expect(target.stop, isNull);
+      expect(target.students, 2);
+    });
+
+    test('afternoon, once every child is checked, the first home stop is the target', () {
+      final home1 = _stop('home1', 1, lat: 36.25, lon: 44.0, riders: [_rider('ck1', boardedAt: boardedAt)]);
+      final stops = [
+        gateRow,
+        home1,
+        _stop('home2', 2, lat: 36.30, lon: 44.0, riders: [_rider('ck3', resolution: 'NO_SHOW')]),
+      ];
+      final target = runTarget(stops: stops, leg: 'RETURN', school: _gate)!;
+      expect(target.school, isFalse);
+      expect(identical(target.stop, home1), isTrue);
+    });
+
+    test('afternoon with every home stop served has no target left', () {
+      final stops = [
+        _stop('home1', 1, lat: 36.25, lon: 44.0, departedAt: boardedAt, riders: [_rider('ck1', boardedAt: boardedAt, alightedAt: boardedAt)]),
+      ];
+      expect(runTarget(stops: stops, leg: 'RETURN', school: _gate), isNull);
+    });
+
+    test('morning ends at school: after the last home stop the target is school with the children aboard', () {
+      final stops = [
+        _stop('home1', 1, lat: 36.25, lon: 44.0, departedAt: boardedAt, riders: [_rider('ck1', boardedAt: boardedAt)]),
+        _stop('home2', 2, lat: 36.30, lon: 44.0, skipped: true, riders: [_rider('ck2', resolution: 'NO_SHOW')]),
+        _stop('home3', 3, lat: 36.22, lon: 44.0, departedAt: boardedAt, riders: [_rider('ck3', boardedAt: boardedAt), _rider('ck4', boardedAt: boardedAt)]),
+        gateRow,
+      ];
+      final target = runTarget(stops: stops, leg: 'OUT', school: _gate)!;
+      expect(target.school, isTrue);
+      expect(target.students, 3);
+
+      final waypoints = runWaypoints(stops: stops, leg: 'OUT', school: _gate);
+      expect(waypoints.where((w) => !w.done).single.school, isTrue);
+    });
+
+    test('morning with a home stop still to do targets that stop, not school', () {
+      final open = _stop('home1', 1, lat: 36.25, lon: 44.0);
+      final target = runTarget(stops: [open, gateRow], leg: 'OUT', school: _gate)!;
+      expect(identical(target.stop, open), isTrue);
+    });
+
+    test('afternoon order before boarding starts from school, not from a bus far away', () {
+      final near = _stop('near', 1, lat: 36.21, lon: 44.0);
+      final mid = _stop('mid', 2, lat: 36.25, lon: 44.0);
+      final far = _stop('far', 3, lat: 36.30, lon: 44.0);
+      final run = arrangeRun(
+        stops: [far, mid, near],
+        leg: 'RETURN',
+        nearest: true,
+        bus: const LatLng(36.31, 44.0),
+        school: _gate,
+      );
+      expect(_ids(run), ['near', 'mid', 'far']);
+      expect(run.basis, RunBasis.schoolFirst);
+      expect(orderWaitsForBus(run.basis), isFalse);
+    });
+  });
+
+  group('route cache rules', () {
+    final near = _stop('near', 1, lat: 36.21, lon: 44.0);
+    final mid = _stop('mid', 2, lat: 36.25, lon: 44.0);
+    final far = _stop('far', 3, lat: 36.30, lon: 44.0);
+
+    test('the route key ignores progress and the boarding check, so neither refetches', () {
+      final before = runRouteKey(leg: 'RETURN', waypoints: runWaypoints(stops: [near, mid, far], leg: 'RETURN', school: _gate));
+      final boarded = [
+        for (final s in [near, mid, far])
+          _stop(s.stopId, s.plannedSequence, lat: s.lat, lon: s.lon, riders: [_rider('ck${s.stopId}', boardedAt: DateTime(2026, 9, 13, 14))]),
+      ];
+      final after = runRouteKey(leg: 'RETURN', waypoints: runWaypoints(stops: boarded, leg: 'RETURN', school: _gate));
+      expect(after, before);
+
+      final served = [
+        _stop('near', 1, lat: 36.21, lon: 44.0, departedAt: DateTime(2026, 9, 13, 15), riders: [_rider('cknear', boardedAt: DateTime(2026, 9, 13, 14))]),
+        boarded[1],
+        boarded[2],
+      ];
+      expect(runRouteKey(leg: 'RETURN', waypoints: runWaypoints(stops: served, leg: 'RETURN', school: _gate)), before);
+    });
+
+    test('the route key changes when a stop is skipped, a stop has nobody riding, or the order changes', () {
+      String key(List<PlannedStop> stops) => runRouteKey(leg: 'OUT', waypoints: runWaypoints(stops: stops, leg: 'OUT', school: _gate));
+      final base = key([near, mid, far]);
+      expect(key([near, _stop('mid', 2, lat: 36.25, lon: 44.0, skipped: true), far]), isNot(base));
+      expect(key([near, _stop('mid', 2, lat: 36.25, lon: 44.0, riders: [_rider('ckm', resolution: 'NO_SHOW')]), far]), isNot(base));
+      expect(key([mid, near, far]), isNot(base));
+      expect(runRouteKey(leg: 'RETURN', waypoints: runWaypoints(stops: [near, mid, far], leg: 'RETURN', school: _gate)), isNot(base));
+    });
+
+    test('the bus leg key is the target alone, so a moving bus never asks again', () {
+      final waypoints = runWaypoints(stops: [near, mid, far], leg: 'OUT', school: _gate);
+      final key = busLegKey(leg: 'OUT', target: waypoints.first);
+      final book = RunRouteBook()..putBusLeg(key, BusLeg(from: const LatLng(36.10, 44.0), line: const [LatLng(36.10, 44.0), LatLng(36.21, 44.0)]));
+      final rebuilt = runWaypoints(stops: [near, mid, far], leg: 'OUT', school: _gate);
+      expect(book.decidedBusLeg(busLegKey(leg: 'OUT', target: rebuilt.where((w) => !w.done).first)), isTrue);
+      expect(book.busLegs.length, 1);
+      final moved = runWaypoints(stops: [_stop('near', 1, lat: 36.21, lon: 44.0, departedAt: DateTime(2026, 9, 13, 7)), mid, far], leg: 'OUT', school: _gate);
+      expect(book.decidedBusLeg(busLegKey(leg: 'OUT', target: moved.where((w) => !w.done).first)), isFalse);
+    });
+
+    test('a bus leg is only fetched when the bus is away from the stop it just left', () {
+      final start = runWaypoints(stops: [near, mid, far], leg: 'OUT', school: _gate);
+      expect(busLegNeeded(waypoints: start, bus: const LatLng(36.10, 44.0)), isTrue);
+      expect(busLegNeeded(waypoints: start, bus: const LatLng(36.2101, 44.0)), isFalse);
+
+      final left = runWaypoints(
+        stops: [_stop('near', 1, lat: 36.21, lon: 44.0, departedAt: DateTime(2026, 9, 13, 7)), mid, far],
+        leg: 'OUT',
+        school: _gate,
+      );
+      expect(busLegNeeded(waypoints: left, bus: const LatLng(36.2105, 44.0)), isFalse);
+      expect(busLegNeeded(waypoints: left, bus: const LatLng(36.23, 44.0)), isTrue);
+
+      final toSchool = runWaypoints(stops: [near, mid, far], leg: 'RETURN', school: _gate);
+      expect(busLegNeeded(waypoints: toSchool, bus: const LatLng(36.10, 44.0)), isTrue);
+      expect(busLegNeeded(waypoints: toSchool, bus: const LatLng(36.2001, 44.0)), isFalse);
+    });
+
+    test('the phase changes on the order toggle and when boarding completes, not on progress', () {
+      final open = [near, mid];
+      final phase = runPhase(leg: 'RETURN', stops: open, nearest: true);
+      expect(runPhase(leg: 'RETURN', stops: open, nearest: false), isNot(phase));
+      final boarded = [
+        for (final s in open)
+          _stop(s.stopId, s.plannedSequence, lat: s.lat, lon: s.lon, riders: [_rider('ck${s.stopId}', boardedAt: DateTime(2026, 9, 13, 14))]),
+      ];
+      final homes = runPhase(leg: 'RETURN', stops: boarded, nearest: true);
+      expect(homes, isNot(phase));
+      final served = [
+        _stop('near', 1, lat: 36.21, lon: 44.0, departedAt: DateTime(2026, 9, 13, 15), riders: [_rider('cknear', boardedAt: DateTime(2026, 9, 13, 14))]),
+        boarded[1],
+      ];
+      expect(runPhase(leg: 'RETURN', stops: served, nearest: true), homes);
+    });
+
+    test('a pinned order is kept while the bus moves and stops are served, and rebuilt for a new stop', () {
+      const pinned = PinnedOrder(order: ['near', 'mid', 'far'], basis: RunBasis.fromBus, road: true);
+      expect(canKeepOrder(pinned: null, open: const ['near'], busKnown: true), isFalse);
+      expect(canKeepOrder(pinned: pinned, open: const ['near', 'mid', 'far'], busKnown: true), isTrue);
+      expect(canKeepOrder(pinned: pinned, open: const ['far'], busKnown: true), isTrue);
+      expect(canKeepOrder(pinned: pinned, open: const ['far', 'new'], busKnown: true), isFalse);
+
+      const guessed = PinnedOrder(order: ['near', 'mid'], basis: RunBasis.noPosition, road: false);
+      expect(canKeepOrder(pinned: guessed, open: const ['near'], busKnown: false), isTrue);
+      expect(canKeepOrder(pinned: guessed, open: const ['near'], busKnown: true), isFalse);
+
+      final kept = arrangeRun(
+        stops: [near, mid, far],
+        leg: 'OUT',
+        nearest: true,
+        bus: const LatLng(36.31, 44.0),
+        keepOrder: const ['mid', 'near', 'far'],
+      );
+      expect(_ids(kept), ['mid', 'near', 'far']);
+      expect(openStopIds([near, _stop('x', 9, lat: 36.4, lon: 44.0, skipped: true), mid], null), ['near', 'mid']);
+    });
+
+    test('the saved book survives a round trip and keeps only recent routes', () {
+      final book = RunRouteBook();
+      for (var i = 0; i < 6; i++) {
+        book.putRoute('r$i', [
+          [LatLng(36.0 + i / 100, 44.0), const LatLng(36.123456, 44.654321)],
+        ]);
+      }
+      book.putBusLeg('b', const BusLeg(from: LatLng(36.1, 44.1)));
+      book.putOrder('OUT:stops:nearest', const PinnedOrder(order: ['a', 'b'], basis: RunBasis.fromBus, road: true));
+      book.matrix['x>y'] = [120.0, 900.0];
+
+      final back = RunRouteBook.fromJson(book.toJson());
+      expect(back.routes.keys, ['r2', 'r3', 'r4', 'r5']);
+      expect(back.routes['r5']!.first.last.latitude, closeTo(36.123456, 1e-6));
+      expect(back.decidedBusLeg('b'), isTrue);
+      expect(back.busLegs['b']!.line, isNull);
+      expect(back.orders['OUT:stops:nearest']!.order, ['a', 'b']);
+      expect(back.orders['OUT:stops:nearest']!.basis, RunBasis.fromBus);
+      expect(back.matrix['x>y'], [120.0, 900.0]);
+      expect(RunRouteBook.fromJson('garbage').routes, isEmpty);
+    });
+
+    test('polyline6 encoding round-trips', () {
+      const line = [LatLng(36.191234, 44.009876), LatLng(36.2, 43.99), LatLng(-12.5, 170.000001)];
+      final back = Directions.decodePolyline6(Directions.encodePolyline6(line));
+      expect(back.length, 3);
+      for (var i = 0; i < 3; i++) {
+        expect(back[i].latitude, closeTo(line[i].latitude, 1e-6));
+        expect(back[i].longitude, closeTo(line[i].longitude, 1e-6));
+      }
+      expect(Directions.encodePolyline6(const [LatLng(3.85, -12.02), LatLng(4.07, -12.095), LatLng(4.3252, -12.6453)]),
+          '_p~iF~ps|U_ulLnnqC_mqNvxq`@');
     });
   });
 

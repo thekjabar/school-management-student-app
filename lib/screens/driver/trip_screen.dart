@@ -234,7 +234,7 @@ class _TripScreenState extends State<TripScreen> {
       stops: plan.stops,
       school: school,
     );
-    _orderedWithoutBus = run.basis != RunBasis.fromBus && run.basis != RunBasis.office;
+    _orderedWithoutBus = orderWaitsForBus(run.basis);
 
     final live = _headerTrip.value;
     if (live != null && live.startedAt != null && live.endedAt == null) {
@@ -660,6 +660,7 @@ class _TripScreenState extends State<TripScreen> {
                           child: SizedBox(
                             height: 230,
                             child: RouteMap(
+                              tripId: widget.tripId,
                               stops: stops,
                               tint: Role.driver.tint,
                               leg: trip?.leg ?? 'OUT',

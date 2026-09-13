@@ -9,6 +9,8 @@ import '../../api/bus_location.dart';
 import '../../api/crew_api.dart';
 import '../../api/directions.dart';
 import '../../i18n/strings.dart';
+import 'roster_kit.dart';
+import 'run_route_cache.dart';
 
 bool stopIsPlaced(PlannedStop s) {
   final lat = s.lat;
@@ -58,12 +60,12 @@ List<int> nearestNeighbourOrder(
   return out;
 }
 
-enum RunBasis { office, fromBus, fromLastStop, fromSchool, noPosition }
+enum RunBasis { office, fromBus, fromLastStop, fromSchool, schoolFirst, noPosition }
 
 typedef TravelCost = double Function(LatLng from, LatLng to);
 
 class RunArrangement {
-  const RunArrangement({required this.stops, required this.basis, this.road = false});
+  const RunArrangement({required this.stops, required this.basis, this.road = false, this.bus});
 
   final List<PlannedStop> stops;
 
@@ -71,7 +73,12 @@ class RunArrangement {
 
   final bool road;
 
+  final LatLng? bus;
+
   PlannedStop? get next => stops.where((s) => !s.done).firstOrNull;
+
+  RunArrangement kept(RunBasis basis, bool road) =>
+      RunArrangement(stops: stops, basis: basis, road: road, bus: bus);
 
   String note(String leg) => switch (basis) {
         RunBasis.office => t('driver.order.note.office'),
@@ -80,8 +87,45 @@ class RunArrangement {
             : (leg == 'RETURN' ? 'driver.order.note.straight' : 'driver.order.note.straightOut')),
         RunBasis.fromLastStop => t('driver.order.note.fromLastStop'),
         RunBasis.fromSchool => t('driver.order.note.fromSchool'),
+        RunBasis.schoolFirst => t('driver.order.note.schoolFirst'),
         RunBasis.noPosition => t('driver.order.note.noPosition'),
       };
+}
+
+class RunTarget {
+  const RunTarget.school({required this.students})
+      : school = true,
+        stop = null;
+
+  const RunTarget.stop(PlannedStop this.stop)
+      : school = false,
+        students = 0;
+
+  final bool school;
+
+  final PlannedStop? stop;
+
+  final int students;
+}
+
+RunTarget? runTarget({
+  required List<PlannedStop> stops,
+  required String leg,
+  SchoolGate? school,
+}) {
+  final schoolId = school?.stopId;
+  if (school != null && schoolCheckOpen(leg, stops)) {
+    return RunTarget.school(students: stops.fold(0, (n, s) => n + s.remaining));
+  }
+  final next = stops.where((s) => !s.done && !isSchoolStop(s, schoolId)).firstOrNull;
+  if (next != null) return RunTarget.stop(next);
+  if (leg == 'RETURN' || school == null) return null;
+  return RunTarget.school(
+    students: stops.fold(
+      0,
+      (n, s) => n + s.students.where((r) => r.boardedAt != null && r.alightedAt == null).length,
+    ),
+  );
 }
 
 bool isSchoolStop(PlannedStop s, String? schoolStopId) =>
@@ -97,6 +141,7 @@ RunArrangement arrangeRun({
   SchoolGate? school,
   TravelCost? cost,
   bool road = false,
+  List<String>? keepOrder,
 }) {
   final schoolId = school?.stopId;
   final bySequence = stops.toList()..sort((a, b) => a.plannedSequence.compareTo(b.plannedSequence));
@@ -125,7 +170,7 @@ RunArrangement arrangeRun({
   }
 
   if (!nearest) {
-    return RunArrangement(stops: measured(assemble(pending)), basis: RunBasis.office);
+    return RunArrangement(stops: measured(assemble(pending)), basis: RunBasis.office, bus: bus);
   }
 
   final atStop = pending.where((s) => s.arrivedAt != null).toList()
@@ -139,7 +184,10 @@ RunArrangement arrangeRun({
 
   final RunBasis basis;
   LatLng? anchor;
-  if (bus != null) {
+  if (leg == 'RETURN' && schoolAt != null && schoolCheckOpen(leg, stops)) {
+    basis = bus == null ? RunBasis.fromSchool : RunBasis.schoolFirst;
+    anchor = schoolAt;
+  } else if (bus != null) {
     basis = RunBasis.fromBus;
     anchor = bus;
   } else if (lastDone != null) {
@@ -149,24 +197,57 @@ RunArrangement arrangeRun({
     basis = RunBasis.fromSchool;
     anchor = schoolAt;
   } else {
-    return RunArrangement(stops: measured(assemble(pending)), basis: RunBasis.noPosition);
+    return RunArrangement(stops: measured(assemble(pending)), basis: RunBasis.noPosition, bus: bus);
   }
 
-  final pinned = atStop.where(stopIsPlaced).lastOrNull;
-  final start = pinned == null ? anchor : LatLng(pinned.lat!, pinned.lon!);
-  final travel = cost ?? metresBetween;
-  final points = [for (final s in placed) LatLng(s.lat!, s.lon!)];
-  final order = nearestNeighbourOrder(
-    placed.length,
-    (to) => travel(start, points[to]),
-    (from, to) => travel(points[from], points[to]),
-  );
+  final List<int> order;
+  if (keepOrder != null && placed.every((s) => keepOrder.contains(s.stopId))) {
+    order = [for (var i = 0; i < placed.length; i++) i]
+      ..sort((a, b) => keepOrder.indexOf(placed[a].stopId).compareTo(keepOrder.indexOf(placed[b].stopId)));
+  } else {
+    final pinned = atStop.where(stopIsPlaced).lastOrNull;
+    final start = pinned == null ? anchor : LatLng(pinned.lat!, pinned.lon!);
+    final travel = cost ?? metresBetween;
+    final points = [for (final s in placed) LatLng(s.lat!, s.lon!)];
+    order = nearestNeighbourOrder(
+      placed.length,
+      (to) => travel(start, points[to]),
+      (from, to) => travel(points[from], points[to]),
+    );
+  }
 
   return RunArrangement(
     stops: measured(assemble([...atStop, for (final i in order) placed[i], ...unplaced])),
     basis: basis,
     road: road,
+    bus: bus,
   );
+}
+
+const Set<RunBasis> _guessedBases = {RunBasis.fromLastStop, RunBasis.fromSchool, RunBasis.noPosition};
+
+bool orderWaitsForBus(RunBasis basis) => _guessedBases.contains(basis);
+
+String runPhase({required String leg, required List<PlannedStop> stops, required bool nearest}) => [
+      leg,
+      leg == 'RETURN' && schoolCheckOpen(leg, stops) ? 'toSchool' : 'stops',
+      nearest ? 'nearest' : 'office',
+    ].join(':');
+
+List<String> openStopIds(List<PlannedStop> stops, String? schoolStopId) => [
+      for (final s in stops)
+        if (!s.done && s.arrivedAt == null && stopIsPlaced(s) && !isSchoolStop(s, schoolStopId)) s.stopId,
+    ];
+
+bool canKeepOrder({
+  required PinnedOrder? pinned,
+  required List<String> open,
+  required bool busKnown,
+}) {
+  if (pinned == null) return false;
+  if (busKnown && orderWaitsForBus(pinned.basis)) return false;
+  final known = pinned.order.toSet();
+  return open.every(known.contains);
 }
 
 List<int?> runNumbers(List<PlannedStop> stops, String? schoolStopId) {
@@ -175,12 +256,22 @@ List<int?> runNumbers(List<PlannedStop> stops, String? schoolStopId) {
 }
 
 class RunWaypoint {
-  const RunWaypoint({required this.at, required this.done, required this.school, required this.key});
+  const RunWaypoint({
+    required this.at,
+    required this.done,
+    required this.school,
+    required this.key,
+    required this.id,
+  });
 
   final LatLng at;
   final bool done;
   final bool school;
   final String key;
+
+  final String id;
+
+  String get place => '$id@${at.latitude.toStringAsFixed(5)},${at.longitude.toStringAsFixed(5)}';
 }
 
 List<RunWaypoint> runWaypoints({
@@ -194,19 +285,43 @@ List<RunWaypoint> runWaypoints({
   if (school != null && school.placed) {
     gate = RunWaypoint(
       at: LatLng(school.lat!, school.lon!),
-      done: leg == 'RETURN',
+      done: leg == 'RETURN' && !schoolCheckOpen(leg, stops),
       school: true,
       key: 'school',
+      id: 'school',
     );
   }
   if (leg == 'RETURN' && gate != null) out.add(gate);
   for (var i = 0; i < stops.length; i++) {
     final s = stops[i];
-    if (isSchoolStop(s, schoolId) || !stopIsPlaced(s)) continue;
-    out.add(RunWaypoint(at: LatLng(s.lat!, s.lon!), done: s.done, school: false, key: 'pin-$i'));
+    if (isSchoolStop(s, schoolId) || !stopIsPlaced(s) || droppedFromRoute(s)) continue;
+    out.add(RunWaypoint(at: LatLng(s.lat!, s.lon!), done: s.done, school: false, key: 'pin-$i', id: s.stopId));
   }
   if (leg != 'RETURN' && gate != null) out.add(gate);
   return out;
+}
+
+bool droppedFromRoute(PlannedStop s) {
+  if (s.arrivedAt != null || s.departedAt != null) return false;
+  if (s.skipped) return true;
+  return s.students.isNotEmpty && s.students.every((r) => r.notTravelling);
+}
+
+String runRouteKey({required String leg, required List<RunWaypoint> waypoints}) =>
+    [leg, for (final w in waypoints) w.place].join(';');
+
+String busLegKey({required String leg, required RunWaypoint target}) => '$leg;${target.place}';
+
+const double busLegFromStopMetres = 300;
+
+const double busAtTargetMetres = 150;
+
+bool busLegNeeded({required List<RunWaypoint> waypoints, required LatLng bus}) {
+  final i = waypoints.indexWhere((w) => !w.done);
+  if (i == -1) return false;
+  if (metresBetween(waypoints[i].at, bus) <= busAtTargetMetres) return false;
+  if (i == 0) return true;
+  return metresBetween(waypoints[i - 1].at, bus) > busLegFromStopMetres;
 }
 
 enum LegState { done, next, later }
@@ -307,28 +422,51 @@ class RunOrder {
       return arrangeRun(stops: stops, leg: leg, nearest: false, bus: bus, school: gate);
     }
 
+    final book = await RunRouteCache.open(tripId);
+    final phase = runPhase(leg: leg, stops: stops, nearest: true);
+    final pinned = book.orders[phase];
+    if (canKeepOrder(pinned: pinned, open: openStopIds(stops, gate?.stopId), busKnown: bus != null)) {
+      return arrangeRun(
+        stops: stops,
+        leg: leg,
+        nearest: true,
+        bus: bus,
+        school: gate,
+        keepOrder: pinned!.order,
+      ).kept(pinned.basis, pinned.road);
+    }
+
     final placed = <String, LatLng>{};
     for (final s in stops) {
       if (s.done || !stopIsPlaced(s)) continue;
       final p = LatLng(s.lat!, s.lon!);
       placed['${p.latitude.toStringAsFixed(5)},${p.longitude.toStringAsFixed(5)}'] ??= p;
     }
+    if (leg == 'RETURN' && gate != null && gate.placed) {
+      final p = LatLng(gate.lat!, gate.lon!);
+      placed['${p.latitude.toStringAsFixed(5)},${p.longitude.toStringAsFixed(5)}'] ??= p;
+    }
     final among = placed.values.toList();
 
-    var road = false;
+    Directions.rememberMatrix(book.matrix);
+    var road = true;
     if (among.length > 1) {
       road = await Directions.travelTimes(among).timeout(_roadWait, onTimeout: () => false);
-    } else {
-      road = true;
-    }
-    if (road && bus != null && among.isNotEmpty) {
-      road = await Directions.travelTimes([bus, ...among], fromFirstOnly: true)
-          .timeout(_roadWait, onTimeout: () => false);
+      if (road) RunRouteCache.keepMatrix(tripId, Directions.matrixAmong(among));
     }
 
-    double travel(LatLng a, LatLng b) => Directions.seconds(a, b) ?? metresBetween(a, b) / 8.0;
+    LatLng stand(LatLng p) {
+      if (!identical(p, bus)) return p;
+      for (final known in among) {
+        if (metresBetween(known, p) <= busLegFromStopMetres) return known;
+      }
+      return p;
+    }
 
-    return arrangeRun(
+    double travel(LatLng a, LatLng b) =>
+        Directions.seconds(stand(a), stand(b)) ?? metresBetween(a, b) / 8.0;
+
+    final run = arrangeRun(
       stops: stops,
       leg: leg,
       nearest: true,
@@ -337,5 +475,18 @@ class RunOrder {
       cost: road ? travel : null,
       road: road,
     );
+    RunRouteCache.keepOrder(
+      tripId,
+      phase,
+      PinnedOrder(
+        order: [
+          for (final s in run.stops)
+            if (!s.done && stopIsPlaced(s) && !isSchoolStop(s, gate?.stopId)) s.stopId,
+        ],
+        basis: run.basis,
+        road: run.road,
+      ),
+    );
+    return run;
   }
 }

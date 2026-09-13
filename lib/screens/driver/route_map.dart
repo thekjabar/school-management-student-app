@@ -19,10 +19,12 @@ import '../../ui/map_tiles.dart';
 import '../../ui/screen_kit.dart';
 import 'roster_kit.dart';
 import 'run_order.dart';
+import 'run_route_cache.dart';
 
 class RouteMap extends StatefulWidget {
   const RouteMap({
     super.key,
+    required this.tripId,
     required this.stops,
     required this.tint,
     required this.leg,
@@ -30,6 +32,8 @@ class RouteMap extends StatefulWidget {
     this.compact = false,
     this.fullScreen = false,
   });
+
+  final String tripId;
 
   final List<PlannedStop> stops;
 
@@ -57,27 +61,28 @@ class _RouteMapState extends State<RouteMap> {
   String? _roadFor;
 
   void _wantRoad(List<RunWaypoint> waypoints) {
-    final points = [for (final w in waypoints) w.at];
-    final schoolIndex = waypoints.indexWhere((w) => w.school);
-    final key = [
-      for (final p in points) '${p.latitude.toStringAsFixed(5)},${p.longitude.toStringAsFixed(5)}',
-      '$schoolIndex',
-    ].join(';');
+    final key = runRouteKey(leg: widget.leg, waypoints: waypoints);
     if (_roadFor == key) return;
     _roadFor = key;
 
+    final points = [for (final w in waypoints) w.at];
     if (points.length < 2) {
       _road = null;
       return;
     }
-    final school = schoolIndex < 0 ? null : schoolIndex;
-    final ready = Directions.cachedRun(points, schoolIndex: school);
+    final ready = RunRouteCache.peek(widget.tripId)?.routes[key];
     if (ready != null) {
       _road = ready;
       return;
     }
     _road = null;
-    Directions.runLegs(points, schoolIndex: school).then((legs) {
+    final schoolIndex = waypoints.indexWhere((w) => w.school);
+    RunRouteCache.route(
+      widget.tripId,
+      key,
+      points,
+      schoolIndex: schoolIndex < 0 ? null : schoolIndex,
+    ).then((legs) {
       if (!mounted || _roadFor != key || legs == null) return;
       setState(() => _road = legs);
     });
@@ -85,7 +90,8 @@ class _RouteMapState extends State<RouteMap> {
 
   @override
   Widget build(BuildContext context) {
-    final pins = _pins();
+    final target = runTarget(stops: widget.stops, leg: widget.leg, school: widget.school);
+    final pins = _pins(target);
 
     if (pins.isEmpty) {
       return _NoMap(
@@ -114,6 +120,8 @@ class _RouteMapState extends State<RouteMap> {
     }
 
     final map = _MapboxCanvas(
+      tripId: widget.tripId,
+      leg: widget.leg,
       pins: pins,
       waypoints: waypoints,
       road: _road,
@@ -144,11 +152,16 @@ class _RouteMapState extends State<RouteMap> {
           end: 62,
           child: Align(
             alignment: AlignmentDirectional.centerStart,
-            child: _Callout(
-              pin: _shown(pins),
-              tint: widget.tint,
-              leg: widget.leg,
-              expanded: _touched != null,
+            child: ValueListenableBuilder<geo.Position?>(
+              valueListenable: BusLocation.instance.here,
+              builder: (context, me, _) => _Callout(
+                pin: _shown(pins, target),
+                target: target,
+                bus: me == null ? null : LatLng(me.latitude, me.longitude),
+                tint: widget.tint,
+                leg: widget.leg,
+                expanded: _touched != null,
+              ),
             ),
           ),
         ),
@@ -165,6 +178,7 @@ class _RouteMapState extends State<RouteMap> {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => RouteMapScreen(
+                        tripId: widget.tripId,
                         stops: widget.stops,
                         tint: widget.tint,
                         leg: widget.leg,
@@ -270,10 +284,9 @@ class _RouteMapState extends State<RouteMap> {
     );
   }
 
-  List<_Stop> _pins() {
+  List<_Stop> _pins(RunTarget? target) {
     final schoolId = widget.school?.stopId;
     final numbers = runNumbers(widget.stops, schoolId);
-    final next = widget.stops.indexWhere((s) => !s.done && !isSchoolStop(s, schoolId));
 
     final out = <_Stop>[];
     for (var i = 0; i < widget.stops.length; i++) {
@@ -284,7 +297,7 @@ class _RouteMapState extends State<RouteMap> {
         stop: s,
         order: numbers[i] ?? i + 1,
         at: LatLng(s.lat!, s.lon!),
-        next: i == next,
+        next: identical(target?.stop, s),
         school: false,
       ));
     }
@@ -296,7 +309,7 @@ class _RouteMapState extends State<RouteMap> {
         stop: _schoolStop(gate),
         order: 0,
         at: LatLng(gate.lat!, gate.lon!),
-        next: next == -1 && widget.leg != 'RETURN',
+        next: target?.school == true,
         school: true,
       ));
     }
@@ -321,12 +334,23 @@ class _RouteMapState extends State<RouteMap> {
         driveSeconds: 0,
       );
 
-  _Stop? _shown(List<_Stop> pins) {
+  _Stop? _shown(List<_Stop> pins, RunTarget? target) {
     for (final p in pins) {
       if (p.key == _touched) return p;
     }
     for (final p in pins) {
       if (p.next) return p;
+    }
+    final gate = widget.school;
+    if (target != null && target.school && gate != null) {
+      return _Stop(
+        key: 'school',
+        stop: _schoolStop(gate),
+        order: 0,
+        at: const LatLng(0, 0),
+        next: true,
+        school: true,
+      );
     }
     return null;
   }
@@ -353,12 +377,14 @@ Future<CameraOptions> cameraToFit(
 class RouteMapScreen extends StatelessWidget {
   const RouteMapScreen({
     super.key,
+    required this.tripId,
     required this.stops,
     required this.tint,
     required this.leg,
     this.school,
   });
 
+  final String tripId;
   final List<PlannedStop> stops;
   final Color tint;
   final String leg;
@@ -381,6 +407,7 @@ class RouteMapScreen extends StatelessWidget {
                     top: Radius.circular(AppTheme.radius),
                   ),
                   child: RouteMap(
+                    tripId: tripId,
                     stops: stops,
                     tint: tint,
                     leg: leg,
@@ -422,20 +449,33 @@ class _Stop {
 class _Callout extends StatelessWidget {
   const _Callout({
     required this.pin,
+    required this.target,
+    required this.bus,
     required this.tint,
     required this.leg,
     this.expanded = false,
   });
 
   final _Stop? pin;
+  final RunTarget? target;
+  final LatLng? bus;
   final Color tint;
   final String leg;
   final bool expanded;
 
+  int? _metres(_Stop p) {
+    if (p.school && !p.next) return null;
+    final from = bus;
+    if (from != null && stopIsPlaced(p.stop)) {
+      return metresBetween(from, LatLng(p.stop.lat!, p.stop.lon!)).round();
+    }
+    return p.school ? null : p.stop.metresAway;
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = pin;
-    final metres = p == null || p.school ? null : p.stop.metresAway;
+    final metres = p == null ? null : _metres(p);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(9, 8, 13, 8),
@@ -591,7 +631,11 @@ class _Callout extends StatelessWidget {
 
   String _line(_Stop p) => [
         if (p.next) t('driver.nextStop'),
-        if (p.school)
+        if (p.school && p.next && target?.school == true)
+          leg == 'RETURN'
+              ? tn('driver.pickUpAtSchool', target!.students)
+              : tn('driver.dropOffAtSchool', target!.students)
+        else if (p.school)
           t('driver.school')
         else if (p.stop.done)
           t('driver.done')
@@ -786,12 +830,12 @@ const _arrowLayer = 'ksp-run-arrows';
 
 const double _linkMinMetres = 12;
 
-const double _liveRefetchMetres = 120;
-
 const double _liveTrimMetres = 50;
 
 class _MapboxCanvas extends StatefulWidget {
   const _MapboxCanvas({
+    required this.tripId,
+    required this.leg,
     required this.pins,
     required this.waypoints,
     required this.road,
@@ -802,6 +846,10 @@ class _MapboxCanvas extends StatefulWidget {
     required this.onReady,
     required this.onPinTap,
   });
+
+  final String tripId;
+
+  final String leg;
 
   final List<_Stop> pins;
 
@@ -835,8 +883,7 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
   String? _linesDrawnFor;
 
   List<LatLng>? _liveLeg;
-  LatLng? _liveOrigin;
-  String? _liveNext;
+  String? _liveFor;
   LatLng? _bus;
 
   double _dpr = 2;
@@ -1026,51 +1073,67 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
   }
 
   void _watchLive() {
-    if (widget.compact || _listening) return;
+    if (widget.compact) {
+      unawaited(RunRouteCache.open(widget.tripId).then((_) => _onFix()));
+      return;
+    }
+    if (_listening) return;
     _listening = true;
     BusLocation.instance.here.addListener(_onFix);
-    _onFix();
+    unawaited(RunRouteCache.open(widget.tripId).then((_) => _onFix()));
   }
 
   RunWaypoint? get _nextWaypoint => widget.waypoints.where((w) => !w.done).firstOrNull;
 
+  bool _straight = false;
+
   void _onFix() {
     if (!mounted) return;
-    final me = BusLocation.instance.here.value;
-    if (me == null) return;
-    final bus = LatLng(me.latitude, me.longitude);
-    _bus = bus;
+    final book = RunRouteCache.peek(widget.tripId);
+    if (book == null) return;
+    final me = widget.compact ? null : BusLocation.instance.here.value;
+    if (me != null) _bus = LatLng(me.latitude, me.longitude);
 
     final next = _nextWaypoint;
     if (next == null) {
-      if (_liveLeg != null) {
-        _liveLeg = null;
-        _liveNext = null;
-        unawaited(_drawLines());
-      }
+      _liveFor = null;
+      _liveLeg = null;
+      _straight = false;
+      unawaited(_drawLines());
       return;
     }
 
-    final nextKey = '${next.key}@${next.at.latitude},${next.at.longitude}';
-    final origin = _liveOrigin;
-    final stale = _liveNext != nextKey ||
-        origin == null ||
-        metresBetween(origin, bus) > _liveRefetchMetres;
-
-    if (stale) {
-      _liveOrigin = bus;
-      _liveNext = nextKey;
-      final heading = me.heading.isFinite && me.heading >= 0 && me.speed.isFinite && me.speed > 1.5
-          ? me.heading
-          : null;
-      final points = [bus, next.at];
-      final school = next.school ? 1 : null;
-      final ready = Directions.cachedRun(points, startBearing: heading, schoolIndex: school);
-      _liveLeg = ready?.first ?? [bus, next.at];
-      if (ready == null) {
-        Directions.runLegs(points, startBearing: heading, schoolIndex: school).then((legs) {
-          if (!mounted || _liveNext != nextKey || legs == null || legs.isEmpty) return;
-          _liveLeg = legs.first;
+    final key = busLegKey(leg: widget.leg, target: next);
+    final decided = book.busLegs[key];
+    if (decided != null) {
+      _liveFor = key;
+      _liveLeg = decided.line;
+      _straight = false;
+    } else if (_liveFor != key) {
+      _liveLeg = null;
+      _straight = false;
+      final bus = _bus;
+      if (bus != null && me != null) {
+        _liveFor = key;
+        final needed = busLegNeeded(waypoints: widget.waypoints, bus: bus);
+        _straight = needed;
+        final heading = me.heading.isFinite && me.heading >= 0 && me.speed.isFinite && me.speed > 1.5
+            ? me.heading
+            : null;
+        RunRouteCache.busLeg(
+          widget.tripId,
+          key,
+          bus: bus,
+          target: next.at,
+          needed: needed,
+          school: next.school,
+          heading: heading,
+        ).then((leg) {
+          if (!mounted || _liveFor != key) return;
+          if (leg != null) {
+            _liveLeg = leg.line;
+            _straight = false;
+          }
           unawaited(_drawLines());
         });
       }
@@ -1081,7 +1144,11 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
   List<LatLng>? _liveFromBus() {
     final leg = _liveLeg;
     final bus = _bus;
-    if (leg == null || leg.length < 2 || bus == null) return leg;
+    if (leg == null) {
+      final next = _nextWaypoint;
+      return _straight && bus != null && next != null ? [bus, next.at] : null;
+    }
+    if (leg.length < 2 || bus == null) return leg;
     final i = Directions.nearestIndex(leg, bus);
     if (metresBetween(leg[i], bus) > _liveTrimMetres) return leg;
     final rest = leg.sublist(math.min(i + 1, leg.length - 1));
@@ -1481,7 +1548,7 @@ class _MapboxCanvasState extends State<_MapboxCanvas> {
     super.didUpdateWidget(old);
     unawaited(_drawLines());
     unawaited(_drawPins());
-    if (!widget.compact) _onFix();
+    _onFix();
   }
 
   late final ViewportState _start = CameraViewportState(

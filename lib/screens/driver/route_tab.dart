@@ -97,6 +97,7 @@ class DriverRoute extends StatelessWidget {
                     child: SizedBox(
                       height: 210,
                       child: RouteMap(
+                        tripId: trip.id,
                         stops: stops,
                         tint: Role.driver.tint,
                         leg: trip.leg,
