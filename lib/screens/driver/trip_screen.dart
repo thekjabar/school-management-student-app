@@ -338,7 +338,7 @@ class _TripScreenState extends State<TripScreen> {
                     ? t('driver.theRun')
                     : (trip.leg == 'RETURN' ? t('driver.legReturn') : t('driver.legOut')),
                 subtitle: trip?.routeName,
-                leading: (trip != null &&
+                action: (trip != null &&
                         trip.startedAt != null &&
                         trip.endedAt == null)
                     ? _PanicChip(

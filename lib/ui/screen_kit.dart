@@ -12,7 +12,7 @@ class ScreenHeader extends StatelessWidget {
     this.notificationCount = 0,
     this.onBell,
     this.trailing,
-    this.leading,
+    this.action,
   });
 
   final String title;
@@ -21,7 +21,7 @@ class ScreenHeader extends StatelessWidget {
   final int notificationCount;
   final VoidCallback? onBell;
   final Widget? trailing;
-  final Widget? leading;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -56,10 +56,6 @@ class ScreenHeader extends StatelessWidget {
             icon: Icons.arrow_back_rounded,
             onTap: () => Navigator.of(context).maybePop(),
           ),
-          if (leading != null) ...[
-            const SizedBox(width: 8),
-            leading!,
-          ],
           const SizedBox(width: 14),
           Expanded(
             child: ConstrainedBox(
@@ -81,7 +77,10 @@ class ScreenHeader extends StatelessWidget {
               ),
             ),
           ),
-          if (trailing == null && onBell != null)
+          if (action != null) ...[
+            const SizedBox(width: 10),
+            action!,
+          ] else if (trailing == null && onBell != null)
             SquareButton(
               icon: Icons.notifications_none_rounded,
               onTap: onBell!,
