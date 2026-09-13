@@ -3599,21 +3599,21 @@ class _PanicChip extends StatelessWidget {
         button: true,
         label: t('driver.sos'),
         child: Container(
-          width: 42,
-          height: 42,
+          width: 34,
+          height: 34,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: AppTheme.rose,
-            borderRadius: BorderRadius.circular(13),
+            borderRadius: BorderRadius.circular(10),
             boxShadow: [
               BoxShadow(
                 color: AppTheme.rose.withValues(alpha: 0.35),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-          child: const Icon(Icons.sos_rounded, size: 26, color: Colors.white),
+          child: const Icon(Icons.sos_rounded, size: 20, color: Colors.white),
         ),
       ),
     );
