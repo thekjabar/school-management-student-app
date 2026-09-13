@@ -63,7 +63,7 @@ class DeviceHeartbeat with WidgetsBindingObserver {
 
     if (_running) return;
     if (me == null) return;
-    if (!me.can('trip.operate') && !me.can('custody.record')) return;
+    if (!kCrewRoles.contains(me.role)) return;
 
     _running = true;
     _refusals = 0;

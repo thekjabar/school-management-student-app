@@ -20,7 +20,6 @@ class Membership {
     required this.tenantKind,
     required this.tenantName,
     required this.role,
-    required this.permissions,
     this.campusId,
   });
 
@@ -28,7 +27,6 @@ class Membership {
   final String tenantKind;
   final String tenantName;
   final String role;
-  final List<String> permissions;
   final String? campusId;
 
   factory Membership.fromJson(Map<String, dynamic> j) => Membership(
@@ -36,7 +34,6 @@ class Membership {
         tenantKind: (j['tenantKind'] ?? 'SCHOOL') as String,
         tenantName: (j['tenantName'] ?? '') as String,
         role: j['role'] as String,
-        permissions: ((j['permissions'] as List?) ?? []).cast<String>(),
         campusId: j['campusId'] as String?,
       );
 }
@@ -69,7 +66,6 @@ class Me {
 
   String get role => active.role;
   String get schoolName => active.tenantName;
-  bool can(String permission) => active.permissions.contains(permission);
 
   List<Membership> schoolsFor(List<String> roles) =>
       memberships.where((m) => roles.contains(m.role)).toList(growable: false);
@@ -104,7 +100,6 @@ class Me {
             .firstOrNull ??
             '',
         role: active['role'] as String,
-        permissions: ((active['permissions'] as List?) ?? []).cast<String>(),
         campusId: active['campusId'] as String?,
       ),
     );

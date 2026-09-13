@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../api/client.dart';
-import '../../api/session.dart';
 import '../../api/teacher_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
@@ -11,7 +10,6 @@ import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
-import 'teacher_kit.dart';
 
 class ExamsTab extends StatefulWidget {
   const ExamsTab({super.key});
@@ -171,9 +169,6 @@ class _MarksScreenState extends State<MarksScreen> {
   List<MarkRow> _rows = [];
   bool _dirty = false;
   bool _saving = false;
-  bool _published = false;
-
-  bool get _mayRelease => Session.instance.me?.can('academic.grade.publish') ?? false;
 
   Future<void> _save() async {
     setState(() => _saving = true);
@@ -190,29 +185,6 @@ class _MarksScreenState extends State<MarksScreen> {
     }
   }
 
-  Future<void> _publish() async {
-    final yes = await confirmDialog(
-      context,
-      icon: Icons.visibility_rounded,
-      tone: AppTheme.green,
-      title: t('teacher.releaseAsk'),
-      body: t('teacher.releaseWarning'),
-      confirmLabel: t('teacher.release'),
-      confirmIcon: Icons.send_rounded,
-      cancelLabel: t('teacher.notYet'),
-    );
-    if (!yes || !mounted) return;
-
-    try {
-      await TeacherApi.instance.publishMarks(widget.exam.id);
-      if (!mounted) return;
-      showNote(context, t('teacher.marksReleased'));
-      _loaderKey.currentState?.reload();
-    } on ApiException catch (e) {
-      if (mounted) showNote(context, e.message, bad: true);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final marked = _rows.where((r) => r.score != null || r.wasAbsent).length;
@@ -222,29 +194,12 @@ class _MarksScreenState extends State<MarksScreen> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: BigButton(
-                  label: tn('teacher.saveCount', '$marked/${_rows.length}'),
-                  color: Role.teacher.tint,
-                  height: 50,
-                  busy: _saving,
-                  onPressed: _dirty ? _save : null,
-                ),
-              ),
-              if (_mayRelease) ...[
-                const SizedBox(width: 10),
-                Expanded(
-                  child: SoftButton(
-                    label: _published ? t('teacher.released') : t('teacher.release'),
-                    tint: AppTheme.green,
-                    height: 50,
-                    onTap: _published || _dirty ? null : _publish,
-                  ),
-                ),
-              ],
-            ],
+          child: BigButton(
+            label: tn('teacher.saveCount', '$marked/${_rows.length}'),
+            color: Role.teacher.tint,
+            height: 50,
+            busy: _saving,
+            onPressed: _dirty ? _save : null,
           ),
         ),
       ),
@@ -260,7 +215,6 @@ class _MarksScreenState extends State<MarksScreen> {
                 load: () async {
                   final data = await TeacherApi.instance.marks(widget.exam.id);
                   _rows = data.rows;
-                  _published = data.published;
                   return data;
                 },
                 isEmpty: (d) => d.rows.isEmpty,
@@ -288,9 +242,7 @@ class _MarksScreenState extends State<MarksScreen> {
                             child: Text(
                               data.published
                                   ? t('teacher.familiesSeeMarks')
-                                  : _mayRelease
-                                      ? t('teacher.onlyYouSee')
-                                      : t('teacher.officeReleases'),
+                                  : t('teacher.officeReleases'),
                               style: TextStyle(
                                 fontSize: 12,
                                 height: 1.45,

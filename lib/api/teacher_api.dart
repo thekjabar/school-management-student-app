@@ -500,8 +500,6 @@ class TeacherApi {
     });
   }
 
-  Future<void> publishMarks(String examId) => _api.post('/teacher/exams/$examId/publish');
-
   String _dateOnly(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
