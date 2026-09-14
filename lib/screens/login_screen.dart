@@ -8,6 +8,7 @@ import '../api/session.dart';
 import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
 import '../ui/async.dart';
+import '../ui/insets.dart';
 import '../ui/kit.dart';
 import '../ui/phone_field.dart';
 import '../ui/sheets.dart';
@@ -746,7 +747,7 @@ class _ForgotSheetState extends State<_ForgotSheet> {
           color: AppTheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
         ),
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 20),
+        padding: withBottomInset(context, const EdgeInsets.fromLTRB(18, 10, 18, 20)),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
