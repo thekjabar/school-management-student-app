@@ -5,6 +5,7 @@ import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
+import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 
@@ -37,7 +38,7 @@ class HomeworkDetail extends StatelessWidget {
                   ),
                 ),
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(kGutter, 6, kGutter, 28),
+                  padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 6, kGutter, 28)),
                   children: [
                     _Hero(item: item, tint: tint),
 

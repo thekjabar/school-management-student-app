@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
+import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/phone_field.dart';
 import '../../ui/pickers.dart';
@@ -458,7 +459,7 @@ class _RequestSheetState extends State<_RequestSheet> {
           color: AppTheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
         ),
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+        padding: withBottomInset(context, const EdgeInsets.fromLTRB(18, 10, 18, 18)),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

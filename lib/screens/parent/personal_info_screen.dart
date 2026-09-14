@@ -7,6 +7,7 @@ import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
+import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/settings_widgets.dart';
@@ -115,7 +116,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 onRefresh: _load,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 24),
+                  padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 24)),
                   children: [
                     if (facts.isNotEmpty) ...[
                       Card16(
@@ -637,7 +638,7 @@ class _AskSheetState extends State<_AskSheet> {
           color: AppTheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
         ),
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+        padding: withBottomInset(context, const EdgeInsets.fromLTRB(18, 10, 18, 18)),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

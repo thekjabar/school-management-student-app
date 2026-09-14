@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:student_app/i18n/strings.dart';
+import 'package:student_app/screens/parent/settings_screen.dart';
 import 'package:student_app/ui/async.dart';
 import 'package:student_app/ui/kit.dart';
 import 'package:student_app/ui/pickers.dart';
@@ -296,6 +297,35 @@ void main() {
       final nav = tester.getRect(find.byType(CenterActionNav));
       expect(note.bottom, lessThanOrEqualTo(nav.top + 0.01));
     });
+  });
+
+  group('parent Settings screen', () {
+    for (final landscape in [false, true]) {
+      testWidgets('header and the last row stay inside the safe region${landscape ? ' in landscape' : ''}',
+          (tester) async {
+        _phone(
+          tester,
+          size: landscape ? _landscape : const Size(390, 560),
+          padding: landscape
+              ? const FakeViewPadding(left: _cutoutSide, right: _cutoutSide, bottom: 21)
+              : const FakeViewPadding(top: _notchTop, bottom: _gestureBottom),
+        );
+        await _app(tester, const SettingsScreen());
+        await tester.pumpAndSettle();
+
+        final safe = _safeRegion(tester);
+        _expectInside(tester, find.byIcon(Icons.arrow_back_rounded), safe);
+
+        await tester.drag(find.byType(ListView), const Offset(0, -3000));
+        await tester.pumpAndSettle();
+        _expectInside(
+          tester,
+          find.ancestor(of: find.text(t('more.changePasswordSub')), matching: find.byType(Card16)),
+          safe,
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
   });
 
   group('confirmDialog', () {

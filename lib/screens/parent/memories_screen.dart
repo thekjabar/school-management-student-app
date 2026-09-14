@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../api/parent_api.dart';
@@ -426,7 +427,9 @@ class _ViewerState extends State<_Viewer> {
   Widget build(BuildContext context) {
     final item = widget.album.items[_current];
 
-    return Scaffold(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: AppTheme.overDarkMedia,
+      child: Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
@@ -443,10 +446,13 @@ class _ViewerState extends State<_Viewer> {
           ),
 
           PositionedDirectional(
-            top: MediaQuery.of(context).padding.top + 6,
-            start: 10,
-            end: 10,
-            child: Row(
+            top: 0,
+            start: 0,
+            end: 0,
+            child: SafeArea(
+              bottom: false,
+              minimum: const EdgeInsets.fromLTRB(10, 6, 10, 0),
+              child: Row(
               children: [
                 _RoundButton(
                   icon: Icons.close_rounded,
@@ -470,6 +476,7 @@ class _ViewerState extends State<_Viewer> {
                 ),
               ],
             ),
+            ),
           ),
 
           if (item.caption != null && item.caption!.isNotEmpty)
@@ -478,11 +485,11 @@ class _ViewerState extends State<_Viewer> {
               end: 0,
               bottom: 0,
               child: Container(
-                padding: EdgeInsetsDirectional.fromSTEB(
-                  18,
+                padding: EdgeInsets.fromLTRB(
+                  18 + MediaQuery.paddingOf(context).left,
                   22,
-                  18,
-                  MediaQuery.of(context).padding.bottom + 20,
+                  18 + MediaQuery.paddingOf(context).right,
+                  MediaQuery.paddingOf(context).bottom + 20,
                 ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -507,6 +514,7 @@ class _ViewerState extends State<_Viewer> {
               ),
             ),
         ],
+      ),
       ),
     );
   }

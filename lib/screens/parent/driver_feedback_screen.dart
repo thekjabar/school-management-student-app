@@ -7,6 +7,7 @@ import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
+import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
@@ -291,7 +292,7 @@ class _ComposeSheetState extends State<_ComposeSheet> {
           color: AppTheme.canvas,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+        padding: withBottomInset(context, const EdgeInsets.fromLTRB(16, 10, 16, 16)),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

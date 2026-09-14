@@ -9,6 +9,7 @@ import '../../api/parent_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/home_kit.dart';
+import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/map_tiles.dart';
 import '../../ui/screen_kit.dart';
@@ -82,7 +83,7 @@ class _StopCorrectionScreenState extends State<StopCorrectionScreen> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 28),
+                padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 28)),
                 child: _sent ? _Receipt(tint: tint) : _form(tint),
               ),
             ),
@@ -859,7 +860,7 @@ class _PinPickerState extends State<_PinPicker> {
                   ),
                 ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(kGutter, 10, kGutter, 14),
+                padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 10, kGutter, 14)),
                 child: BigButton(
                   label: t('stopfix.usePlace'),
                   color: tint,

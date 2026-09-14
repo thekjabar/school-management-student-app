@@ -5,6 +5,7 @@ import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/home_kit.dart';
+import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/motion.dart';
 import '../../ui/screen_kit.dart';
@@ -32,7 +33,7 @@ class HelpScreen extends StatelessWidget {
             ScreenHeader(title: t('profile.help')),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 24),
+                padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 24)),
                 children: [
                   Card16(
                     padding: const EdgeInsets.all(14),

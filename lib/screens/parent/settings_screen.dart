@@ -4,6 +4,7 @@ import '../../ui/screen_kit.dart';
 import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
+import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/settings_widgets.dart';
 import '../../ui/sheets.dart';
@@ -26,7 +27,7 @@ class SettingsScreen extends StatelessWidget {
             ScreenHeader(title: t('settings.title')),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(14, 4, 14, 24),
+                padding: withBottomInset(context, const EdgeInsets.fromLTRB(14, 4, 14, 24)),
         children: [
           _Section(t('settings.signedInAs')),
           Card16(

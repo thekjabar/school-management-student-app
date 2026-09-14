@@ -6,6 +6,7 @@ import '../../api/parent_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/home_kit.dart';
+import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
@@ -243,7 +244,7 @@ class _GateState extends State<_Gate> {
     if (widget.frame == SectionFrame.inline) return body;
     final list = ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 24),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 24)),
       children: [body],
     );
     if (widget.frame == SectionFrame.page) return list;
