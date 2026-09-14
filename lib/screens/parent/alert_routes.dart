@@ -7,9 +7,10 @@ import 'attitude_screen.dart';
 import 'bus_screen.dart';
 import 'conversation_screen.dart';
 import 'dropoff_screen.dart';
-import 'fees_screen.dart';
+import 'app_fee_screen.dart';
 import 'marks_screen.dart';
 import 'reports_screen.dart';
+import 'school_fees_screen.dart';
 import 'section_gate.dart';
 import 'track_screen.dart';
 
@@ -17,7 +18,8 @@ enum AlertDestination {
   track,
   bus,
   dropoff,
-  fees,
+  appFee,
+  schoolFees,
   attendance,
   attitude,
   marks,
@@ -49,9 +51,13 @@ const Map<String, AlertDestination> _byTemplate = {
   'school.dismissal_cancelled': AlertDestination.bus,
   'transport.dropoff_changed': AlertDestination.dropoff,
   'transport.dropoff_change_refused': AlertDestination.dropoff,
-  'billing.invoice_issued': AlertDestination.fees,
-  'billing.invoice_overdue': AlertDestination.fees,
-  'billing.payment_confirmed': AlertDestination.fees,
+  'billing.invoice_issued': AlertDestination.appFee,
+  'billing.invoice_overdue': AlertDestination.appFee,
+  'billing.payment_confirmed': AlertDestination.appFee,
+  'package_payment.confirmed': AlertDestination.appFee,
+  'package_payment.rejected': AlertDestination.appFee,
+  'school_fees.payment.confirmed': AlertDestination.schoolFees,
+  'school_fees.payment.rejected': AlertDestination.schoolFees,
   'academic.attendance_absent': AlertDestination.attendance,
   'academic.behaviour_recorded': AlertDestination.attitude,
   'academic.exam_result': AlertDestination.marks,
@@ -67,13 +73,18 @@ AlertDestination alertDestinationFor(String? templateKey, String? category) {
   if (known != null) return known;
   final key = templateKey ?? '';
   if (key.startsWith('transport.')) return AlertDestination.bus;
-  if (key.startsWith('billing.')) return AlertDestination.fees;
+  if (key.startsWith('school_fees.') || key.startsWith('school_fee.') || key.startsWith('schoolfee.')) {
+    return AlertDestination.schoolFees;
+  }
+  if (key.startsWith('billing.') || key.startsWith('package_payment.') || key.startsWith('package.')) {
+    return AlertDestination.appFee;
+  }
   if (key.startsWith('message.')) return AlertDestination.conversation;
   if (key.startsWith('announcement.')) return AlertDestination.announcement;
   return switch (category) {
     'SAFETY_CRITICAL' || 'ARRIVAL_ETA' => AlertDestination.track,
     'TRIP_STATUS' || 'DELAY' || 'CUSTODY_EVENT' || 'NO_SHOW' => AlertDestination.bus,
-    'BILLING' => AlertDestination.fees,
+    'BILLING' => AlertDestination.appFee,
     'ATTENDANCE' => AlertDestination.attendance,
     'MESSAGE' => AlertDestination.conversation,
     'ANNOUNCEMENT' => AlertDestination.announcement,
@@ -182,13 +193,10 @@ Future<void> openAlertDestination(
       await forChild(ParentSection.assignments, (c) => AssignmentsScreen(child: c));
     case AlertDestination.reports:
       await forChild(ParentSection.reports, (c) => ReportsScreen(child: c));
-    case AlertDestination.fees:
-      await openHouseholdSection<void>(
-        context,
-        childIds: ids,
-        section: ParentSection.fees,
-        builder: (_) => const FeesScreen(),
-      );
+    case AlertDestination.appFee:
+      await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => const AppFeeScreen()));
+    case AlertDestination.schoolFees:
+      await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => const SchoolFeesScreen()));
     case AlertDestination.dropoff:
       await openHouseholdSection<void>(
         context,

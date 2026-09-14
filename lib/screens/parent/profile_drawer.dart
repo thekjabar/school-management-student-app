@@ -12,7 +12,7 @@ import 'assignments_screen.dart';
 import 'bus_screen.dart';
 import 'attendance_screen.dart';
 import 'attitude_screen.dart';
-import 'fees_screen.dart';
+import 'app_fee_screen.dart';
 import 'marks_screen.dart';
 import 'reports_screen.dart';
 import 'section_gate.dart';
@@ -140,10 +140,9 @@ class ProfileDrawer extends StatelessWidget {
                   ),
                   _Row(
                     icon: Icons.credit_card_outlined,
-                    label: t('drawer.fees'),
+                    label: t('appFee.title'),
                     tint: AppTheme.amber,
-                    locked: Entitlements.instance.current.value.lockedForAll([for (final c in children) c.studentId], ParentSection.fees),
-                    onTap: () => _household(context, ParentSection.fees, (_) => const FeesScreen()),
+                    onTap: () => _push(context, const AppFeeScreen()),
                   ),
                   _Row(
                     icon: Icons.pie_chart_outline_rounded,
@@ -189,17 +188,6 @@ class ProfileDrawer extends StatelessWidget {
     final nav = Navigator.of(context);
     nav.pop();
     openSection<void>(nav.context, childId: selected!.studentId, section: section, builder: builder);
-  }
-
-  void _household(BuildContext context, String section, WidgetBuilder builder) {
-    final nav = Navigator.of(context);
-    nav.pop();
-    openHouseholdSection<void>(
-      nav.context,
-      childIds: [for (final c in children) c.studentId],
-      section: section,
-      builder: builder,
-    );
   }
 
   Future<void> _pickChild(BuildContext context) async {

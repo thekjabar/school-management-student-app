@@ -586,7 +586,7 @@ class _AlertRow extends StatelessWidget {
     final (colour, icon) = switch (alertDestinationFor(item.templateKey, item.category)) {
       AlertDestination.track || AlertDestination.bus => (AppTheme.amber, Icons.directions_bus_rounded),
       AlertDestination.dropoff => (AppTheme.amber, Icons.pin_drop_rounded),
-      AlertDestination.fees => (AppTheme.green, Icons.receipt_long_rounded),
+      AlertDestination.appFee || AlertDestination.schoolFees => (AppTheme.green, Icons.receipt_long_rounded),
       AlertDestination.attendance => (AppTheme.green, Icons.verified_user_rounded),
       AlertDestination.attitude => (AppTheme.violet, Icons.emoji_events_rounded),
       AlertDestination.marks ||

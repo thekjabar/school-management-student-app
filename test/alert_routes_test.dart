@@ -20,7 +20,7 @@ void main() {
 
   test('unknown keys fall back on their family, then their category, then the alerts list', () {
     expect(alertDestinationFor('transport.something_new', null), AlertDestination.bus);
-    expect(alertDestinationFor('billing.refund_issued', null), AlertDestination.fees);
+    expect(alertDestinationFor('billing.refund_issued', null), AlertDestination.appFee);
     expect(alertDestinationFor(null, 'ATTENDANCE'), AlertDestination.attendance);
     expect(alertDestinationFor(null, 'SAFETY_CRITICAL'), AlertDestination.track);
     expect(alertDestinationFor('telemetry.device_silence', 'OPERATIONAL'), AlertDestination.alerts);

@@ -17,9 +17,10 @@ import '../../ui/sheets.dart';
 import 'consents_screen.dart';
 import 'dropoff_screen.dart';
 import 'household_screen.dart';
-import 'fees_screen.dart';
+import 'app_fee_screen.dart';
 import 'help_screen.dart';
 import 'personal_info_screen.dart';
+import 'school_fees_screen.dart';
 import 'section_gate.dart';
 import 'settings_screen.dart';
 
@@ -441,15 +442,22 @@ class _Settings extends StatelessWidget {
           ),
           Divider(height: 1, color: AppTheme.border),
           _Row(
+            key: const ValueKey('profile.appFee'),
             icon: Icons.receipt_long_rounded,
-            title: t('fees.title'),
-            sub: t('profile.paymentsSub'),
-            locked: ent.lockedForAll(ids, ParentSection.fees),
-            onTap: () => openHouseholdSection<void>(
-              context,
-              childIds: ids,
-              section: ParentSection.fees,
-              builder: (_) => const FeesScreen(),
+            title: t('appFee.title'),
+            sub: t('appFee.rowSub'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AppFeeScreen()),
+            ),
+          ),
+          Divider(height: 1, color: AppTheme.border),
+          _Row(
+            key: const ValueKey('profile.schoolFees'),
+            icon: Icons.school_outlined,
+            title: t('schoolFees.title'),
+            sub: t('schoolFees.rowSub'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SchoolFeesScreen()),
             ),
           ),
           Divider(height: 1, color: AppTheme.border),
@@ -530,6 +538,7 @@ class _ConsentsRowState extends State<_ConsentsRow> {
 
 class _Row extends StatelessWidget {
   const _Row({
+    super.key,
     required this.icon,
     required this.title,
     required this.sub,

@@ -195,15 +195,23 @@ void main() {
         reason: 'a grade-4 notice reached a family with no child in grade 4');
   });
 
-  test('fees parse for the card and the fees screen', () async {
-    final f = await ParentApi.instance.fees();
-    expect(f.outstandingIqd, greaterThanOrEqualTo(0));
-    expect(f.invoices, isNotEmpty, reason: 'nothing has been billed to this household');
-    for (final i in f.invoices) {
-      expect(i.serial, isNotEmpty);
-      expect(i.totalIqd, greaterThan(0));
-      expect(i.balanceIqd, lessThanOrEqualTo(i.totalIqd));
+  test('the KSP package and school fees parse for both payment screens', () async {
+    final package = await ParentApi.instance.packageOverview();
+    expect(package.methods, contains('CASH'));
+    expect(package.children, isNotEmpty);
+    for (final c in package.children) {
+      expect(c.studentId, isNotEmpty);
+      expect(c.childName, isNotEmpty);
     }
+    final fees = await ParentApi.instance.schoolFees();
+    expect(fees.children.map((c) => c.studentId), unorderedEquals(package.children.map((c) => c.studentId)));
+    for (final c in fees.children) {
+      if (c.allowsAppPayment) continue;
+      expect(c.code, 'SCHOOL_FEES_NOT_IN_APP');
+      expect(c.notInAppText(), isNotEmpty);
+    }
+    await ParentApi.instance.paymentNotices(PaymentPayee.ksp, limit: 5);
+    await ParentApi.instance.paymentNotices(PaymentPayee.school, limit: 5);
   });
 
   test('leave requests parse, and one can be raised and withdrawn', () async {
