@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
 import 'format.dart';
+import 'insets.dart';
 import 'kit.dart';
 import 'sheets.dart';
 
@@ -66,7 +67,7 @@ class _SheetFrame extends StatelessWidget {
         color: AppTheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
       ),
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 14),
+      padding: withBottomInset(context, const EdgeInsets.only(bottom: 14)),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

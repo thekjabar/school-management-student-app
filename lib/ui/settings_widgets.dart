@@ -5,6 +5,7 @@ import '../api/session.dart';
 import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
 import 'async.dart';
+import 'insets.dart';
 import 'kit.dart';
 
 class ThemePicker extends StatelessWidget {
@@ -195,8 +196,9 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
           color: AppTheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        child: Column(
+        padding: withBottomInset(context, const EdgeInsets.fromLTRB(20, 12, 20, 24)),
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -243,6 +245,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
               onPressed: _busy ? null : _submit,
             ),
           ],
+          ),
         ),
       ),
     );

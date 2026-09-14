@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
+import 'insets.dart';
 import 'sheets.dart';
 
 class MapTiles {
@@ -119,7 +120,7 @@ class _CreditSheet extends StatelessWidget {
         color: AppTheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
       ),
-      padding: const EdgeInsets.fromLTRB(18, 10, 18, 22),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(18, 10, 18, 22)),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
+import '../theme/app_theme.dart';
 import '../ui/motion.dart';
 
 class SplashGate extends StatefulWidget {
@@ -151,13 +153,16 @@ class _SplashGateState extends State<SplashGate> {
       children: [
         widget.child,
         if (!_curtainGone)
-          IgnorePointer(
-            ignoring: _done,
-            child: AnimatedOpacity(
-              opacity: _done ? 0 : 1,
-              duration: _fade,
-              curve: Curves.easeOut,
-              child: _Curtain(video: _video, tint: widget.tint),
+          AnnotatedRegion<SystemUiOverlayStyle>(
+            value: AppTheme.overDarkMedia,
+            child: IgnorePointer(
+              ignoring: _done,
+              child: AnimatedOpacity(
+                opacity: _done ? 0 : 1,
+                duration: _fade,
+                curve: Curves.easeOut,
+                child: _Curtain(video: _video, tint: widget.tint),
+              ),
             ),
           ),
       ],

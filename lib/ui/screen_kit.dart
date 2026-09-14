@@ -47,7 +47,9 @@ class ScreenHeader extends StatelessWidget {
       ],
     );
 
-    return Padding(
+    return SafeArea(
+      bottom: false,
+      child: Padding(
       padding: const EdgeInsets.fromLTRB(kGutter, 6, kGutter, 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,6 +89,7 @@ class ScreenHeader extends StatelessWidget {
               badge: notificationCount,
             ),
         ],
+      ),
       ),
     );
   }

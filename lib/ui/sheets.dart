@@ -11,12 +11,13 @@ Future<T?> showAppSheet<T>(
   return showModalBottomSheet<T>(
     context: context,
     useRootNavigator: true,
+    useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     isDismissible: isDismissible,
     enableDrag: enableDrag,
     constraints: BoxConstraints(
-      maxHeight: MediaQuery.of(context).size.height * _maxSheetHeightFraction,
+      maxHeight: MediaQuery.sizeOf(context).height * _maxSheetHeightFraction,
     ),
     builder: builder,
   );

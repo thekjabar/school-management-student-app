@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../api/client.dart';
 import '../i18n/strings.dart';
 import '../theme/app_theme.dart';
+import 'insets.dart';
 
 String errorText(Object? e) => e is OfflineException
     ? t('common.offline')
@@ -141,7 +142,7 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
 
           return ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: widget.padding,
+            padding: withBottomInset(context, widget.padding),
             children: [widget.builder(context, data)],
           );
         },
@@ -151,7 +152,7 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
 
   Widget _scrollable(Widget child) => ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: widget.padding,
+        padding: withBottomInset(context, widget.padding),
         children: [child],
       );
 }

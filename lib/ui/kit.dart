@@ -1211,7 +1211,7 @@ Future<bool> confirmDialog(
       surfaceTintColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 26, vertical: 40),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
