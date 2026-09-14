@@ -127,6 +127,8 @@ class Session {
 
   final ValueNotifier<String?> activeTenant = ValueNotifier<String?>(null);
 
+  final ValueNotifier<int> revision = ValueNotifier<int>(0);
+
   final ApiClient _api = ApiClient.instance;
 
   Future<SignInResult> signIn(String phone, String password) async {
@@ -188,6 +190,7 @@ class Session {
   }
 
   Future<Me?> refresh() async {
+    final askedIn = AppLocale.current.value;
     final Map<String, dynamic> json;
     try {
       json = await _api.get('/auth/me') as Map<String, dynamic>;
@@ -203,9 +206,12 @@ class Session {
       rethrow;
     }
 
+    if (AppLocale.current.value != askedIn) return refresh();
+
     _me = Me.fromJson(json);
     await _api.setTenant(_me!.active.tenantId);
     activeTenant.value = _me!.active.tenantId;
+    revision.value++;
     await _api.saveMe(jsonEncode(json));
     await Push.identify(_me!.id, identityToken: _me!.pushIdentityToken);
     await syncLocale();

@@ -45,20 +45,72 @@ class Loader<T> extends StatefulWidget {
   State<Loader<T>> createState() => LoaderState<T>();
 }
 
-class LoaderState<T> extends State<Loader<T>> with RouteAware {
+mixin FollowsReload<W extends StatefulWidget> on State<W> {
+  Lang _fetchedIn = AppLocale.current.value;
+  int? _roundSeen;
+
+  void refetch();
+
+  void refetchAfterPull() => refetch();
+
+  void markFetchedInCurrentLanguage() => _fetchedIn = AppLocale.current.value;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchedIn = AppLocale.current.value;
+    AppLocale.current.addListener(_languageMoved);
+  }
+
+  @override
+  void dispose() {
+    AppLocale.current.removeListener(_languageMoved);
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final round = context.dependOnInheritedWidgetOfExactType<_PullRound>()?.round;
+    final seen = _roundSeen;
+    _roundSeen = round;
+    if (seen == null || round == null || round == seen) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      markFetchedInCurrentLanguage();
+      refetchAfterPull();
+    });
+  }
+
+  void _languageMoved() {
+    if (!mounted || AppLocale.current.value == _fetchedIn) return;
+    _fetchedIn = AppLocale.current.value;
+    refetch();
+  }
+}
+
+class _PullRound extends InheritedWidget {
+  const _PullRound({required this.round, required super.child});
+
+  final int round;
+
+  @override
+  bool updateShouldNotify(_PullRound oldWidget) => round != oldWidget.round;
+}
+
+class LoaderState<T> extends State<Loader<T>> with RouteAware, FollowsReload<Loader<T>> {
   late Future<T> _future;
-  Lang _loadedIn = AppLocale.current.value;
+  int _generation = 0;
+  int _pulls = 0;
 
   @override
   void initState() {
     super.initState();
     _future = widget.load();
-    AppLocale.current.addListener(_languageChanged);
   }
 
   @override
   void dispose() {
-    AppLocale.current.removeListener(_languageChanged);
     routeObserver.unsubscribe(this);
     super.dispose();
   }
@@ -79,21 +131,27 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
   @override
   void didPopNext() => reload();
 
-  void _languageChanged() {
-    if (!mounted) return;
-    if (AppLocale.current.value == _loadedIn) return;
-    _loadedIn = AppLocale.current.value;
-    reload();
+  @override
+  void refetch() => reload();
+
+  @override
+  void refetchAfterPull() => pull();
+
+  Future<void> pull() {
+    if (!mounted) return Future<void>.value();
+    setState(() => _pulls++);
+    return reload();
   }
 
   Future<void> reload({bool quiet = false}) async {
     if (!mounted) return;
-    _loadedIn = AppLocale.current.value;
+    markFetchedInCurrentLanguage();
+    final generation = ++_generation;
 
     if (quiet) {
       try {
         final value = await widget.load();
-        if (!mounted) return;
+        if (!mounted || generation != _generation) return;
         setState(() {
           _future = SynchronousFuture<T>(value);
         });
@@ -112,9 +170,9 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
   Widget build(BuildContext context) {
     final tint = widget.tint ?? AppTheme.violet;
 
-    return RefreshIndicator(
+    final refreshable = RefreshIndicator(
       color: tint,
-      onRefresh: reload,
+      onRefresh: pull,
       child: FutureBuilder<T>(
         future: _future,
         builder: (context, snap) {
@@ -127,7 +185,7 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
             return _scrollable(
               _Failed(
                 message: errorText(error),
-                onRetry: reload,
+                onRetry: pull,
                 tint: tint,
                 locked: error is SectionLockedException,
               ),
@@ -148,6 +206,8 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware {
         },
       ),
     );
+
+    return _PullRound(round: _pulls, child: refreshable);
   }
 
   Widget _scrollable(Widget child) => ListView(

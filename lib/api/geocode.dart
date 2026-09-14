@@ -147,7 +147,7 @@ class Geocode {
   static final Map<String, String?> _seen = {};
 
   static String _key(double lat, double lon) =>
-      '${lat.toStringAsFixed(4)},${lon.toStringAsFixed(4)}';
+      '${AppLocale.current.value.code}:${lat.toStringAsFixed(4)},${lon.toStringAsFixed(4)}';
 
   static Future<String?> at(double lat, double lon) async {
     if (!available) return null;

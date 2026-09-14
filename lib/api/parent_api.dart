@@ -2253,7 +2253,10 @@ class ParentApi {
     T Function(dynamic json) parse, {
     String? tenantId,
   }) async {
-    final key = tenantId == null ? path : '$tenantId$path';
+    final key = OfflineCache.languageKey(
+      AppLocale.current.value,
+      tenantId == null ? path : '$tenantId$path',
+    );
     try {
       final json = await _api.get(path, tenantId: tenantId);
       unawaited(OfflineCache.instance.write(key, json));
@@ -3879,6 +3882,16 @@ class Entitlements {
     });
     _running = next;
     return next;
+  }
+
+  Future<void> renew() {
+    if (!current.value.loaded && _tenantIds.isEmpty && _running == null) {
+      return Future<void>.value();
+    }
+    _generation++;
+    _running = null;
+    _fetchedAt = null;
+    return refresh();
   }
 
   DateTime? _fetchedAt;

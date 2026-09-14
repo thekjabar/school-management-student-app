@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../i18n/strings.dart';
+
 class CachedAt<T> {
   const CachedAt(this.value, this.savedAt);
 
@@ -20,6 +22,8 @@ class OfflineCache {
   static const _folder = 'parent_cache';
   static const _version = 1;
   static const _keepFor = Duration(days: 14);
+
+  static String languageKey(Lang lang, String key) => '${lang.code}.$key';
 
   Directory? _dir;
   Future<Directory>? _opening;

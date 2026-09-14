@@ -6,6 +6,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' show MapboxOptions
 
 import 'api/boot.dart';
 import 'api/client.dart';
+import 'api/language_refresh.dart';
 import 'api/push.dart';
 import 'i18n/delegates.dart';
 import 'ui/async.dart';
@@ -46,7 +47,7 @@ Future<void> main() async {
     MapboxOptions.setAccessToken(MapTiles.token);
   }
   await AppLocale.restore();
-  AppLocale.onChanged = Session.instance.setLocale;
+  AppLocale.onChanged = LanguageRefresh.apply;
   await AppThemeSetting.restore();
   await Push.start();
   runApp(const KspApp());
@@ -68,12 +69,18 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    Session.instance.revision.addListener(_accountReloaded);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    Session.instance.revision.removeListener(_accountReloaded);
     super.dispose();
+  }
+
+  void _accountReloaded() {
+    if (mounted) _repaintEverything();
   }
 
   @override

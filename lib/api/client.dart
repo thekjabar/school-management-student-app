@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -102,7 +102,10 @@ class ApiClient {
     }
   }
 
-  final http.Client _http = http.Client();
+  http.Client _http = http.Client();
+
+  @visibleForTesting
+  set httpForTest(http.Client client) => _http = client;
 
   String? _access;
   String? _refresh;

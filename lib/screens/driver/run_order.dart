@@ -401,7 +401,7 @@ class RunOrder {
 
   static bool _restored = false;
 
-  static final Map<String, SchoolGate> _schools = {};
+  static final Map<String, ({Lang lang, SchoolGate gate})> _schools = {};
 
   static Future<void> _restore() async {
     if (_restored) return;
@@ -424,14 +424,15 @@ class RunOrder {
   }
 
   static Future<SchoolGate?> school(String tripId) async {
+    final lang = AppLocale.current.value;
     final known = _schools[tripId];
-    if (known != null) return known;
+    if (known != null && known.lang == lang) return known.gate;
     try {
       final gate = await CrewApi.instance.schoolGate(tripId);
-      _schools[tripId] = gate;
+      _schools[tripId] = (lang: lang, gate: gate);
       return gate;
     } catch (_) {
-      return null;
+      return known?.gate;
     }
   }
 
