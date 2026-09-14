@@ -6,6 +6,7 @@ import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
+import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
 import '../../ui/screen_kit.dart';
@@ -41,6 +42,7 @@ class _HomeworkTabState extends State<HomeworkTab> {
               child: Loader<List<TeacherHomework>>(
                 key: _loaderKey,
                 tint: Role.teacher.tint,
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
                 load: () => TeacherApi.instance.homework(),
                 isEmpty: (rows) => rows.isEmpty,
                 empty: t('teacher.noHomeworkYet'),
@@ -262,7 +264,7 @@ class _SetSheetState extends State<_SetSheet> {
           color: AppTheme.canvas,
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         ),
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 22),
+        padding: withBottomInset(context, const EdgeInsets.fromLTRB(18, 12, 18, 22)),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

@@ -9,6 +9,7 @@ import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
+import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
 import '../../ui/screen_kit.dart';
@@ -1556,6 +1557,7 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
     final total = _rows.length;
     final narrowed = _status != null || _query.trim().isNotEmpty;
     final statuses = _statuses;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return Scaffold(
       backgroundColor: AppTheme.canvas,
@@ -1606,7 +1608,10 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
                 ),
               ),
             Expanded(
-              child: LayoutBuilder(
+              child: MediaQuery.removePadding(
+                context: context,
+                removeBottom: true,
+                child: LayoutBuilder(
                 builder: (context, box) => Loader<List<ClassStudent>>(
                   key: _loaderKey,
                   tint: Role.teacher.tint,
@@ -1690,12 +1695,13 @@ class _ClassRosterScreenState extends State<ClassRosterScreen> {
                                 ),
                               ),
                             ),
-                          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                          SliverToBoxAdapter(child: SizedBox(height: 16 + bottomInset)),
                         ],
                       ),
                     ),
                   ),
                 ),
+              ),
               ),
             ),
           ],
@@ -2103,7 +2109,7 @@ class _BehaviourSheetState extends State<BehaviourSheet> {
           color: AppTheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
         ),
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+        padding: withBottomInset(context, const EdgeInsets.fromLTRB(18, 10, 18, 18)),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

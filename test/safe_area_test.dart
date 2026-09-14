@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:student_app/i18n/strings.dart';
 import 'package:student_app/screens/parent/settings_screen.dart';
+import 'package:student_app/screens/teacher/homework_tab.dart';
 import 'package:student_app/ui/async.dart';
 import 'package:student_app/ui/kit.dart';
 import 'package:student_app/ui/pickers.dart';
@@ -326,6 +327,24 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+  });
+
+  group('teacher Homework screen', () {
+    testWidgets('header and the Set homework button stay inside, and the list clears both', (tester) async {
+      _phone(tester);
+      await _app(tester, const HomeworkTab());
+      await tester.pumpAndSettle();
+
+      final safe = _safeRegion(tester);
+      _expectInside(tester, find.byIcon(Icons.arrow_back_rounded), safe);
+      _expectInside(tester, find.byType(FloatingActionButton), safe);
+
+      final list = tester.widget<ListView>(find.byType(ListView).first);
+      final fab = tester.getRect(find.byType(FloatingActionButton));
+      final bottomRoom = list.padding!.resolve(TextDirection.ltr).bottom;
+      expect(_portrait.height - bottomRoom, lessThanOrEqualTo(fab.top));
+      expect(tester.takeException(), isNull);
+    });
   });
 
   group('confirmDialog', () {
