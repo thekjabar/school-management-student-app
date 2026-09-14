@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
+import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
@@ -1629,7 +1630,7 @@ class _RefuseScreenState extends State<_RefuseScreen> {
             ScreenHeader(title: t('handover.refuseTitle')),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 28),
+                padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 28)),
                 children: [
                   NoticeBanner(
                     icon: Icons.shield_rounded,
@@ -1872,7 +1873,7 @@ class _NobodyScreenState extends State<_NobodyScreen> {
               ScreenHeader(title: t('handover.nobodyTitle')),
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 28),
+                  padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 28)),
                   children: [
                     NoticeBanner(
                       icon: Icons.airline_seat_recline_normal_rounded,

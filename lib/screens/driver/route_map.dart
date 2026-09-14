@@ -200,7 +200,9 @@ class _RouteMapState extends State<RouteMap> {
       overview: points,
       camera: _camera,
       canFollow: widget.fullScreen && widget.live,
-      bottomInset: _driven ? (_selected == null ? 140.0 : 0.0) : 0.0,
+      bottomInset: _driven
+          ? (_selected == null ? 140.0 + MediaQuery.paddingOf(context).bottom : 0.0)
+          : 0.0,
       onReady: (m) => _mapbox = m,
       onPinTap: widget.compact
           ? null
@@ -351,7 +353,7 @@ class _RouteMapState extends State<RouteMap> {
             ),
           ),
         ),
-        const _Credit(),
+        _Credit(edgeToEdge: widget.fullScreen),
         if (_driven)
           PositionedDirectional(
             start: 0,
@@ -834,15 +836,17 @@ class _RiderLine extends StatelessWidget {
 }
 
 class _Credit extends StatelessWidget {
-  const _Credit({this.small = false});
+  const _Credit({this.small = false, this.edgeToEdge = false});
 
   final bool small;
+
+  final bool edgeToEdge;
 
   @override
   Widget build(BuildContext context) => PositionedDirectional(
         start: small ? null : 8,
         end: small ? 5 : null,
-        bottom: small ? 4 : 6,
+        bottom: (small ? 4 : 6) + (edgeToEdge ? MediaQuery.paddingOf(context).bottom : 0),
         child: MapAttribution(small: small),
       );
 }

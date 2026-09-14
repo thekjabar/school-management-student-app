@@ -13,6 +13,7 @@ import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
+import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
@@ -2503,8 +2504,9 @@ class _SkipStopSheetState extends State<SkipStopSheet> {
           color: AppTheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
         ),
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
-        child: Column(
+        padding: withBottomInset(context, const EdgeInsets.fromLTRB(18, 10, 18, 18)),
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2569,6 +2571,7 @@ class _SkipStopSheetState extends State<SkipStopSheet> {
               onPressed: valid ? () => Navigator.of(context).pop(trimmed) : null,
             ),
           ],
+          ),
         ),
       ),
     );
@@ -4743,7 +4746,7 @@ class _ChildFoundSheet extends StatelessWidget {
         color: AppTheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
       ),
-      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(18, 10, 18, 18)),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4907,7 +4910,7 @@ class _RecordAllOffSheetState extends State<_RecordAllOffSheet> {
         color: AppTheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
       ),
-      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(18, 10, 18, 18)),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -5000,8 +5003,9 @@ class _EndWithChildrenSheet extends StatelessWidget {
         color: AppTheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
       ),
-      padding: const EdgeInsets.fromLTRB(18, 10, 18, 20),
-      child: Column(
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(18, 10, 18, 20)),
+      child: SingleChildScrollView(
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -5040,6 +5044,7 @@ class _EndWithChildrenSheet extends StatelessWidget {
             onPressed: () => Navigator.of(context).pop(true),
           ),
         ],
+        ),
       ),
     );
   }
@@ -5055,7 +5060,7 @@ class _PanicSheet extends StatelessWidget {
         color: AppTheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
       ),
-      padding: const EdgeInsets.fromLTRB(18, 10, 18, 20),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(18, 10, 18, 20)),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -5144,7 +5149,7 @@ class _CorrectionSheetState extends State<_CorrectionSheet> {
           color: AppTheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
         ),
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+        padding: withBottomInset(context, const EdgeInsets.fromLTRB(18, 10, 18, 18)),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

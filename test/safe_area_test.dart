@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:student_app/i18n/strings.dart';
+import 'package:student_app/screens/driver/run_driving.dart';
+import 'package:student_app/screens/driver/trip_screen.dart';
 import 'package:student_app/screens/parent/settings_screen.dart';
 import 'package:student_app/screens/teacher/homework_tab.dart';
 import 'package:student_app/ui/async.dart';
@@ -344,6 +346,102 @@ void main() {
       final bottomRoom = list.padding!.resolve(TextDirection.ltr).bottom;
       expect(_portrait.height - bottomRoom, lessThanOrEqualTo(fab.top));
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('driver map', () {
+    Widget fullScreenMap() {
+      final driving = RunDriving(
+        stopPanel: (_, _, _) => const SizedBox.shrink(),
+        schoolPanel: (_, _) => null,
+        runBar: (_, _) => SizedBox(
+          height: 56,
+          child: FilledButton(onPressed: () {}, child: const Text('Arrived')),
+        ),
+        sos: (_, _) => null,
+      )..publish(const RunSnapshot(trip: null, leg: 'OUT', stops: [], planStops: [], school: null));
+
+      return Scaffold(
+        body: Stack(
+          children: [
+            const Positioned.fill(child: ColoredBox(color: Colors.green)),
+            PositionedDirectional(
+              start: 0,
+              end: 0,
+              bottom: 0,
+              child: RunMapSheet(driving: driving, selection: null, onClose: () {}),
+            ),
+          ],
+        ),
+      );
+    }
+
+    testWidgets('the action panel sits on the map but above the gesture bar', (tester) async {
+      _phone(tester);
+      await _app(tester, fullScreenMap());
+
+      final safe = _safeRegion(tester);
+      _expectInside(tester, find.text('Arrived'), safe);
+      _expectInside(tester, find.text(t('driver.map.tapStopHint')), safe);
+      expect(tester.getRect(find.byType(RunMapSheet)).bottom, _portrait.height);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the action panel clears landscape cutouts', (tester) async {
+      _phone(
+        tester,
+        size: _landscape,
+        padding: const FakeViewPadding(left: _cutoutSide, right: _cutoutSide, bottom: 21),
+      );
+      await _app(tester, fullScreenMap());
+
+      _expectInside(tester, find.text('Arrived'), _safeRegion(tester));
+      expect(tester.takeException(), isNull);
+    });
+
+    Future<void> openSkip(WidgetTester tester) async {
+      late BuildContext host;
+      await _app(
+        tester,
+        Scaffold(
+          body: Builder(builder: (context) {
+            host = context;
+            return const SizedBox.expand();
+          }),
+        ),
+      );
+      showAppSheet<String>(host, builder: (_) => const SkipStopSheet());
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('the skip-stop sheet keeps its button above the gesture bar and the keyboard', (tester) async {
+      _phone(tester);
+      await openSkip(tester);
+      final skip = find.text(t('driver.skipConfirm'));
+      _expectInside(tester, skip, _safeRegion(tester));
+
+      tester.view.viewInsets = const FakeViewPadding(bottom: _keyboard);
+      tester.view.padding = const FakeViewPadding(top: _notchTop);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      _expectInside(tester, skip, _safeRegion(tester, keyboard: true));
+    });
+
+    testWidgets('the skip-stop sheet does not overflow with a keyboard in landscape', (tester) async {
+      _phone(
+        tester,
+        size: _landscape,
+        padding: const FakeViewPadding(left: _cutoutSide, right: _cutoutSide, bottom: 21),
+      );
+      await openSkip(tester);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 180);
+      tester.view.padding = const FakeViewPadding(left: _cutoutSide, right: _cutoutSide);
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      final sheet = tester.getRect(find.byType(SkipStopSheet));
+      expect(sheet.left, greaterThanOrEqualTo(_cutoutSide));
+      expect(sheet.right, lessThanOrEqualTo(_landscape.width - _cutoutSide));
     });
   });
 
