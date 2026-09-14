@@ -21,7 +21,7 @@ class PersonalInfoScreen extends StatefulWidget {
   State<PersonalInfoScreen> createState() => _PersonalInfoScreenState();
 }
 
-class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
+class _PersonalInfoScreenState extends State<PersonalInfoScreen> with FollowsReload<PersonalInfoScreen> {
   List<ProfileChange>? _requests;
 
   Object? _error;
@@ -31,6 +31,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     super.initState();
     _load();
   }
+
+  @override
+  void refetch() => _load();
 
   Future<void> _load() async {
     try {

@@ -805,10 +805,13 @@ class _Conversations extends StatefulWidget {
   State<_Conversations> createState() => _ConversationsState();
 }
 
-class _ConversationsState extends State<_Conversations> {
+class _ConversationsState extends State<_Conversations> with FollowsReload<_Conversations> {
   late Future<List<ThreadSummary>> _threads = ParentApi.instance.threads();
 
   void _reload() => setState(() => _threads = ParentApi.instance.threads());
+
+  @override
+  void refetch() => _reload();
 
   @override
   Widget build(BuildContext context) {

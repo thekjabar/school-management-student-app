@@ -712,7 +712,7 @@ class _AttendanceCard extends StatefulWidget {
   State<_AttendanceCard> createState() => _AttendanceCardState();
 }
 
-class _AttendanceCardState extends State<_AttendanceCard> {
+class _AttendanceCardState extends State<_AttendanceCard> with FollowsReload<_AttendanceCard> {
   _Period _period = _Period.week;
 
   AttendanceSummary? _fetched;
@@ -726,10 +726,17 @@ class _AttendanceCardState extends State<_AttendanceCard> {
     _loadTrend();
   }
 
+  @override
+  void refetch() {
+    _load(_period);
+    _loadTrend();
+  }
+
   Future<void> _loadTrend() async {
+    final askedIn = AppLocale.current.value;
     try {
       final got = await ParentApi.instance.attendanceTrend(widget.child.studentId);
-      if (!mounted) return;
+      if (!mounted || askedIn != AppLocale.current.value) return;
       setState(() => _trend = got);
     } catch (_) {
       if (!mounted) return;
@@ -767,13 +774,14 @@ class _AttendanceCardState extends State<_AttendanceCard> {
       _busy = true;
     });
     final w = _window(p);
+    final askedIn = AppLocale.current.value;
     try {
       final got = await ParentApi.instance.attendance(
         widget.child.studentId,
         from: w.from,
         to: w.to,
       );
-      if (!mounted) return;
+      if (!mounted || askedIn != AppLocale.current.value) return;
       setState(() {
         _fetched = got;
         _busy = false;

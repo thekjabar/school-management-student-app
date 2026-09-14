@@ -19,7 +19,7 @@ class CredentialsPanel extends StatefulWidget {
   State<CredentialsPanel> createState() => _CredentialsPanelState();
 }
 
-class _CredentialsPanelState extends State<CredentialsPanel> {
+class _CredentialsPanelState extends State<CredentialsPanel> with FollowsReload<CredentialsPanel> {
   List<Credential>? _rows;
   bool _failed = false;
   bool _busy = false;
@@ -29,6 +29,9 @@ class _CredentialsPanelState extends State<CredentialsPanel> {
     super.initState();
     _load();
   }
+
+  @override
+  void refetch() => _load();
 
   Future<void> _load() async {
     try {
@@ -291,7 +294,7 @@ class CredentialWarning extends StatefulWidget {
   State<CredentialWarning> createState() => _CredentialWarningState();
 }
 
-class _CredentialWarningState extends State<CredentialWarning> {
+class _CredentialWarningState extends State<CredentialWarning> with FollowsReload<CredentialWarning> {
   List<Credential>? _rows;
 
   @override
@@ -299,6 +302,9 @@ class _CredentialWarningState extends State<CredentialWarning> {
     super.initState();
     _load();
   }
+
+  @override
+  void refetch() => _load();
 
   Future<void> _load() async {
     try {

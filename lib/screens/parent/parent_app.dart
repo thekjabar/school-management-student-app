@@ -30,7 +30,8 @@ class ParentApp extends StatefulWidget {
   State<ParentApp> createState() => _ParentAppState();
 }
 
-class _ParentAppState extends State<ParentApp> with WidgetsBindingObserver {
+class _ParentAppState extends State<ParentApp>
+    with WidgetsBindingObserver, FollowsReload<ParentApp> {
   List<GlobalKey<NavigatorState>> _navKeys = List.generate(4, (_) => GlobalKey<NavigatorState>());
 
   int _tab = 0;
@@ -113,6 +114,20 @@ class _ParentAppState extends State<ParentApp> with WidgetsBindingObserver {
 
     await _refreshUnread();
     _pushTapped();
+  }
+
+  @override
+  void refetch() => unawaited(_reloadChildren());
+
+  Future<void> _reloadChildren() async {
+    final askedIn = AppLocale.current.value;
+    try {
+      final children = await ParentApi.instance.children();
+      if (!mounted || askedIn != AppLocale.current.value) return;
+      setState(() => _children = children);
+    } catch (e) {
+      debugPrint('parent: the children were not reloaded in the new language: $e');
+    }
   }
 
   Future<void> _refreshUnread() async {
