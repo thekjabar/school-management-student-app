@@ -40,6 +40,7 @@ String get _title => switch (kRole) {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(AppTheme.systemOverlay);
   if (MapTiles.configured) {
     MapboxOptions.setAccessToken(MapTiles.token);
@@ -128,13 +129,16 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
       themeMode: ThemeMode.light,
       builder: (context, child) {
         final media = MediaQuery.of(context);
-        return Directionality(
-          textDirection: lang.direction,
-          child: MediaQuery(
-            data: media.copyWith(
-              textScaler: media.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.3),
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: AppTheme.systemOverlay,
+          child: Directionality(
+            textDirection: lang.direction,
+            child: MediaQuery(
+              data: media.copyWith(
+                textScaler: media.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.3),
+              ),
+              child: child ?? const SizedBox.shrink(),
             ),
-            child: child ?? const SizedBox.shrink(),
           ),
         );
       },
