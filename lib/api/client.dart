@@ -17,10 +17,11 @@ const String kApiBase = String.fromEnvironment(
 );
 
 class ApiException implements Exception {
-  ApiException(this.message, this.status);
+  ApiException(this.message, this.status, [this.errorCode]);
 
   final String message;
   final int status;
+  final String? errorCode;
 
   bool get isAuth => status == 401;
 
@@ -286,7 +287,7 @@ class ApiClient {
 
   ApiException _failure(http.Response res) {
     final locked = res.statusCode == 403 ? _lockedFrom(res) : null;
-    if (locked == null) return ApiException(_messageFrom(res), res.statusCode);
+    if (locked == null) return ApiException(_messageFrom(res), res.statusCode, _codeFrom(res));
     onSectionLocked?.call(locked);
     return locked;
   }
@@ -313,8 +314,9 @@ class ApiClient {
     required String filename,
     required String mime,
     Map<String, String> fields = const {},
+    String? tenantId,
   }) =>
-      _sendFile(path, field, bytes, filename, mime, fields);
+      _sendFile(path, field, bytes, filename, mime, fields, tenantId);
 
   Future<dynamic> _sendFile(
     String path,
@@ -322,7 +324,8 @@ class ApiClient {
     Uint8List bytes,
     String filename,
     String mime,
-    Map<String, String> fields, [
+    Map<String, String> fields,
+    String? tenantId, [
     bool retry = true,
   ]) async {
     final uri = Uri.parse('$kApiBase$path');
@@ -352,7 +355,7 @@ class ApiClient {
     http.Response res;
     try {
       final request = http.Request('POST', uri)
-        ..headers.addAll(_headers())
+        ..headers.addAll(_headers(tenantId: tenantId))
         ..headers['Content-Type'] = 'multipart/form-data; boundary=$boundary'
         ..bodyBytes = form.takeBytes();
       final streamed = await _http.send(request).timeout(const Duration(seconds: 90));
@@ -366,7 +369,7 @@ class ApiClient {
     if (res.statusCode == 401 && retry && !path.startsWith('/auth/login')) {
       switch (await _renew()) {
         case Renewal.renewed:
-          return _sendFile(path, field, bytes, filename, mime, fields, false);
+          return _sendFile(path, field, bytes, filename, mime, fields, tenantId, false);
         case Renewal.unreachable:
           throw OfflineException();
         case Renewal.rejected:
@@ -382,6 +385,16 @@ class ApiClient {
     }
 
     throw _failure(res);
+  }
+
+  String? _codeFrom(http.Response res) {
+    try {
+      final body = jsonDecode(utf8.decode(res.bodyBytes));
+      final code = body is Map ? body['code'] : null;
+      return code is String && code.isNotEmpty ? code : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   String _messageFrom(http.Response res) {

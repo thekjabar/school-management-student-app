@@ -4,8 +4,11 @@ import 'package:flutter/foundation.dart';
 import '../i18n/strings.dart';
 import 'attachments.dart';
 import 'client.dart';
+import 'family_payments.dart';
 import 'offline_cache.dart';
 import 'session.dart';
+
+export 'family_payments.dart';
 
 class Child {
   Child({
@@ -2630,6 +2633,7 @@ class ParentApi {
     String? note,
     DateTime? capturedAt,
     int? durationMs,
+    String? tenantId,
   }) async {
     final json = await _api.upload(
       '/parent/uploads',
@@ -2644,6 +2648,7 @@ class ParentApi {
         'capturedAt': ?capturedAt?.toUtc().toIso8601String(),
         if (durationMs != null) 'durationMs': durationMs.toString(),
       },
+      tenantId: _scope(tenantId),
     );
     final id = json is Map ? json['id'] : null;
     if (id is! String || id.isEmpty) {
@@ -2823,74 +2828,75 @@ class ParentApi {
     return json is Map ? ((json['marked'] as num?)?.toInt() ?? 0) : 0;
   }
 
-  Future<FeeSummary> fees() => _keepable(
-        '/parent/fees',
-        (json) => FeeSummary.fromJson(json as Map<String, dynamic>),
+  Future<PackageOverview> packageOverview() => _keepable(
+        PaymentPayee.ksp.base,
+        PackageOverview.fromJson,
       );
 
-  Future<PaymentOptions?> paymentOptions() async {
-    try {
-      final json = await _api.get('/parent/payments/options') as Map<String, dynamic>;
-      return PaymentOptions.fromJson(json);
-    } on ApiException catch (e) {
-      if (e.status == 404) return null;
-      rethrow;
+  Future<SchoolFeesOverview> schoolFees() => _keepable(
+        PaymentPayee.school.base,
+        SchoolFeesOverview.fromJson,
+      );
+
+  Future<NoticePage> paymentNotices(
+    PaymentPayee payee, {
+    String? studentId,
+    String? after,
+    int limit = 50,
+  }) {
+    final query = <String>[
+      'limit=$limit',
+      if (studentId != null && studentId.isNotEmpty) 'studentId=${Uri.encodeQueryComponent(studentId)}',
+      if (after != null && after.isNotEmpty) 'after=${Uri.encodeQueryComponent(after)}',
+    ];
+    final path = '${payee.noticesPath}?${query.join('&')}';
+    if (after != null && after.isNotEmpty) {
+      return _api.get(path).then(NoticePage.fromJson);
     }
+    return _keepable(path, NoticePage.fromJson);
   }
 
-  Future<Paged<DeclaredPayment>> payments({int pageSize = 50}) async {
-    final json = await _api.get('/parent/payments?pageSize=$pageSize');
-    return Paged.from<DeclaredPayment>(json, DeclaredPayment.fromJson);
+  Future<PaymentNotice> paymentNotice(PaymentPayee payee, String id) async {
+    final json = await _api.get('${payee.noticesPath}/$id');
+    return PaymentNotice.fromJson(json as Map<String, dynamic>);
   }
 
-  Future<Paged<PaymentReceipt>> receipts({int pageSize = 50}) async {
-    final json = await _api.get('/parent/receipts?pageSize=$pageSize');
-    return Paged.from<PaymentReceipt>(json, PaymentReceipt.fromJson);
-  }
-
-  Future<StoredDocument> receiptPdf(String receiptId) async {
-    final json = await _api.get('/parent/receipts/$receiptId/pdf') as Map<String, dynamic>;
-    return StoredDocument.fromJson(json);
-  }
-
-  Future<StoredDocument> invoicePdf(String invoiceId) async {
-    final json = await _api.get('/parent/invoices/$invoiceId/pdf') as Map<String, dynamic>;
-    return StoredDocument.fromJson(json);
-  }
-
-  Future<void> declarePayment({
+  Future<NoticeSent> submitPaymentNotice(
+    PaymentPayee payee, {
+    required String studentId,
+    required String schoolId,
     required int amountIqd,
     required String method,
     required String idempotencyKey,
-    String? invoiceId,
-    String? studentId,
-    DateTime? paidAt,
+    DateTime? paidOn,
     String? reference,
-    String? notes,
+    String? senderName,
+    String? senderPhone,
     String? proofAssetId,
+    String? notes,
   }) async {
-    final ref = reference?.trim() ?? '';
-    final note = notes?.trim() ?? '';
-    try {
-      await _api.post('/parent/payments', {
-        'amountIqd': amountIqd,
-        'method': method,
-        'idempotencyKey': idempotencyKey,
-        if (invoiceId != null && invoiceId.isNotEmpty) 'invoiceId': invoiceId,
-        if (studentId != null && studentId.isNotEmpty) 'studentId': studentId,
-        if (paidAt != null) 'paidAt': paidAt.toUtc().toIso8601String(),
-        if (ref.isNotEmpty) 'reference': ref,
-        if (note.length >= 2) 'notes': note,
-        if (proofAssetId != null && proofAssetId.isNotEmpty) 'proofAssetId': proofAssetId,
-      });
-    } on ApiException catch (e) {
-      if (e.status == 409) return;
-      rethrow;
-    }
+    final json = await _api.postAs(_scope(schoolId), payee.noticesPath, {
+      'studentId': studentId,
+      'amountIqd': amountIqd,
+      'method': method,
+      'idempotencyKey': idempotencyKey,
+      if (paidOn != null) 'paidOn': isoDay(paidOn),
+      'reference': ?_filled(reference, 1),
+      'senderName': ?_filled(senderName, 2),
+      'senderPhone': ?_filled(senderPhone, 6),
+      'proofAssetId': ?_filled(proofAssetId, 1),
+      'notes': ?_filled(notes, 2),
+    });
+    return NoticeSent.fromJson(json);
   }
 
-  Future<void> withdrawPayment(String paymentId) async {
-    await _api.post('/parent/payments/$paymentId/withdraw');
+  Future<void> withdrawPaymentNotice(PaymentPayee payee, PaymentNotice notice) async {
+    await _api.postAs(_scope(notice.schoolId), '${payee.noticesPath}/${notice.id}/withdraw', const <String, Object>{});
+  }
+
+  static String? _filled(String? value, int minLength) {
+    final trimmed = value?.trim() ?? '';
+    return trimmed.length >= minLength ? trimmed : null;
   }
 
   Future<ConsentBook> consents() async {
@@ -3036,266 +3042,6 @@ class ParentAlert {
         body: (j['body'] ?? '') as String,
         readAt: j['readAt'] == null ? null : DateTime.parse(j['readAt'] as String).toLocal(),
         createdAt: DateTime.parse(j['createdAt'] as String).toLocal(),
-      );
-}
-
-class InvoiceLine2 {
-  InvoiceLine2({required this.description, required this.amountIqd, required this.studentName});
-
-  final String description;
-  final int amountIqd;
-  final String? studentName;
-
-  factory InvoiceLine2.fromJson(Map<String, dynamic> j) => InvoiceLine2(
-        description: (j['description'] ?? '') as String,
-        amountIqd: (j['amountIqd'] as num?)?.toInt() ?? 0,
-        studentName: j['studentName'] as String?,
-      );
-}
-
-class Invoice2 {
-  Invoice2({
-    required this.id,
-    required this.serial,
-    required this.status,
-    required this.periodStart,
-    required this.periodEnd,
-    required this.dueAt,
-    required this.totalIqd,
-    required this.paidIqd,
-    required this.balanceIqd,
-    required this.overdue,
-    required this.lines,
-  });
-
-  final String id;
-  final String serial;
-  final String status;
-  final DateTime periodStart;
-  final DateTime periodEnd;
-  final DateTime dueAt;
-  final int totalIqd;
-  final int paidIqd;
-  final int balanceIqd;
-  final bool overdue;
-  final List<InvoiceLine2> lines;
-
-  factory Invoice2.fromJson(Map<String, dynamic> j) => Invoice2(
-        id: j['id'] as String,
-        serial: (j['serial'] ?? '') as String,
-        status: (j['status'] ?? '') as String,
-        periodStart: DateTime.parse(j['periodStart'] as String).toLocal(),
-        periodEnd: DateTime.parse(j['periodEnd'] as String).toLocal(),
-        dueAt: DateTime.parse(j['dueAt'] as String).toLocal(),
-        totalIqd: (j['totalIqd'] as num?)?.toInt() ?? 0,
-        paidIqd: (j['paidIqd'] as num?)?.toInt() ?? 0,
-        balanceIqd: (j['balanceIqd'] as num?)?.toInt() ?? 0,
-        overdue: (j['overdue'] ?? false) as bool,
-        lines: ((j['lines'] as List?) ?? [])
-            .map((e) => InvoiceLine2.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
-}
-
-class FeeSummary {
-  FeeSummary({
-    required this.outstandingIqd,
-    required this.overdueIqd,
-    required this.dueAt,
-    required this.daysUntilDue,
-    required this.invoices,
-  });
-
-  final int outstandingIqd;
-  final int overdueIqd;
-  final DateTime? dueAt;
-  final int? daysUntilDue;
-  final List<Invoice2> invoices;
-
-  factory FeeSummary.fromJson(Map<String, dynamic> j) => FeeSummary(
-        outstandingIqd: (j['outstandingIqd'] as num?)?.toInt() ?? 0,
-        overdueIqd: (j['overdueIqd'] as num?)?.toInt() ?? 0,
-        dueAt: j['dueAt'] == null ? null : DateTime.parse(j['dueAt'] as String).toLocal(),
-        daysUntilDue: (j['daysUntilDue'] as num?)?.toInt(),
-        invoices: ((j['invoices'] as List?) ?? [])
-            .map((e) => Invoice2.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
-}
-
-String? _twoPartName(Map<String, dynamic>? j) {
-  if (j == null) return null;
-  final name = '${j['nameGiven'] ?? ''} ${j['nameFamily'] ?? ''}'.trim();
-  return name.isEmpty ? null : name;
-}
-
-class PaymentOptions {
-  PaymentOptions({
-    required this.allowSelfDeclare,
-    required this.requireProofForTransfer,
-    required this.methods,
-    required this.currencyCode,
-    required this.instructions,
-  });
-
-  final bool allowSelfDeclare;
-
-  final bool requireProofForTransfer;
-
-  final List<String> methods;
-
-  final String currencyCode;
-
-  final String? instructions;
-
-  List<String> get usableMethods => methods;
-
-  factory PaymentOptions.fromJson(Map<String, dynamic> j) {
-    final written = (j['paymentInstructions'] as String?)?.trim() ?? '';
-    return PaymentOptions(
-      allowSelfDeclare: (j['allowParentSelfDeclare'] ?? false) as bool,
-      requireProofForTransfer: (j['requireProofForTransfer'] ?? true) as bool,
-      methods: ((j['methods'] as List?) ?? const []).map((e) => '$e').toList(),
-      currencyCode: (j['currencyCode'] ?? 'IQD') as String,
-      instructions: written.isEmpty ? null : written,
-    );
-  }
-}
-
-class PaymentReceipt {
-  PaymentReceipt({
-    required this.id,
-    required this.serial,
-    required this.amountIqd,
-    required this.currencyCode,
-    required this.method,
-    required this.issuedAt,
-    required this.voidedAt,
-    required this.invoiceSerial,
-    required this.studentName,
-  });
-
-  final String id;
-  final String serial;
-  final int amountIqd;
-  final String currencyCode;
-  final String method;
-  final DateTime? issuedAt;
-  final DateTime? voidedAt;
-  final String? invoiceSerial;
-  final String? studentName;
-
-  bool get open => voidedAt == null;
-
-  factory PaymentReceipt.fromJson(Map<String, dynamic> j) => PaymentReceipt(
-        id: j['id'] as String,
-        serial: (j['serial'] ?? '') as String,
-        amountIqd: (j['amountIqd'] as num?)?.toInt() ?? 0,
-        currencyCode: (j['currencyCode'] ?? 'IQD') as String,
-        method: (j['method'] ?? '') as String,
-        issuedAt: DateTime.tryParse((j['issuedAt'] ?? '') as String)?.toLocal(),
-        voidedAt: DateTime.tryParse((j['voidedAt'] ?? '') as String)?.toLocal(),
-        invoiceSerial: (j['invoice'] as Map<String, dynamic>?)?['serial'] as String?,
-        studentName: _twoPartName(j['student'] as Map<String, dynamic>?),
-      );
-}
-
-class DeclaredPayment {
-  DeclaredPayment({
-    required this.id,
-    required this.amountIqd,
-    required this.currencyCode,
-    required this.method,
-    required this.status,
-    required this.paidAt,
-    required this.receivedAt,
-    required this.createdAt,
-    required this.reference,
-    required this.rejectedReason,
-    required this.invoiceId,
-    required this.invoiceSerial,
-    required this.studentName,
-    required this.receipts,
-  });
-
-  final String id;
-  final int amountIqd;
-  final String currencyCode;
-  final String method;
-
-  final String status;
-
-  final DateTime? paidAt;
-  final DateTime? receivedAt;
-  final DateTime createdAt;
-  final String? reference;
-  final String? rejectedReason;
-  final String? invoiceId;
-  final String? invoiceSerial;
-  final String? studentName;
-  final List<PaymentReceipt> receipts;
-
-  bool get awaiting => status == 'PENDING_CONFIRMATION';
-  bool get confirmed => status == 'CONFIRMED';
-
-  static const _withdrawnMark = 'Withdrawn by the family';
-
-  bool get withdrawnByFamily =>
-      status == 'REJECTED' && (rejectedReason ?? '').startsWith(_withdrawnMark);
-
-  String? get refusal {
-    final reason = rejectedReason?.trim() ?? '';
-    if (reason.isEmpty) return null;
-    if (!withdrawnByFamily) return reason;
-    var rest = reason.substring(_withdrawnMark.length).trim();
-    if (rest.startsWith(':')) rest = rest.substring(1).trim();
-    return rest.isEmpty ? null : rest;
-  }
-
-  DateTime get when => paidAt ?? receivedAt ?? createdAt;
-
-  PaymentReceipt? get receipt {
-    for (final r in receipts) {
-      if (r.open) return r;
-    }
-    return null;
-  }
-
-  factory DeclaredPayment.fromJson(Map<String, dynamic> j) {
-    final invoice = j['invoice'] as Map<String, dynamic>?;
-    return DeclaredPayment(
-      id: j['id'] as String,
-      amountIqd: (j['amountIqd'] as num?)?.toInt() ?? 0,
-      currencyCode: (j['currencyCode'] ?? 'IQD') as String,
-      method: (j['method'] ?? '') as String,
-      status: (j['status'] ?? '') as String,
-      paidAt: DateTime.tryParse((j['paidAt'] ?? '') as String)?.toLocal(),
-      receivedAt: DateTime.tryParse((j['receivedAt'] ?? '') as String)?.toLocal(),
-      createdAt: DateTime.tryParse((j['createdAt'] ?? '') as String)?.toLocal() ?? DateTime.now(),
-      reference: j['reference'] as String?,
-      rejectedReason: j['rejectedReason'] as String?,
-      invoiceId: invoice?['id'] as String?,
-      invoiceSerial: invoice?['serial'] as String?,
-      studentName: _twoPartName(j['student'] as Map<String, dynamic>?),
-      receipts: ((j['receipts'] as List?) ?? const [])
-          .map((e) => PaymentReceipt.fromJson(e as Map<String, dynamic>))
-          .toList(),
-    );
-  }
-}
-
-class StoredDocument {
-  StoredDocument({required this.url, required this.filename, required this.latinOnly});
-
-  final String url;
-  final String filename;
-
-  final bool latinOnly;
-
-  factory StoredDocument.fromJson(Map<String, dynamic> j) => StoredDocument(
-        url: (j['url'] ?? '') as String,
-        filename: (j['filename'] ?? '') as String,
-        latinOnly: (j['latinOnly'] ?? false) as bool,
       );
 }
 
@@ -3739,7 +3485,6 @@ abstract final class ParentSection {
   static const skipRide = 'parent.skipRide';
   static const collectionRequest = 'parent.collectionRequest';
   static const leave = 'parent.leave';
-  static const fees = 'parent.fees';
   static const consents = 'parent.consents';
   static const routeSafety = 'parent.routeSafety';
   static const dropoff = 'parent.dropoff';
