@@ -6,6 +6,7 @@ import 'attendance_screen.dart';
 import 'attitude_screen.dart';
 import 'bus_screen.dart';
 import 'conversation_screen.dart';
+import 'conversations_screen.dart';
 import 'dropoff_screen.dart';
 import 'app_fee_screen.dart';
 import 'marks_screen.dart';
@@ -147,7 +148,7 @@ class AlertLink {
   String? get announcement => announcementId ?? (sourceType == 'ANNOUNCEMENT' ? sourceId : null);
 }
 
-enum MessagesFilter { all, alerts, announcements, notices, urgent, conversations }
+enum MessagesFilter { all, alerts, announcements, notices, urgent }
 
 class MessagesFocus {
   const MessagesFocus(this.filter, {this.announcementId});
@@ -206,10 +207,12 @@ Future<void> openAlertDestination(
       );
     case AlertDestination.conversation:
       final thread = await _threadFor(link.threadId);
-      if (thread == null || !context.mounted) {
-        showInMessages(const MessagesFocus(MessagesFilter.conversations));
+      if (thread == null) {
+        if (!context.mounted) return;
+        await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => const ConversationsScreen()));
         return;
       }
+      if (!context.mounted) return;
       await openSection<void>(
         context,
         childId: thread.studentId,

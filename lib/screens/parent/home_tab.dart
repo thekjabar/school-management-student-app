@@ -18,6 +18,7 @@ import 'attendance_screen.dart';
 import 'attitude_screen.dart';
 import 'homework_detail.dart';
 import 'marks_screen.dart';
+import 'conversations_screen.dart';
 import 'memories_screen.dart';
 import 'reports_screen.dart';
 import 'section_gate.dart';
@@ -167,6 +168,13 @@ class HomeTab extends StatelessWidget {
                       color: AppTheme.violet,
                       section: ParentSection.reports,
                       builder: (_) => ReportsScreen(child: child),
+                    ),
+                    action(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      label: t('quick.conversations'),
+                      color: AppTheme.green,
+                      section: ParentSection.messages,
+                      builder: (_) => const ConversationsScreen(),
                     ),
                     QuickAction(
                       icon: Icons.badge_outlined,
