@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart' hide Path;
 
 import '../../api/client.dart';
 import '../../api/geocode.dart';
+import '../../api/names_input.dart';
 import '../../api/parent_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
@@ -37,6 +38,8 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
   String? _autoFilled;
 
   bool _editing = false;
+
+  LocalText _storedAddresses = LocalText.empty;
 
   String _wasAddress = '';
   String _wasNote = '';
@@ -179,6 +182,7 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
                 padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 28),
                 load: () async {
                   final h = await ParentApi.instance.homeLocation();
+                  _storedAddresses = h.addresses;
                   if (!_dirty) {
                     _address.text = h.address ?? '';
                     _note.text = h.note ?? '';
@@ -364,11 +368,24 @@ class _HomeAddressScreenState extends State<HomeAddressScreen> {
     });
     final movedPin = _pin != null && (_wasPin == null || _wasPin != _pin);
     try {
+      final pin = _pin;
+      final geocoded = pin == null
+          ? LocalText.empty
+          : await AddressGeocoder.instance.at(pin.latitude, pin.longitude);
+      if (!mounted) return;
       await ParentApi.instance.saveHomeLocation(
-        lat: _pin?.latitude,
-        lon: _pin?.longitude,
-        address: _address.text,
-        note: _note.text,
+        homeAddressBody(
+          reading: AppLocale.current.value,
+          lat: pin?.latitude,
+          lon: pin?.longitude,
+          address: _address.text,
+          addressShown: _wasAddress,
+          note: _note.text,
+          noteShown: _wasNote,
+          stored: _storedAddresses,
+          geocoded: geocoded,
+          pinMoved: movedPin,
+        ),
       );
       if (!mounted) return;
       setState(() {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/names_input.dart';
 import '../../api/parent_api.dart';
 import '../../api/session.dart';
 import '../../i18n/strings.dart';
@@ -386,7 +387,7 @@ class _RequestCard extends StatelessWidget {
               _Asked(
                 label: _label(f.field),
                 value: f.value,
-                ltr: f.field == 'email',
+                ltr: f.field == 'email' || f.field.endsWith('En'),
               ),
 
           if ((item.reason ?? '').isNotEmpty) ...[
@@ -495,14 +496,18 @@ class _RequestCard extends StatelessWidget {
         _ => Icons.undo_rounded,
       };
 
-  static String _label(String field) => switch (field) {
-        'nameGiven' => t('personal.fieldGiven'),
-        'nameFather' => t('personal.fieldFather'),
-        'nameGrandfather' => t('personal.fieldGrandfather'),
-        'nameFamily' => t('personal.fieldFamily'),
-        'email' => t('personal.fieldEmail'),
-        _ => humanise(field),
-      };
+  static String _label(String field) {
+    if (field.endsWith('Ar')) return '${_label(field.substring(0, field.length - 2))} (${Lang.ar.label})';
+    if (field.endsWith('En')) return '${_label(field.substring(0, field.length - 2))} (${Lang.en.label})';
+    return switch (field) {
+      'nameGiven' => t('personal.fieldGiven'),
+      'nameFather' => t('personal.fieldFather'),
+      'nameGrandfather' => t('personal.fieldGrandfather'),
+      'nameFamily' => t('personal.fieldFamily'),
+      'email' => t('personal.fieldEmail'),
+      _ => humanise(field),
+    };
+  }
 }
 
 class _Asked extends StatelessWidget {
@@ -559,6 +564,10 @@ class _AskSheetState extends State<_AskSheet> {
   final _family = TextEditingController();
   final _email = TextEditingController();
   final _reason = TextEditingController();
+  final _arabic = {for (final part in _parts) '${part}Ar': TextEditingController()};
+  final _english = {for (final part in _parts) '${part}En': TextEditingController()};
+
+  static const _parts = ['nameGiven', 'nameFather', 'nameGrandfather', 'nameFamily'];
 
   bool _busy = false;
   String? _error;
@@ -573,8 +582,18 @@ class _AskSheetState extends State<_AskSheet> {
     _family.dispose();
     _email.dispose();
     _reason.dispose();
+    for (final c in [..._arabic.values, ..._english.values]) {
+      c.dispose();
+    }
     super.dispose();
   }
+
+  static const _partLabel = {
+    'nameGiven': 'personal.fieldGiven',
+    'nameFather': 'personal.fieldFather',
+    'nameGrandfather': 'personal.fieldGrandfather',
+    'nameFamily': 'personal.fieldFamily',
+  };
 
   static bool _looksLikeEmail(String value) {
     final at = value.indexOf('@');
@@ -590,13 +609,23 @@ class _AskSheetState extends State<_AskSheet> {
     final family = _family.text.trim();
     final email = _email.text.trim();
     final reason = _reason.text.trim();
+    final otherLanguages = {
+      for (final e in [..._arabic.entries, ..._english.entries])
+        if (e.value.text.trim().isNotEmpty) e.key: e.value.text.trim(),
+    };
 
     if (given.isEmpty &&
         father.isEmpty &&
         grandfather.isEmpty &&
         family.isEmpty &&
-        email.isEmpty) {
+        email.isEmpty &&
+        otherLanguages.isEmpty) {
       setState(() => _error = t('personal.nothingToAsk'));
+      return;
+    }
+    final wrongScript = profileNameScriptError(otherLanguages);
+    if (wrongScript != null) {
+      setState(() => _error = t(wrongScript));
       return;
     }
     if (email.isNotEmpty && !_looksLikeEmail(email)) {
@@ -614,6 +643,7 @@ class _AskSheetState extends State<_AskSheet> {
         nameFather: father.isEmpty ? null : father,
         nameGrandfather: grandfather.isEmpty ? null : grandfather,
         nameFamily: family.isEmpty ? null : family,
+        otherLanguages: otherLanguages,
         email: email.isEmpty ? null : email,
         reason: reason.isEmpty ? null : reason,
       );
@@ -748,7 +778,37 @@ class _AskSheetState extends State<_AskSheet> {
               _Field(label: t('personal.fieldGrandfather'), controller: _grandfather),
               const SizedBox(height: 12),
               _Field(label: t('personal.fieldFamily'), controller: _family),
-              const SizedBox(height: 12),
+              const SizedBox(height: 18),
+              Text(
+                t('personal.otherLanguagesNote'),
+                style: TextStyle(fontSize: 11.5, height: 1.45, color: AppTheme.textMuted),
+              ),
+              for (final (title, fields, direction) in [
+                (t('personal.namesInArabic'), _arabic, TextDirection.rtl),
+                (t('personal.namesInEnglish'), _english, TextDirection.ltr),
+              ]) ...[
+                const SizedBox(height: 14),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                    color: AppTheme.text,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                for (final part in _parts) ...[
+                  _Field(
+                    label: t(_partLabel[part]!),
+                    controller: fields['$part${direction == TextDirection.ltr ? 'En' : 'Ar'}']!,
+                    direction: direction,
+                    capitalise: direction == TextDirection.ltr,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ],
+              const SizedBox(height: 6),
               _Field(
                 label: t('personal.fieldEmail'),
                 controller: _email,
@@ -809,6 +869,7 @@ class _Field extends StatelessWidget {
     this.keyboardType,
     this.capitalise = true,
     this.ltr = false,
+    this.direction,
   });
 
   final String label;
@@ -817,6 +878,7 @@ class _Field extends StatelessWidget {
   final bool capitalise;
 
   final bool ltr;
+  final TextDirection? direction;
 
   @override
   Widget build(BuildContext context) {
@@ -836,7 +898,7 @@ class _Field extends StatelessWidget {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
-          textDirection: ltr ? TextDirection.ltr : null,
+          textDirection: ltr ? TextDirection.ltr : direction,
           textCapitalization:
               capitalise ? TextCapitalization.words : TextCapitalization.none,
           decoration: InputDecoration(

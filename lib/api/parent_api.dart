@@ -375,10 +375,14 @@ class HomeLocation {
     required this.lat,
     required this.lon,
     required this.children,
+    this.addresses = LocalText.empty,
+    this.notes = LocalText.empty,
   });
 
   final String? address;
   final String? note;
+  final LocalText addresses;
+  final LocalText notes;
   final double? lat;
   final double? lon;
 
@@ -389,6 +393,8 @@ class HomeLocation {
   factory HomeLocation.fromJson(Map<String, dynamic> j) => HomeLocation(
         address: j['address'] as String?,
         note: j['note'] as String?,
+        addresses: LocalText.fromJson(j['addresses']),
+        notes: LocalText.fromJson(j['notes']),
         lat: (j['lat'] as num?)?.toDouble(),
         lon: (j['lon'] as num?)?.toDouble(),
         children: ((j['children'] as List?) ?? const [])
@@ -2338,18 +2344,8 @@ class ParentApi {
     return HomeLocation.fromJson(json);
   }
 
-  Future<void> saveHomeLocation({
-    double? lat,
-    double? lon,
-    String? address,
-    String? note,
-  }) async {
-    await _api.put('/parent/home', {
-      'lat': ?lat,
-      'lon': ?lon,
-      if (address != null) 'address': address.trim(),
-      if (note != null) 'note': note.trim(),
-    });
+  Future<void> saveHomeLocation(Map<String, Object> body) async {
+    await _api.put('/parent/home', body);
   }
 
   Future<HouseholdOverview> household() async {
@@ -2573,6 +2569,7 @@ class ParentApi {
     String? nameFather,
     String? nameGrandfather,
     String? nameFamily,
+    Map<String, String> otherLanguages = const {},
     String? email,
     String? reason,
   }) =>
@@ -2581,6 +2578,8 @@ class ParentApi {
         'nameFather': ?nameFather,
         'nameGrandfather': ?nameGrandfather,
         'nameFamily': ?nameFamily,
+        for (final entry in otherLanguages.entries)
+          if (kProfileNameFields.contains(entry.key)) entry.key: entry.value,
         'email': ?email,
         if (reason != null && reason.isNotEmpty) 'reason': reason,
       });
@@ -3087,19 +3086,19 @@ class ProfileChange {
 
   factory ProfileChange.fromJson(Map<String, dynamic> j) {
     final asked = <({String field, String value})>[];
-    void take(String key) {
-      final v = j[key];
-      if (v is String) asked.add((field: key, value: v));
-    }
-
-    final flat = (j['proposed'] as Map<String, dynamic>?) ?? j;
-    for (final key in const ['nameGiven', 'nameFather', 'nameGrandfather', 'nameFamily', 'email']) {
-      final v = flat[key];
-      if (v is String) asked.add((field: key, value: v));
-    }
-    if (asked.isEmpty) {
-      for (final key in const ['nameGiven', 'nameFather', 'nameGrandfather', 'nameFamily', 'email']) {
-        take(key);
+    final changes = j['changes'];
+    if (changes is List) {
+      for (final change in changes) {
+        if (change is! Map) continue;
+        final field = change['field'];
+        if (field is! String || !kProfileChangeFields.contains(field)) continue;
+        final value = change['proposedValue'];
+        asked.add((field: field, value: value is String ? value : ''));
+      }
+    } else {
+      for (final field in kProfileChangeFields) {
+        final v = j['proposed${field[0].toUpperCase()}${field.substring(1)}'] ?? j[field];
+        if (v is String) asked.add((field: field, value: v));
       }
     }
 
@@ -3114,6 +3113,23 @@ class ProfileChange {
     );
   }
 }
+
+const List<String> kProfileNameFields = [
+  'nameGiven',
+  'nameFather',
+  'nameGrandfather',
+  'nameFamily',
+  'nameGivenAr',
+  'nameFatherAr',
+  'nameGrandfatherAr',
+  'nameFamilyAr',
+  'nameGivenEn',
+  'nameFatherEn',
+  'nameGrandfatherEn',
+  'nameFamilyEn',
+];
+
+const List<String> kProfileChangeFields = [...kProfileNameFields, 'email'];
 
 const List<String> kConsentPurposes = [
   'PHOTO',

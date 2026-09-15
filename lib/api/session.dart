@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../i18n/strings.dart';
 import 'client.dart';
+import 'family_payments.dart' show LocalText;
 import 'offline_cache.dart';
 import 'push.dart';
 
@@ -41,7 +42,7 @@ class Membership {
 class Me {
   Me({
     required this.id,
-    required this.name,
+    required String name,
     required this.phone,
     required this.phoneVerified,
     required this.memberships,
@@ -49,10 +50,14 @@ class Me {
     this.locale,
     this.pushIdentityToken,
     this.passwordMustChange = false,
-  });
+    this.names = LocalText.empty,
+  }) : _nameAsSent = name;
 
   final String id;
-  final String name;
+  final String _nameAsSent;
+  final LocalText names;
+
+  String get name => names.pick(_nameAsSent);
   final String phone;
   final bool phoneVerified;
   final List<Membership> memberships;
@@ -82,6 +87,7 @@ class Me {
     return Me(
       id: person['id'] as String,
       name: (person['name'] ?? '') as String,
+      names: LocalText.fromJson(person['names']),
       phone: (person['phoneE164'] ?? '') as String,
       phoneVerified: (person['phoneVerified'] ?? false) as bool,
       locale: person['locale'] as String?,
