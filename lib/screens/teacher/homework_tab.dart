@@ -11,6 +11,7 @@ import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
+import 'homework_marks.dart';
 
 class HomeworkTab extends StatefulWidget {
   const HomeworkTab({super.key});
@@ -59,10 +60,11 @@ class _HomeworkTabState extends State<HomeworkTab> {
                         ...drafts.map((h) => _Card(
                               item: h,
                               onPublish: () => _publish(h),
+                              onMark: null,
                             )),
                       ],
                       if (live.isNotEmpty) SectionHead(t('teacher.alreadySet')),
-                      ...live.map((h) => _Card(item: h, onPublish: null)),
+                      ...live.map((h) => _Card(item: h, onPublish: null, onMark: () => _mark(h))),
                       const SizedBox(height: 80),
                     ],
                   );
@@ -85,23 +87,31 @@ class _HomeworkTabState extends State<HomeworkTab> {
     }
   }
 
+  Future<void> _mark(TeacherHomework h) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => HomeworkMarksScreen(homework: h)),
+    );
+    _loaderKey.currentState?.reload();
+  }
+
   Future<void> _set() async {
-    final saved = await showAppSheet<bool>(
+    final count = await showAppSheet<int>(
       context,
       builder: (_) => const _SetSheet(),
     );
-    if (saved == true) {
+    if (count != null && count > 0) {
       _loaderKey.currentState?.reload();
-      if (mounted) showNote(context, t('teacher.homeworkSet'));
+      if (mounted) showNote(context, count > 1 ? tn('teacher.homeworkSetMany', count) : t('teacher.homeworkSet'));
     }
   }
 }
 
 class _Card extends StatelessWidget {
-  const _Card({required this.item, required this.onPublish});
+  const _Card({required this.item, required this.onPublish, required this.onMark});
 
   final TeacherHomework item;
   final VoidCallback? onPublish;
+  final VoidCallback? onMark;
 
   @override
   Widget build(BuildContext context) {
@@ -171,6 +181,15 @@ class _Card extends StatelessWidget {
                 onPressed: onPublish,
               ),
             ],
+            if (onMark != null) ...[
+              const SizedBox(height: 12),
+              BigButton(
+                label: t('teacher.markHomework'),
+                color: Role.teacher.tint,
+                height: 42,
+                onPressed: onMark,
+              ),
+            ],
           ],
         ),
       ),
@@ -188,6 +207,8 @@ class _SetSheet extends StatefulWidget {
 class _SetSheetState extends State<_SetSheet> {
   List<TeachingSlot> _classes = [];
   TeachingSlot? _slot;
+  final Set<String> _alsoFor = {};
+  int? _maxScore;
   final _title = TextEditingController();
   final _description = TextEditingController();
   DateTime _due = DateTime.now().add(const Duration(days: 2));
@@ -239,20 +260,50 @@ class _SetSheetState extends State<_SetSheet> {
       _error = null;
     });
     try {
-      await TeacherApi.instance.setHomework(
-        classId: slot.classId,
+      final count = await TeacherApi.instance.setHomeworkForClasses(
+        classIds: [slot.classId, ..._alsoFor],
         subjectId: slot.subjectId,
         title: _title.text.trim(),
         description: _description.text.trim(),
         dueDate: _due,
         estimatedMinutes: _minutes,
+        maxScore: _maxScore,
       );
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) Navigator.of(context).pop(count);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  List<Widget> _otherClasses() {
+    final slot = _slot;
+    if (slot == null) return const [];
+    final others = _classes
+        .where((c) => c.subjectId == slot.subjectId && c.classId != slot.classId)
+        .fold<Map<String, TeachingSlot>>({}, (map, c) => map..putIfAbsent(c.classId, () => c))
+        .values
+        .toList();
+    if (others.isEmpty) return const [];
+    return [
+      const SizedBox(height: 16),
+      _Label(t('teacher.alsoSetFor')),
+      Text(t('teacher.alsoSetForHint'), style: TextStyle(fontSize: 11.5, color: AppTheme.textFaint)),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: others
+            .map((c) => FilterChip(
+                  label: Text(c.className),
+                  selected: _alsoFor.contains(c.classId),
+                  selectedColor: Role.teacher.tint.withValues(alpha: 0.18),
+                  onSelected: (on) => setState(() => on ? _alsoFor.add(c.classId) : _alsoFor.remove(c.classId)),
+                ))
+            .toList(),
+      ),
+    ];
   }
 
   @override
@@ -311,7 +362,32 @@ class _SetSheetState extends State<_SetSheet> {
                               ))
                           .toList(),
                     );
-                    if (picked != null) setState(() => _slot = picked);
+                    if (picked != null) {
+                      setState(() {
+                        _slot = picked;
+                        _alsoFor.clear();
+                      });
+                    }
+                  },
+                ),
+                ..._otherClasses(),
+                const SizedBox(height: 16),
+                _Label(t('teacher.maxMark')),
+                PickerField(
+                  label: '',
+                  value: _maxScore == null ? t('teacher.notMarked') : '$_maxScore',
+                  onTap: () async {
+                    final picked = await pickOne<int>(
+                      context,
+                      title: t('teacher.maxMark'),
+                      tint: Role.teacher.tint,
+                      selected: _maxScore ?? 0,
+                      options: [
+                        PickOption(value: 0, label: t('teacher.notMarked')),
+                        ...const [5, 10, 20, 50, 100].map((m) => PickOption(value: m, label: '$m')),
+                      ],
+                    );
+                    if (picked != null) setState(() => _maxScore = picked == 0 ? null : picked);
                   },
                 ),
                 const SizedBox(height: 16),

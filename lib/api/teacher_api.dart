@@ -191,6 +191,7 @@ class TeacherHomework {
     required this.colorHex,
     required this.className,
     required this.submissions,
+    this.maxScore,
   });
 
   final String id;
@@ -202,6 +203,7 @@ class TeacherHomework {
   final String? colorHex;
   final String className;
   final int submissions;
+  final num? maxScore;
 
   factory TeacherHomework.fromJson(Map<String, dynamic> j) {
     final subject = ((j['subject'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
@@ -216,6 +218,79 @@ class TeacherHomework {
       colorHex: subject['colorHex'] as String?,
       className: (cls['name'] ?? '') as String,
       submissions: (((j['_count'] as Map<String, dynamic>?) ?? const <String, dynamic>{}))['submissions'] as int? ?? 0,
+      maxScore: j['maxScore'] == null ? null : num.tryParse('${j['maxScore']}'),
+    );
+  }
+}
+
+class HomeworkSheetRow {
+  HomeworkSheetRow({
+    required this.studentId,
+    required this.code,
+    required this.rollNumber,
+    required this.name,
+    required this.status,
+    required this.score,
+  })  : savedStatus = status,
+        savedScore = score;
+
+  final String studentId;
+  final String code;
+  final String? rollNumber;
+  final String name;
+  String status;
+  num? score;
+  final String savedStatus;
+  final num? savedScore;
+
+  bool get changed => status != savedStatus || score != savedScore;
+
+  Map<String, Object?> toEntry() => {
+        'studentId': studentId,
+        if (score != savedScore) 'score': score,
+        if (status != savedStatus) 'status': status,
+      };
+
+  factory HomeworkSheetRow.fromJson(Map<String, dynamic> j) => HomeworkSheetRow(
+        studentId: (j['studentId'] ?? '') as String,
+        code: (j['code'] ?? '') as String,
+        rollNumber: j['rollNumber'] as String?,
+        name: (j['name'] ?? '') as String,
+        status: (j['status'] ?? 'NOT_SUBMITTED') as String,
+        score: j['score'] as num?,
+      );
+}
+
+class HomeworkSheet {
+  HomeworkSheet({
+    required this.id,
+    required this.title,
+    required this.maxScore,
+    required this.className,
+    required this.subjectName,
+    required this.rows,
+  });
+
+  final String id;
+  final String title;
+  final num? maxScore;
+  final String className;
+  final String subjectName;
+  final List<HomeworkSheetRow> rows;
+
+  List<Map<String, Object?>> changedEntries() => rows.where((r) => r.changed).map((r) => r.toEntry()).toList();
+
+  factory HomeworkSheet.fromJson(Map<String, dynamic> j) {
+    final hw = ((j['homework'] as Map<String, dynamic>?) ?? const <String, dynamic>{});
+    return HomeworkSheet(
+      id: (hw['id'] ?? '') as String,
+      title: (hw['title'] ?? '') as String,
+      maxScore: hw['maxScore'] as num?,
+      className: (hw['className'] ?? '') as String,
+      subjectName: (hw['subjectName'] ?? '') as String,
+      rows: ((j['students'] as List?) ?? const [])
+          .map((e) => HomeworkSheetRow.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 }
@@ -420,25 +495,40 @@ class TeacherApi {
     return Paged.from<TeacherHomework>(json, TeacherHomework.fromJson).rows;
   }
 
-  Future<void> setHomework({
-    required String classId,
+  Future<void> publishHomework(String id) => _api.post('/teacher/homework/$id/publish');
+
+  Future<int> setHomeworkForClasses({
+    required List<String> classIds,
     required String subjectId,
     required String title,
     required String description,
     required DateTime dueDate,
     int? estimatedMinutes,
+    num? maxScore,
   }) async {
-    await _api.post('/teacher/homework', {
-      'classId': classId,
+    final json = await _api.post('/teacher/homework/batch', {
+      'classIds': classIds,
       'subjectId': subjectId,
       'title': title,
       'description': description,
       'dueDate': _dateOnly(dueDate),
       'estimatedMinutes': ?estimatedMinutes,
+      'maxScore': ?maxScore,
     });
+    return (((json as Map<String, dynamic>)['created'] as List?) ?? const []).length;
   }
 
-  Future<void> publishHomework(String id) => _api.post('/teacher/homework/$id/publish');
+  Future<HomeworkSheet> homeworkSheet(String id) async {
+    final json = await _api.get('/teacher/homework/$id/submissions');
+    return HomeworkSheet.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<int> saveHomeworkMarks(HomeworkSheet sheet) async {
+    final entries = sheet.changedEntries();
+    if (entries.isEmpty) return 0;
+    final json = await _api.put('/teacher/homework/${sheet.id}/grades', {'entries': entries});
+    return (((json as Map<String, dynamic>)['saved'] as num?) ?? 0).toInt();
+  }
 
   Future<List<TeacherExam>> exams() async {
     final json = await _api.get('/teacher/exams');
