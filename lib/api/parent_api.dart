@@ -3150,7 +3150,7 @@ const List<String> kConsentStatuses = [
   'SUPERSEDED',
 ];
 
-const List<String> kConsentBodyLanguages = ['ckb', 'kmr', 'ar', 'en'];
+const List<String> kConsentBodyLanguages = ['ckb', 'ar', 'en'];
 
 String consentBodyLanguage() => switch (AppLocale.current.value) {
       Lang.ckb => 'ckb',
@@ -3192,7 +3192,6 @@ class ConsentForm {
     this.effectiveTo,
     this.expiresAt,
     this.bodyCkb,
-    this.bodyKmr,
     this.bodyAr,
     this.bodyEn,
   });
@@ -3229,7 +3228,6 @@ class ConsentForm {
   final DateTime? expiresAt;
 
   final String? bodyCkb;
-  final String? bodyKmr;
   final String? bodyAr;
   final String? bodyEn;
 
@@ -3254,7 +3252,6 @@ class ConsentForm {
   String? bodyIn(String language) {
     final raw = switch (language) {
       'ckb' => bodyCkb,
-      'kmr' => bodyKmr,
       'ar' => bodyAr,
       'en' => bodyEn,
       _ => null,
@@ -3292,7 +3289,6 @@ class ConsentForm {
         effectiveTo: DateTime.tryParse((j['effectiveTo'] ?? '') as String)?.toLocal(),
         expiresAt: DateTime.tryParse((j['expiresAt'] ?? '') as String)?.toLocal(),
         bodyCkb: j['bodyCkb'] as String?,
-        bodyKmr: j['bodyKmr'] as String?,
         bodyAr: j['bodyAr'] as String?,
         bodyEn: j['bodyEn'] as String?,
       );

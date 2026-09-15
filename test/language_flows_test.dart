@@ -104,7 +104,7 @@ void main() {
   });
 
   test('an untranslated record falls back to the original, never to blank', () async {
-    // Kurmanji has no seeded content at all, so every field must fall back.
+    // Content seeded in Kurdish only must fall back, every field of it.
     // A blank here would mean a parent sees an empty screen rather than the
     // message in a language they can half-read.
     AppLocale.current.value = Lang.en;
