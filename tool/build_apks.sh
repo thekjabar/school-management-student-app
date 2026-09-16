@@ -49,7 +49,14 @@ for role in "${ROLES[@]}"; do
     parent)  api="https://parent-api.krsprotection.com" ;;
     teacher) api="https://teacher-api.krsprotection.com" ;;
     driver)  api="https://driver-api.krsprotection.com" ;;
-    *)      api="https://api.krsprotection.com" ;;
+    *)
+      echo
+      echo "FAILED: there is no API for the role \"$role\"."
+      echo "  Every audience answers on its own host and refuses the others, so a"
+      echo "  build for a role with no host would ship an app that cannot sign"
+      echo "  anybody in. The roles are parent, teacher and driver."
+      exit 1
+      ;;
   esac
   echo "api: $api"
 
