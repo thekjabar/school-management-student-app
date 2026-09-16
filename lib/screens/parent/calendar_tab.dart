@@ -13,6 +13,7 @@ import 'assignments_screen.dart';
 import 'homework_detail.dart';
 import 'section_gate.dart';
 import 'timetable_screen.dart';
+import '../../ui/insets.dart';
 
 class CalendarTab extends StatefulWidget {
   const CalendarTab({super.key, required this.child});
@@ -53,7 +54,7 @@ class _CalendarTabState extends State<CalendarTab> {
     return Loader<_Diary>(
       tint: tint,
       watch: '$id|${ent.lockSignature(id)}',
-      padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20)),
       load: () async {
         final r = await Future.wait<Object>([
           when(ParentSection.timetable, () => ParentApi.instance.timetable(id), const <DayOfLessons>[]),

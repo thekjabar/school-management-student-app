@@ -14,6 +14,7 @@ import 'classes_tab.dart';
 import 'exams_tab.dart';
 import 'homework_tab.dart';
 import 'teacher_account.dart';
+import '../../ui/insets.dart';
 
 class TeacherHome extends StatelessWidget {
   const TeacherHome({super.key, required this.onOpenTab});
@@ -24,7 +25,7 @@ class TeacherHome extends StatelessWidget {
   Widget build(BuildContext context) {
     return Loader<_Today>(
       tint: Role.teacher.tint,
-      padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
       load: () async {
         return _Today.from(await TeacherPayload.fetch());
       },

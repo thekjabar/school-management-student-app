@@ -11,6 +11,7 @@ import '../../ui/sheets.dart';
 import 'handover_screen.dart';
 import 'home_tab.dart' show loadDutyTrip;
 import 'trip_screen.dart' show stopEtaLine;
+import '../../ui/insets.dart';
 
 class DriverStudents extends StatefulWidget {
   const DriverStudents({super.key});
@@ -125,7 +126,7 @@ class _DriverStudentsState extends State<DriverStudents> {
     return Loader<_Roster>(
       key: _loaderKey,
       tint: Role.driver.tint,
-      padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 18),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 18)),
       load: () async {
         final trip = await loadDutyTrip();
         if (trip == null) return _Roster(trip: null, riders: const []);

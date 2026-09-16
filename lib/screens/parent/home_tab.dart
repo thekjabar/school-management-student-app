@@ -26,6 +26,7 @@ import 'section_gate.dart';
 import 'student_info_screen.dart';
 import 'timetable_screen.dart';
 import 'track_screen.dart';
+import '../../ui/insets.dart';
 
 class HomeTab extends StatelessWidget {
   const HomeTab({super.key, required this.child, required this.onOpenTab});
@@ -68,7 +69,7 @@ class HomeTab extends StatelessWidget {
         return Loader<_Home>(
           tint: Role.parent.tint,
           watch: '${child.studentId}|${ent.lockSignature(child.studentId)}',
-          padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
+          padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
           load: () async {
             await Entitlements.instance.ensureLoaded();
             final now = Entitlements.instance.current.value;

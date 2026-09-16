@@ -10,6 +10,7 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import 'alert_routes.dart';
+import '../../ui/insets.dart';
 
 class MessagesTab extends StatefulWidget {
   const MessagesTab({
@@ -256,7 +257,7 @@ class _MessagesTabState extends State<MessagesTab> {
     return Loader<_Inbox>(
       key: _loader,
       tint: tint,
-      padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
       load: _load,
       builder: (context, inbox) {
         _inbox = inbox;

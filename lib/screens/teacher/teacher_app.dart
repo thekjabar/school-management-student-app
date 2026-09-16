@@ -66,6 +66,7 @@ class _TeacherAppState extends State<TeacherApp> {
 
     return Scaffold(
       backgroundColor: AppTheme.canvas,
+      extendBody: true,
       body: SafeArea(
         bottom: false,
         child: Column(

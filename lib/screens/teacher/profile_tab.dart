@@ -12,6 +12,7 @@ import '../../ui/settings_widgets.dart';
 import '../../ui/sheets.dart';
 import '../login_screen.dart' show LanguagePicker;
 import '../staff_leave_screen.dart';
+import '../../ui/insets.dart';
 
 class TeacherProfileTab extends StatelessWidget {
   const TeacherProfileTab({super.key});
@@ -24,7 +25,7 @@ class TeacherProfileTab extends StatelessWidget {
 
     return Loader<TeacherProfile?>(
       tint: tint,
-      padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 20),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 20)),
       load: () async {
         try {
           return await TeacherApi.instance.me();

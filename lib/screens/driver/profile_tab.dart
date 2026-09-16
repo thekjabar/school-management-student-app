@@ -11,6 +11,7 @@ import '../../ui/sheets.dart';
 import '../login_screen.dart' show LanguagePicker;
 import '../staff_leave_screen.dart';
 import 'crew_account.dart';
+import '../../ui/insets.dart';
 
 class DriverProfile extends StatelessWidget {
   const DriverProfile({super.key});
@@ -21,7 +22,7 @@ class DriverProfile extends StatelessWidget {
     final me = Session.instance.me;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 20),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 20)),
       children: [
         Card16(
           padding: const EdgeInsets.all(14),

@@ -14,6 +14,7 @@ import 'roster_kit.dart';
 import 'route_map.dart';
 import 'run_order.dart';
 import 'trip_screen.dart';
+import '../../ui/insets.dart';
 
 Future<CrewTrip?> loadDutyTrip() async {
   final today = pickLiveTrip(await CrewApi.instance.today());
@@ -89,7 +90,7 @@ class _DriverHomeState extends State<DriverHome> {
     return Loader<_Duty>(
       key: _loaderKey,
       tint: Role.driver.tint,
-      padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
       load: () async {
         final live = await loadDutyTrip();
         if (live == null) return _Duty(trip: null, plan: null, run: null, school: null);

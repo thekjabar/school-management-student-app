@@ -299,6 +299,7 @@ class _ParentAppState extends State<ParentApp>
       },
       child: Scaffold(
       backgroundColor: AppTheme.canvas,
+      extendBody: true,
       body: SafeArea(
         bottom: false,
         child: Column(

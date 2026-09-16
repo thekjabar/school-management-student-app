@@ -78,6 +78,7 @@ class _DriverAppState extends State<DriverApp> {
 
     return Scaffold(
       backgroundColor: AppTheme.canvas,
+      extendBody: true,
       body: SafeArea(
         bottom: false,
         child: Column(

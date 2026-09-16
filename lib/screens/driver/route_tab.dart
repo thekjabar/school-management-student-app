@@ -11,6 +11,7 @@ import 'home_tab.dart' show loadDutyTrip;
 import 'route_map.dart';
 import 'run_order.dart';
 import 'trip_screen.dart';
+import '../../ui/insets.dart';
 
 class DriverRoute extends StatelessWidget {
   const DriverRoute({super.key});
@@ -19,7 +20,7 @@ class DriverRoute extends StatelessWidget {
   Widget build(BuildContext context) {
     return Loader<_Run>(
       tint: Role.driver.tint,
-      padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 18),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 18)),
       load: () async {
         final trip = await loadDutyTrip();
         if (trip == null) return _Run(trip: null, plan: null, run: null, school: null);
