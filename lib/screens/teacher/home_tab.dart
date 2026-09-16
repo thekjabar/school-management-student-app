@@ -9,12 +9,13 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
+import '../../ui/insets.dart';
 import 'assistant_screen.dart';
 import 'classes_tab.dart';
 import 'exams_tab.dart';
 import 'homework_tab.dart';
+import 'mark_bank.dart';
 import 'teacher_account.dart';
-import '../../ui/insets.dart';
 
 class TeacherHome extends StatelessWidget {
   const TeacherHome({super.key, required this.onOpenTab});
@@ -66,9 +67,9 @@ class TeacherHome extends StatelessWidget {
               ),
               QuickAction(
                 icon: Icons.bookmark_border_rounded,
-                label: t('teacher.gradebook'),
+                label: t('bank.title'),
                 color: AppTheme.violet,
-                onTap: () => _push(context, const ExamsTab()),
+                onTap: () => _push(context, const MarkBankScreen()),
               ),
               QuickAction(
                 icon: Icons.auto_awesome_outlined,
