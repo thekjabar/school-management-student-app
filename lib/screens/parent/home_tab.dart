@@ -12,6 +12,7 @@ import '../../ui/motion.dart';
 import '../../ui/pickers.dart';
 import '../../ui/nav_glyphs.dart';
 import 'assignments_screen.dart';
+import 'assistant_screen.dart';
 import 'bus_screen.dart';
 import 'driver_feedback_screen.dart';
 import 'attendance_screen.dart';
@@ -168,6 +169,13 @@ class HomeTab extends StatelessWidget {
                       color: AppTheme.violet,
                       section: ParentSection.reports,
                       builder: (_) => ReportsScreen(child: child),
+                    ),
+                    action(
+                      icon: Icons.auto_awesome_outlined,
+                      label: t('quick.assistant'),
+                      color: AppTheme.blue,
+                      section: ParentSection.ai,
+                      builder: (_) => AssistantScreen(child: child),
                     ),
                     action(
                       icon: Icons.chat_bubble_outline_rounded,

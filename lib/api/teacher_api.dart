@@ -2,7 +2,59 @@ import 'package:flutter/foundation.dart' show Uint8List, ValueNotifier;
 
 import 'attachments.dart';
 import 'client.dart';
-import 'parent_api.dart' show Announcement;
+import 'parent_api.dart' show AiAnswer, Announcement;
+
+class AiTeacherClass {
+  AiTeacherClass({
+    required this.classId,
+    required this.name,
+    required this.gradeLevel,
+    required this.subjects,
+  });
+
+  final String classId;
+  final String name;
+  final int gradeLevel;
+  final List<String> subjects;
+
+  factory AiTeacherClass.fromJson(Map<String, dynamic> j) => AiTeacherClass(
+        classId: (j['classId'] ?? '') as String,
+        name: (j['name'] ?? '') as String,
+        gradeLevel: (j['gradeLevel'] as num?)?.toInt() ?? 0,
+        subjects: ((j['subjects'] as List?) ?? const [])
+            .map((s) => s.toString())
+            .where((s) => s.isNotEmpty)
+            .toList(),
+      );
+}
+
+class AiTeacherOverview {
+  AiTeacherOverview({
+    required this.available,
+    required this.limit,
+    required this.remaining,
+    required this.resetsOn,
+    required this.classes,
+  });
+
+  final bool available;
+  final int limit;
+  final int remaining;
+  final String? resetsOn;
+  final List<AiTeacherClass> classes;
+
+  bool get spent => remaining <= 0;
+
+  factory AiTeacherOverview.fromJson(Map<String, dynamic> j) => AiTeacherOverview(
+        available: (j['available'] ?? false) as bool,
+        limit: (j['limit'] as num?)?.toInt() ?? 0,
+        remaining: (j['remaining'] as num?)?.toInt() ?? 0,
+        resetsOn: j['resetsOn'] as String?,
+        classes: ((j['classes'] as List?) ?? const [])
+            .map((c) => AiTeacherClass.fromJson((c as Map).cast<String, dynamic>()))
+            .toList(),
+      );
+}
 
 class TeacherProfile {
   TeacherProfile({
@@ -409,6 +461,48 @@ class TeacherApi {
   }
 
   final ValueNotifier<int> unreadAnnouncements = ValueNotifier<int>(0);
+
+  Future<AiTeacherOverview> aiOverview() async {
+    final json = await _api.get('/teacher/ai') as Map<String, dynamic>;
+    return AiTeacherOverview.fromJson(json);
+  }
+
+  Future<AiAnswer> aiQuestion({
+    required String question,
+    String? classId,
+    String? subjectId,
+  }) async {
+    final json = await _api.post('/teacher/ai/question', {
+      'question': question.trim(),
+      'classId': ?(classId == null || classId.isEmpty ? null : classId),
+      'subjectId': ?(subjectId == null || subjectId.isEmpty ? null : subjectId),
+    });
+    return AiAnswer.fromJson((json as Map).cast<String, dynamic>());
+  }
+
+  Future<AiAnswer> aiClassReport({
+    required String classId,
+    required String question,
+  }) async {
+    final json = await _api.post('/teacher/ai/class-report', {
+      'classId': classId,
+      'question': question.trim(),
+    });
+    return AiAnswer.fromJson((json as Map).cast<String, dynamic>());
+  }
+
+  Future<AiAnswer> aiStudentReport({
+    required String classId,
+    required String studentId,
+    required String question,
+  }) async {
+    final json = await _api.post('/teacher/ai/student-report', {
+      'classId': classId,
+      'studentId': studentId,
+      'question': question.trim(),
+    });
+    return AiAnswer.fromJson((json as Map).cast<String, dynamic>());
+  }
 
   Future<TeacherProfile> me() async =>
       TeacherProfile.fromJson(await _api.get('/teacher/me') as Map<String, dynamic>);

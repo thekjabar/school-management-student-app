@@ -9,6 +9,7 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
+import 'assistant_screen.dart';
 import 'classes_tab.dart';
 import 'exams_tab.dart';
 import 'homework_tab.dart';
@@ -67,6 +68,12 @@ class TeacherHome extends StatelessWidget {
                 label: t('teacher.gradebook'),
                 color: AppTheme.violet,
                 onTap: () => _push(context, const ExamsTab()),
+              ),
+              QuickAction(
+                icon: Icons.auto_awesome_outlined,
+                label: t('teacher.assistant'),
+                color: AppTheme.blue,
+                onTap: () => _push(context, const TeacherAssistantScreen()),
               ),
               QuickAction(
                 icon: Icons.chat_bubble_outline_rounded,

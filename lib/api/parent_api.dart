@@ -2724,6 +2724,35 @@ class ParentApi {
     await _api.post('/parent/messages/$id/resolve', const {});
   }
 
+  Future<AiOverview> aiOverview() async {
+    final json = await _api.get('/parent/ai') as Map<String, dynamic>;
+    return AiOverview.fromJson(json);
+  }
+
+  Future<AiAnswer> aiQuestion({
+    required String studentId,
+    required String question,
+    String? subjectId,
+  }) async {
+    final json = await _api.post('/parent/ai/question', {
+      'studentId': studentId,
+      'question': question.trim(),
+      if (subjectId != null && subjectId.isNotEmpty) 'subjectId': subjectId,
+    });
+    return AiAnswer.fromJson((json as Map).cast<String, dynamic>());
+  }
+
+  Future<AiAnswer> aiChildReport({
+    required String studentId,
+    required String question,
+  }) async {
+    final json = await _api.post('/parent/ai/child-report', {
+      'studentId': studentId,
+      'question': question.trim(),
+    });
+    return AiAnswer.fromJson((json as Map).cast<String, dynamic>());
+  }
+
   Future<Map<String, dynamic>> raiseConcern({
     required String studentId,
     required String urgency,
@@ -3481,7 +3510,79 @@ class ThreadMessage {
       );
 }
 
+class AiChildAllowance {
+  AiChildAllowance({
+    required this.studentId,
+    required this.name,
+    required this.limit,
+    required this.remaining,
+    required this.resetsOn,
+  });
+
+  final String studentId;
+  final String name;
+  final int limit;
+  final int remaining;
+  final String? resetsOn;
+
+  bool get spent => remaining <= 0;
+
+  factory AiChildAllowance.fromJson(Map<String, dynamic> j) => AiChildAllowance(
+        studentId: (j['studentId'] ?? '') as String,
+        name: (j['name'] ?? '') as String,
+        limit: (j['limit'] as num?)?.toInt() ?? 0,
+        remaining: (j['remaining'] as num?)?.toInt() ?? 0,
+        resetsOn: j['resetsOn'] as String?,
+      );
+}
+
+class AiOverview {
+  AiOverview({required this.available, required this.children});
+
+  final bool available;
+  final List<AiChildAllowance> children;
+
+  AiChildAllowance? forChild(String studentId) {
+    for (final c in children) {
+      if (c.studentId == studentId) return c;
+    }
+    return null;
+  }
+
+  factory AiOverview.fromJson(Map<String, dynamic> j) => AiOverview(
+        available: (j['available'] ?? false) as bool,
+        children: ((j['children'] as List?) ?? const [])
+            .map((e) => AiChildAllowance.fromJson((e as Map).cast<String, dynamic>()))
+            .toList(),
+      );
+}
+
+class AiAnswer {
+  AiAnswer({
+    required this.ok,
+    required this.outcome,
+    required this.answer,
+    required this.remaining,
+    required this.resetsOn,
+  });
+
+  final bool ok;
+  final String outcome;
+  final String answer;
+  final int? remaining;
+  final String? resetsOn;
+
+  factory AiAnswer.fromJson(Map<String, dynamic> j) => AiAnswer(
+        ok: (j['ok'] ?? false) as bool,
+        outcome: (j['outcome'] ?? '') as String,
+        answer: (j['answer'] ?? '') as String,
+        remaining: (j['remaining'] as num?)?.toInt(),
+        resetsOn: j['resetsOn'] as String?,
+      );
+}
+
 abstract final class ParentSection {
+  static const ai = 'parent.ai';
   static const track = 'parent.track';
   static const bus = 'parent.bus';
   static const attendance = 'parent.attendance';
