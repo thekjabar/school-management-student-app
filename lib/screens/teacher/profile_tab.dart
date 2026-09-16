@@ -20,10 +20,18 @@ class TeacherProfileTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final tint = Role.teacher.tint;
 
-    return Loader<TeacherProfile>(
+    final me = Session.instance.me;
+
+    return Loader<TeacherProfile?>(
       tint: tint,
       padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 20),
-      load: () => TeacherApi.instance.me(),
+      load: () async {
+        try {
+          return await TeacherApi.instance.me();
+        } catch (_) {
+          return null;
+        }
+      },
       builder: (context, profile) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -33,14 +41,14 @@ class TeacherProfileTab extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    CircleInitials(label: profile.name, tint: tint, size: 48),
+                    CircleInitials(label: profile?.name ?? me?.name ?? '', tint: tint, size: 48),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            profile.name,
+                            profile?.name ?? me?.name ?? '',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -52,50 +60,54 @@ class TeacherProfileTab extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            profile.phone,
+                            profile?.phone ?? me?.phone ?? '',
                             textDirection: TextDirection.ltr,
                             style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            profile.schoolName,
+                            profile?.schoolName ?? me?.active.tenantName ?? '',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(fontSize: 11.5, color: AppTheme.textFaint),
                           ),
+                          const SizedBox(height: 5),
+                          Pill(t('teacher.roleLabel'), color: tint),
                         ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 13),
-                Divider(height: 1, color: AppTheme.border),
-                const SizedBox(height: 13),
-                IconFigureStrip(
-                  figures: [
-                    IconFigure(
-                      icon: Icons.groups_outlined,
-                      label: t('teacher.classes'),
-                      value: '${profile.classCount}',
-                      caption: '',
-                      color: tint,
-                    ),
-                    IconFigure(
-                      icon: Icons.menu_book_rounded,
-                      label: t('teacher.subjects'),
-                      value: '${profile.subjectCount}',
-                      caption: '',
-                      color: AppTheme.blue,
-                    ),
-                    IconFigure(
-                      icon: Icons.child_care_rounded,
-                      label: t('teacher.children'),
-                      value: '${profile.studentCount}',
-                      caption: '',
-                      color: AppTheme.amber,
-                    ),
-                  ],
-                ),
+                if (profile != null) ...[
+                  const SizedBox(height: 13),
+                  Divider(height: 1, color: AppTheme.border),
+                  const SizedBox(height: 13),
+                  IconFigureStrip(
+                    figures: [
+                      IconFigure(
+                        icon: Icons.groups_outlined,
+                        label: t('teacher.classes'),
+                        value: '${profile.classCount}',
+                        caption: '',
+                        color: tint,
+                      ),
+                      IconFigure(
+                        icon: Icons.menu_book_rounded,
+                        label: t('teacher.subjects'),
+                        value: '${profile.subjectCount}',
+                        caption: '',
+                        color: AppTheme.blue,
+                      ),
+                      IconFigure(
+                        icon: Icons.child_care_rounded,
+                        label: t('teacher.children'),
+                        value: '${profile.studentCount}',
+                        caption: '',
+                        color: AppTheme.amber,
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

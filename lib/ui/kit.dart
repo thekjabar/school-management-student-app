@@ -81,8 +81,10 @@ class RoleHeader extends StatelessWidget {
                 ),
               ),
               ?trailing,
-              if (trailing == null && onBell != null)
+              if (onBell != null) ...[
+                if (trailing != null) const SizedBox(width: 6),
                 BellButton(count: notificationCount, onTap: onBell),
+              ],
               if (onAvatar != null) ...[
                 const SizedBox(width: 6),
                 _MenuButton(onTap: onAvatar!),
