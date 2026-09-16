@@ -382,8 +382,16 @@ class _MarkBankScreenState extends State<MarkBankScreen> {
   bool _showSpent = false;
 
   final Set<String> _picked = <String>{};
+  String? _pickedStudentId;
+
+  MarkBankRules? _rules;
 
   bool _busy = false;
+
+  List<num> get _steps {
+    final steps = _rules?.pointSteps ?? const <num>[];
+    return steps.isEmpty ? _pointSteps : steps;
+  }
 
   List<MarkBankEntry> get _visible => _all
       .where((e) => _showSpent || e.isBanked)
@@ -422,45 +430,71 @@ class _MarkBankScreenState extends State<MarkBankScreen> {
     ];
   }
 
+  /// Credit is awarded one child at a time, so picking a second child's credit
+  /// starts a fresh selection rather than silently failing at the server.
   void _toggle(MarkBankEntry entry) {
-    if (!entry.isBanked) return;
+    if (!entry.canSpend) return;
     setState(() {
-      if (!_picked.remove(entry.id)) _picked.add(entry.id);
+      if (_picked.remove(entry.id)) return;
+      if (_pickedStudentId != null && _pickedStudentId != entry.studentId) {
+        _picked.clear();
+      }
+      _pickedStudentId = entry.studentId;
+      _picked.add(entry.id);
     });
   }
 
   void _pickAllFor(List<MarkBankEntry> rows) {
-    final ids = rows.where((e) => e.isBanked).map((e) => e.id).toList();
-    final allOn = ids.isNotEmpty && ids.every(_picked.contains);
+    final ids = rows.where((e) => e.canSpend).map((e) => e.id).toList();
+    if (ids.isEmpty) return;
+    final allOn = ids.every(_picked.contains);
     setState(() {
       if (allOn) {
         _picked.removeAll(ids);
-      } else {
-        _picked.addAll(ids);
+        return;
       }
+      if (_pickedStudentId != rows.first.studentId) _picked.clear();
+      _pickedStudentId = rows.first.studentId;
+      _picked.addAll(ids);
     });
   }
 
-  Future<void> _redeem(List<String> ids) async {
+  Future<void> _award(List<String> ids) async {
     if (ids.isEmpty || _busy) return;
-    final into = await showAppSheet<String>(
-      context,
-      builder: (_) => _RedeemSheet(count: ids.length, points: _pointsFor(ids)),
-    );
-    if (into == null || !mounted) return;
+    final entries = _all.where((e) => ids.contains(e.id)).toList();
+    if (entries.isEmpty) return;
 
     setState(() => _busy = true);
-    try {
-      await TeacherApi.instance.redeemMarks(entryIds: ids, redeemedAs: into);
-      if (!mounted) return;
+    final given = await showAppSheet<MarkBankAward>(
+      context,
+      builder: (_) => _AwardSheet(
+        entryIds: ids,
+        studentName: entries.first.studentName,
+        points: _pointsFor(ids),
+        subjectName: entries.first.subjectName,
+        principalApproves: _rules?.principalApproves ?? false,
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (given == null) return;
+
+    setState(() {
       _picked.clear();
-      showNote(context, tn('bank.redeemedNote', ids.length));
-      await _loaderKey.currentState?.reload();
-    } catch (e) {
-      if (mounted) showNote(context, errorText(e), bad: true);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+      _pickedStudentId = null;
+    });
+    showNote(context, given.isWaiting ? t('bank.sentToHead') : t('bank.awardedNote'));
+    await _loaderKey.currentState?.reload();
+  }
+
+  Future<void> _edit(MarkBankEntry entry) async {
+    final changed = await showAppSheet<bool>(
+      context,
+      builder: (_) => _EditSheet(entry: entry, steps: _steps),
+    );
+    if (changed != true || !mounted) return;
+    showNote(context, t('bank.changedNote'));
+    await _loaderKey.currentState?.reload();
   }
 
   String _termName(List<({String id, String name})> terms) {
@@ -511,11 +545,15 @@ class _MarkBankScreenState extends State<MarkBankScreen> {
                 tint: tint,
                 padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 24),
                 load: () async {
-                  final rows = await TeacherApi.instance.markBank();
+                  final api = TeacherApi.instance;
+                  final (rows, rules) =
+                      await (api.markBank(), api.markBankRules()).wait;
                   _all = rows;
+                  _rules = rules;
                   _picked.removeWhere(
-                    (id) => !rows.any((e) => e.id == id && e.isBanked),
+                    (id) => !rows.any((e) => e.id == id && e.canSpend),
                   );
+                  if (_picked.isEmpty) _pickedStudentId = null;
                   return rows;
                 },
                 isEmpty: (rows) => rows.isEmpty,
@@ -606,7 +644,8 @@ class _MarkBankScreenState extends State<MarkBankScreen> {
                             picked: _picked,
                             onToggle: _toggle,
                             onPickAll: () => _pickAllFor(group.rows),
-                            onRedeemOne: (e) => _redeem([e.id]),
+                            onAwardOne: (e) => _award([e.id]),
+                            onEdit: _edit,
                             onWithdraw: _withdraw,
                           ),
                           const SizedBox(height: kCardGap),
@@ -625,22 +664,26 @@ class _MarkBankScreenState extends State<MarkBankScreen> {
           ? null
           : SafeArea(
               minimum: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 10),
-              child: _RedeemBar(
+              child: _AwardBar(
                 count: _picked.length,
                 points: _pickedPoints,
                 busy: _busy,
-                onClear: () => setState(_picked.clear),
-                onRedeem: () => _redeem(_picked.toList()),
+                principalApproves: _rules?.principalApproves ?? false,
+                onClear: () => setState(() {
+                  _picked.clear();
+                  _pickedStudentId = null;
+                }),
+                onAward: () => _award(_picked.toList()),
               ),
             ),
     );
   }
 }
 
-String _signed(num v) {
-  final whole = v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(2);
-  return v > 0 ? '+$whole' : whole;
-}
+String _plain(num v) =>
+    v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(2);
+
+String _signed(num v) => v > 0 ? '+${_plain(v)}' : _plain(v);
 
 class _Grabber extends StatelessWidget {
   const _Grabber();
@@ -868,7 +911,7 @@ class _BalanceCard extends StatelessWidget {
               const SizedBox(width: 7),
               Expanded(
                 child: Text(
-                  t('bank.redeemExplains'),
+                  t('bank.awardExplains'),
                   style: TextStyle(fontSize: 11.5, height: 1.4, color: AppTheme.textMuted),
                 ),
               ),
@@ -887,7 +930,8 @@ class _ChildBlock extends StatelessWidget {
     required this.picked,
     required this.onToggle,
     required this.onPickAll,
-    required this.onRedeemOne,
+    required this.onAwardOne,
+    required this.onEdit,
     required this.onWithdraw,
   });
 
@@ -896,13 +940,15 @@ class _ChildBlock extends StatelessWidget {
   final Set<String> picked;
   final void Function(MarkBankEntry) onToggle;
   final VoidCallback onPickAll;
-  final void Function(MarkBankEntry) onRedeemOne;
+  final void Function(MarkBankEntry) onAwardOne;
+  final void Function(MarkBankEntry) onEdit;
   final void Function(MarkBankEntry) onWithdraw;
 
   @override
   Widget build(BuildContext context) {
     final tint = Role.teacher.tint;
     final banked = rows.where((e) => e.isBanked).toList();
+    final spendable = rows.where((e) => e.canSpend).toList();
     final balance = banked.fold<num>(0, (sum, e) => sum + e.points);
 
     return Card16(
@@ -933,7 +979,7 @@ class _ChildBlock extends StatelessWidget {
                 color: balance < 0 ? AppTheme.amber : tint,
                 background: (balance < 0 ? AppTheme.amber : tint).withValues(alpha: 0.12),
               ),
-              if (banked.length > 1) ...[
+              if (spendable.length > 1) ...[
                 const SizedBox(width: 6),
                 InkWell(
                   onTap: onPickAll,
@@ -941,7 +987,7 @@ class _ChildBlock extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.all(5),
                     child: Icon(
-                      banked.every((e) => picked.contains(e.id))
+                      spendable.every((e) => picked.contains(e.id))
                           ? Icons.select_all_rounded
                           : Icons.checklist_rounded,
                       size: 18,
@@ -958,7 +1004,8 @@ class _ChildBlock extends StatelessWidget {
               entry: entry,
               picked: picked.contains(entry.id),
               onToggle: () => onToggle(entry),
-              onRedeem: () => onRedeemOne(entry),
+              onAward: () => onAwardOne(entry),
+              onEdit: () => onEdit(entry),
               onWithdraw: () => onWithdraw(entry),
             ),
         ],
@@ -972,25 +1019,28 @@ class _EntryRow extends StatelessWidget {
     required this.entry,
     required this.picked,
     required this.onToggle,
-    required this.onRedeem,
+    required this.onAward,
+    required this.onEdit,
     required this.onWithdraw,
   });
 
   final MarkBankEntry entry;
   final bool picked;
   final VoidCallback onToggle;
-  final VoidCallback onRedeem;
+  final VoidCallback onAward;
+  final VoidCallback onEdit;
   final VoidCallback onWithdraw;
 
   @override
   Widget build(BuildContext context) {
     final tint = Role.teacher.tint;
     final spent = !entry.isBanked;
+    final open = entry.canSpend;
     final colour = entry.points < 0 ? AppTheme.amber : tint;
 
     return InkWell(
-      onTap: spent ? null : onToggle,
-      onLongPress: spent ? null : onWithdraw,
+      onTap: open ? onToggle : null,
+      onLongPress: open ? onWithdraw : null,
       borderRadius: BorderRadius.circular(12),
       child: Opacity(
         opacity: spent ? 0.55 : 1,
@@ -999,7 +1049,7 @@ class _EntryRow extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (!spent)
+              if (open)
                 Padding(
                   padding: const EdgeInsets.only(top: 1),
                   child: Icon(
@@ -1012,11 +1062,13 @@ class _EntryRow extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 1),
                   child: Icon(
-                    entry.state == 'VOIDED'
-                        ? Icons.undo_rounded
-                        : Icons.redeem_rounded,
+                    entry.awaitingApproval
+                        ? Icons.hourglass_empty_rounded
+                        : entry.state == 'VOIDED'
+                            ? Icons.undo_rounded
+                            : Icons.redeem_rounded,
                     size: 18,
-                    color: AppTheme.textFaint,
+                    color: entry.awaitingApproval ? AppTheme.amber : AppTheme.textFaint,
                   ),
                 ),
               const SizedBox(width: 9),
@@ -1045,7 +1097,10 @@ class _EntryRow extends StatelessWidget {
                             [
                               shortDate(entry.occurredAt),
                               ?entry.subjectName,
-                              if (spent) t('bank.state.${entry.state}'),
+                              if (entry.awaitingApproval)
+                                t('bank.waitingOnHead')
+                              else if (spent)
+                                t('bank.state.${entry.state}'),
                             ].where((s) => s.isNotEmpty).join(' · '),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1066,10 +1121,18 @@ class _EntryRow extends StatelessWidget {
                   color: spent ? AppTheme.textFaint : colour,
                 ),
               ),
-              if (!spent) ...[
-                const SizedBox(width: 4),
+              if (open) ...[
+                const SizedBox(width: 2),
                 InkWell(
-                  onTap: onRedeem,
+                  onTap: onEdit,
+                  borderRadius: BorderRadius.circular(9),
+                  child: Padding(
+                    padding: const EdgeInsets.all(5),
+                    child: Icon(Icons.edit_outlined, size: 16, color: AppTheme.textFaint),
+                  ),
+                ),
+                InkWell(
+                  onTap: onAward,
                   borderRadius: BorderRadius.circular(9),
                   child: Padding(
                     padding: const EdgeInsets.all(5),
@@ -1085,20 +1148,22 @@ class _EntryRow extends StatelessWidget {
   }
 }
 
-class _RedeemBar extends StatelessWidget {
-  const _RedeemBar({
+class _AwardBar extends StatelessWidget {
+  const _AwardBar({
     required this.count,
     required this.points,
     required this.busy,
+    required this.principalApproves,
     required this.onClear,
-    required this.onRedeem,
+    required this.onAward,
   });
 
   final int count;
   final num points;
   final bool busy;
+  final bool principalApproves;
   final VoidCallback onClear;
-  final VoidCallback onRedeem;
+  final VoidCallback onAward;
 
   @override
   Widget build(BuildContext context) {
@@ -1121,7 +1186,7 @@ class _RedeemBar extends StatelessWidget {
           child: SizedBox(
             height: 50,
             child: FilledButton(
-              onPressed: busy ? null : onRedeem,
+              onPressed: busy ? null : onAward,
               style: FilledButton.styleFrom(
                 backgroundColor: AppTheme.amber,
                 foregroundColor: Colors.white,
@@ -1134,7 +1199,10 @@ class _RedeemBar extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
                     )
                   : Text(
-                      tv('bank.redeemN', {'n': count, 'points': _signed(points)}),
+                      tv(
+                        principalApproves ? 'bank.proposeN' : 'bank.awardN',
+                        {'n': count, 'points': _signed(points)},
+                      ),
                       style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
                     ),
             ),
@@ -1145,75 +1213,588 @@ class _RedeemBar extends StatelessWidget {
   }
 }
 
-class _RedeemSheet extends StatelessWidget {
-  const _RedeemSheet({required this.count, required this.points});
+InputDecoration _reasonBox(String hint) => InputDecoration(
+      hintText: hint,
+      counterText: '',
+      filled: true,
+      fillColor: AppTheme.canvas,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: AppTheme.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: AppTheme.border),
+      ),
+    );
 
-  final int count;
+/// Awarding is the moment private credit turns into a mark or a merit the
+/// family can see, so the sheet asks the server what would change and shows it
+/// before the teacher can confirm. Nothing is sent until the reason is typed.
+class _AwardSheet extends StatefulWidget {
+  const _AwardSheet({
+    required this.entryIds,
+    required this.studentName,
+    required this.points,
+    required this.principalApproves,
+    this.subjectName,
+  });
+
+  final List<String> entryIds;
+  final String studentName;
   final num points;
+  final bool principalApproves;
+  final String? subjectName;
 
-  static const _targets = <String, IconData>{
-    'EXAM_RESULT': Icons.assignment_turned_in_outlined,
-    'TERM_GRADE': Icons.workspace_premium_outlined,
-    'MERIT': Icons.star_outline_rounded,
-    'REPORT_COMMENT': Icons.notes_rounded,
-  };
+  @override
+  State<_AwardSheet> createState() => _AwardSheetState();
+}
+
+class _AwardSheetState extends State<_AwardSheet> {
+  String _kind = 'TERM_MARK';
+
+  final _reason = TextEditingController();
+
+  AwardPreview? _preview;
+  bool _looking = true;
+  bool _acceptCap = false;
+
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _reason.addListener(() => setState(() {}));
+    _look();
+  }
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  Future<void> _look() async {
+    setState(() {
+      _looking = true;
+      _error = null;
+      _acceptCap = false;
+    });
+    try {
+      final preview = await TeacherApi.instance.previewAward(
+        entryIds: widget.entryIds,
+        kind: _kind,
+      );
+      if (mounted) setState(() => _preview = preview);
+    } catch (e) {
+      if (mounted) setState(() => _error = errorText(e));
+    } finally {
+      if (mounted) setState(() => _looking = false);
+    }
+  }
+
+  void _pick(String kind) {
+    if (_kind == kind) return;
+    setState(() {
+      _kind = kind;
+      _preview = null;
+    });
+    _look();
+  }
+
+  bool get _ready {
+    final preview = _preview;
+    if (preview == null || _busy || !preview.canGo) return false;
+    if (preview.capped && !_acceptCap) return false;
+    return _reason.text.trim().length >= 4;
+  }
+
+  Future<void> _give() async {
+    if (!_ready) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final award = await TeacherApi.instance.awardBanked(
+        entryIds: widget.entryIds,
+        kind: _kind,
+        reason: _reason.text.trim(),
+        acceptCap: _acceptCap,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(award);
+    } catch (e) {
+      if (mounted) setState(() => _error = errorText(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+    final inset = MediaQuery.of(context).viewInsets.bottom;
+    final preview = _preview;
+    final waits = preview?.needsApproval ?? widget.principalApproves;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: inset),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        padding: withBottomInset(context, const EdgeInsets.fromLTRB(18, 10, 18, 18)),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _Grabber(),
+              const SizedBox(height: 16),
+              Text(
+                tv('bank.awardTitle', {
+                  'name': widget.studentName,
+                  'points': _signed(widget.points),
+                }),
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                  color: AppTheme.text,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                t('bank.awardBody'),
+                style: TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.textMuted),
+              ),
+              const SizedBox(height: 14),
+
+              for (final kind in const ['TERM_MARK', 'MERIT']) ...[
+                Card16(
+                  padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+                  color: _kind == kind ? AppTheme.amber.withValues(alpha: 0.10) : AppTheme.canvas,
+                  onTap: _busy ? null : () => _pick(kind),
+                  child: Row(
+                    children: [
+                      Icon(
+                        kind == 'MERIT'
+                            ? Icons.star_outline_rounded
+                            : Icons.workspace_premium_outlined,
+                        size: 19,
+                        color: _kind == kind ? AppTheme.amber : AppTheme.textFaint,
+                      ),
+                      const SizedBox(width: 11),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              t('bank.kind.$kind'),
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.text,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              t('bank.kindBody.$kind'),
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                height: 1.35,
+                                color: AppTheme.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        _kind == kind
+                            ? Icons.radio_button_checked_rounded
+                            : Icons.radio_button_off_rounded,
+                        size: 18,
+                        color: _kind == kind ? AppTheme.amber : AppTheme.border,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+
+              const SizedBox(height: 4),
+              if (_looking)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  child: Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.4, color: AppTheme.amber),
+                    ),
+                  ),
+                )
+              else if (preview != null)
+                _ChangeCard(preview: preview, subjectName: widget.subjectName),
+
+              if (preview != null && preview.capped) ...[
+                const SizedBox(height: 8),
+                Card16(
+                  padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+                  color: AppTheme.amber.withValues(alpha: 0.10),
+                  onTap: () => setState(() => _acceptCap = !_acceptCap),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        _acceptCap
+                            ? Icons.check_box_rounded
+                            : Icons.check_box_outline_blank_rounded,
+                        size: 19,
+                        color: AppTheme.amber,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          preview.capMessage ??
+                              tv('bank.capLoses', {'points': _signed(preview.pointsLost)}),
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.4,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.text,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              if (preview != null && preview.canGo) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _reason,
+                  maxLines: 2,
+                  maxLength: 300,
+                  textCapitalization: TextCapitalization.sentences,
+                  style: TextStyle(fontSize: 14, color: AppTheme.text),
+                  decoration: _reasonBox(t('bank.awardWhy')),
+                ),
+              ],
+
+              if (_error != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _error!,
+                  style: TextStyle(fontSize: 12.5, height: 1.4, color: AppTheme.rose),
+                ),
+              ],
+
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton(
+                  onPressed: _ready ? _give : null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.amber,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppTheme.neutralSoft,
+                    disabledForegroundColor: AppTheme.textFaint,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  ),
+                  child: _busy
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                        )
+                      : Text(
+                          waits
+                              ? t('bank.sendToHead')
+                              : tv('bank.giveIt', {
+                                  'points': _signed(preview?.pointsToAward ?? widget.points),
+                                }),
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                        ),
+                ),
+              ),
+              if (waits) ...[
+                const SizedBox(height: 8),
+                Text(
+                  t('bank.headMustAgree'),
+                  style: TextStyle(fontSize: 11.5, height: 1.4, color: AppTheme.textMuted),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
-      padding: withBottomInset(context, const EdgeInsets.fromLTRB(18, 10, 18, 18)),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    );
+  }
+}
+
+class _ChangeCard extends StatelessWidget {
+  const _ChangeCard({required this.preview, this.subjectName});
+
+  final AwardPreview preview;
+  final String? subjectName;
+
+  @override
+  Widget build(BuildContext context) {
+    if (preview.refusal != null) {
+      return Card16(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 13),
+        color: AppTheme.rose.withValues(alpha: 0.10),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _Grabber(),
-            const SizedBox(height: 16),
+            Icon(Icons.block_rounded, size: 18, color: AppTheme.rose),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                preview.refusalMessage ?? t('bank.refusal.${preview.refusal}'),
+                style: TextStyle(fontSize: 12.5, height: 1.4, color: AppTheme.text),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final before = preview.scoreBefore;
+    final after = preview.scoreAfter;
+    final isMark = preview.kind == 'TERM_MARK' && before != null && after != null;
+
+    return Card16(
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+      color: AppTheme.canvas,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            t('bank.whatChanges'),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+              color: AppTheme.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (isMark)
+            Row(
+              children: [
+                Text(
+                  _plain(before),
+                  style: TextStyle(
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textFaint,
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Icon(Icons.arrow_forward_rounded, size: 17, color: AppTheme.textFaint),
+                const SizedBox(width: 9),
+                Text(
+                  _plain(after),
+                  style: TextStyle(
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.amber,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    subjectName ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                  ),
+                ),
+              ],
+            )
+          else
             Text(
-              tv('bank.redeemTitle', {'n': count, 'points': _signed(points)}),
+              tv('bank.meritOf', {'points': _plain(preview.pointsToAward)}),
               style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.4,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
                 color: AppTheme.text,
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              t('bank.redeemBody'),
-              style: TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.textMuted),
-            ),
-            const SizedBox(height: 14),
-            for (final target in _targets.entries) ...[
-              Card16(
-                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 13),
-                color: AppTheme.canvas,
-                onTap: () => Navigator.of(context).pop(target.key),
-                child: Row(
-                  children: [
-                    Icon(target.value, size: 19, color: AppTheme.amber),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Text(
-                        t('bank.into.${target.key}'),
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.text,
-                        ),
+          const SizedBox(height: 7),
+          Text(
+            tv('bank.spends', {
+              'n': preview.entryCount,
+              'points': _plain(preview.pointsToAward),
+            }),
+            style: TextStyle(fontSize: 12, height: 1.4, color: AppTheme.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Banked credit is still the teacher's own note, so it can be corrected until
+/// it is awarded or sent to the principal.
+class _EditSheet extends StatefulWidget {
+  const _EditSheet({required this.entry, required this.steps});
+
+  final MarkBankEntry entry;
+  final List<num> steps;
+
+  @override
+  State<_EditSheet> createState() => _EditSheetState();
+}
+
+class _EditSheetState extends State<_EditSheet> {
+  late num _points = widget.entry.points;
+  late final _reason = TextEditingController(text: widget.entry.reason);
+
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _reason.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  bool get _changed =>
+      _points != widget.entry.points || _reason.text.trim() != widget.entry.reason;
+
+  bool get _ready => _changed && !_busy && _reason.text.trim().length >= 2;
+
+  Future<void> _save() async {
+    if (!_ready) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await TeacherApi.instance.reviseMark(
+        widget.entry.id,
+        points: _points == widget.entry.points ? null : _points,
+        reason: _reason.text.trim() == widget.entry.reason ? null : _reason.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) setState(() => _error = errorText(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final inset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: inset),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        padding: withBottomInset(context, const EdgeInsets.fromLTRB(18, 10, 18, 18)),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _Grabber(),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      t('bank.editTitle'),
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
+                        color: AppTheme.text,
                       ),
                     ),
-                    Icon(Icons.chevron_right_rounded, size: 20, color: AppTheme.textFaint),
-                  ],
+                  ),
+                  const _PrivatePill(),
+                ],
+              ),
+              const SizedBox(height: 5),
+              Text(
+                t('bank.editBody'),
+                style: TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.textMuted),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final step in widget.steps)
+                    _PointChip(
+                      value: step,
+                      on: _points == step,
+                      onTap: () => setState(() => _points = step),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _reason,
+                maxLines: 2,
+                maxLength: 500,
+                textCapitalization: TextCapitalization.sentences,
+                style: TextStyle(fontSize: 14, color: AppTheme.text),
+                decoration: _reasonBox(t('bank.why')),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _error!,
+                  style: TextStyle(fontSize: 12.5, height: 1.4, color: AppTheme.rose),
+                ),
+              ],
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton(
+                  onPressed: _ready ? _save : null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Role.teacher.tint,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppTheme.neutralSoft,
+                    disabledForegroundColor: AppTheme.textFaint,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  ),
+                  child: _busy
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                        )
+                      : Text(
+                          t('bank.saveChange'),
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                        ),
                 ),
               ),
-              const SizedBox(height: 8),
             ],
-          ],
+          ),
         ),
       ),
     );

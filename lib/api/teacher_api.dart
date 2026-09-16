@@ -715,18 +715,74 @@ class TeacherApi {
     return Paged.from<MarkBankEntry>(json, MarkBankEntry.fromJson).rows;
   }
 
-  Future<void> redeemMarks({
-    required List<String> entryIds,
-    required String redeemedAs,
-  }) async {
-    await _api.post('$_bankBase/redeem', {
-      'entryIds': entryIds,
-      'redeemedAs': redeemedAs,
-    });
+  Future<MarkBankRules> markBankRules() async {
+    final json = await _api.get('$_bankBase/policy');
+    return MarkBankRules.fromJson((json as Map).cast<String, dynamic>());
   }
+
+  Future<void> reviseMark(
+    String id, {
+    num? points,
+    String? reason,
+    String? subjectId,
+    String? termId,
+  }) =>
+      _api.patch('$_bankBase/$id', {
+        'points': ?points,
+        if (reason != null) 'reason': reason.trim(),
+        'subjectId': ?subjectId,
+        'termId': ?termId,
+      });
 
   Future<void> voidMark(String id, String reason) =>
       _api.post('$_bankBase/$id/void', {'reason': reason.trim()});
+
+  Future<AwardPreview> previewAward({
+    required List<String> entryIds,
+    required String kind,
+    String? subjectId,
+    String? termId,
+  }) async {
+    final json = await _api.post('$_bankBase/awards/preview', {
+      'entryIds': entryIds,
+      'kind': kind,
+      'subjectId': ?subjectId,
+      'termId': ?termId,
+    });
+    return AwardPreview.fromJson((json as Map).cast<String, dynamic>());
+  }
+
+  Future<MarkBankAward> awardBanked({
+    required List<String> entryIds,
+    required String kind,
+    required String reason,
+    bool acceptCap = false,
+    String? subjectId,
+    String? termId,
+  }) async {
+    final json = await _api.post('$_bankBase/awards', {
+      'entryIds': entryIds,
+      'kind': kind,
+      'reason': reason.trim(),
+      'acceptCap': acceptCap,
+      'subjectId': ?subjectId,
+      'termId': ?termId,
+    });
+    return MarkBankAward.fromJson((json as Map).cast<String, dynamic>());
+  }
+
+  Future<List<MarkBankAward>> markBankAwards({String? status, String? studentId}) async {
+    final query = <String>[
+      'pageSize=100',
+      if (status != null) 'status=$status',
+      if (studentId != null) 'studentId=$studentId',
+    ].join('&');
+    final json = await _api.get('$_bankBase/awards?$query');
+    return Paged.from<MarkBankAward>(json, MarkBankAward.fromJson).rows;
+  }
+
+  Future<void> reverseAward(String id, String reason) =>
+      _api.post('$_bankBase/awards/$id/reverse', {'reason': reason.trim()});
 
   Future<String> uploadMarkEvidence({
     required Uint8List bytes,
@@ -754,6 +810,9 @@ class TeacherApi {
   }
 }
 
+num _points(Object? value) =>
+    value is num ? value : num.tryParse('${value ?? ''}') ?? 0;
+
 class MarkBankEntry {
   MarkBankEntry({
     required this.id,
@@ -763,11 +822,14 @@ class MarkBankEntry {
     required this.reason,
     required this.occurredAt,
     required this.state,
+    this.classId,
     this.className,
+    this.subjectId,
     this.subjectName,
     this.termId,
     this.termName,
     this.evidenceMediaId,
+    this.awaitingApproval = false,
     this.redeemedAt,
     this.redeemedAs,
   });
@@ -782,16 +844,22 @@ class MarkBankEntry {
 
   final String state;
 
+  final String? classId;
   final String? className;
+  final String? subjectId;
   final String? subjectName;
   final String? termId;
   final String? termName;
   final String? evidenceMediaId;
+
+  final bool awaitingApproval;
   final DateTime? redeemedAt;
 
   final String? redeemedAs;
 
   bool get isBanked => state == 'BANKED';
+
+  bool get canSpend => isBanked && !awaitingApproval;
 
   static String? _name(Map<String, dynamic> j, String flat, String nested) {
     final direct = j[flat];
@@ -805,18 +873,193 @@ class MarkBankEntry {
         id: (j['id'] ?? '') as String,
         studentId: (j['studentId'] ?? '') as String,
         studentName: _name(j, 'studentName', 'student') ?? '—',
-        points: (j['points'] as num?) ??
-            num.tryParse('${j['points'] ?? ''}') ??
-            0,
+        points: _points(j['points']),
         reason: (j['reason'] ?? '') as String,
         occurredAt: DateTime.tryParse((j['occurredAt'] ?? '') as String)?.toLocal(),
         state: (j['state'] ?? 'BANKED') as String,
+        classId: j['classId'] as String?,
         className: _name(j, 'className', 'class'),
+        subjectId: j['subjectId'] as String?,
         subjectName: _name(j, 'subjectName', 'subject'),
         termId: j['termId'] as String?,
         termName: _name(j, 'termName', 'term'),
         evidenceMediaId: j['evidenceMediaId'] as String?,
+        awaitingApproval: j['awaitingApproval'] == true,
         redeemedAt: DateTime.tryParse((j['redeemedAt'] ?? '') as String)?.toLocal(),
         redeemedAs: j['redeemedAs'] as String?,
+      );
+}
+
+class MarkBankRules {
+  const MarkBankRules({
+    required this.enabled,
+    required this.maxPointsPerEntry,
+    required this.maxBankedPerStudentPerTerm,
+    required this.maxAddedToMark,
+    required this.approvalMode,
+    required this.allSubjects,
+    required this.subjectIds,
+    required this.pointSteps,
+  });
+
+  final bool enabled;
+  final num maxPointsPerEntry;
+  final num maxBankedPerStudentPerTerm;
+  final num maxAddedToMark;
+
+  final String approvalMode;
+
+  final bool allSubjects;
+  final List<String> subjectIds;
+  final List<num> pointSteps;
+
+  bool get principalApproves => approvalMode == 'PRINCIPAL';
+
+  bool covers(String? subjectId) =>
+      allSubjects || (subjectId != null && subjectIds.contains(subjectId));
+
+  factory MarkBankRules.fromJson(Map<String, dynamic> j) => MarkBankRules(
+        enabled: j['enabled'] == true,
+        maxPointsPerEntry: _points(j['maxPointsPerEntry']),
+        maxBankedPerStudentPerTerm: _points(j['maxBankedPerStudentPerTerm']),
+        maxAddedToMark: _points(j['maxAddedToMark']),
+        approvalMode: (j['approvalMode'] ?? 'TEACHER') as String,
+        allSubjects: j['allSubjects'] != false,
+        subjectIds: [
+          for (final id in (j['subjectIds'] as List? ?? const []))
+            if (id is String) id,
+        ],
+        pointSteps: [
+          for (final step in (j['pointSteps'] as List? ?? const []))
+            if (step != null) _points(step),
+        ],
+      );
+}
+
+class AwardPreview {
+  const AwardPreview({
+    required this.kind,
+    required this.bankedPoints,
+    required this.pointsToAward,
+    required this.cappedByMarkLimit,
+    required this.cappedByMaxScore,
+    required this.needsApproval,
+    required this.entryCount,
+    this.scoreBefore,
+    this.scoreAfter,
+    this.refusal,
+    this.refusalMessage,
+    this.capMessage,
+  });
+
+  final String kind;
+  final num bankedPoints;
+  final num pointsToAward;
+
+  final bool cappedByMarkLimit;
+  final bool cappedByMaxScore;
+  final bool needsApproval;
+  final int entryCount;
+
+  final num? scoreBefore;
+  final num? scoreAfter;
+
+  final String? refusal;
+  final String? refusalMessage;
+  final String? capMessage;
+
+  bool get capped => cappedByMarkLimit || cappedByMaxScore;
+
+  bool get canGo => refusal == null && pointsToAward > 0;
+
+  num get pointsLost => bankedPoints - pointsToAward;
+
+  factory AwardPreview.fromJson(Map<String, dynamic> j) => AwardPreview(
+        kind: (j['kind'] ?? 'TERM_MARK') as String,
+        bankedPoints: _points(j['bankedPoints']),
+        pointsToAward: _points(j['pointsToAward']),
+        cappedByMarkLimit: j['cappedByMarkLimit'] == true,
+        cappedByMaxScore: j['cappedByMaxScore'] == true,
+        needsApproval: j['needsApproval'] == true,
+        entryCount: (j['entryCount'] as num?)?.toInt() ?? 0,
+        scoreBefore: j['scoreBefore'] == null ? null : _points(j['scoreBefore']),
+        scoreAfter: j['scoreAfter'] == null ? null : _points(j['scoreAfter']),
+        refusal: j['refusal'] as String?,
+        refusalMessage: j['refusalMessage'] as String?,
+        capMessage: j['capMessage'] as String?,
+      );
+}
+
+class MarkBankAward {
+  const MarkBankAward({
+    required this.id,
+    required this.studentId,
+    required this.studentName,
+    required this.kind,
+    required this.status,
+    required this.points,
+    required this.reason,
+    required this.entryCount,
+    this.subjectName,
+    this.termName,
+    this.scoreBefore,
+    this.scoreAfter,
+    this.appliedAt,
+    this.decidedAt,
+    this.decisionReason,
+    this.reversedAt,
+    this.reversedReason,
+    this.createdAt,
+  });
+
+  final String id;
+  final String studentId;
+  final String studentName;
+
+  final String kind;
+  final String status;
+
+  final num points;
+  final String reason;
+  final int entryCount;
+
+  final String? subjectName;
+  final String? termName;
+
+  final num? scoreBefore;
+  final num? scoreAfter;
+
+  final DateTime? appliedAt;
+  final DateTime? decidedAt;
+  final String? decisionReason;
+  final DateTime? reversedAt;
+  final String? reversedReason;
+  final DateTime? createdAt;
+
+  bool get isApplied => status == 'APPLIED';
+
+  bool get isWaiting => status == 'PROPOSED';
+
+  bool get canUndo => status == 'APPLIED' || status == 'PROPOSED';
+
+  factory MarkBankAward.fromJson(Map<String, dynamic> j) => MarkBankAward(
+        id: (j['id'] ?? '') as String,
+        studentId: (j['studentId'] ?? '') as String,
+        studentName: MarkBankEntry._name(j, 'studentName', 'student') ?? '—',
+        kind: (j['kind'] ?? 'TERM_MARK') as String,
+        status: (j['status'] ?? 'APPLIED') as String,
+        points: _points(j['points']),
+        reason: (j['reason'] ?? '') as String,
+        entryCount: (j['entryCount'] as num?)?.toInt() ?? 0,
+        subjectName: MarkBankEntry._name(j, 'subjectName', 'subject'),
+        termName: MarkBankEntry._name(j, 'termName', 'term'),
+        scoreBefore: j['scoreBefore'] == null ? null : _points(j['scoreBefore']),
+        scoreAfter: j['scoreAfter'] == null ? null : _points(j['scoreAfter']),
+        appliedAt: DateTime.tryParse((j['appliedAt'] ?? '') as String)?.toLocal(),
+        decidedAt: DateTime.tryParse((j['decidedAt'] ?? '') as String)?.toLocal(),
+        decisionReason: j['decisionReason'] as String?,
+        reversedAt: DateTime.tryParse((j['reversedAt'] ?? '') as String)?.toLocal(),
+        reversedReason: j['reversedReason'] as String?,
+        createdAt: DateTime.tryParse((j['createdAt'] ?? '') as String)?.toLocal(),
       );
 }
