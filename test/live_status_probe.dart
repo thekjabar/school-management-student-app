@@ -89,5 +89,7 @@ void main() {
         expect(await tester.binding.handlePopRoute(), isTrue);
         expect(find.byType(MaintenanceScreen), findsOneWidget);
     }
+
+    PlatformStatusService.instance.resetForTest();
   });
 }

@@ -231,6 +231,80 @@ void main() {
     }
     expect(find.text(t('status.maintenanceTitle')), findsOneWidget);
     expect(find.text(t('status.maintenanceBody')), findsOneWidget);
+
+    PlatformStatusService.instance.resetForTest();
+  });
+
+  testWidgets('a blocked app lets itself back in without anybody tapping Refresh',
+      (tester) async {
+    final server = await _serve([
+      _maintenance(),
+      _maintenance(),
+      {'state': 'ok'},
+    ]);
+
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+    expect(find.byType(MaintenanceScreen), findsOneWidget);
+    expect(server.asked, hasLength(1));
+
+    await tester.pump(const Duration(seconds: 119));
+    expect(server.asked, hasLength(1));
+
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(server.asked, hasLength(2));
+    expect(find.byType(MaintenanceScreen), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 120));
+    await tester.pumpAndSettle();
+    expect(server.asked, hasLength(3));
+    expect(find.byType(MaintenanceScreen), findsNothing);
+    expect(find.text(_homeText), findsOneWidget);
+  });
+
+  testWidgets('waiting is never longer than a quarter of an hour, whatever the service asks',
+      (tester) async {
+    final server = await _serve([
+      {..._maintenance(), 'retryAfterSeconds': 86_400},
+      {'state': 'ok'},
+    ]);
+
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+    expect(server.asked, hasLength(1));
+
+    await tester.pump(const Duration(minutes: 15));
+    await tester.pumpAndSettle();
+    expect(server.asked, hasLength(2));
+    expect(find.text(_homeText), findsOneWidget);
+  });
+
+  testWidgets('coming back to the app asks again, so nobody works on a screen that is already down',
+      (tester) async {
+    final server = await _serve([
+      {'state': 'ok'},
+      _maintenance(),
+    ]);
+
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+    expect(find.text(_homeText), findsOneWidget);
+    expect(server.asked, hasLength(1));
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(server.asked, hasLength(2));
+    expect(find.byType(MaintenanceScreen), findsOneWidget);
+    expect(find.text(_homeText), findsNothing);
+
+    PlatformStatusService.instance.resetForTest();
   });
 
   testWidgets('a platform request that fails asks the status service again',
@@ -254,6 +328,8 @@ void main() {
     expect(server.asked, hasLength(2));
     expect(find.byType(MaintenanceScreen), findsOneWidget);
     expect(find.text(_homeText), findsNothing);
+
+    PlatformStatusService.instance.resetForTest();
   });
 
   testWidgets('a network error asks too, but never more than once a minute',

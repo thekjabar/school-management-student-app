@@ -32,6 +32,13 @@ class _StatusGateState extends State<StatusGate> with WidgetsBindingObserver {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      PlatformStatusService.instance.refresh();
+    }
+  }
+
+  @override
   Future<bool> didPopRoute() async {
     final answer = PlatformStatusService.instance.current.value;
     if (answer.blocks) return true;

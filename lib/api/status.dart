@@ -86,6 +86,12 @@ class PlatformStatusService {
 
   static const quietPeriod = Duration(minutes: 1);
 
+  static const _soonest = Duration(seconds: 20);
+
+  static const _latest = Duration(minutes: 15);
+
+  static const _whenNoEndGiven = Duration(minutes: 2);
+
   http.Client _http = http.Client();
 
   @visibleForTesting
@@ -108,6 +114,8 @@ class PlatformStatusService {
   DateTime? _rechecked;
 
   Future<void>? _asking;
+
+  Timer? _next;
 
   bool get configured => _key.isNotEmpty;
 
@@ -172,7 +180,21 @@ class PlatformStatusService {
       debugPrint('status: could not reach the status service: $e');
     } finally {
       _asking = null;
+      _askAgainWhileBlocked();
     }
+  }
+
+  void _askAgainWhileBlocked() {
+    _next?.cancel();
+    _next = null;
+    final answer = current.value;
+    if (!answer.blocks) return;
+
+    final asked = answer.retryAfterSeconds;
+    var wait = asked != null ? Duration(seconds: asked) : _whenNoEndGiven;
+    if (wait < _soonest) wait = _soonest;
+    if (wait > _latest) wait = _latest;
+    _next = Timer(wait, () => unawaited(refresh()));
   }
 
   Uri _endpoint() => Uri.parse('$kStatusBase/api/status').replace(
@@ -185,6 +207,8 @@ class PlatformStatusService {
 
   @visibleForTesting
   void resetForTest() {
+    _next?.cancel();
+    _next = null;
     current.value = PlatformStatus.allClear;
     _app = '';
     _key = kStatusKey;

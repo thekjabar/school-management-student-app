@@ -12,10 +12,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'offline_cache.dart';
 import 'status.dart';
 
-const String kApiBase = String.fromEnvironment(
-  'API_BASE',
-  defaultValue: 'https://api.krsprotection.com',
-);
+const String _apiBaseDefine = String.fromEnvironment('API_BASE');
+
+final String kApiBase = _apiBaseDefine.isNotEmpty
+    ? _apiBaseDefine
+    : switch (const String.fromEnvironment('APP_ROLE')) {
+        'teacher' => 'https://teacher-api.krsprotection.com',
+        'driver' => 'https://driver-api.krsprotection.com',
+        _ => 'https://parent-api.krsprotection.com',
+      };
 
 class ApiException implements Exception {
   ApiException(this.message, this.status, [this.errorCode]);
