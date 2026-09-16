@@ -126,7 +126,7 @@ class _DriverStudentsState extends State<DriverStudents> {
     return Loader<_Roster>(
       key: _loaderKey,
       tint: Role.driver.tint,
-      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 18)),
+      padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 18)),
       load: () async {
         final trip = await loadDutyTrip();
         if (trip == null) return _Roster(trip: null, riders: const []);

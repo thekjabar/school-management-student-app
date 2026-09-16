@@ -76,7 +76,7 @@ class _DayTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Loader<HouseholdDay>(
       tint: Role.parent.tint,
-      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 24)),
+      padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 24)),
       load: () => ParentApi.instance.householdDay(),
       builder: (context, day) => _Day(day: day),
     );
@@ -372,7 +372,7 @@ class _FamilyTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Loader<(HouseholdOverview, HouseholdConflicts)>(
       tint: Role.parent.tint,
-      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 24)),
+      padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 24)),
       load: () async {
         final r = await Future.wait<Object?>([
           ParentApi.instance.household(),

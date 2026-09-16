@@ -244,7 +244,7 @@ class _GateState extends State<_Gate> {
     if (widget.frame == SectionFrame.inline) return body;
     final list = ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 24)),
+      padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 24)),
       children: [body],
     );
     if (widget.frame == SectionFrame.page) return list;

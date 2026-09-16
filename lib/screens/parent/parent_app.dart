@@ -660,7 +660,7 @@ class _HomeSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
+      padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
       physics: const NeverScrollableScrollPhysics(),
       children: [
         const _Block(height: 92),

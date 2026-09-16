@@ -69,7 +69,7 @@ class HomeTab extends StatelessWidget {
         return Loader<_Home>(
           tint: Role.parent.tint,
           watch: '${child.studentId}|${ent.lockSignature(child.studentId)}',
-          padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
+          padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
           load: () async {
             await Entitlements.instance.ensureLoaded();
             final now = Entitlements.instance.current.value;

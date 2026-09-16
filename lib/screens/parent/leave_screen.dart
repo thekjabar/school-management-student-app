@@ -79,7 +79,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
                   Loader<List<LeaveRequestItem>>(
                     key: _loaderKey,
                     tint: tint,
-                    padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 90)),
+                    padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 90)),
                     load: () async {
                       final all = await ParentApi.instance.leaveRequests();
                       return all

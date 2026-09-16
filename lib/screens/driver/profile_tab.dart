@@ -22,7 +22,7 @@ class DriverProfile extends StatelessWidget {
     final me = Session.instance.me;
 
     return ListView(
-      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 20)),
+      padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 20)),
       children: [
         Card16(
           padding: const EdgeInsets.all(14),

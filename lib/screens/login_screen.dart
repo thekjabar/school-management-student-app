@@ -144,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   final art = (box.maxHeight * 0.26).clamp(120.0, 208.0);
 
                   return SingleChildScrollView(
-                    padding: withBottomInset(context, const EdgeInsets.fromLTRB(16, 10, 16, 56)),
+                    padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(16, 10, 16, 56)),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [

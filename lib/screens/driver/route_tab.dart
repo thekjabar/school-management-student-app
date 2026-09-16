@@ -20,7 +20,7 @@ class DriverRoute extends StatelessWidget {
   Widget build(BuildContext context) {
     return Loader<_Run>(
       tint: Role.driver.tint,
-      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 18)),
+      padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 18)),
       load: () async {
         final trip = await loadDutyTrip();
         if (trip == null) return _Run(trip: null, plan: null, run: null, school: null);

@@ -90,7 +90,7 @@ class _DriverHomeState extends State<DriverHome> {
     return Loader<_Duty>(
       key: _loaderKey,
       tint: Role.driver.tint,
-      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
+      padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
       load: () async {
         final live = await loadDutyTrip();
         if (live == null) return _Duty(trip: null, plan: null, run: null, school: null);

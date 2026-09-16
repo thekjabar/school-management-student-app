@@ -257,7 +257,7 @@ class _MessagesTabState extends State<MessagesTab> {
     return Loader<_Inbox>(
       key: _loader,
       tint: tint,
-      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
+      padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
       load: _load,
       builder: (context, inbox) {
         _inbox = inbox;

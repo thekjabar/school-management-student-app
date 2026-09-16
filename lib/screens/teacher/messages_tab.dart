@@ -30,7 +30,7 @@ class _TeacherMessagesState extends State<TeacherMessages> {
   Widget build(BuildContext context) {
     return Loader<List<Announcement>>(
       tint: Role.teacher.tint,
-      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 18)),
+      padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 18)),
       load: () => TeacherApi.instance.announcements(),
       isEmpty: (rows) => rows.isEmpty,
       empty: t('teacher.noAnnouncements'),

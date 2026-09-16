@@ -54,7 +54,7 @@ class _CalendarTabState extends State<CalendarTab> {
     return Loader<_Diary>(
       tint: tint,
       watch: '$id|${ent.lockSignature(id)}',
-      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20)),
+      padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20)),
       load: () async {
         final r = await Future.wait<Object>([
           when(ParentSection.timetable, () => ParentApi.instance.timetable(id), const <DayOfLessons>[]),

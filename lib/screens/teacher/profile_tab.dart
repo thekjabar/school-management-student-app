@@ -25,7 +25,7 @@ class TeacherProfileTab extends StatelessWidget {
 
     return Loader<TeacherProfile?>(
       tint: tint,
-      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 20)),
+      padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 20)),
       load: () async {
         try {
           return await TeacherApi.instance.me();

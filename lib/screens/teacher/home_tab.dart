@@ -25,7 +25,7 @@ class TeacherHome extends StatelessWidget {
   Widget build(BuildContext context) {
     return Loader<_Today>(
       tint: Role.teacher.tint,
-      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
+      padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
       load: () async {
         return _Today.from(await TeacherPayload.fetch());
       },

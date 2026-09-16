@@ -200,7 +200,7 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware, FollowsReload<Loa
 
           return ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: withBottomInset(context, widget.padding),
+            padding: clearOfTheBar(context, widget.padding),
             children: [widget.builder(context, data)],
           );
         },
@@ -212,7 +212,7 @@ class LoaderState<T> extends State<Loader<T>> with RouteAware, FollowsReload<Loa
 
   Widget _scrollable(Widget child) => ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: withBottomInset(context, widget.padding),
+        padding: clearOfTheBar(context, widget.padding),
         children: [child],
       );
 }
