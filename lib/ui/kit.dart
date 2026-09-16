@@ -877,22 +877,28 @@ class CenterActionNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final half = (items.length / 2).ceil();
+    final under = MediaQuery.paddingOf(context).bottom;
 
     return SafeArea(
       top: false,
+      bottom: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
         child: SizedBox(
-          height: _bar + _lift,
+          height: _bar + _lift + under,
           child: Stack(
             alignment: Alignment.bottomCenter,
             clipBehavior: Clip.none,
             children: [
               Container(
-                height: _bar,
+                height: _bar + under,
+                padding: EdgeInsets.only(bottom: under),
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.vertical(
+                    top: const Radius.circular(24),
+                    bottom: Radius.circular(under > 0 ? 0 : 24),
+                  ),
                   border: AppTheme.dark ? Border.all(color: AppTheme.border) : null,
                   boxShadow: AppTheme.dark
                       ? null
