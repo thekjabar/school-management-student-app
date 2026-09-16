@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import '../i18n/strings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'offline_cache.dart';
+import 'status.dart';
 
 const String kApiBase = String.fromEnvironment(
   'API_BASE',
@@ -257,8 +258,10 @@ class ApiClient {
       final streamed = await _http.send(request).timeout(const Duration(seconds: 25));
       res = await http.Response.fromStream(streamed);
     } on TimeoutException {
+      _statusMayKnowWhy();
       throw ApiException('The school system is not answering. Try again in a moment.', 0);
     } catch (_) {
+      _statusMayKnowWhy();
       throw OfflineException();
     }
 
@@ -285,7 +288,10 @@ class ApiClient {
 
   void Function(SectionLockedException locked)? onSectionLocked;
 
+  void _statusMayKnowWhy() => PlatformStatusService.instance.recheckAfterFailure();
+
   ApiException _failure(http.Response res) {
+    if (res.statusCode >= 500) _statusMayKnowWhy();
     final locked = res.statusCode == 403 ? _lockedFrom(res) : null;
     if (locked == null) return ApiException(_messageFrom(res), res.statusCode, _codeFrom(res));
     onSectionLocked?.call(locked);
@@ -361,8 +367,10 @@ class ApiClient {
       final streamed = await _http.send(request).timeout(const Duration(seconds: 90));
       res = await http.Response.fromStream(streamed);
     } on TimeoutException {
+      _statusMayKnowWhy();
       throw ApiException('The school system is not answering. Try again in a moment.', 0);
     } catch (_) {
+      _statusMayKnowWhy();
       throw OfflineException();
     }
 

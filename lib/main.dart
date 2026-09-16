@@ -8,8 +8,10 @@ import 'api/boot.dart';
 import 'api/client.dart';
 import 'api/language_refresh.dart';
 import 'api/push.dart';
+import 'api/status.dart';
 import 'i18n/delegates.dart';
 import 'ui/async.dart';
+import 'ui/platform_status.dart';
 import 'ui/map_tiles.dart';
 import 'i18n/strings.dart';
 import 'api/session.dart';
@@ -49,6 +51,7 @@ Future<void> main() async {
   await AppLocale.restore();
   AppLocale.onChanged = LanguageRefresh.apply;
   await AppThemeSetting.restore();
+  unawaited(PlatformStatusService.instance.start(kRole));
   await Push.start();
   runApp(const KspApp());
 }
@@ -144,7 +147,10 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
               data: media.copyWith(
                 textScaler: media.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.3),
               ),
-              child: child ?? const SizedBox.shrink(),
+              child: StatusGate(
+                role: _role,
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
           ),
         );

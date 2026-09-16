@@ -1502,6 +1502,15 @@ const Map<String, String> _en = {
   'teacher.subject': 'Subject',
   'map.noToken': 'The map is not set up in this app. The rest of the screen still works.',
   'common.tryAgain': 'Try again',
+  'status.maintenanceTitle': 'The app is being worked on',
+  'status.maintenanceBody':
+      'We are working on the system right now. Nothing you have sent is lost. '
+      'Please try again in a little while.',
+  'status.noticeTitle': 'A note from KSP',
+  'status.noticeBody': 'There is some work planned on the system.',
+  'status.refresh': 'Check again',
+  'status.backBy': 'Expected back by {n}',
+  'status.startsAt': 'Starts at {n}',
   'common.didNotLoad': 'That did not load',
   'common.loadFailed': 'Something went wrong. Pull down to try again.',
   'common.offline': 'No connection. Check the phone is on the network and try again.',
@@ -3693,6 +3702,15 @@ const Map<String, String> _ckb = {
   'teacher.subject': 'بابەت',
   'map.noToken': 'نەخشە لەم وەشانەی ئەپەکەدا ڕێکنەخراوە. بەشەکانی تری شاشەکە هێشتا کاردەکەن.',
   'common.tryAgain': 'دووبارە هەوڵ بدە',
+  'status.maintenanceTitle': 'ئەپەکە لە چاککردندایە',
+  'status.maintenanceBody':
+      'ئێستا کار لەسەر سیستەمەکە دەکەین. هیچ شتێک لەوانەی ناردووتە لەدەست نەچووە. '
+      'تکایە پاش کەمێک دووبارە هەوڵ بدەرەوە.',
+  'status.noticeTitle': 'پەیامێک لە KSP',
+  'status.noticeBody': 'کاری چاککردن لەسەر سیستەمەکە بەڕێوەیە.',
+  'status.refresh': 'دووبارە بپشکنە',
+  'status.backBy': 'پێشبینی دەکرێت لە {n} بگەڕێتەوە',
+  'status.startsAt': 'لە {n} دەست پێدەکات',
   'common.didNotLoad': 'زانیارییەکان نەهاتن',
   'common.loadFailed': 'شتێک هەڵە بوو. پەڕەکە بەرەو خوارەوە ڕابکێشە بۆ هەوڵدانەوە.',
   'common.offline': 'ئینتەرنێت نییە. دڵنیابە مۆبایلەکە بە ئینتەرنێتەوە بەستراوە و دووبارە هەوڵ بدەرەوە.',
@@ -5877,6 +5895,15 @@ const Map<String, String> _ar = {
   'teacher.subject': 'المادة',
   'map.noToken': 'الخريطة غير مُهيأة في هذه النسخة. بقية الشاشة تعمل كالمعتاد.',
   'common.tryAgain': 'حاول مرة أخرى',
+  'status.maintenanceTitle': 'التطبيق قيد الصيانة',
+  'status.maintenanceBody':
+      'نعمل على النظام الآن. لم يضع أي شيء أرسلته. '
+      'حاول مرة أخرى بعد قليل.',
+  'status.noticeTitle': 'رسالة من KSP',
+  'status.noticeBody': 'هناك أعمال صيانة جارية على النظام.',
+  'status.refresh': 'تحقق مرة أخرى',
+  'status.backBy': 'من المتوقع أن يعود في {n}',
+  'status.startsAt': 'يبدأ في {n}',
   'common.didNotLoad': 'تعذّر التحميل',
   'common.loadFailed': 'حدث خطأ ما. اسحب للأسفل للمحاولة مرة أخرى.',
   'common.offline': 'لا يوجد اتصال. تأكد من اتصال الهاتف بالشبكة وحاول مرة أخرى.',

@@ -51,3 +51,10 @@ assets/video/splash.mp4
 # of a public repository so nobody can clone the code and spend the quota.
 tool/mapbox.token
 tool/mapbox.style
+
+# One status key per role, copied from the server's ksp-status-api/.env and
+# passed to the build as STATUS_KEY. Shipped inside the APK by necessity; a key
+# used with another app's name is refused, so they are never interchangeable.
+tool/status.parent.key
+tool/status.teacher.key
+tool/status.driver.key

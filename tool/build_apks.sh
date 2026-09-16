@@ -25,6 +25,9 @@ if [ -n "$MAPBOX_STYLE" ]; then
   echo "style: $MAPBOX_STYLE"
 fi
 
+APP_VERSION="$(awk '/^version:/ {print $2}' pubspec.yaml | cut -d+ -f1)"
+echo "version: ${APP_VERSION:-unknown}"
+
 for role in "${ROLES[@]}"; do
   echo
   echo "── $role ─────────────────────────────────────────────"
@@ -50,10 +53,27 @@ for role in "${ROLES[@]}"; do
   esac
   echo "api: $api"
 
+  STATUS_KEY=""
+  if [ -f "tool/status.$role.key" ]; then
+    STATUS_KEY="$(tr -d "[:space:]" < "tool/status.$role.key")"
+  fi
+  if [ -z "$STATUS_KEY" ]; then
+    echo
+    echo "FAILED: tool/status.$role.key is missing or empty."
+    echo "  Without it the $role app cannot ask the status service, so a family"
+    echo "  or a driver sees a dead app with no explanation while the platform"
+    echo "  is down. Copy the key from STATUS_KEY_$(echo "$role" | tr 'a-z' 'A-Z') in"
+    echo "  /var/www/school/ksp-status-api/.env on the server."
+    exit 1
+  fi
+  echo "status: tool/status.$role.key (${#STATUS_KEY} characters)"
+
   flutter build apk --release \
     --flavor "$role" \
     --dart-define="APP_ROLE=$role" \
     --dart-define="API_BASE=$api" \
+    --dart-define="APP_VERSION=$APP_VERSION" \
+    --dart-define="STATUS_KEY=$STATUS_KEY" \
     --dart-define="MAPBOX_TOKEN=$MAPBOX_TOKEN" \
     --dart-define="MAPBOX_STYLE=$MAPBOX_STYLE" \
     --split-per-abi
@@ -111,8 +131,36 @@ for role in "${ROLES[@]}"; do
       [ -n "$wrong" ] && echo "  found instead:$wrong"
       exit 1
     fi
+    if ! grep -aqF "$STATUS_KEY" "$tmp"; then
+      rm -f "$tmp"
+      echo
+      echo "FAILED: $name.apk does not carry the $role status key."
+      echo "  STATUS_KEY did not reach the Dart side, so this app can never ask"
+      echo "  the status service and would show a family or a driver a dead app"
+      echo "  with no explanation while the platform is down."
+      exit 1
+    fi
+    strayKey=""
+    for other in parent teacher driver; do
+      [ "$other" = "$role" ] && continue
+      if [ -f "tool/status.$other.key" ]; then
+        otherKey="$(tr -d "[:space:]" < "tool/status.$other.key")"
+        if [ -n "$otherKey" ] && grep -aqF "$otherKey" "$tmp"; then
+          strayKey="$strayKey $other"
+        fi
+      fi
+    done
+    if [ -n "$strayKey" ]; then
+      rm -f "$tmp"
+      echo
+      echo "FAILED: $name.apk carries another app's status key:$strayKey"
+      echo "  The service refuses a key used with another app's name, so every"
+      echo "  status check from this build would be answered 403 and no notice"
+      echo "  or maintenance screen would ever be shown."
+      exit 1
+    fi
     rm -f "$tmp"
-    echo "role verified: binary is the $role app"
+    echo "role verified: binary is the $role app, with the $role status key"
   fi
 
   echo "→ $OUT/$name.apk  ($(du -h "$OUT/$name.apk" | cut -f1))"
