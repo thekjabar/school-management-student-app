@@ -2656,13 +2656,26 @@ class ParentApi {
     return id;
   }
 
-  Future<List<ThreadSummary>> threads({String? status, String? studentId}) async {
-    final q = <String>['pageSize=50'];
+  Future<Paged<ThreadSummary>> threadPage({
+    String? status,
+    String? studentId,
+    String? search,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    final q = <String>['pageSize=$pageSize', 'page=$page'];
     if (status != null && status.isNotEmpty) q.add('status=$status');
     if (studentId != null && studentId.isNotEmpty) q.add('studentId=$studentId');
+    final term = (search ?? '').trim();
+    if (term.length >= kThreadSearchMin) {
+      q.add('q=${Uri.encodeQueryComponent(term)}');
+    }
     final json = await _api.get('/parent/messages?${q.join('&')}');
-    return Paged.from<ThreadSummary>(json, ThreadSummary.fromJson).rows;
+    return Paged.from<ThreadSummary>(json, ThreadSummary.fromJson);
   }
+
+  Future<List<ThreadSummary>> threads({String? status, String? studentId}) async =>
+      (await threadPage(status: status, studentId: studentId, pageSize: 50)).rows;
 
   Future<int> unreadThreadCount() async {
     final json = await _api.get('/parent/messages/unread-count');
@@ -3435,6 +3448,8 @@ class VoiceNote {
         state: (j['state'] ?? 'PENDING') as String,
       );
 }
+
+const int kThreadSearchMin = 2;
 
 class ThreadSummary {
   ThreadSummary({

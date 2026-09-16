@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api/client.dart';
 import '../../api/parent_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
+import '../../ui/assistant_kit.dart';
 import '../../ui/async.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
@@ -25,12 +28,7 @@ class ConversationsScreen extends StatelessWidget {
         child: Column(
           children: [
             const _Heading(),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 24),
-                children: const [_ConversationList()],
-              ),
-            ),
+            const Expanded(child: _ConversationList()),
           ],
         ),
       ),
@@ -98,98 +96,277 @@ class _ConversationList extends StatefulWidget {
 }
 
 class _ConversationListState extends State<_ConversationList> with FollowsReload<_ConversationList> {
-  late Future<List<ThreadSummary>> _threads = ParentApi.instance.threads();
+  final _search = TextEditingController();
+  final _rows = <ThreadSummary>[];
 
-  void _reload() => setState(() => _threads = ParentApi.instance.threads());
+  Timer? _typing;
+  int _request = 0;
+  String _term = '';
+  String? _childId;
+  String? _status;
+  List<Child> _children = const [];
+  int _page = 1;
+  int _pages = 1;
+  bool _loading = true;
+  bool _older = false;
+  Object? _error;
 
   @override
-  void refetch() => _reload();
+  void initState() {
+    super.initState();
+    _loadChildren();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _typing?.cancel();
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  void refetch() => _load();
+
+  Future<void> _loadChildren() async {
+    try {
+      final all = await ParentApi.instance.children();
+      await Entitlements.instance.ensureLoaded();
+      if (!mounted) return;
+      setState(() {
+        _children = [
+          for (final c in all)
+            if (!sectionLocked(c.studentId, ParentSection.messages)) c,
+        ];
+      });
+    } catch (_) {
+    }
+  }
+
+  Future<void> _load({bool older = false}) async {
+    final mine = ++_request;
+    setState(() {
+      if (older) {
+        _older = true;
+      } else {
+        _loading = true;
+        _error = null;
+      }
+    });
+    try {
+      final page = await ParentApi.instance.threadPage(
+        status: _status,
+        studentId: _childId,
+        search: _term,
+        page: older ? _page + 1 : 1,
+      );
+      if (!mounted || mine != _request) return;
+      setState(() {
+        if (!older) _rows.clear();
+        _rows.addAll(page.rows);
+        _page = page.page;
+        _pages = page.pages;
+        _loading = false;
+        _older = false;
+      });
+    } catch (e) {
+      if (!mounted || mine != _request) return;
+      setState(() {
+        _loading = false;
+        _older = false;
+        if (!older) _error = e;
+      });
+    }
+  }
+
+  void _typed(String value) {
+    _typing?.cancel();
+    _typing = Timer(const Duration(milliseconds: 350), () {
+      final term = value.trim();
+      final asked = term.length >= kThreadSearchMin ? term : '';
+      if (asked == _term) return;
+      _term = asked;
+      _load();
+    });
+  }
+
+  void _choose(void Function() change) {
+    setState(change);
+    _load();
+  }
+
+  bool _onScroll(ScrollNotification note) {
+    if (_loading || _older || _page >= _pages) return false;
+    final m = note.metrics;
+    if (m.pixels >= m.maxScrollExtent - 240) _load(older: true);
+    return false;
+  }
+
+  List<ThreadSummary> get _visible => [
+        for (final thread in _rows)
+          if (!sectionLocked(thread.studentId, ParentSection.messages)) thread,
+      ];
 
   @override
   Widget build(BuildContext context) {
     final tint = Role.parent.tint;
-    return Card16(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
-      child: Column(
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScroll,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 24),
         children: [
-          SectionRow(
-            title: t('conv.title'),
-            actionLabel: t('conv.start'),
-            actionIcon: Icons.add_rounded,
-            onAction: () async {
-              await _startConversation(context);
-              if (mounted) _reload();
-            },
-          ),
-          FutureBuilder<List<ThreadSummary>>(
-            future: _threads,
-            builder: (context, snap) {
-              if (snap.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 26),
-                  child: Center(
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
-                );
-              }
-              if (snap.hasError) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 22),
-                  child: Column(
-                    children: [
-                      Text(
-                        errorText(snap.error),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
-                      ),
-                      const SizedBox(height: 10),
-                      TextButton(onPressed: _reload, child: Text(t('common.tryAgain'))),
+          Card16(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
+            child: Column(
+              children: [
+                SectionRow(
+                  title: t('conv.title'),
+                  actionLabel: t('conv.start'),
+                  actionIcon: Icons.add_rounded,
+                  onAction: () async {
+                    await _startConversation(context);
+                    if (mounted) _load();
+                  },
+                ),
+                _SearchField(controller: _search, onChanged: _typed),
+                const SizedBox(height: 10),
+                if (_children.length > 1) ...[
+                  AssistantFilterPills(
+                    choices: [
+                      AssistantFilterChoice(value: null, label: t('conv.allChildren')),
+                      for (final c in _children)
+                        AssistantFilterChoice(value: c.studentId, label: c.name),
                     ],
+                    selected: _childId,
+                    tint: tint,
+                    onChanged: (v) => _choose(() => _childId = v),
                   ),
-                );
-              }
-              final rows = [
-                for (final thread in snap.data ?? const <ThreadSummary>[])
-                  if (!sectionLocked(thread.studentId, ParentSection.messages)) thread,
-              ];
-              if (rows.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 26),
-                  child: Center(
-                    child: Text(
-                      t('conv.none'),
-                      style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
-                    ),
-                  ),
-                );
-              }
-              return Column(
-                children: [
-                  for (var i = 0; i < rows.length; i++) ...[
-                    if (i > 0) Divider(height: 1, color: AppTheme.border),
-                    _ThreadRow(
-                      thread: rows[i],
-                      tint: tint,
-                      onTap: () async {
-                        await openSection<void>(
-                          context,
-                          childId: rows[i].studentId,
-                          section: ParentSection.messages,
-                          builder: (_) => ConversationScreen(thread: rows[i]),
-                        );
-                        if (mounted) _reload();
-                      },
-                    ),
-                  ],
+                  const SizedBox(height: 8),
                 ],
-              );
-            },
+                AssistantFilterPills(
+                  choices: [
+                    AssistantFilterChoice(value: null, label: t('conv.allStatus')),
+                    AssistantFilterChoice(value: 'OPEN', label: t('conv.open')),
+                    AssistantFilterChoice(value: 'RESOLVED', label: t('conv.resolved')),
+                  ],
+                  selected: _status,
+                  tint: tint,
+                  onChanged: (v) => _choose(() => _status = v),
+                ),
+                const SizedBox(height: 6),
+                ..._body(tint),
+              ],
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  List<Widget> _body(Color tint) {
+    if (_loading) {
+      return const [
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 26),
+          child: Center(
+            child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
+          ),
+        ),
+      ];
+    }
+    if (_error != null) {
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 22),
+          child: Column(
+            children: [
+              Text(
+                t('conv.failed'),
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+              ),
+              const SizedBox(height: 10),
+              TextButton(onPressed: _load, child: Text(t('common.tryAgain'))),
+            ],
+          ),
+        ),
+      ];
+    }
+    final rows = _visible;
+    if (rows.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 26),
+          child: Center(
+            child: Text(
+              _term.isEmpty ? t('conv.none') : t('conv.noMatch'),
+              style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+            ),
+          ),
+        ),
+      ];
+    }
+    return [
+      for (var i = 0; i < rows.length; i++) ...[
+        if (i > 0) Divider(height: 1, color: AppTheme.border),
+        _ThreadRow(
+          thread: rows[i],
+          tint: tint,
+          onTap: () async {
+            await openSection<void>(
+              context,
+              childId: rows[i].studentId,
+              section: ParentSection.messages,
+              builder: (_) => ConversationScreen(thread: rows[i]),
+            );
+            if (mounted) _load();
+          },
+        ),
+      ],
+      if (_older)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Center(
+            child: Text(
+              t('conv.loadingOlder'),
+              style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+            ),
+          ),
+        ),
+    ];
+  }
+}
+
+class _SearchField extends StatelessWidget {
+  const _SearchField({required this.controller, required this.onChanged});
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      maxLength: 120,
+      textInputAction: TextInputAction.search,
+      style: TextStyle(fontSize: 13.5, color: AppTheme.text),
+      decoration: InputDecoration(
+        hintText: t('conv.search'),
+        counterText: '',
+        isDense: true,
+        prefixIcon: Icon(Icons.search_rounded, size: 18, color: AppTheme.textMuted),
+        filled: true,
+        fillColor: AppTheme.canvas,
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: AppTheme.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: AppTheme.border),
+        ),
       ),
     );
   }
