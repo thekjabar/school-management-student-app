@@ -5,6 +5,10 @@ import 'package:student_app/ui/kit.dart';
 
 const _gesture = EdgeInsets.only(bottom: 24, top: 40);
 
+void _ignore(int _) {}
+
+void _nothing() {}
+
 Widget _shell() => MaterialApp(
       home: MediaQuery(
         data: const MediaQueryData(size: Size(390, 844), padding: _gesture, viewPadding: _gesture),
@@ -29,27 +33,27 @@ Widget _shell() => MaterialApp(
       ),
     );
 
-void _ignore(int _) {}
-
-void _nothing() {}
-
 void main() {
-  testWidgets('the bar reaches the bottom of the screen, with the gesture area inside it', (tester) async {
+  testWidgets('the white of the bar reaches both edges and the bottom of the screen', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(_shell());
 
-    final bar = tester.getRect(find.byType(CenterActionNav));
     final screen = tester.getRect(find.byType(Scaffold));
-    expect(bar.bottom, screen.bottom, reason: 'a strip of background is left under the navigation bar');
-
-    final surface = tester
+    final painted = tester
         .widgetList<Container>(find.descendant(of: find.byType(CenterActionNav), matching: find.byType(Container)))
         .firstWhere((c) => c.decoration is BoxDecoration && (c.decoration as BoxDecoration).color == AppTheme.surface);
-    expect((surface.padding as EdgeInsets).bottom, _gesture.bottom,
-        reason: 'the gesture area is not kept clear inside the bar');
+    final white = tester.getRect(find.byWidget(painted));
+
+    expect(white.bottom, screen.bottom, reason: 'the page shows below the bar');
+    expect(white.left, screen.left, reason: 'the page shows at the left of the bar');
+    expect(white.right, screen.right, reason: 'the page shows at the right of the bar');
+
+    final corners = (painted.decoration as BoxDecoration).borderRadius! as BorderRadius;
+    expect(corners.topLeft.x, greaterThan(0), reason: 'the bar lost its rounded top');
+    expect(corners.bottomLeft.x, 0, reason: 'a rounded bottom corner leaves the page showing');
 
     final home = tester.getRect(find.text('Home'));
     expect(screen.bottom - home.bottom, greaterThanOrEqualTo(_gesture.bottom),

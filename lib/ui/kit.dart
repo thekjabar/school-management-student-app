@@ -877,41 +877,34 @@ class CenterActionNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final half = (items.length / 2).ceil();
-    final under = MediaQuery.paddingOf(context).bottom;
 
-    return SafeArea(
-      top: false,
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
-        child: SizedBox(
-          height: _bar + _lift + under,
-          child: Stack(
-            alignment: Alignment.bottomCenter,
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                height: _bar + under,
-                padding: EdgeInsets.only(bottom: under),
-                decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  borderRadius: BorderRadius.vertical(
-                    top: const Radius.circular(24),
-                    bottom: Radius.circular(under > 0 ? 0 : 24),
-                  ),
-                  border: AppTheme.dark ? Border.all(color: AppTheme.border) : null,
-                  boxShadow: AppTheme.dark
-                      ? null
-                      : const [
-                          BoxShadow(
-                            color: Color(0x14101828),
-                            blurRadius: 18,
-                            offset: Offset(0, 6),
-                          ),
-                        ],
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: AppTheme.dark ? Border(top: BorderSide(color: AppTheme.border)) : null,
+        boxShadow: AppTheme.dark
+            ? null
+            : const [
+                BoxShadow(
+                  color: Color(0x14101828),
+                  blurRadius: 18,
+                  offset: Offset(0, -6),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
+              ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+          child: SizedBox(
+            height: _bar + _lift,
+            child: Stack(
+              alignment: Alignment.bottomCenter,
+              clipBehavior: Clip.none,
+              children: [
+                SizedBox(
+                  height: _bar,
                   child: Row(
                     children: [
                       for (var i = 0; i < half; i++) Expanded(child: _slot(i)),
@@ -920,51 +913,51 @@ class CenterActionNav extends StatelessWidget {
                     ],
                   ),
                 ),
-              ),
-              Positioned(
-                top: 0,
-                child: GestureDetector(
-                  onTap: onCenter,
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    width: _fab,
-                    height: _fab,
-                    decoration: BoxDecoration(
-                      color: tint,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppTheme.canvas, width: 3.5),
-                      boxShadow: AppTheme.dark
-                          ? null
-                          : const [
-                              BoxShadow(
-                                color: Color(0x1A101828),
-                                blurRadius: 12,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                    ),
-                    child: centerLabel == null
-                        ? Icon(centerIcon, size: 25, color: Colors.white)
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(centerIcon, size: 22, color: Colors.white),
-                              Text(
-                                centerLabel!,
-                                maxLines: 1,
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.2,
-                                  color: Colors.white,
+                Positioned(
+                  top: 0,
+                  child: GestureDetector(
+                    onTap: onCenter,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: _fab,
+                      height: _fab,
+                      decoration: BoxDecoration(
+                        color: tint,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppTheme.canvas, width: 3.5),
+                        boxShadow: AppTheme.dark
+                            ? null
+                            : const [
+                                BoxShadow(
+                                  color: Color(0x1A101828),
+                                  blurRadius: 12,
+                                  offset: Offset(0, 4),
                                 ),
-                              ),
-                            ],
-                          ),
+                              ],
+                      ),
+                      child: centerLabel == null
+                          ? Icon(centerIcon, size: 25, color: Colors.white)
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(centerIcon, size: 22, color: Colors.white),
+                                Text(
+                                  centerLabel!,
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.2,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
