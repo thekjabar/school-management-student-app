@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
+import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import 'children_tab.dart';
@@ -75,7 +76,7 @@ class _DayTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Loader<HouseholdDay>(
       tint: Role.parent.tint,
-      padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 24),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 24)),
       load: () => ParentApi.instance.householdDay(),
       builder: (context, day) => _Day(day: day),
     );
@@ -371,7 +372,7 @@ class _FamilyTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Loader<(HouseholdOverview, HouseholdConflicts)>(
       tint: Role.parent.tint,
-      padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 24),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 24)),
       load: () async {
         final r = await Future.wait<Object?>([
           ParentApi.instance.household(),

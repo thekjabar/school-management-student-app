@@ -10,6 +10,7 @@ import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/format.dart';
+import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/nav_glyphs.dart';
 import '../../ui/pickers.dart';
@@ -658,7 +659,7 @@ class _HomeSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18),
+      padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
       physics: const NeverScrollableScrollPhysics(),
       children: [
         const _Block(height: 92),

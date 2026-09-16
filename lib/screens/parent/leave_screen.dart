@@ -79,7 +79,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
                   Loader<List<LeaveRequestItem>>(
                     key: _loaderKey,
                     tint: tint,
-                    padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 90),
+                    padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 90)),
                     load: () async {
                       final all = await ParentApi.instance.leaveRequests();
                       return all
@@ -104,7 +104,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
                   ),
                   PositionedDirectional(
                     end: kGutter,
-                    bottom: 16,
+                    bottom: 16 + MediaQuery.paddingOf(context).bottom,
                     child: _AskButton(onTap: _ask),
                   ),
                 ],

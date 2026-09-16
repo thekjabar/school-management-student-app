@@ -342,7 +342,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Loader<({bool alreadyTaken, List<RegisterMark> marks})>(
                   key: _loaderKey,
                   tint: Role.teacher.tint,
-                  padding: const EdgeInsets.symmetric(horizontal: kGutter),
+                  padding: withBottomInset(context, const EdgeInsets.symmetric(horizontal: kGutter)),
                   load: () async {
                     final data = await TeacherApi.instance.register(
                       widget.slot.classId,
