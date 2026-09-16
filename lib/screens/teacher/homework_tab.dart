@@ -411,68 +411,64 @@ class _SetSheetState extends State<_SetSheet> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Expanded(child: _Label(t('teacher.due'))),
+                    const SizedBox(width: 12),
+                    Expanded(child: _Label(t('teacher.howLong'))),
+                  ],
+                ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _Label(t('teacher.due')),
-                          GestureDetector(
-                            onTap: () async {
-                              final picked = await pickDate(
-                                context,
-                                initial: _due,
-                                first: DateTime.now(),
-                                last: DateTime.now().add(const Duration(days: 180)),
-                                tint: Role.teacher.tint,
-                              );
-                              if (picked != null) setState(() => _due = picked);
-                            },
-                            child: Container(
-                              height: 48,
-                              padding: const EdgeInsets.symmetric(horizontal: 14),
-                              decoration: BoxDecoration(
-                                color: AppTheme.surface,
-                                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                                border: Border.all(color: AppTheme.border),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.calendar_today_rounded, size: 15, color: AppTheme.textFaint),
-                                  const SizedBox(width: 9),
-                                  Text(
-                                    shortDate(_due),
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                                  ),
-                                ],
-                              ),
-                            ),
+                      child: GestureDetector(
+                        onTap: () async {
+                          final picked = await pickDate(
+                            context,
+                            initial: _due,
+                            first: DateTime.now(),
+                            last: DateTime.now().add(const Duration(days: 180)),
+                            tint: Role.teacher.tint,
+                          );
+                          if (picked != null) setState(() => _due = picked);
+                        },
+                        child: Container(
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surface,
+                            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                            border: Border.all(color: AppTheme.border),
                           ),
-                        ],
+                          child: Row(
+                            children: [
+                              Icon(Icons.calendar_today_rounded, size: 15, color: AppTheme.textFaint),
+                              const SizedBox(width: 9),
+                              Text(
+                                shortDate(_due),
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _Label(t('teacher.howLong')),
-                          PickerField(
-                            label: '',
-                            value: tn('teacher.minutes', _minutes),
-                            onTap: () async {
-                              final picked = await pickOne<int>(
-                                context,
-                                title: t('teacher.howLong'),
-                                tint: Role.teacher.tint,
-                                selected: _minutes,
-                                options: const [15, 20, 30, 45, 60, 90]
-                                    .map((m) => PickOption(value: m, label: tn('teacher.minutes', m)))
-                                    .toList(),
-                              );
-                              if (picked != null) setState(() => _minutes = picked);
-                            },
-                          ),
-                        ],
+                      child: PickerField(
+                        label: '',
+                        value: tn('teacher.minutes', _minutes),
+                        onTap: () async {
+                          final picked = await pickOne<int>(
+                            context,
+                            title: t('teacher.howLong'),
+                            tint: Role.teacher.tint,
+                            selected: _minutes,
+                            options: const [15, 20, 30, 45, 60, 90]
+                                .map((m) => PickOption(value: m, label: tn('teacher.minutes', m)))
+                                .toList(),
+                          );
+                          if (picked != null) setState(() => _minutes = picked);
+                        },
                       ),
                     ),
                   ],

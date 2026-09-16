@@ -575,68 +575,64 @@ class _NewExamSheetState extends State<_NewExamSheet> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Expanded(child: _Label(t('teacher.dueDate'))),
+                    const SizedBox(width: 12),
+                    Expanded(child: _Label(t('teacher.outOf'))),
+                  ],
+                ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _Label(t('teacher.dueDate')),
-                          GestureDetector(
-                            onTap: () async {
-                              final picked = await pickDate(
-                                context,
-                                initial: _date,
-                                first: DateTime.now().subtract(const Duration(days: 30)),
-                                last: DateTime.now().add(const Duration(days: 180)),
-                                tint: Role.teacher.tint,
-                              );
-                              if (picked != null) setState(() => _date = picked);
-                            },
-                            child: Container(
-                              height: 48,
-                              padding: const EdgeInsets.symmetric(horizontal: 14),
-                              decoration: BoxDecoration(
-                                color: AppTheme.surface,
-                                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                                border: Border.all(color: AppTheme.border),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.calendar_today_rounded, size: 15, color: AppTheme.textFaint),
-                                  const SizedBox(width: 9),
-                                  Text(
-                                    shortDate(_date),
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                                  ),
-                                ],
-                              ),
-                            ),
+                      child: GestureDetector(
+                        onTap: () async {
+                          final picked = await pickDate(
+                            context,
+                            initial: _date,
+                            first: DateTime.now().subtract(const Duration(days: 30)),
+                            last: DateTime.now().add(const Duration(days: 180)),
+                            tint: Role.teacher.tint,
+                          );
+                          if (picked != null) setState(() => _date = picked);
+                        },
+                        child: Container(
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surface,
+                            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                            border: Border.all(color: AppTheme.border),
                           ),
-                        ],
+                          child: Row(
+                            children: [
+                              Icon(Icons.calendar_today_rounded, size: 15, color: AppTheme.textFaint),
+                              const SizedBox(width: 9),
+                              Text(
+                                shortDate(_date),
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _Label(t('teacher.outOf')),
-                          PickerField(
-                            label: '',
-                            value: '$_maxScore',
-                            onTap: () async {
-                              final picked = await pickOne<int>(
-                                context,
-                                title: t('teacher.outOf'),
-                                tint: Role.teacher.tint,
-                                selected: _maxScore,
-                                options: const [10, 20, 25, 50, 100]
-                                    .map((m) => PickOption(value: m, label: '$m'))
-                                    .toList(),
-                              );
-                              if (picked != null) setState(() => _maxScore = picked);
-                            },
-                          ),
-                        ],
+                      child: PickerField(
+                        label: '',
+                        value: '$_maxScore',
+                        onTap: () async {
+                          final picked = await pickOne<int>(
+                            context,
+                            title: t('teacher.outOf'),
+                            tint: Role.teacher.tint,
+                            selected: _maxScore,
+                            options: const [10, 20, 25, 50, 100]
+                                .map((m) => PickOption(value: m, label: '$m'))
+                                .toList(),
+                          );
+                          if (picked != null) setState(() => _maxScore = picked);
+                        },
                       ),
                     ),
                   ],
