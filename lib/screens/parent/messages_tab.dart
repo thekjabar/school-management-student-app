@@ -150,6 +150,7 @@ class _MessagesTabState extends State<MessagesTab> {
       await ParentApi.instance.markAnnouncementRead(item.id);
       if (!mounted) return;
       setState(() => _sending.remove(item.id));
+      widget.onRead();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -192,6 +193,7 @@ class _MessagesTabState extends State<MessagesTab> {
         _sending.removeAll(ids);
       });
       final total = marked.fold<int>(0, (sum, n) => sum + n);
+      widget.onRead();
       if (total > 0) showNote(context, tn('msg.markedRead', total));
     } catch (e) {
       if (!mounted) return;

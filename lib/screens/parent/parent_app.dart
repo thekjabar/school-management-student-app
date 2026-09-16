@@ -400,6 +400,7 @@ class _ParentAppState extends State<ParentApp>
             _navKeys[i].currentState?.popUntil((r) => r.isFirst);
           } else {
             setState(() => _tab = i);
+            unawaited(_refreshUnread());
           }
         },
         centerIcon: Icons.add_rounded,
