@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api/client.dart';
-import '../../api/parent_api.dart' show AiAnswer;
+import '../../api/parent_api.dart' show AiAnswer, AiHistoryRow;
 import '../../api/teacher_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
@@ -21,7 +23,8 @@ class TeacherAssistantScreen extends StatefulWidget {
 
 class _TeacherAssistantScreenState extends State<TeacherAssistantScreen> {
   final _text = TextEditingController();
-  final _turns = <AssistantTurn>[];
+  final _past = <AiHistoryRow>[];
+  final _answers = <String, String?>{};
 
   int _tab = 0;
   bool _busy = false;
@@ -33,11 +36,105 @@ class _TeacherAssistantScreenState extends State<TeacherAssistantScreen> {
   ClassStudent? _student;
   List<ClassStudent> _students = const [];
 
+  String? _only;
+  String? _cursor;
+  bool _hasMore = false;
+  bool _loadingPast = true;
+  bool _loadingOlder = false;
+  String? _pastFailed;
+  String? _openId;
+  String? _opening;
+  int _round = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadPast());
+  }
+
   @override
   void dispose() {
     _text.dispose();
     super.dispose();
   }
+
+  Future<void> _loadPast() async {
+    final round = ++_round;
+    setState(() {
+      _loadingPast = true;
+      _pastFailed = null;
+    });
+    try {
+      final page = await TeacherApi.instance.aiHistory(classId: _only);
+      if (!mounted || round != _round) return;
+      setState(() {
+        _past
+          ..clear()
+          ..addAll(page.rows);
+        _cursor = page.nextCursor;
+        _hasMore = page.hasMore;
+        _loadingPast = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted || round != _round) return;
+      setState(() {
+        _loadingPast = false;
+        _pastFailed = e.message;
+      });
+    }
+  }
+
+  Future<void> _loadOlder() async {
+    final cursor = _cursor;
+    if (cursor == null || _loadingOlder || !_hasMore) return;
+    final round = _round;
+    setState(() => _loadingOlder = true);
+    try {
+      final page = await TeacherApi.instance.aiHistory(classId: _only, after: cursor);
+      if (!mounted || round != _round) return;
+      setState(() {
+        final seen = _past.map((r) => r.id).toSet();
+        _past.addAll(page.rows.where((r) => seen.add(r.id)));
+        _cursor = page.nextCursor;
+        _hasMore = page.hasMore;
+      });
+    } on ApiException catch (e) {
+      if (mounted) showNote(context, e.message, bad: true);
+    }
+    if (mounted && round == _round) setState(() => _loadingOlder = false);
+  }
+
+  Future<void> _open(String id) async {
+    if (_openId == id) {
+      setState(() => _openId = null);
+      return;
+    }
+    setState(() => _openId = id);
+    if (_answers.containsKey(id)) return;
+    setState(() => _opening = id);
+    try {
+      final entry = await TeacherApi.instance.aiHistoryEntry(id);
+      if (!mounted) return;
+      setState(() => _answers[id] = entry.answer);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showNote(context, e.message, bad: true);
+      setState(() => _openId = null);
+    }
+    if (mounted) setState(() => _opening = null);
+  }
+
+  void _filterBy(String? classId) {
+    if (_only == classId) return;
+    setState(() {
+      _only = classId;
+      _openId = null;
+    });
+    unawaited(_loadPast());
+  }
+
+  bool _nearEnd(ScrollNotification note) =>
+      note.metrics.maxScrollExtent - note.metrics.pixels < 260;
 
   bool get _ready {
     if (_text.text.trim().isEmpty) return false;
@@ -119,18 +216,12 @@ class _TeacherAssistantScreenState extends State<TeacherAssistantScreen> {
       };
       if (!mounted) return;
       setState(() {
-        _turns.insert(
-          0,
-          AssistantTurn(
-            question: asked,
-            answer: answer.answer,
-            ok: answer.ok,
-            icon: _iconFor(kind),
-          ),
-        );
         _text.clear();
         _apply(answer);
       });
+      await _loadPast();
+      final newest = _past.isEmpty ? null : _past.first;
+      if (newest != null && mounted) await _open(newest.id);
     } on ApiException catch (e) {
       if (mounted) showNote(context, e.message, bad: true);
     }
@@ -141,12 +232,6 @@ class _TeacherAssistantScreenState extends State<TeacherAssistantScreen> {
     if (answer.remaining != null) _remaining = answer.remaining!;
     if (answer.resetsOn != null) _resetsOn = answer.resetsOn;
   }
-
-  static IconData _iconFor(int tab) => switch (tab) {
-        1 => Icons.groups_outlined,
-        2 => Icons.person_search_outlined,
-        _ => Icons.edit_note_outlined,
-      };
 
   @override
   Widget build(BuildContext context) {
@@ -160,110 +245,129 @@ class _TeacherAssistantScreenState extends State<TeacherAssistantScreen> {
           children: [
             ScreenHeader(title: t('tai.title')),
             Expanded(
-              child: Loader<AiTeacherOverview>(
-                tint: tint,
-                padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 28),
-                load: TeacherApi.instance.aiOverview,
-                builder: (context, overview) {
-                  if (!overview.available) {
-                    return AssistantQuiet(icon: Icons.cloud_off_rounded, text: t('tai.unavailable'));
-                  }
-                  _limitsFrom(overview);
-                  final spent = _remaining <= 0;
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (note) {
+                  if (_nearEnd(note)) unawaited(_loadOlder());
+                  return false;
+                },
+                child: Loader<AiTeacherOverview>(
+                  tint: tint,
+                  padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 28),
+                  load: TeacherApi.instance.aiOverview,
+                  builder: (context, overview) {
+                    if (!overview.available) {
+                      return AssistantQuiet(icon: Icons.cloud_off_rounded, text: t('tai.unavailable'));
+                    }
+                    _limitsFrom(overview);
+                    final spent = _remaining <= 0;
 
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      PillTabs(
-                        tint: tint,
-                        index: _tab,
-                        onChanged: (i) => setState(() => _tab = i),
-                        tabs: [
-                          TabSpec(label: t('tai.tab.question'), icon: Icons.edit_note_outlined),
-                          TabSpec(label: t('tai.tab.classReport'), icon: Icons.groups_outlined),
-                          TabSpec(label: t('tai.tab.studentReport'), icon: Icons.person_search_outlined),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _leadFor(_tab),
-                        style: TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.textMuted),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_tab > 0)
-                        overview.classes.isEmpty
-                            ? AssistantQuiet(icon: Icons.groups_outlined, text: t('tai.noClasses'))
-                            : Card16(
-                                child: Column(
-                                  children: [
-                                    _ChooserRow(
-                                      icon: Icons.groups_rounded,
-                                      label: t('tai.pickClass'),
-                                      value: _class?.name,
-                                      onTap: () => _pickClass(overview.classes),
-                                    ),
-                                    if (_tab == 2) ...[
-                                      Divider(height: 18, color: AppTheme.border),
-                                      _ChooserRow(
-                                        icon: Icons.person_outline_rounded,
-                                        label: t('tai.pickStudent'),
-                                        value: _student?.name,
-                                        onTap: _students.isEmpty ? null : _pickStudent,
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                      if (_tab > 0) const SizedBox(height: kCardGap),
-                      Card16(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            AssistantField(
-                              controller: _text,
-                              hint: _hintFor(_tab),
-                              enabled: !_busy && !spent,
-                              onChanged: (_) => setState(() {}),
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    teacherAllowanceLine(_remaining, overview.limit, _resetsOn),
-                                    style: TextStyle(fontSize: 11.5, height: 1.4, color: AppTheme.textFaint),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                FilledButton(
-                                  onPressed: _busy || spent || !_ready ? null : _ask,
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: tint,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
-                                  ),
-                                  child: Text(_busy ? t('tai.thinking') : t('tai.ask')),
-                                ),
-                              ],
-                            ),
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        PillTabs(
+                          tint: tint,
+                          index: _tab,
+                          onChanged: (i) => setState(() => _tab = i),
+                          tabs: [
+                            TabSpec(label: t('tai.tab.question'), icon: Icons.edit_note_outlined),
+                            TabSpec(label: t('tai.tab.classReport'), icon: Icons.groups_outlined),
+                            TabSpec(label: t('tai.tab.studentReport'), icon: Icons.person_search_outlined),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: kCardGap),
-                      if (_turns.isEmpty)
-                        AssistantQuiet(
-                          icon: Icons.auto_awesome_outlined,
-                          text: t('tai.nothingAsked'),
-                          note: t('tai.scopeNote'),
-                        )
-                      else
-                        for (final turn in _turns) ...[
-                          AssistantTurnCard(turn: turn),
-                          const SizedBox(height: kCardGap),
+                        const SizedBox(height: 12),
+                        Text(
+                          _leadFor(_tab),
+                          style: TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.textMuted),
+                        ),
+                        const SizedBox(height: 12),
+                        if (_tab > 0)
+                          overview.classes.isEmpty
+                              ? AssistantQuiet(icon: Icons.groups_outlined, text: t('tai.noClasses'))
+                              : Card16(
+                                  child: Column(
+                                    children: [
+                                      _ChooserRow(
+                                        icon: Icons.groups_rounded,
+                                        label: t('tai.pickClass'),
+                                        value: _class?.name,
+                                        onTap: () => _pickClass(overview.classes),
+                                      ),
+                                      if (_tab == 2) ...[
+                                        Divider(height: 18, color: AppTheme.border),
+                                        _ChooserRow(
+                                          icon: Icons.person_outline_rounded,
+                                          label: t('tai.pickStudent'),
+                                          value: _student?.name,
+                                          onTap: _students.isEmpty ? null : _pickStudent,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                        if (_tab > 0) const SizedBox(height: kCardGap),
+                        Card16(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AssistantField(
+                                controller: _text,
+                                hint: _hintFor(_tab),
+                                enabled: !_busy && !spent,
+                                onChanged: (_) => setState(() {}),
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      teacherAllowanceLine(_remaining, overview.limit, _resetsOn),
+                                      style: TextStyle(fontSize: 11.5, height: 1.4, color: AppTheme.textFaint),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  FilledButton(
+                                    onPressed: _busy || spent || !_ready ? null : _ask,
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: tint,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+                                    ),
+                                    child: Text(_busy ? t('tai.thinking') : t('tai.ask')),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: kCardGap),
+                        Text(
+                          t('aih.past'),
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.text),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          t('aih.note'),
+                          style: TextStyle(fontSize: 11.5, height: 1.45, color: AppTheme.textFaint),
+                        ),
+                        if (overview.classes.length > 1) ...[
+                          const SizedBox(height: 10),
+                          AssistantFilterPills(
+                            tint: tint,
+                            selected: _only,
+                            onChanged: _filterBy,
+                            choices: [
+                              AssistantFilterChoice(value: null, label: t('aih.allClasses')),
+                              for (final c in overview.classes)
+                                AssistantFilterChoice(value: c.classId, label: c.name),
+                            ],
+                          ),
                         ],
-                    ],
-                  );
-                },
+                        const SizedBox(height: 12),
+                        ..._pastCards(),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
           ],
@@ -271,6 +375,51 @@ class _TeacherAssistantScreenState extends State<TeacherAssistantScreen> {
       ),
     );
   }
+
+  List<Widget> _pastCards() {
+    final failed = _pastFailed;
+    if (failed != null) {
+      return [AssistantQuiet(icon: Icons.wifi_off_rounded, text: t('aih.failed'), note: failed)];
+    }
+    if (_loadingPast) return [const AssistantWaitingLine()];
+    if (_past.isEmpty) {
+      return [
+        AssistantQuiet(
+          icon: Icons.auto_awesome_outlined,
+          text: t('tai.nothingAsked'),
+          note: t('tai.scopeNote'),
+        ),
+      ];
+    }
+
+    return [
+      for (final row in _past) ...[
+        AssistantHistoryCard(
+          row: row,
+          kindLabel: _kindLabel(row.kind),
+          icon: _kindIcon(row.kind),
+          open: _openId == row.id,
+          loading: _opening == row.id,
+          answer: _answers[row.id],
+          onTap: () => _open(row.id),
+        ),
+        const SizedBox(height: kCardGap),
+      ],
+      if (_hasMore) const AssistantWaitingLine(),
+    ];
+  }
+
+  static String _kindLabel(String kind) => switch (kind) {
+        'CLASS_REPORT' => t('tai.tab.classReport'),
+        'CHILD_REPORT' => t('tai.tab.studentReport'),
+        _ => t('tai.tab.question'),
+      };
+
+  static IconData _kindIcon(String kind) => switch (kind) {
+        'CLASS_REPORT' => Icons.groups_outlined,
+        'CHILD_REPORT' => Icons.person_search_outlined,
+        _ => Icons.edit_note_outlined,
+      };
 
   void _limitsFrom(AiTeacherOverview overview) {
     if (_seeded) return;

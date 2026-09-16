@@ -2753,6 +2753,21 @@ class ParentApi {
     return AiAnswer.fromJson((json as Map).cast<String, dynamic>());
   }
 
+  Future<AiHistoryPage> aiHistory({String? studentId, String? after}) async {
+    final query = <String>[
+      if (studentId != null && studentId.isNotEmpty) 'studentId=${Uri.encodeQueryComponent(studentId)}',
+      if (after != null && after.isNotEmpty) 'after=${Uri.encodeQueryComponent(after)}',
+    ];
+    final path = '/parent/ai/history${query.isEmpty ? '' : '?${query.join('&')}'}';
+    final json = await _api.get(path) as Map<String, dynamic>;
+    return AiHistoryPage.fromJson(json);
+  }
+
+  Future<AiHistoryEntry> aiHistoryEntry(String id) async {
+    final json = await _api.get('/parent/ai/history/$id') as Map<String, dynamic>;
+    return AiHistoryEntry.fromJson(json);
+  }
+
   Future<Map<String, dynamic>> raiseConcern({
     required String studentId,
     required String urgency,
@@ -3578,6 +3593,98 @@ class AiAnswer {
         answer: (j['answer'] ?? '') as String,
         remaining: (j['remaining'] as num?)?.toInt(),
         resetsOn: j['resetsOn'] as String?,
+      );
+}
+
+class AiNamed {
+  AiNamed({required this.id, required this.name, required this.names});
+
+  final String id;
+  final String name;
+  final LocalText names;
+
+  String get label => names.pick(name);
+
+  static AiNamed? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final id = (raw['studentId'] ?? raw['id'] ?? '') as String;
+    if (id.isEmpty) return null;
+    return AiNamed(
+      id: id,
+      name: (raw['name'] ?? '') as String,
+      names: LocalText.fromJson(raw['names']),
+    );
+  }
+}
+
+class AiHistoryRow {
+  AiHistoryRow({
+    required this.id,
+    required this.at,
+    required this.kind,
+    required this.outcome,
+    required this.lang,
+    required this.question,
+    required this.truncated,
+    required this.person,
+    required this.schoolClass,
+    required this.subject,
+  });
+
+  final String id;
+  final DateTime? at;
+  final String kind;
+  final String outcome;
+  final String lang;
+  final String question;
+  final bool truncated;
+  final AiNamed? person;
+  final AiNamed? schoolClass;
+  final AiNamed? subject;
+
+  bool get answered => outcome == 'ANSWERED';
+
+  factory AiHistoryRow.fromJson(Map<String, dynamic> j) => AiHistoryRow(
+        id: (j['id'] ?? '') as String,
+        at: DateTime.tryParse((j['at'] ?? '') as String)?.toLocal(),
+        kind: (j['kind'] ?? '') as String,
+        outcome: (j['outcome'] ?? '') as String,
+        lang: (j['lang'] ?? '') as String,
+        question: (j['question'] ?? '') as String,
+        truncated: (j['truncated'] ?? false) as bool,
+        person: AiNamed.fromJson(j['child'] ?? j['pupil']),
+        schoolClass: AiNamed.fromJson(j['schoolClass']),
+        subject: AiNamed.fromJson(j['subject']),
+      );
+}
+
+class AiHistoryEntry {
+  AiHistoryEntry({required this.row, required this.answer});
+
+  final AiHistoryRow row;
+  final String? answer;
+
+  factory AiHistoryEntry.fromJson(Map<String, dynamic> j) => AiHistoryEntry(
+        row: AiHistoryRow.fromJson(j),
+        answer: j['answer'] as String?,
+      );
+}
+
+class AiHistoryPage {
+  const AiHistoryPage({required this.rows, required this.nextCursor, required this.hasMore});
+
+  final List<AiHistoryRow> rows;
+  final String? nextCursor;
+  final bool hasMore;
+
+  static const empty = AiHistoryPage(rows: [], nextCursor: null, hasMore: false);
+
+  factory AiHistoryPage.fromJson(Map<String, dynamic> j) => AiHistoryPage(
+        rows: ((j['rows'] as List?) ?? const [])
+            .map((e) => AiHistoryRow.fromJson((e as Map).cast<String, dynamic>()))
+            .toList(),
+        nextCursor: j['nextCursor'] as String?,
+        hasMore: (j['hasMore'] ?? false) as bool,
       );
 }
 

@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart' show Uint8List, ValueNotifier;
 
 import 'attachments.dart';
 import 'client.dart';
-import 'parent_api.dart' show AiAnswer, Announcement;
+import 'parent_api.dart' show AiAnswer, AiHistoryEntry, AiHistoryPage, Announcement;
 
 class AiTeacherClass {
   AiTeacherClass({
@@ -502,6 +502,21 @@ class TeacherApi {
       'question': question.trim(),
     });
     return AiAnswer.fromJson((json as Map).cast<String, dynamic>());
+  }
+
+  Future<AiHistoryPage> aiHistory({String? classId, String? after}) async {
+    final query = <String>[
+      if (classId != null && classId.isNotEmpty) 'classId=${Uri.encodeQueryComponent(classId)}',
+      if (after != null && after.isNotEmpty) 'after=${Uri.encodeQueryComponent(after)}',
+    ];
+    final path = '/teacher/ai/history${query.isEmpty ? '' : '?${query.join('&')}'}';
+    final json = await _api.get(path) as Map<String, dynamic>;
+    return AiHistoryPage.fromJson(json);
+  }
+
+  Future<AiHistoryEntry> aiHistoryEntry(String id) async {
+    final json = await _api.get('/teacher/ai/history/$id') as Map<String, dynamic>;
+    return AiHistoryEntry.fromJson(json);
   }
 
   Future<TeacherProfile> me() async =>
