@@ -14,7 +14,7 @@ void main() {
   SharedPreferences.setMockInitialValues({});
 
   setUpAll(() async {
-    final r = await Session.instance.signIn('07511100001', 'School@123');
+    final r = await Session.instance.signIn('07503000002', 'School@123');
     expect(r.me.role, 'TEACHER');
   });
 

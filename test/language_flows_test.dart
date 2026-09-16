@@ -16,7 +16,7 @@ import 'package:student_app/api/parent_api.dart';
 import 'package:student_app/api/session.dart';
 import 'package:student_app/i18n/strings.dart';
 
-const _phone = '07501100001';
+const _phone = '07501190001';
 const _password = 'School@123';
 
 void main() {

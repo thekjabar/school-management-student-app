@@ -28,7 +28,7 @@ void main() {
   late TeachingSlot slot;
 
   setUpAll(() async {
-    final r = await Session.instance.signIn('07511100001', 'School@123');
+    final r = await Session.instance.signIn('07503000002', 'School@123');
     expect(r.me.role, 'TEACHER');
     final classes = await TeacherApi.instance.classes();
     expect(classes, isNotEmpty, reason: 'this teacher takes no classes');

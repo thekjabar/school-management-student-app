@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:student_app/api/crew_api.dart';
 import 'package:student_app/api/session.dart';
 
-const phone = '07701100001';
+const phone = '07503000173';
 const password = 'School@123';
 
 void main() {
