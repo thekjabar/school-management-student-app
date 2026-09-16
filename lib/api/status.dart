@@ -105,7 +105,7 @@ class PlatformStatusService {
 
   String? get dismissedId => _dismissedId;
 
-  DateTime? _asked;
+  DateTime? _rechecked;
 
   Future<void>? _asking;
 
@@ -139,8 +139,10 @@ class PlatformStatusService {
   }
 
   void recheckAfterFailure() {
-    final last = _asked;
-    if (last != null && DateTime.now().difference(last) < quietPeriod) return;
+    final last = _rechecked;
+    final now = DateTime.now();
+    if (last != null && now.difference(last) < quietPeriod) return;
+    _rechecked = now;
     unawaited(refresh());
   }
 
@@ -155,7 +157,6 @@ class PlatformStatusService {
   }
 
   Future<void> _ask() async {
-    _asked = DateTime.now();
     try {
       final res = await _http
           .get(_endpoint(), headers: {'X-Status-Key': _key})
@@ -188,7 +189,7 @@ class PlatformStatusService {
     _app = '';
     _key = kStatusKey;
     _dismissedId = null;
-    _asked = null;
+    _rechecked = null;
     _asking = null;
   }
 }
