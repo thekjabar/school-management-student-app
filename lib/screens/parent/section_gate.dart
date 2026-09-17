@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../api/parent_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
+import '../../ui/assistant_kit.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/insets.dart';
 import '../../ui/kit.dart';
@@ -16,6 +17,8 @@ enum SectionFrame { screen, page, inline }
 PackageEntitlements get _now => Entitlements.instance.current.value;
 
 bool sectionLocked(String childId, String section) => _now.isLocked(childId, section);
+
+bool sectionAtThisStage(String childId, String section) => _now.applies(childId, section);
 
 Future<T?> openSection<T>(
   BuildContext context, {
@@ -222,6 +225,7 @@ class _GateState extends State<_Gate> {
       builder: (context, now, _) => switch (widget.access(now)) {
         SectionAccess.open => widget.builder(context),
         SectionAccess.locked => _frame(LockedSectionPanel(section: widget.section)),
+        SectionAccess.hidden => _frame(AssistantQuiet(icon: Icons.child_care_rounded, text: t('section.notAtThisStage'))),
         SectionAccess.unknown => _frame(
             _failed && !_checking
                 ? _CouldNotCheck(onRetry: _check)

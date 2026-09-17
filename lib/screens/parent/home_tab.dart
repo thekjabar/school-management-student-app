@@ -40,7 +40,8 @@ class HomeTab extends StatelessWidget {
     return ValueListenableBuilder<PackageEntitlements>(
       valueListenable: Entitlements.instance.current,
       builder: (context, ent, _) {
-        bool shut(String section) => ent.access(child.studentId, section) != SectionAccess.open;
+        bool shut(String section) => ent.access(child.studentId, section) == SectionAccess.locked;
+        bool away(String section) => ent.access(child.studentId, section) == SectionAccess.hidden;
 
         void open(String section, WidgetBuilder builder) => openSection<void>(
               context,
@@ -49,7 +50,7 @@ class HomeTab extends StatelessWidget {
               builder: builder,
             );
 
-        QuickAction action({
+        QuickAction? action({
           required IconData icon,
           required String label,
           required Color color,
@@ -57,14 +58,16 @@ class HomeTab extends StatelessWidget {
           required WidgetBuilder builder,
           Widget Function(Color colour, double size)? glyph,
         }) =>
-            QuickAction(
-              icon: icon,
-              glyph: glyph,
-              label: label,
-              locked: shut(section),
-              color: color,
-              onTap: () => open(section, builder),
-            );
+            away(section)
+                ? null
+                : QuickAction(
+                    icon: icon,
+                    glyph: glyph,
+                    label: label,
+                    locked: shut(section),
+                    color: color,
+                    onTap: () => open(section, builder),
+                  );
 
         return Loader<_Home>(
           tint: Role.parent.tint,
@@ -99,7 +102,7 @@ class HomeTab extends StatelessWidget {
               Rise(
                 index: 1,
                 child: QuickActions(
-                  actions: [
+                  actions: <QuickAction?>[
                     QuickAction(
                       icon: Icons.videocam_outlined,
                       label: t('quick.liveVideo'),
@@ -207,11 +210,12 @@ class HomeTab extends StatelessWidget {
                       section: ParentSection.driverFeedback,
                       builder: (_) => DriverFeedbackScreen(child: child),
                     ),
-                  ],
+                  ].nonNulls.toList(),
                 ),
               ),
               const SizedBox(height: kCardGap),
 
+              if (!away(ParentSection.timetable)) ...[
               Rise(
                 index: 2,
                 child: shut(ParentSection.timetable)
@@ -256,7 +260,9 @@ class HomeTab extends StatelessWidget {
                       ),
               ),
               const SizedBox(height: kCardGap),
+              ],
 
+              if (!away(ParentSection.marks)) ...[
               Rise(
                 index: 3,
                 child: shut(ParentSection.calendar)
@@ -267,6 +273,7 @@ class HomeTab extends StatelessWidget {
                     : _ExamsCard(exams: home.exams, onSeeAll: () => onOpenTab(2)),
               ),
               const SizedBox(height: kCardGap),
+              ],
 
               Rise(
                 index: 4,

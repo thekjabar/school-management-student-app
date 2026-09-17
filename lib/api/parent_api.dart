@@ -3725,7 +3725,7 @@ abstract final class ParentSection {
   static const dropoff = 'parent.dropoff';
 }
 
-enum SectionAccess { open, locked, unknown }
+enum SectionAccess { open, locked, hidden, unknown }
 
 class PackageEntitlements {
   const PackageEntitlements({
@@ -3734,6 +3734,7 @@ class PackageEntitlements {
     required this.names,
     required this.blurbs,
     required this.lockedByChild,
+    required this.sectionsByChild,
   });
 
   final bool loaded;
@@ -3746,16 +3747,26 @@ class PackageEntitlements {
 
   final Map<String, Set<String>> lockedByChild;
 
+  final Map<String, Set<String>> sectionsByChild;
+
   static const PackageEntitlements none = PackageEntitlements(
     loaded: false,
     paidSections: <String>{},
     names: <String, Map<String, String>>{},
     blurbs: <String, Map<String, String>>{},
     lockedByChild: <String, Set<String>>{},
+    sectionsByChild: <String, Set<String>>{},
   );
+
+  bool applies(String childId, String sectionKey) {
+    final mine = sectionsByChild[childId];
+    if (mine == null || mine.isEmpty) return true;
+    return mine.contains(sectionKey);
+  }
 
   SectionAccess access(String childId, String sectionKey) {
     if (!loaded) return SectionAccess.unknown;
+    if (!applies(childId, sectionKey)) return SectionAccess.hidden;
     if (!paidSections.contains(sectionKey)) return SectionAccess.open;
     final locked = lockedByChild[childId];
     if (locked == null || locked.contains(sectionKey)) return SectionAccess.locked;
@@ -3775,7 +3786,8 @@ class PackageEntitlements {
       for (final key in paidSections)
         if (isLocked(childId, key)) key,
     ]..sort();
-    return '$loaded|${locked.join(',')}';
+    final mine = [...?sectionsByChild[childId]]..sort();
+    return '$loaded|${locked.join(',')}|${mine.join(',')}';
   }
 
   String? nameFor(String sectionKey, String lang) =>
@@ -3804,12 +3816,17 @@ class PackageEntitlements {
     }
 
     final locked = <String, Set<String>>{};
+    final mine = <String, Set<String>>{};
     for (final raw in (j['children'] as List?) ?? const []) {
       final c = raw as Map<String, dynamic>;
       final id = (c['studentId'] ?? '') as String;
       if (id.isEmpty) continue;
       locked[id] = {
         for (final k in (c['lockedSections'] as List?) ?? const [])
+          if (k is String) k,
+      };
+      mine[id] = {
+        for (final k in (c['sections'] as List?) ?? const [])
           if (k is String) k,
       };
     }
@@ -3820,6 +3837,7 @@ class PackageEntitlements {
       names: names,
       blurbs: blurbs,
       lockedByChild: locked,
+      sectionsByChild: mine,
     );
   }
 
@@ -3829,6 +3847,7 @@ class PackageEntitlements {
         names: names,
         blurbs: blurbs,
         lockedByChild: {...other.lockedByChild, ...lockedByChild},
+        sectionsByChild: {...other.sectionsByChild, ...sectionsByChild},
       );
 }
 
