@@ -79,7 +79,7 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
               child: Loader<List<ConcernStatus>>(
                 key: _loaderKey,
                 tint: tint,
-                padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 96),
+                padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 96)),
                 load: () => ParentApi.instance.concerns(
                       studentId: widget.child.studentId,
                       topic: 'PICKUP_ARRANGEMENT',

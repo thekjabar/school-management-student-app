@@ -42,7 +42,7 @@ class _ExamsTabState extends State<ExamsTab> {
               child: Loader<List<TeacherExam>>(
                 key: _loaderKey,
                 tint: Role.teacher.tint,
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+                padding: withBottomInset(context, const EdgeInsets.fromLTRB(16, 4, 16, 96)),
                 load: () => TeacherApi.instance.exams(),
                 isEmpty: (rows) => rows.isEmpty,
                 empty: t('teacher.noTestsYet'),

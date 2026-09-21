@@ -43,7 +43,7 @@ class _HomeworkTabState extends State<HomeworkTab> {
               child: Loader<List<TeacherHomework>>(
                 key: _loaderKey,
                 tint: Role.teacher.tint,
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+                padding: withBottomInset(context, const EdgeInsets.fromLTRB(16, 4, 16, 96)),
                 load: () => TeacherApi.instance.homework(),
                 isEmpty: (rows) => rows.isEmpty,
                 empty: t('teacher.noHomeworkYet'),

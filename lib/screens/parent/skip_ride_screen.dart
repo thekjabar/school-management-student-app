@@ -85,7 +85,7 @@ class _SkipRideScreenState extends State<SkipRideScreen> {
               child: Loader<List<Map<String, dynamic>>>(
                 key: _loaderKey,
                 tint: tint,
-                padding: const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 96),
+                padding: withBottomInset(context, const EdgeInsets.fromLTRB(kGutter, 4, kGutter, 96)),
                 load: () => ParentApi.instance.skipRides(),
                 isEmpty: (rows) => _mine(rows).isEmpty,
                 empty: tn('skip.none', widget.child.name.split(' ').first),
