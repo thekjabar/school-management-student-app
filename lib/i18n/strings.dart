@@ -141,6 +141,7 @@ const Map<String, String> _en = {
   'login.signIn': 'Sign in',
   'login.forgot': 'Forgotten it? The school office can issue a new one.',
   'login.phoneNeeded': 'Enter the phone number the school has for you.',
+  'login.passwordNeeded': 'Enter your password.',
   'login.choose': 'Choose your own password',
   'login.chooseWhy':
       'The one you were given is known to whoever typed it. Pick something only you know.',
@@ -2427,6 +2428,7 @@ const Map<String, String> _ckb = {
   'login.signIn': 'چوونەژوورەوە',
   'login.forgot': 'لەبیرت چووە؟ نووسینگەی قوتابخانە دەتوانێت یەکی نوێت بداتێ.',
   'login.phoneNeeded': 'ئەو ژمارە مۆبایلە بنووسە کە قوتابخانە هەیەتی.',
+  'login.passwordNeeded': 'وشەی نهێنییەکەت بنووسە.',
   'login.choose': 'وشەیەکی نهێنی تایبەت بە خۆت هەڵبژێرە',
   'login.chooseWhy':
       'ئەوەی پێیان داویت، ئەو کەسەی نووسیویەتی دەیزانێت. شتێک هەڵبژێرە کە تەنها خۆت بزانیت.',
@@ -4710,6 +4712,7 @@ const Map<String, String> _ar = {
   'login.signIn': 'تسجيل الدخول',
   'login.forgot': 'نسيتها؟ يمكن لمكتب المدرسة إصدار واحدة جديدة.',
   'login.phoneNeeded': 'أدخل رقم الهاتف المسجّل لدى المدرسة.',
+  'login.passwordNeeded': 'اكتب كلمة المرور.',
   'login.choose': 'اختر كلمة مرور خاصة بك',
   'login.chooseWhy': 'التي أُعطيت لك يعرفها من كتبها. اختر شيئاً تعرفه أنت وحدك.',
   'login.newPassword': 'كلمة مرور جديدة',

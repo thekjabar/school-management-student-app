@@ -70,6 +70,10 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = t(_phone.text.trim().isEmpty ? 'login.phoneNeeded' : 'phone.invalid'));
       return;
     }
+    if (_password.text.isEmpty) {
+      setState(() => _error = t('login.passwordNeeded'));
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
