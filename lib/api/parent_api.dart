@@ -368,6 +368,70 @@ class MemoryItem {
       );
 }
 
+class NewsPost {
+  NewsPost({
+    required this.id,
+    required this.texts,
+    required this.publishedAt,
+    required this.campusNames,
+    required this.photos,
+  });
+
+  final String id;
+  final LocalText texts;
+  final DateTime? publishedAt;
+  final LocalText campusNames;
+  final List<NewsPhoto> photos;
+
+  String get text => texts.pick(null);
+
+  String? get campusName {
+    final name = campusNames.pick(null);
+    return name.isEmpty ? null : name;
+  }
+
+  factory NewsPost.fromJson(Map<String, dynamic> j) => NewsPost(
+        id: (j['id'] ?? '') as String,
+        texts: LocalText(
+          ckb: j['text'] as String?,
+          ar: j['textAr'] as String?,
+          en: j['textEn'] as String?,
+        ),
+        publishedAt: DateTime.tryParse((j['publishedAt'] ?? '') as String)?.toLocal(),
+        campusNames: LocalText.fromJson(j['campusNames']),
+        photos: ((j['photos'] as List?) ?? const [])
+            .map((e) => NewsPhoto.fromJson(e as Map<String, dynamic>))
+            .toList(growable: false),
+      );
+}
+
+class NewsPhoto {
+  NewsPhoto({
+    required this.id,
+    required this.url,
+    required this.thumbnailUrl,
+    required this.width,
+    required this.height,
+  });
+
+  final String id;
+  final String? url;
+  final String? thumbnailUrl;
+  final int? width;
+  final int? height;
+
+  double get aspect =>
+      (width != null && height != null && height! > 0) ? width! / height! : 1;
+
+  factory NewsPhoto.fromJson(Map<String, dynamic> j) => NewsPhoto(
+        id: (j['id'] ?? '') as String,
+        url: j['url'] as String?,
+        thumbnailUrl: (j['thumbnailUrl'] ?? j['url']) as String?,
+        width: (j['width'] as num?)?.toInt(),
+        height: (j['height'] as num?)?.toInt(),
+      );
+}
+
 class HomeLocation {
   HomeLocation({
     required this.address,
@@ -2339,6 +2403,11 @@ class ParentApi {
     return Paged.from<MemoryAlbum>(json, MemoryAlbum.fromJson).rows;
   }
 
+  Future<List<NewsPost>> news(String studentId) async {
+    final json = await _api.get('/parent/children/$studentId/news?pageSize=24');
+    return Paged.from<NewsPost>(json, NewsPost.fromJson).rows;
+  }
+
   Future<HomeLocation> homeLocation() async {
     final json = await _api.get('/parent/home') as Map<String, dynamic>;
     return HomeLocation.fromJson(json);
@@ -3501,6 +3570,7 @@ class ThreadMessage {
     required this.authorName,
     required this.authorRole,
     required this.body,
+    required this.translatedBody,
     required this.voice,
     required this.systemNote,
     required this.sentAt,
@@ -3512,6 +3582,7 @@ class ThreadMessage {
   final String authorName;
   final String? authorRole;
   final String? body;
+  final String? translatedBody;
   final VoiceNote? voice;
   final bool systemNote;
   final DateTime? sentAt;
@@ -3527,6 +3598,7 @@ class ThreadMessage {
         authorName: (j['authorName'] ?? '') as String,
         authorRole: j['authorRole'] as String?,
         body: j['body'] as String?,
+        translatedBody: j['translatedBody'] as String?,
         voice: j['voice'] == null
             ? null
             : VoiceNote.fromJson(j['voice'] as Map<String, dynamic>),
@@ -3715,6 +3787,7 @@ abstract final class ParentSection {
   static const attitude = 'parent.attitude';
   static const timetable = 'parent.timetable';
   static const memories = 'parent.memories';
+  static const newsFeed = 'parent.newsFeed';
   static const driverFeedback = 'parent.driverFeedback';
   static const calendar = 'parent.calendar';
   static const skipRide = 'parent.skipRide';

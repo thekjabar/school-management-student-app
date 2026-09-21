@@ -12,6 +12,7 @@ import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/screen_kit.dart';
+import '../../ui/translated_body.dart';
 
 const _maxRecording = Duration(minutes: 3);
 
@@ -378,9 +379,10 @@ class _Bubble extends StatelessWidget {
                   if ((message.body ?? '').isNotEmpty)
                     Padding(
                       padding: EdgeInsets.only(top: message.voice != null ? 6 : 0),
-                      child: Text(
-                        message.body!,
-                        style: TextStyle(fontSize: 13.5, color: AppTheme.text),
+                      child: TranslatedBody(
+                        body: message.body ?? '',
+                        translated: message.translatedBody,
+                        tint: tint,
                       ),
                     ),
                 ],

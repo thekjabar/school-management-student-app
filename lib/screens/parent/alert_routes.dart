@@ -10,6 +10,7 @@ import 'conversations_screen.dart';
 import 'dropoff_screen.dart';
 import 'app_fee_screen.dart';
 import 'marks_screen.dart';
+import 'news_screen.dart';
 import 'reports_screen.dart';
 import 'school_fees_screen.dart';
 import 'section_gate.dart';
@@ -28,6 +29,7 @@ enum AlertDestination {
   reports,
   conversation,
   announcement,
+  news,
   alerts,
 }
 
@@ -67,6 +69,7 @@ const Map<String, AlertDestination> _byTemplate = {
   'message.reply_from_school': AlertDestination.conversation,
   'message.voice_from_school': AlertDestination.conversation,
   'announcement.broadcast': AlertDestination.announcement,
+  'news.published': AlertDestination.news,
 };
 
 AlertDestination alertDestinationFor(String? templateKey, String? category) {
@@ -82,6 +85,7 @@ AlertDestination alertDestinationFor(String? templateKey, String? category) {
   }
   if (key.startsWith('message.')) return AlertDestination.conversation;
   if (key.startsWith('announcement.')) return AlertDestination.announcement;
+  if (key.startsWith('news.')) return AlertDestination.news;
   return switch (category) {
     'SAFETY_CRITICAL' || 'ARRIVAL_ETA' => AlertDestination.track,
     'TRIP_STATUS' || 'DELAY' || 'CUSTODY_EVENT' || 'NO_SHOW' => AlertDestination.bus,
@@ -219,6 +223,8 @@ Future<void> openAlertDestination(
         section: ParentSection.messages,
         builder: (_) => ConversationScreen(thread: thread),
       );
+    case AlertDestination.news:
+      await forChild(ParentSection.newsFeed, (c) => NewsScreen(child: c));
     case AlertDestination.announcement:
       showInMessages(MessagesFocus(MessagesFilter.announcements, announcementId: link.announcement));
     case AlertDestination.alerts:

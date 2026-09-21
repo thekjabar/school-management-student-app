@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart' show Uint8List, ValueNotifier;
 
 import 'attachments.dart';
 import 'client.dart';
-import 'parent_api.dart' show AiAnswer, AiHistoryEntry, AiHistoryPage, Announcement;
+import 'parent_api.dart' show AiAnswer, AiHistoryEntry, AiHistoryPage, Announcement, LocalText;
 
 class AiTeacherClass {
   AiTeacherClass({
@@ -823,6 +823,289 @@ class TeacherApi {
     }
     return id;
   }
+
+  Future<TeacherNewsRights> newsRights() async {
+    final json = await _api.get('/teacher/news/allowed');
+    return TeacherNewsRights.fromJson((json as Map).cast<String, dynamic>());
+  }
+
+  Future<List<TeacherNewsSummary>> myNews() async {
+    final json = await _api.get('/teacher/news?pageSize=30');
+    return Paged.from<TeacherNewsSummary>(json, TeacherNewsSummary.fromJson).rows;
+  }
+
+  Future<TeacherNewsPost> newsPost(String id) async {
+    final json = await _api.get('/teacher/news/$id');
+    return TeacherNewsPost.fromJson((json as Map).cast<String, dynamic>());
+  }
+
+  Future<List<TeacherNewsChild>> newsPostChildren(String id) async {
+    final json = await _api.get('/teacher/news/$id/children') as Map<String, dynamic>;
+    return ((json['rows'] as List?) ?? const [])
+        .map((e) => TeacherNewsChild.fromJson((e as Map).cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
+  Future<String> writeNews({
+    required String text,
+    String? textAr,
+    String? textEn,
+    required List<String> classIds,
+  }) async {
+    final json = await _api.post('/teacher/news', {
+      'text': text.trim(),
+      'textAr': ?_someText(textAr),
+      'textEn': ?_someText(textEn),
+      'classIds': classIds,
+    });
+    final id = json is Map ? json['id'] : null;
+    if (id is! String || id.isEmpty) {
+      throw ApiException('The school could not save that post.', 500);
+    }
+    return id;
+  }
+
+  Future<void> reviseNews(
+    String id, {
+    String? text,
+    String? textAr,
+    String? textEn,
+    List<String>? classIds,
+  }) =>
+      _api.patch('/teacher/news/$id', {
+        'text': ?_someText(text),
+        'textAr': ?_someText(textAr),
+        'textEn': ?_someText(textEn),
+        'classIds': ?classIds,
+      });
+
+  Future<String> uploadNewsPhoto({
+    required Uint8List bytes,
+    required String filename,
+    required String mime,
+  }) async {
+    final json = await _api.upload(
+      '/teacher/uploads/direct',
+      field: 'file',
+      bytes: bytes,
+      filename: filename,
+      mime: mime,
+      fields: {
+        'kind': 'NEWS_PHOTO',
+        'capturedAt': DateTime.now().toUtc().toIso8601String(),
+      },
+    );
+    final id = json is Map ? json['id'] : null;
+    if (id is! String || id.isEmpty) {
+      throw ApiException('The school could not store that photo.', 500);
+    }
+    return id;
+  }
+
+  Future<String> attachNewsPhoto(String postId, String mediaAssetId) async {
+    final json = await _api.post('/teacher/news/$postId/photos', {'mediaAssetId': mediaAssetId});
+    final id = json is Map ? json['id'] : null;
+    if (id is! String || id.isEmpty) {
+      throw ApiException('The school could not add that photo.', 500);
+    }
+    return id;
+  }
+
+  Future<void> nameChildrenInNewsPhoto(
+    String photoId, {
+    required List<String> studentIds,
+    required bool noChildren,
+  }) =>
+      _api.patch('/teacher/news/photos/$photoId', {
+        'studentIds': studentIds,
+        'noChildren': noChildren,
+      });
+
+  Future<void> removeNewsPhoto(String photoId) =>
+      _api.delete('/teacher/news/photos/$photoId');
+
+  Future<TeacherNewsPublished> publishNews(String id) async {
+    final json = await _api.post('/teacher/news/$id/publish');
+    final map = (json as Map).cast<String, dynamic>();
+    return TeacherNewsPublished(
+      familiesTold: (map['familiesTold'] as num?)?.toInt() ?? 0,
+      photosWithheld: (map['photosWithheldForConsent'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Future<void> takeDownNews(String id) => _api.delete('/teacher/news/$id');
+}
+
+String? _someText(String? value) {
+  final text = value?.trim() ?? '';
+  return text.isEmpty ? null : text;
+}
+
+class TeacherNewsRights {
+  TeacherNewsRights({
+    required this.allowed,
+    required this.classes,
+    required this.photoLimit,
+    required this.textMax,
+  });
+
+  final bool allowed;
+  final List<TeacherNewsClass> classes;
+  final int photoLimit;
+  final int textMax;
+
+  factory TeacherNewsRights.fromJson(Map<String, dynamic> j) => TeacherNewsRights(
+        allowed: (j['allowed'] ?? false) as bool,
+        classes: ((j['classes'] as List?) ?? const [])
+            .map((c) => TeacherNewsClass.fromJson((c as Map).cast<String, dynamic>()))
+            .toList(growable: false),
+        photoLimit: (j['photoLimit'] as num?)?.toInt() ?? 6,
+        textMax: (j['textMax'] as num?)?.toInt() ?? 2000,
+      );
+}
+
+class TeacherNewsClass {
+  TeacherNewsClass({required this.id, required this.names});
+
+  final String id;
+  final LocalText names;
+
+  String get name => names.pick(null);
+
+  factory TeacherNewsClass.fromJson(Map<String, dynamic> j) => TeacherNewsClass(
+        id: (j['id'] ?? '') as String,
+        names: LocalText(
+          ckb: j['name'] as String?,
+          ar: j['nameAr'] as String?,
+          en: j['nameEn'] as String?,
+        ),
+      );
+}
+
+class TeacherNewsSummary {
+  TeacherNewsSummary({
+    required this.id,
+    required this.text,
+    required this.classCount,
+    required this.published,
+    required this.publishedAt,
+    required this.photoCount,
+    required this.hiddenPhotoCount,
+  });
+
+  final String id;
+  final String text;
+  final int classCount;
+  final bool published;
+  final DateTime? publishedAt;
+  final int photoCount;
+  final int hiddenPhotoCount;
+
+  factory TeacherNewsSummary.fromJson(Map<String, dynamic> j) => TeacherNewsSummary(
+        id: (j['id'] ?? '') as String,
+        text: (j['text'] ?? '') as String,
+        classCount: ((j['classIds'] as List?) ?? const []).length,
+        published: (j['published'] ?? false) as bool,
+        publishedAt: DateTime.tryParse((j['publishedAt'] ?? '') as String)?.toLocal(),
+        photoCount: (j['photoCount'] as num?)?.toInt() ?? 0,
+        hiddenPhotoCount: (j['hiddenPhotoCount'] as num?)?.toInt() ?? 0,
+      );
+}
+
+class TeacherNewsPost {
+  TeacherNewsPost({
+    required this.id,
+    required this.text,
+    required this.textAr,
+    required this.textEn,
+    required this.classIds,
+    required this.published,
+    required this.photos,
+  });
+
+  final String id;
+  final String text;
+  final String? textAr;
+  final String? textEn;
+  final List<String> classIds;
+  final bool published;
+  final List<TeacherNewsPhoto> photos;
+
+  factory TeacherNewsPost.fromJson(Map<String, dynamic> j) => TeacherNewsPost(
+        id: (j['id'] ?? '') as String,
+        text: (j['text'] ?? '') as String,
+        textAr: j['textAr'] as String?,
+        textEn: j['textEn'] as String?,
+        classIds: ((j['classIds'] as List?) ?? const [])
+            .map((e) => e.toString())
+            .toList(growable: false),
+        published: (j['published'] ?? false) as bool,
+        photos: ((j['photos'] as List?) ?? const [])
+            .map((p) => TeacherNewsPhoto.fromJson((p as Map).cast<String, dynamic>()))
+            .toList(growable: false),
+      );
+}
+
+class TeacherNewsPhoto {
+  TeacherNewsPhoto({
+    required this.id,
+    required this.url,
+    required this.thumbnailUrl,
+    required this.noChildren,
+    required this.withheldForConsent,
+    required this.taggedIds,
+  });
+
+  final String id;
+  final String? url;
+  final String? thumbnailUrl;
+  final bool noChildren;
+  final bool withheldForConsent;
+  final List<String> taggedIds;
+
+  bool get named => noChildren || taggedIds.isNotEmpty;
+
+  factory TeacherNewsPhoto.fromJson(Map<String, dynamic> j) => TeacherNewsPhoto(
+        id: (j['id'] ?? '') as String,
+        url: j['url'] as String?,
+        thumbnailUrl: (j['thumbnailUrl'] ?? j['url']) as String?,
+        noChildren: (j['noChildren'] ?? false) as bool,
+        withheldForConsent: (j['withheldForConsent'] ?? false) as bool,
+        taggedIds: ((j['tags'] as List?) ?? const [])
+            .map((tag) => ((tag as Map)['studentId'] ?? '').toString())
+            .where((id) => id.isNotEmpty)
+            .toList(growable: false),
+      );
+}
+
+class TeacherNewsChild {
+  TeacherNewsChild({
+    required this.id,
+    required this.names,
+    required this.plainName,
+    required this.photoConsent,
+  });
+
+  final String id;
+  final LocalText names;
+  final String plainName;
+  final bool photoConsent;
+
+  String get name => names.pick(plainName);
+
+  factory TeacherNewsChild.fromJson(Map<String, dynamic> j) => TeacherNewsChild(
+        id: (j['id'] ?? '') as String,
+        names: LocalText.fromJson(j['names']),
+        plainName: (j['name'] ?? '') as String,
+        photoConsent: (j['photoConsent'] ?? false) as bool,
+      );
+}
+
+class TeacherNewsPublished {
+  TeacherNewsPublished({required this.familiesTold, required this.photosWithheld});
+
+  final int familiesTold;
+  final int photosWithheld;
 }
 
 num _points(Object? value) =>

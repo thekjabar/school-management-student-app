@@ -21,6 +21,7 @@ import 'homework_detail.dart';
 import 'marks_screen.dart';
 import 'conversations_screen.dart';
 import 'memories_screen.dart';
+import 'news_screen.dart';
 import 'reports_screen.dart';
 import 'section_gate.dart';
 import 'student_info_screen.dart';
@@ -202,6 +203,13 @@ class HomeTab extends StatelessWidget {
                       color: AppTheme.rose,
                       section: ParentSection.memories,
                       builder: (_) => MemoriesScreen(child: child),
+                    ),
+                    action(
+                      icon: Icons.campaign_outlined,
+                      label: t('quick.news'),
+                      color: AppTheme.blue,
+                      section: ParentSection.newsFeed,
+                      builder: (_) => NewsScreen(child: child),
                     ),
                     action(
                       icon: Icons.rate_review_outlined,

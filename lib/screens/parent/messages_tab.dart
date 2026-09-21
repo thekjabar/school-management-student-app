@@ -581,6 +581,7 @@ class _AlertRow extends StatelessWidget {
         (AppTheme.violet, Icons.school_rounded),
       AlertDestination.conversation => (AppTheme.green, Icons.chat_bubble_rounded),
       AlertDestination.announcement => (AppTheme.violet, Icons.campaign_rounded),
+      AlertDestination.news => (AppTheme.blue, Icons.campaign_outlined),
       AlertDestination.alerts => (Role.parent.tint, Icons.notifications_rounded),
     };
     final title = item.title?.trim() ?? '';

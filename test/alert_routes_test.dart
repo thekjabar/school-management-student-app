@@ -42,6 +42,12 @@ void main() {
     expect(link.threadId, isNull);
   });
 
+  test('a news post opens the feed, not the alerts list', () {
+    expect(alertDestinationFor('news.published', 'ANNOUNCEMENT'), AlertDestination.news);
+    expect(alertDestinationFor('news.something_new', null), AlertDestination.news);
+    expect(alertDestinationFor('announcement.broadcast', null), AlertDestination.announcement);
+  });
+
   test('a push without our data is not routed', () {
     expect(AlertLink.fromPush(null), isNull);
     expect(AlertLink.fromPush({}), isNull);

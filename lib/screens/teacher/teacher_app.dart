@@ -14,6 +14,7 @@ import 'exams_tab.dart';
 import 'home_tab.dart';
 import 'homework_tab.dart';
 import 'messages_tab.dart';
+import 'news_tab.dart';
 import 'profile_tab.dart';
 import 'teacher_account.dart';
 
@@ -27,11 +28,22 @@ class TeacherApp extends StatefulWidget {
 class _TeacherAppState extends State<TeacherApp> {
   int _tab = 0;
   int _unread = 0;
+  TeacherNewsRights? _news;
 
   @override
   void initState() {
     super.initState();
     _countUnread();
+    _askAboutNews();
+  }
+
+  Future<void> _askAboutNews() async {
+    try {
+      final rights = await TeacherApi.instance.newsRights();
+      if (!mounted || !rights.allowed || rights.classes.isEmpty) return;
+      setState(() => _news = rights);
+    } catch (_) {
+    }
   }
 
   Future<void> _countUnread() async {
@@ -107,6 +119,7 @@ class _TeacherAppState extends State<TeacherApp> {
   }
 
   Future<void> _newThing() async {
+    final news = _news;
     final picked = await pickOne<String>(
       context,
       title: t('teacher.newWork'),
@@ -127,12 +140,19 @@ class _TeacherAppState extends State<TeacherApp> {
           label: t('teacher.exams'),
           icon: Icons.school_rounded,
         ),
+        if (news != null)
+          PickOption(
+            value: 'news',
+            label: t('teacher.news'),
+            icon: Icons.campaign_outlined,
+          ),
       ],
     );
     if (picked == null || !mounted) return;
     final screen = switch (picked) {
       'homework' => const HomeworkTab(),
       'register' => const ClassesScreen(),
+      'news' => TeacherNewsScreen(rights: news!),
       _ => const ExamsTab(),
     };
     if (!mounted) return;
