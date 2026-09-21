@@ -2160,6 +2160,18 @@ class HomeArrival {
       );
 }
 
+class WhatsAppChoice {
+  WhatsAppChoice({required this.offered, required this.enabled});
+
+  final bool offered;
+  final bool enabled;
+
+  factory WhatsAppChoice.fromJson(Map<String, dynamic> j) => WhatsAppChoice(
+        offered: (j['offered'] ?? false) as bool,
+        enabled: (j['enabled'] ?? true) as bool,
+      );
+}
+
 class HomeArrivalConfirmed {
   HomeArrivalConfirmed({
     required this.studentId,
@@ -3107,6 +3119,16 @@ class ParentApi {
   Future<int> markAllAlertsRead() async {
     final json = await _api.post('/parent/notifications/read-all');
     return json is Map ? ((json['marked'] as num?)?.toInt() ?? 0) : 0;
+  }
+
+  Future<WhatsAppChoice> whatsappChoice() async {
+    final json = await _api.get('/parent/notifications/whatsapp');
+    return WhatsAppChoice.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<WhatsAppChoice> chooseWhatsapp({required bool enabled}) async {
+    final json = await _api.post('/parent/notifications/whatsapp', {'enabled': enabled});
+    return WhatsAppChoice.fromJson(json as Map<String, dynamic>);
   }
 
   Future<PackageOverview> packageOverview() => _keepable(

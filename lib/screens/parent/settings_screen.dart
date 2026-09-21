@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../ui/screen_kit.dart';
 
+import '../../api/parent_api.dart';
 import '../../api/session.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
+import '../../ui/async.dart';
 import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/settings_widgets.dart';
@@ -82,7 +84,12 @@ class SettingsScreen extends StatelessWidget {
           _Section(t('settings.notifications')),
           Card16(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-            child: PushRow(tint: tint),
+            child: Column(
+              children: [
+                PushRow(tint: tint),
+                const _WhatsAppRow(),
+              ],
+            ),
           ),
 
           _Section(t('more.account')),
@@ -106,6 +113,105 @@ class SettingsScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _WhatsAppRow extends StatefulWidget {
+  const _WhatsAppRow();
+
+  @override
+  State<_WhatsAppRow> createState() => _WhatsAppRowState();
+}
+
+class _WhatsAppRowState extends State<_WhatsAppRow> {
+  WhatsAppChoice? _choice;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final choice = await ParentApi.instance.whatsappChoice();
+      if (mounted) setState(() => _choice = choice);
+    } catch (_) {
+      if (mounted) setState(() => _choice = null);
+    }
+  }
+
+  Future<void> _set(bool enabled) async {
+    final before = _choice;
+    if (before == null) return;
+    setState(() {
+      _saving = true;
+      _choice = WhatsAppChoice(offered: before.offered, enabled: enabled);
+    });
+    try {
+      final saved = await ParentApi.instance.chooseWhatsapp(enabled: enabled);
+      if (mounted) setState(() => _choice = saved);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _choice = before);
+      showNote(context, t('more.whatsappFailed'), bad: true);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final choice = _choice;
+    if (choice == null || !choice.offered) return const SizedBox.shrink();
+    final tint = Role.parent.tint;
+
+    return Column(
+      children: [
+        Divider(height: 1, color: AppTheme.border),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          child: Row(
+            children: [
+              Chip36(icon: Icons.chat_rounded, color: AppTheme.green),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      t('more.whatsapp'),
+                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      choice.enabled ? t('more.whatsappOn') : t('more.whatsappOff'),
+                      style: TextStyle(fontSize: 11.5, height: 1.4, color: AppTheme.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Semantics(
+                label: t('more.whatsapp'),
+                toggled: choice.enabled,
+                child: Switch(
+                  value: choice.enabled,
+                  onChanged: _saving ? null : _set,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  thumbColor: const WidgetStatePropertyAll(Colors.white),
+                  trackColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected) ? tint : AppTheme.textFaint,
+                  ),
+                  trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
