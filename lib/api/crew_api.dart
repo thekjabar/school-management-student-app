@@ -842,6 +842,75 @@ class Credential {
       );
 }
 
+class DrivingHours {
+  DrivingHours({
+    required this.standing,
+    required this.breakDue,
+    required this.minutesUntilBreakDue,
+    required this.drivingMinutesToday,
+    required this.dutyMinutesToday,
+    required this.dutyMinutesThisWeek,
+    required this.currentDrivingStretchMinutes,
+    required this.restMinutesSinceLastDuty,
+    required this.onDutyNow,
+    required this.maxContinuousDrivingMinutes,
+    required this.breakMinutes,
+    required this.maxDutyMinutesPerDay,
+    required this.maxDutyMinutesPerWeek,
+    required this.stopsTrips,
+    required this.over,
+    required this.nearing,
+  });
+
+  final String standing;
+  final bool breakDue;
+  final int minutesUntilBreakDue;
+  final int drivingMinutesToday;
+  final int dutyMinutesToday;
+  final int dutyMinutesThisWeek;
+  final int currentDrivingStretchMinutes;
+  final int? restMinutesSinceLastDuty;
+  final bool onDutyNow;
+  final int maxContinuousDrivingMinutes;
+  final int breakMinutes;
+  final int maxDutyMinutesPerDay;
+  final int maxDutyMinutesPerWeek;
+  final bool stopsTrips;
+  final List<String> over;
+  final List<String> nearing;
+
+  bool get past => standing == 'OVER';
+  bool get close => standing == 'WARNING';
+
+  static List<String> _rules(dynamic value) => (value as List?)
+          ?.map((e) => ((e as Map<String, dynamic>)['rule'] ?? '') as String)
+          .where((r) => r.isNotEmpty)
+          .toList() ??
+      const <String>[];
+
+  factory DrivingHours.fromJson(Map<String, dynamic> j) {
+    final limits = (j['limits'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
+    return DrivingHours(
+      standing: (j['standing'] ?? 'OK') as String,
+      breakDue: (j['breakDue'] ?? false) as bool,
+      minutesUntilBreakDue: (j['minutesUntilBreakDue'] as num?)?.toInt() ?? 0,
+      drivingMinutesToday: (j['drivingMinutesToday'] as num?)?.toInt() ?? 0,
+      dutyMinutesToday: (j['dutyMinutesToday'] as num?)?.toInt() ?? 0,
+      dutyMinutesThisWeek: (j['dutyMinutesThisWeek'] as num?)?.toInt() ?? 0,
+      currentDrivingStretchMinutes: (j['currentDrivingStretchMinutes'] as num?)?.toInt() ?? 0,
+      restMinutesSinceLastDuty: (j['restMinutesSinceLastDuty'] as num?)?.toInt(),
+      onDutyNow: (j['onDutyNow'] ?? false) as bool,
+      maxContinuousDrivingMinutes: (limits['maxContinuousDrivingMinutes'] as num?)?.toInt() ?? 0,
+      breakMinutes: (limits['breakMinutes'] as num?)?.toInt() ?? 0,
+      maxDutyMinutesPerDay: (limits['maxDutyMinutesPerDay'] as num?)?.toInt() ?? 0,
+      maxDutyMinutesPerWeek: (limits['maxDutyMinutesPerWeek'] as num?)?.toInt() ?? 0,
+      stopsTrips: (j['enforcement'] ?? 'BLOCK') == 'BLOCK',
+      over: _rules(j['over']),
+      nearing: _rules(j['nearing']),
+    );
+  }
+}
+
 class CrewApi {
   CrewApi._();
 
@@ -851,6 +920,11 @@ class CrewApi {
   Future<List<CrewTrip>> today() async {
     final json = await _api.get('/crew/duty/today');
     return Paged.from<CrewTrip>(json, CrewTrip.fromJson).rows;
+  }
+
+  Future<DrivingHours> hours() async {
+    final json = await _api.get('/crew/hours/me');
+    return DrivingHours.fromJson(json as Map<String, dynamic>);
   }
 
   Future<List<CrewTrip>> trips({String? date, int? days}) async {

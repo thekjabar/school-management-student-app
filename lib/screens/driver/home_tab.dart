@@ -10,6 +10,7 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import 'credentials_screen.dart';
+import 'hours_card.dart';
 import 'roster_kit.dart';
 import 'route_map.dart';
 import 'run_order.dart';
@@ -111,6 +112,7 @@ class _DriverHomeState extends State<DriverHome> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const CredentialWarning(),
+              const HoursCard(),
               Padding(
                 padding: const EdgeInsets.only(top: 40),
                 child: Center(
@@ -133,6 +135,7 @@ class _DriverHomeState extends State<DriverHome> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const CredentialWarning(),
+            const HoursCard(),
             _DutyCard(
               trip: trip,
               plan: duty.plan,
