@@ -64,6 +64,8 @@ dependencies:
 
   intl: ^0.20.2
 
+  qr_flutter: ^4.1.0
+
   # Push, through OneSignal rather than FCM directly: a large share of handsets
   # in this market are Huawei with no Google Play Services, and an FCM-only
   # stack reaches perhaps three-quarters of families without telling anyone

@@ -20,22 +20,26 @@ import 'screens/login_screen.dart';
 import 'screens/school_picker.dart';
 import 'screens/splash_screen.dart';
 import 'screens/parent/parent_app.dart';
+import 'screens/student/student_app.dart';
+import 'screens/student/student_login.dart';
 import 'screens/teacher/teacher_app.dart';
 import 'theme/app_theme.dart';
 
 const String kRole = String.fromEnvironment('APP_ROLE');
 
-const List<String> kRoles = ['parent', 'teacher', 'driver'];
+const List<String> kRoles = ['parent', 'student', 'teacher', 'driver'];
 
 bool get _roleIsValid => kRoles.contains(kRole);
 
 Role get _role => switch (kRole) {
+      'student' => Role.student,
       'teacher' => Role.teacher,
       'driver' => Role.driver,
       _ => Role.parent,
     };
 
 String get _title => switch (kRole) {
+      'student' => 'KSP Student',
       'teacher' => 'KSP Teacher',
       'driver' => 'KSP Driver',
       _ => 'KSP Parent',
@@ -244,18 +248,19 @@ class _GateState extends State<_Gate> {
     }
 
     if (_me == null) {
-      return LoginScreen(
-        role: _role,
-        offline: _offline,
-        onSignedIn: (me) {
-          setState(() {
-            _me = me;
-            _schoolChosen = false;
-            _ready = false;
-          });
-          _settleAfterSignIn(me);
-        },
-      );
+      void signedIn(Me me) {
+        setState(() {
+          _me = me;
+          _schoolChosen = false;
+          _ready = false;
+        });
+        _settleAfterSignIn(me);
+      }
+
+      if (_role == Role.student) {
+        return StudentLoginScreen(offline: _offline, onSignedIn: signedIn);
+      }
+      return LoginScreen(role: _role, offline: _offline, onSignedIn: signedIn);
     }
 
     return ValueListenableBuilder<String?>(
@@ -288,6 +293,7 @@ class _GateState extends State<_Gate> {
 
     return switch (kRole) {
       'driver' => DriverApp(key: ValueKey(tenantId)),
+      'student' => StudentApp(key: ValueKey(tenantId)),
       'teacher' => TeacherApp(key: ValueKey(tenantId)),
       _ => const ParentApp(),
     };
@@ -334,7 +340,7 @@ class _BrokenBuild extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text(
                     'APP_ROLE was not set, so this APK does not know whether it is '
-                    'the parent, teacher or driver app.\n\n'
+                    'the parent, student, teacher or driver app.\n\n'
                     'Do not hand this file to anybody. Build with '
                     'tool/build_apks.sh, which passes the define.',
                     textAlign: TextAlign.center,

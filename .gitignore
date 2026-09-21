@@ -58,3 +58,4 @@ tool/mapbox.style
 tool/status.parent.key
 tool/status.teacher.key
 tool/status.driver.key
+tool/status.student.key

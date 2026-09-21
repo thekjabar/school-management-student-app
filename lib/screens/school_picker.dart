@@ -9,6 +9,7 @@ import '../ui/kit.dart';
 import '../ui/pickers.dart';
 
 List<String> rolesForApp(Role role) => switch (role) {
+      Role.student => kStudentRoles,
       Role.teacher => kTeacherRoles,
       Role.driver => kCrewRoles,
       _ => kGuardianRoles,

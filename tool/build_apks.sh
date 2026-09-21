@@ -3,9 +3,29 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+ALL_ROLES=(parent teacher driver student)
+
+role_api() {
+  case "$1" in
+    parent)  echo "https://parent-api.krsprotection.com"  ;;
+    teacher) echo "https://teacher-api.krsprotection.com" ;;
+    driver)  echo "https://driver-api.krsprotection.com"  ;;
+    student) echo "https://student-api.krsprotection.com" ;;
+  esac
+}
+
+role_title() {
+  case "$1" in
+    parent)  echo "KSP Parent"  ;;
+    teacher) echo "KSP Teacher" ;;
+    driver)  echo "KSP Driver"  ;;
+    student) echo "KSP Student" ;;
+  esac
+}
+
 OUT="${1:-../apk}"
 ROLES=("${@:2}")
-if [ ${#ROLES[@]} -eq 0 ]; then ROLES=(parent teacher driver); fi
+if [ ${#ROLES[@]} -eq 0 ]; then ROLES=("${ALL_ROLES[@]}"); fi
 
 mkdir -p assets/video "$OUT"
 
@@ -45,19 +65,15 @@ for role in "${ROLES[@]}"; do
   rm -rf build/app/intermediates/merged_assets
   rm -rf build/app/intermediates/assets
 
-  case "$role" in
-    parent)  api="https://parent-api.krsprotection.com" ;;
-    teacher) api="https://teacher-api.krsprotection.com" ;;
-    driver)  api="https://driver-api.krsprotection.com" ;;
-    *)
-      echo
-      echo "FAILED: there is no API for the role \"$role\"."
-      echo "  Every audience answers on its own host and refuses the others, so a"
-      echo "  build for a role with no host would ship an app that cannot sign"
-      echo "  anybody in. The roles are parent, teacher and driver."
-      exit 1
-      ;;
-  esac
+  api="$(role_api "$role")"
+  if [ -z "$api" ]; then
+    echo
+    echo "FAILED: there is no API for the role \"$role\"."
+    echo "  Every audience answers on its own host and refuses the others, so a"
+    echo "  build for a role with no host would ship an app that cannot sign"
+    echo "  anybody in. The roles are ${ALL_ROLES[*]}."
+    exit 1
+  fi
   echo "api: $api"
 
   STATUS_KEY=""
@@ -85,12 +101,8 @@ for role in "${ROLES[@]}"; do
     --dart-define="MAPBOX_STYLE=$MAPBOX_STYLE" \
     --split-per-abi
 
-  case "$role" in
-    parent)  name="KSP-Parent"  ;;
-    teacher) name="KSP-Teacher" ;;
-    driver)  name="KSP-Driver"  ;;
-    *)       name="KSP-${role}" ;;
-  esac
+  title="$(role_title "$role")"
+  name="${title// /-}"
 
   cp "build/app/outputs/flutter-apk/app-arm64-v8a-$role-release.apk" "$OUT/$name.apk"
 
@@ -114,22 +126,13 @@ for role in "${ROLES[@]}"; do
   if [ "${lib:-0}" -gt 0 ]; then
     tmp=$(mktemp)
     unzip -p "$OUT/$name.apk" lib/arm64-v8a/libapp.so > "$tmp"
-    case "$role" in
-      parent)  wantTitle="KSP Parent"  ;;
-      teacher) wantTitle="KSP Teacher" ;;
-      driver)  wantTitle="KSP Driver"  ;;
-    esac
     wrong=""
-    for other in parent teacher driver; do
+    for other in "${ALL_ROLES[@]}"; do
       [ "$other" = "$role" ] && continue
-      case "$other" in
-        parent)  otherName="KSP Parent"  ;;
-        teacher) otherName="KSP Teacher" ;;
-        driver)  otherName="KSP Driver"  ;;
-      esac
+      otherName="$(role_title "$other")"
       if grep -aq "$otherName" "$tmp"; then wrong="$wrong $otherName"; fi
     done
-    if ! grep -aq "$wantTitle" "$tmp" || [ -n "$wrong" ]; then
+    if ! grep -aq "$title" "$tmp" || [ -n "$wrong" ]; then
       rm -f "$tmp"
       echo
       echo "FAILED: $name.apk is not the $role app."
@@ -148,7 +151,7 @@ for role in "${ROLES[@]}"; do
       exit 1
     fi
     strayKey=""
-    for other in parent teacher driver; do
+    for other in "${ALL_ROLES[@]}"; do
       [ "$other" = "$role" ] && continue
       if [ -f "tool/status.$other.key" ]; then
         otherKey="$(tr -d "[:space:]" < "tool/status.$other.key")"

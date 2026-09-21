@@ -11,6 +11,8 @@ import 'push.dart';
 
 const List<String> kGuardianRoles = ['GUARDIAN'];
 
+const List<String> kStudentRoles = ['STUDENT'];
+
 const List<String> kTeacherRoles = ['TEACHER'];
 
 const List<String> kCrewRoles = ['DRIVER', 'ATTENDANT'];
@@ -157,6 +159,34 @@ class Session {
         tenantId: memberships.first.tenantId,
       );
     }
+
+    final me = await refresh();
+    if (me == null) {
+      throw ApiException('Signed in, but your account could not be loaded.', 500);
+    }
+    await Push.identify(me.id, identityToken: me.pushIdentityToken);
+    return SignInResult(
+      me: me,
+      mustChangePassword: (body['mustChangePassword'] ?? false) as bool,
+    );
+  }
+
+  Future<SignInResult> signInAsStudent(
+    String tenantId,
+    String code,
+    String password,
+  ) async {
+    final body = await _api.post('/auth/login', {
+      'tenantId': tenantId,
+      'code': code.trim(),
+      'password': password,
+    }) as Map<String, dynamic>;
+
+    await _api.saveSession(
+      access: body['accessToken'] as String,
+      refresh: body['refreshToken'] as String?,
+      tenantId: tenantId,
+    );
 
     final me = await refresh();
     if (me == null) {

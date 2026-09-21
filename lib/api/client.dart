@@ -17,6 +17,7 @@ const String _apiBaseDefine = String.fromEnvironment('API_BASE');
 final String kApiBase = _apiBaseDefine.isNotEmpty
     ? _apiBaseDefine
     : switch (const String.fromEnvironment('APP_ROLE')) {
+        'student' => 'https://student-api.krsprotection.com',
         'teacher' => 'https://teacher-api.krsprotection.com',
         'driver' => 'https://driver-api.krsprotection.com',
         _ => 'https://parent-api.krsprotection.com',
