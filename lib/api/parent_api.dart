@@ -432,6 +432,145 @@ class NewsPhoto {
       );
 }
 
+class DailyMeal {
+  DailyMeal({required this.id, required this.meal, required this.amount, required this.note});
+
+  final String id;
+  final String meal;
+  final String amount;
+  final String? note;
+
+  factory DailyMeal.fromJson(Map<String, dynamic> j) => DailyMeal(
+        id: (j['id'] ?? '') as String,
+        meal: (j['meal'] ?? '') as String,
+        amount: (j['amount'] ?? '') as String,
+        note: j['note'] as String?,
+      );
+}
+
+class DailyNap {
+  DailyNap({required this.id, required this.startedAt, required this.endedAt, required this.minutes});
+
+  final String id;
+  final DateTime startedAt;
+  final DateTime? endedAt;
+  final int? minutes;
+
+  factory DailyNap.fromJson(Map<String, dynamic> j) => DailyNap(
+        id: (j['id'] ?? '') as String,
+        startedAt: DateTime.tryParse((j['startedAt'] ?? '') as String)?.toLocal() ?? DateTime.now(),
+        endedAt: DateTime.tryParse((j['endedAt'] ?? '') as String)?.toLocal(),
+        minutes: (j['minutes'] as num?)?.toInt(),
+      );
+}
+
+class DailyToilet {
+  DailyToilet({required this.id, required this.at, required this.kind, required this.note});
+
+  final String id;
+  final DateTime at;
+  final String kind;
+  final String? note;
+
+  factory DailyToilet.fromJson(Map<String, dynamic> j) => DailyToilet(
+        id: (j['id'] ?? '') as String,
+        at: DateTime.tryParse((j['at'] ?? '') as String)?.toLocal() ?? DateTime.now(),
+        kind: (j['kind'] ?? '') as String,
+        note: j['note'] as String?,
+      );
+}
+
+class DailyPhoto {
+  DailyPhoto({
+    required this.id,
+    required this.caption,
+    required this.url,
+    required this.thumbnailUrl,
+    required this.width,
+    required this.height,
+  });
+
+  final String id;
+  final String? caption;
+  final String? url;
+  final String? thumbnailUrl;
+  final int? width;
+  final int? height;
+
+  factory DailyPhoto.fromJson(Map<String, dynamic> j) => DailyPhoto(
+        id: (j['id'] ?? '') as String,
+        caption: j['caption'] as String?,
+        url: j['url'] as String?,
+        thumbnailUrl: (j['thumbnailUrl'] ?? j['url']) as String?,
+        width: (j['width'] as num?)?.toInt(),
+        height: (j['height'] as num?)?.toInt(),
+      );
+}
+
+class DailyReport {
+  DailyReport({
+    required this.id,
+    required this.day,
+    required this.sentAt,
+    required this.className,
+    required this.classNames,
+    required this.mood,
+    required this.activities,
+    required this.bringTomorrow,
+    required this.carerNote,
+    required this.meals,
+    required this.naps,
+    required this.toilet,
+    required this.photos,
+  });
+
+  final String id;
+  final DateTime day;
+  final DateTime? sentAt;
+  final String? className;
+  final LocalText classNames;
+  final String? mood;
+  final String? activities;
+  final List<String> bringTomorrow;
+  final String? carerNote;
+  final List<DailyMeal> meals;
+  final List<DailyNap> naps;
+  final List<DailyToilet> toilet;
+  final List<DailyPhoto> photos;
+
+  String get classLabel => classNames.pick(className);
+
+  int get sleepMinutes =>
+      naps.fold(0, (sum, nap) => sum + (nap.minutes ?? 0));
+
+  factory DailyReport.fromJson(Map<String, dynamic> j) => DailyReport(
+        id: (j['id'] ?? '') as String,
+        day: DateTime.tryParse((j['day'] ?? '') as String) ?? DateTime.now(),
+        sentAt: DateTime.tryParse((j['sentAt'] ?? '') as String)?.toLocal(),
+        className: j['className'] as String?,
+        classNames: LocalText.fromJson(j['classNames']),
+        mood: j['mood'] as String?,
+        activities: j['activities'] as String?,
+        bringTomorrow: [
+          for (final item in (j['bringTomorrow'] as List?) ?? const [])
+            if (item is String && item.trim().isNotEmpty) item,
+        ],
+        carerNote: j['carerNote'] as String?,
+        meals: ((j['meals'] as List?) ?? const [])
+            .map((e) => DailyMeal.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        naps: ((j['naps'] as List?) ?? const [])
+            .map((e) => DailyNap.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        toilet: ((j['toilet'] as List?) ?? const [])
+            .map((e) => DailyToilet.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        photos: ((j['photos'] as List?) ?? const [])
+            .map((e) => DailyPhoto.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
 class HomeLocation {
   HomeLocation({
     required this.address,
@@ -2408,6 +2547,23 @@ class ParentApi {
     return Paged.from<NewsPost>(json, NewsPost.fromJson).rows;
   }
 
+  Future<DailyReport?> dailyReport(String studentId, {DateTime? day, String? tenantId}) async {
+    final json = await _api.get(
+      '/parent/children/$studentId/daily-report${day == null ? '' : '?date=${_day(day)}'}',
+      tenantId: _scope(tenantId),
+    );
+    if (json is! Map<String, dynamic>) return null;
+    return DailyReport.fromJson(json);
+  }
+
+  Future<List<DailyReport>> dailyReports(String studentId, {int page = 1, String? tenantId}) async {
+    final json = await _api.get(
+      '/parent/children/$studentId/daily-reports?page=$page&pageSize=14',
+      tenantId: _scope(tenantId),
+    );
+    return Paged.from<DailyReport>(json, DailyReport.fromJson).rows;
+  }
+
   Future<HomeLocation> homeLocation() async {
     final json = await _api.get('/parent/home') as Map<String, dynamic>;
     return HomeLocation.fromJson(json);
@@ -3788,6 +3944,7 @@ abstract final class ParentSection {
   static const timetable = 'parent.timetable';
   static const memories = 'parent.memories';
   static const newsFeed = 'parent.newsFeed';
+  static const dailyReport = 'parent.dailyReport';
   static const driverFeedback = 'parent.driverFeedback';
   static const calendar = 'parent.calendar';
   static const skipRide = 'parent.skipRide';

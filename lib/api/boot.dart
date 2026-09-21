@@ -86,6 +86,7 @@ class HomePayload {
     required this.attitude,
     required this.announcements,
     required this.exams,
+    required this.dailyReport,
   });
 
   final String studentId;
@@ -98,12 +99,14 @@ class HomePayload {
 
   final List<UpcomingExam> exams;
 
+  final DailyReport? dailyReport;
+
   static Future<HomePayload> fetch(
     String studentId, {
     required bool Function(String section) open,
   }) async {
     final api = ParentApi.instance;
-    Future<Object> when(String section, Future<Object> Function() load, Object closed) async {
+    Future<Object?> when(String section, Future<Object?> Function() load, Object? closed) async {
       if (!open(section)) return closed;
       try {
         return await load();
@@ -112,7 +115,7 @@ class HomePayload {
       }
     }
 
-    final r = await Future.wait<Object>([
+    final r = await Future.wait<Object?>([
       when(ParentSection.bus, () => api.transport(studentId), TransportInfo.fromJson(const {})),
       when(ParentSection.timetable, () => api.timetable(studentId), const <DayOfLessons>[]),
       when(ParentSection.attendance, () => api.attendance(studentId), AttendanceSummary.fromJson(const {})),
@@ -120,6 +123,7 @@ class HomePayload {
       when(ParentSection.attitude, () => api.attitude(studentId), AttitudeSummary.fromJson(const {})),
       api.announcements(),
       when(ParentSection.calendar, () => api.upcomingExams(studentId), const <UpcomingExam>[]),
+      when(ParentSection.dailyReport, () => api.dailyReport(studentId), null),
     ]);
     return HomePayload(
       studentId: studentId,
@@ -130,6 +134,7 @@ class HomePayload {
       attitude: r[4] as AttitudeSummary,
       announcements: r[5] as List<Announcement>,
       exams: r[6] as List<UpcomingExam>,
+      dailyReport: r[7] as DailyReport?,
     );
   }
 }

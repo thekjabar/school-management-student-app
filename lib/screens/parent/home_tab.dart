@@ -20,6 +20,7 @@ import 'attitude_screen.dart';
 import 'homework_detail.dart';
 import 'marks_screen.dart';
 import 'conversations_screen.dart';
+import 'daily_report_screen.dart';
 import 'memories_screen.dart';
 import 'news_screen.dart';
 import 'reports_screen.dart';
@@ -86,7 +87,26 @@ class HomeTab extends StatelessWidget {
           builder: (context, home) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (!away(ParentSection.dailyReport)) ...[
+                Rise(
+                  child: shut(ParentSection.dailyReport)
+                      ? const LockedSectionCard(
+                          section: ParentSection.dailyReport,
+                          icon: Icons.child_care_rounded,
+                        )
+                      : _TodayCard(
+                          today: home.dailyReport,
+                          onTap: () => open(
+                            ParentSection.dailyReport,
+                            (_) => DailyReportScreen(child: child),
+                          ),
+                        ),
+                ),
+                const SizedBox(height: kCardGap),
+              ],
+
               Rise(
+                index: 1,
                 child: shut(ParentSection.bus)
                     ? const LockedSectionCard(
                         section: ParentSection.bus,
@@ -101,7 +121,7 @@ class HomeTab extends StatelessWidget {
               const SizedBox(height: kCardGap),
 
               Rise(
-                index: 1,
+                index: 2,
                 child: QuickActions(
                   actions: <QuickAction?>[
                     QuickAction(
@@ -225,7 +245,7 @@ class HomeTab extends StatelessWidget {
 
               if (!away(ParentSection.timetable)) ...[
               Rise(
-                index: 2,
+                index: 3,
                 child: shut(ParentSection.timetable)
                     ? const LockedSectionCard(
                         section: ParentSection.timetable,
@@ -272,7 +292,7 @@ class HomeTab extends StatelessWidget {
 
               if (!away(ParentSection.marks)) ...[
               Rise(
-                index: 3,
+                index: 4,
                 child: shut(ParentSection.calendar)
                     ? const LockedSectionCard(
                         section: ParentSection.calendar,
@@ -284,13 +304,13 @@ class HomeTab extends StatelessWidget {
               ],
 
               Rise(
-                index: 4,
+                index: 5,
                 child: _ChildCard(child: child, home: home, shut: shut, open: open),
               ),
               const SizedBox(height: kCardGap),
 
               Rise(
-                index: 5,
+                index: 6,
                 child: IntrinsicHeight(
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -339,6 +359,7 @@ class _Home {
     required this.attitude,
     required this.announcements,
     required this.exams,
+    required this.dailyReport,
   });
 
   factory _Home.from(HomePayload p) => _Home(
@@ -349,6 +370,7 @@ class _Home {
         attitude: p.attitude,
         announcements: p.announcements,
         exams: p.exams,
+        dailyReport: p.dailyReport,
       );
 
   final TransportInfo transport;
@@ -358,6 +380,7 @@ class _Home {
   final AttitudeSummary attitude;
   final List<Announcement> announcements;
   final List<UpcomingExam> exams;
+  final DailyReport? dailyReport;
 
   List<Lesson> get today {
     final name = todayWeekday();
@@ -382,6 +405,107 @@ class _Home {
       (sum, h) => sum + (h.score!.toDouble() / h.maxScore!.toDouble()) * 100,
     );
     return (total / marked.length).round();
+  }
+}
+
+class _TodayCard extends StatelessWidget {
+  const _TodayCard({required this.today, required this.onTap});
+
+  final DailyReport? today;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final day = today;
+    final colour = moodColour(day?.mood);
+    final ate = day == null ? 0 : day.meals.where((m) => m.amount != 'NONE').length;
+
+    return Card16(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionRow(
+            title: t('dailyReport.homeTitle'),
+            actionLabel: t('dailyReport.open'),
+            onAction: onTap,
+            dense: true,
+          ),
+          if (day == null)
+            _Quiet(text: t('dailyReport.notSentYet'))
+          else ...[
+            Row(
+              children: [
+                Chip36(
+                  icon: day.mood == null ? Icons.child_care_rounded : Icons.emoji_emotions_rounded,
+                  color: colour,
+                  size: 34,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    day.mood == null ? t('dailyReport.dayDone') : moodName(day.mood),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                      color: AppTheme.text,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 11),
+            IconFigureStrip(
+              figures: [
+                IconFigure(
+                  icon: Icons.restaurant_rounded,
+                  label: t('dailyReport.meals'),
+                  value: '$ate',
+                  caption: tn('dailyReport.ofMeals', day.meals.length),
+                  color: AppTheme.green,
+                ),
+                IconFigure(
+                  icon: Icons.bedtime_rounded,
+                  label: t('dailyReport.sleep'),
+                  value: '${day.sleepMinutes}',
+                  caption: t('dailyReport.minutesWord'),
+                  color: AppTheme.violet,
+                ),
+                IconFigure(
+                  icon: Icons.baby_changing_station_rounded,
+                  label: t('dailyReport.toilet'),
+                  value: '${day.toilet.length}',
+                  caption: t('dailyReport.timesWord'),
+                  color: AppTheme.amber,
+                ),
+              ],
+            ),
+            if (day.bringTomorrow.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.backpack_outlined, size: 15, color: AppTheme.amber),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '${t('dailyReport.bring')}: ${day.bringTomorrow.join(' · ')}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11.5, height: 1.4, color: AppTheme.textMuted),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
   }
 }
 
