@@ -2174,6 +2174,77 @@ class WhatsAppChoice {
       );
 }
 
+class StudentAppAccount {
+  StudentAppAccount({
+    required this.studentId,
+    required this.code,
+    required String name,
+    required this.names,
+    required this.gradeLevel,
+    required this.oldEnough,
+    required this.blockedByOffice,
+    required this.enabled,
+    required this.passwordSet,
+    required this.lastLoginAt,
+    required this.mayBeSwitchedOn,
+    required this.canOpenTheApp,
+  }) : _name = name;
+
+  final String studentId;
+  final String code;
+  final String _name;
+  final LocalText names;
+  final int? gradeLevel;
+  final bool oldEnough;
+  final bool blockedByOffice;
+  final bool enabled;
+  final bool passwordSet;
+  final DateTime? lastLoginAt;
+  final bool mayBeSwitchedOn;
+  final bool canOpenTheApp;
+
+  String get displayName => names.pick(_name);
+
+  factory StudentAppAccount.fromJson(Map<String, dynamic> j) => StudentAppAccount(
+        studentId: (j['studentId'] ?? '') as String,
+        code: (j['code'] ?? '') as String,
+        name: (j['name'] ?? '') as String,
+        names: LocalText.fromJson(j['names']),
+        gradeLevel: (j['gradeLevel'] as num?)?.toInt(),
+        oldEnough: (j['oldEnough'] ?? false) as bool,
+        blockedByOffice: (j['blockedByOffice'] ?? false) as bool,
+        enabled: (j['enabled'] ?? false) as bool,
+        passwordSet: (j['passwordSet'] ?? false) as bool,
+        lastLoginAt: ChildProfile._date(j['lastLoginAt']),
+        mayBeSwitchedOn: (j['mayBeSwitchedOn'] ?? false) as bool,
+        canOpenTheApp: (j['canOpenTheApp'] ?? false) as bool,
+      );
+}
+
+class StudentAppAccounts {
+  StudentAppAccounts({
+    required this.schoolOpen,
+    required this.minGradeLevel,
+    required this.children,
+  });
+
+  final bool schoolOpen;
+  final int minGradeLevel;
+  final List<StudentAppAccount> children;
+
+  factory StudentAppAccounts.fromJson(Map<String, dynamic> j) => StudentAppAccounts(
+        schoolOpen: (j['schoolOpen'] ?? false) as bool,
+        minGradeLevel: (j['minGradeLevel'] as num?)?.toInt() ?? 5,
+        children: [
+          for (final raw in (j['children'] as List?) ?? const [])
+            StudentAppAccounts._child(raw),
+        ],
+      );
+
+  static StudentAppAccount _child(Object? raw) =>
+      StudentAppAccount.fromJson((raw as Map).cast<String, dynamic>());
+}
+
 class HomeArrivalConfirmed {
   HomeArrivalConfirmed({
     required this.studentId,
@@ -3258,6 +3329,22 @@ class ParentApi {
     return CanteenLimit.fromJson(json as Map<String, dynamic>);
   }
 
+  Future<StudentAppAccounts> studentAccounts() async {
+    final json = await _api.get('/parent/student-accounts');
+    return StudentAppAccounts.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<StudentAppAccount> switchStudentAccount(String studentId, {required bool enabled}) async {
+    final json = await _api.post('/parent/student-accounts/$studentId/switch', {'enabled': enabled});
+    return StudentAppAccount.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<StudentAppAccount> setStudentPassword(String studentId, String password) async {
+    final json =
+        await _api.post('/parent/student-accounts/$studentId/password', {'password': password});
+    return StudentAppAccount.fromJson(json as Map<String, dynamic>);
+  }
+
   Future<PackageOverview> packageOverview() => _keepable(
         PaymentPayee.ksp.base,
         PackageOverview.fromJson,
@@ -4104,6 +4191,7 @@ abstract final class ParentSection {
   static const dropoff = 'parent.dropoff';
   static const events = 'parent.events';
   static const canteen = 'parent.canteen';
+  static const studentAccount = 'parent.studentAccount';
 }
 
 enum SectionAccess { open, locked, hidden, unknown }

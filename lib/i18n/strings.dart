@@ -2652,6 +2652,35 @@ const Map<String, String> _en = {
   'allergen.FISH': 'Fish',
   'allergen.SHELLFISH': 'Shellfish',
   'allergen.HONEY': 'Honey',
+
+  'studentAccount.title': 'Student app',
+  'studentAccount.subtitle': 'Let your child use the app with their own account.',
+  'studentAccount.rowSub': 'Turn the app on for your child and give them a password',
+  'studentAccount.whatItIs':
+      'Your child can see their timetable, homework, marks and school news in their own app.',
+  'studentAccount.fromGrade': 'The school opens this from grade {n} upwards.',
+  'studentAccount.schoolClosed': 'This school has not opened the student app yet.',
+  'studentAccount.schoolClosedBody':
+      'When the school opens it you can turn it on here for each child.',
+  'studentAccount.ready': 'Ready',
+  'studentAccount.needsPassword': 'Needs a password',
+  'studentAccount.off': 'Off',
+  'studentAccount.officeClosedIt':
+      'The school office has switched this account off. Ask the office about it.',
+  'studentAccount.tooYoung': 'Your child is in too young a class for the student app.',
+  'studentAccount.letThemIn': 'Let them sign in',
+  'studentAccount.onBody': 'They can sign in with their student code and the password you set.',
+  'studentAccount.offBody': 'They cannot sign in. Turn this on to let them.',
+  'studentAccount.setPassword': 'Set a password',
+  'studentAccount.resetPassword': 'Change the password',
+  'studentAccount.passwordIsSet': 'A password is set. You can change it whenever you want.',
+  'studentAccount.noPasswordYet': 'No password yet, so they cannot sign in.',
+  'studentAccount.passwordFor': 'A password for {name}',
+  'studentAccount.passwordWhy':
+      'Your child signs in with their student code and this password. Tell it to them yourself.',
+  'studentAccount.turnedOn': '{name} can sign in now.',
+  'studentAccount.turnedOff': '{name} can no longer sign in.',
+  'studentAccount.passwordSaved': 'Saved. Tell {name} the new password.',
 };
 
 const Map<String, String> _ckb = {
@@ -5184,6 +5213,36 @@ const Map<String, String> _ckb = {
   'allergen.FISH': 'ماسی',
   'allergen.SHELLFISH': 'ماسی توێکڵدار',
   'allergen.HONEY': 'هەنگوین',
+
+  'studentAccount.title': 'ئەپی قوتابی',
+  'studentAccount.subtitle': 'ڕێگە بدە منداڵەکەت بە هەژماری خۆی ئەپەکە بەکاربهێنێت.',
+  'studentAccount.rowSub': 'ئەپەکە بۆ منداڵەکەت بکەرەوە و وشەیەکی نهێنی پێبدە',
+  'studentAccount.whatItIs':
+      'منداڵەکەت دەتوانێت خشتەی وانە، ئەرکی ماڵەوە، نمرەکان و هەواڵی قوتابخانە لە ئەپی خۆیدا ببینێت.',
+  'studentAccount.fromGrade': 'قوتابخانە ئەمە لە پۆلی {n} بەرەوسەرەوە دەکاتەوە.',
+  'studentAccount.schoolClosed': 'ئەم قوتابخانەیە هێشتا ئەپی قوتابی نەکردووەتەوە.',
+  'studentAccount.schoolClosedBody':
+      'کاتێک قوتابخانە بکاتەوە، لێرە بۆ هەر منداڵێک دەتوانیت بکەیەوە.',
+  'studentAccount.ready': 'ئامادەیە',
+  'studentAccount.needsPassword': 'وشەی نهێنی پێویستە',
+  'studentAccount.off': 'داخراوە',
+  'studentAccount.officeClosedIt':
+      'نووسینگەی قوتابخانە ئەم هەژمارە داخستووە. لە نووسینگە بپرسە.',
+  'studentAccount.tooYoung': 'منداڵەکەت لە پۆلێکدایە کە بچووکترە بۆ ئەپی قوتابی.',
+  'studentAccount.letThemIn': 'ڕێگەی بدە بچێتە ژوورەوە',
+  'studentAccount.onBody':
+      'دەتوانێت بە کۆدی قوتابی و ئەو وشەی نهێنییەی تۆ داناوە بچێتە ژوورەوە.',
+  'studentAccount.offBody': 'ناتوانێت بچێتە ژوورەوە. ئەمە بکەرەوە بۆ ئەوەی بتوانێت.',
+  'studentAccount.setPassword': 'وشەیەکی نهێنی دابنێ',
+  'studentAccount.resetPassword': 'وشەی نهێنی بگۆڕە',
+  'studentAccount.passwordIsSet': 'وشەی نهێنی دانراوە. هەر کاتێک بتەوێت دەتوانیت بگۆڕیت.',
+  'studentAccount.noPasswordYet': 'هێشتا وشەی نهێنی نییە، بۆیە ناتوانێت بچێتە ژوورەوە.',
+  'studentAccount.passwordFor': 'وشەیەکی نهێنی بۆ {name}',
+  'studentAccount.passwordWhy':
+      'منداڵەکەت بە کۆدی قوتابی و ئەم وشەی نهێنییە دەچێتە ژوورەوە. خۆت پێی بڵێ.',
+  'studentAccount.turnedOn': '{name} ئێستا دەتوانێت بچێتە ژوورەوە.',
+  'studentAccount.turnedOff': '{name} چیتر ناتوانێت بچێتە ژوورەوە.',
+  'studentAccount.passwordSaved': 'پاشەکەوت کرا. وشەی نهێنی نوێ بە {name} بڵێ.',
 };
 
 const Map<String, String> _ar = {
@@ -7710,4 +7769,31 @@ const Map<String, String> _ar = {
   'allergen.FISH': 'السمك',
   'allergen.SHELLFISH': 'المحار',
   'allergen.HONEY': 'العسل',
+
+  'studentAccount.title': 'تطبيق الطالب',
+  'studentAccount.subtitle': 'اسمح لطفلك باستخدام التطبيق بحسابه الخاص.',
+  'studentAccount.rowSub': 'افتح التطبيق لطفلك وأعطه كلمة سر',
+  'studentAccount.whatItIs':
+      'يرى طفلك جدول حصصه وواجباته ودرجاته وأخبار المدرسة في تطبيقه الخاص.',
+  'studentAccount.fromGrade': 'تفتح المدرسة هذا من الصف {n} وما فوق.',
+  'studentAccount.schoolClosed': 'لم تفتح هذه المدرسة تطبيق الطالب بعد.',
+  'studentAccount.schoolClosedBody': 'عندما تفتحه المدرسة يمكنك تشغيله هنا لكل طفل.',
+  'studentAccount.ready': 'جاهز',
+  'studentAccount.needsPassword': 'يحتاج كلمة سر',
+  'studentAccount.off': 'مغلق',
+  'studentAccount.officeClosedIt': 'أغلق مكتب المدرسة هذا الحساب. اسأل المكتب عنه.',
+  'studentAccount.tooYoung': 'طفلك في صف أصغر من أن يستخدم تطبيق الطالب.',
+  'studentAccount.letThemIn': 'اسمح له بالدخول',
+  'studentAccount.onBody': 'يستطيع الدخول برمز الطالب وكلمة السر التي تضعها.',
+  'studentAccount.offBody': 'لا يستطيع الدخول. شغّل هذا ليستطيع.',
+  'studentAccount.setPassword': 'ضع كلمة سر',
+  'studentAccount.resetPassword': 'غيّر كلمة السر',
+  'studentAccount.passwordIsSet': 'كلمة السر موضوعة. يمكنك تغييرها وقت ما تريد.',
+  'studentAccount.noPasswordYet': 'لا كلمة سر بعد، فلا يستطيع الدخول.',
+  'studentAccount.passwordFor': 'كلمة سر لـ {name}',
+  'studentAccount.passwordWhy':
+      'يدخل طفلك برمز الطالب وهذه كلمة السر. أخبره بها أنت.',
+  'studentAccount.turnedOn': 'يستطيع {name} الدخول الآن.',
+  'studentAccount.turnedOff': 'لم يعد {name} يستطيع الدخول.',
+  'studentAccount.passwordSaved': 'تم الحفظ. أخبر {name} بكلمة السر الجديدة.',
 };

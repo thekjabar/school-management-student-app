@@ -23,6 +23,7 @@ import 'personal_info_screen.dart';
 import 'school_fees_screen.dart';
 import 'section_gate.dart';
 import 'settings_screen.dart';
+import 'student_account_screen.dart';
 
 class ParentProfileTab extends StatelessWidget {
   const ParentProfileTab({
@@ -419,6 +420,20 @@ class _Settings extends StatelessWidget {
               childIds: ids,
               section: ParentSection.dropoff,
               builder: (_) => const DropoffScreen(),
+            ),
+          ),
+          Divider(height: 1, color: AppTheme.border),
+          _Row(
+            key: const ValueKey('profile.studentAccount'),
+            icon: Icons.phone_iphone_rounded,
+            title: t('studentAccount.title'),
+            sub: t('studentAccount.rowSub'),
+            locked: ent.lockedForAll(ids, ParentSection.studentAccount),
+            onTap: () => openHouseholdSection<void>(
+              context,
+              childIds: ids,
+              section: ParentSection.studentAccount,
+              builder: (_) => const StudentAccountScreen(),
             ),
           ),
           Divider(height: 1, color: AppTheme.border),
