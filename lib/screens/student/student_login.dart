@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../api/client.dart';
 import '../../api/push.dart';
@@ -9,13 +8,10 @@ import '../../api/session.dart';
 import '../../api/student_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
-import '../../ui/async.dart';
 import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
 import '../login_screen.dart' show LanguagePicker, ThemeToggle;
-
-const _lastSchoolKey = 'sm_student_school';
 
 class StudentLoginScreen extends StatefulWidget {
   const StudentLoginScreen({super.key, required this.onSignedIn, this.offline = false});
@@ -34,15 +30,12 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
   final _confirm = TextEditingController();
   final _passwordFocus = FocusNode();
 
-  List<OpenSchool>? _schools;
-  OpenSchool? _school;
+  String? _tenantId;
 
-  bool _loadingSchools = true;
   bool _busy = false;
   bool _obscure = true;
   bool _choosing = false;
   String? _error;
-  String? _schoolsError;
 
   @override
   void initState() {
@@ -52,8 +45,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
       Session.passwordChangeRequired = false;
       _error = t('login.mustChangeAgain');
     }
-    _code.addListener(() => setState(() {}));
-    unawaited(_loadSchools());
+    _code.addListener(() => setState(() => _tenantId = null));
   }
 
   @override
@@ -66,56 +58,18 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
     super.dispose();
   }
 
-  Future<void> _loadSchools() async {
-    setState(() {
-      _loadingSchools = true;
-      _schoolsError = null;
-    });
-    try {
-      final schools = await StudentApi.instance.openSchools();
-      final prefs = await SharedPreferences.getInstance();
-      final last = prefs.getString(_lastSchoolKey);
-      if (!mounted) return;
-      setState(() {
-        _schools = schools;
-        _school = schools.where((s) => s.id == last).firstOrNull ??
-            (schools.length == 1 ? schools.first : null);
-        _loadingSchools = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _schoolsError = errorText(e);
-        _loadingSchools = false;
-      });
-    }
-  }
-
-  Future<void> _pickSchool() async {
-    final schools = _schools ?? const <OpenSchool>[];
-    if (schools.isEmpty) return;
-    final picked = await pickOne<String>(
+  Future<String?> _pickSchool(List<OpenSchool> schools) {
+    return pickOne<String>(
       context,
       title: t('student.whichSchool'),
       tint: Role.student.tint,
-      selected: _school?.id,
       options: schools
           .map((s) => PickOption(value: s.id, label: s.displayName, icon: Icons.school_rounded))
           .toList(),
     );
-    if (picked == null || !mounted) return;
-    setState(() {
-      _school = schools.where((s) => s.id == picked).firstOrNull;
-      _error = null;
-    });
   }
 
   Future<void> _signIn() async {
-    final school = _school;
-    if (school == null) {
-      setState(() => _error = t('student.schoolNeeded'));
-      return;
-    }
     if (_code.text.trim().isEmpty) {
       setState(() => _error = t('student.codeNeeded'));
       return;
@@ -130,10 +84,18 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
       _error = null;
     });
     try {
-      final result =
-          await Session.instance.signInAsStudent(school.id, _code.text, _password.text);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_lastSchoolKey, school.id);
+      final SignInResult result;
+      try {
+        result = await Session.instance.signInAsStudent(_code.text, _password.text, tenantId: _tenantId);
+      } on SchoolChoiceNeeded catch (choice) {
+        if (!mounted) return;
+        setState(() => _busy = false);
+        final picked = await _pickSchool(choice.schools);
+        if (picked == null || !mounted) return;
+        _tenantId = picked;
+        return _signIn();
+      }
+      _tenantId = result.me.active.tenantId;
       if (!mounted) return;
       if (result.mustChangePassword) {
         setState(() => _choosing = true);
@@ -151,8 +113,6 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
   }
 
   Future<void> _choose() async {
-    final school = _school;
-    if (school == null) return;
     if (_next.text.length < 8) {
       setState(() => _error = t('login.tooShort'));
       return;
@@ -168,7 +128,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
     try {
       await Session.instance.changePassword(_password.text, _next.text);
       final again =
-          await Session.instance.signInAsStudent(school.id, _code.text, _next.text);
+          await Session.instance.signInAsStudent(_code.text, _next.text, tenantId: _tenantId);
       if (!mounted) return;
       unawaited(Push.askPermission());
       widget.onSignedIn(again.me);
@@ -241,16 +201,6 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
           style: TextStyle(fontSize: 14, color: AppTheme.textMuted),
         ),
         const SizedBox(height: 18),
-
-        _SchoolField(
-          tint: role.tint,
-          loading: _loadingSchools,
-          error: _schoolsError,
-          school: _school,
-          onTap: _pickSchool,
-          onRetry: _loadSchools,
-        ),
-        const SizedBox(height: 16),
 
         _Field(
           icon: Icons.badge_outlined,
@@ -487,85 +437,6 @@ class _Crest extends StatelessWidget {
   }
 }
 
-class _SchoolField extends StatelessWidget {
-  const _SchoolField({
-    required this.tint,
-    required this.loading,
-    required this.error,
-    required this.school,
-    required this.onTap,
-    required this.onRetry,
-  });
-
-  final Color tint;
-  final bool loading;
-  final String? error;
-  final OpenSchool? school;
-  final VoidCallback onTap;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    if (error != null) {
-      return GestureDetector(
-        onTap: onRetry,
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-          decoration: BoxDecoration(
-            color: AppTheme.roseSoft,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: AppTheme.rose.withValues(alpha: 0.4)),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.refresh_rounded, size: 20, color: AppTheme.rose),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Text(
-                  error!,
-                  style: TextStyle(fontSize: 12.5, height: 1.4, color: AppTheme.rose),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return GestureDetector(
-      onTap: loading ? null : onTap,
-      behavior: HitTestBehavior.opaque,
-      child: _Field(
-        icon: Icons.school_rounded,
-        tint: tint,
-        label: t('student.school'),
-        trailing: loading
-            ? SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2.2, color: tint),
-              )
-            : Icon(Icons.expand_more_rounded, size: 21, color: AppTheme.textFaint),
-        child: Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: Text(
-            school?.displayName ?? t('student.pickSchool'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 15.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
-              color: school == null ? AppTheme.textFaint : AppTheme.text,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _Card extends StatelessWidget {
   const _Card({required this.child});
 
@@ -668,8 +539,4 @@ class _ErrorLine extends StatelessWidget {
       ),
     );
   }
-}
-
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
 }
