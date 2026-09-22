@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/session.dart';
 import '../../api/student_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
@@ -252,13 +253,15 @@ class _ExamCard extends StatelessWidget {
                 Pill(tn('student.examSessionsDone', exam.sessionsDone), color: AppTheme.green),
             ],
           ),
-          const SizedBox(height: 12),
-          BigButton(
-            label: t('student.planForExam'),
-            color: colour,
-            height: 42,
-            onPressed: busy ? null : onPlan,
-          ),
+          if (!Session.instance.readOnlyHere.value) ...[
+            const SizedBox(height: 12),
+            BigButton(
+              label: t('student.planForExam'),
+              color: colour,
+              height: 42,
+              onPressed: busy ? null : onPlan,
+            ),
+          ],
         ],
       ),
     );
@@ -307,11 +310,12 @@ class _Plan extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        BigButton(
-          label: t('student.planRevision'),
-          color: tint,
-          onPressed: busy ? null : onAdd,
-        ),
+        if (!Session.instance.readOnlyHere.value)
+          BigButton(
+            label: t('student.planRevision'),
+            color: tint,
+            onPressed: busy ? null : onAdd,
+          ),
         if (plan.rows.isEmpty) ...[
           const SizedBox(height: kCardGap),
           NoticeBanner(
@@ -377,18 +381,28 @@ class _SessionCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          IconButton(
-            onPressed: busy ? null : onTick,
-            icon: Icon(
-              done ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-              size: 24,
+          if (Session.instance.readOnlyHere.value)
+            Padding(
+              padding: const EdgeInsets.only(top: 5),
+              child: Icon(
+                done ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                size: 24,
+                color: done ? AppTheme.green : AppTheme.textFaint,
+              ),
+            )
+          else
+            IconButton(
+              onPressed: busy ? null : onTick,
+              icon: Icon(
+                done ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                size: 24,
+              ),
+              color: done ? AppTheme.green : AppTheme.textFaint,
+              tooltip: t('student.revisionTick'),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
             ),
-            color: done ? AppTheme.green : AppTheme.textFaint,
-            tooltip: t('student.revisionTick'),
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-          ),
           const SizedBox(width: 9),
           Expanded(
             child: Column(
@@ -426,16 +440,18 @@ class _SessionCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 6),
-          IconButton(
-            onPressed: busy ? null : onRemove,
-            icon: const Icon(Icons.close_rounded, size: 18),
-            color: AppTheme.rose,
-            tooltip: t('student.revisionRemove'),
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          ),
+          if (!Session.instance.readOnlyHere.value) ...[
+            const SizedBox(width: 6),
+            IconButton(
+              onPressed: busy ? null : onRemove,
+              icon: const Icon(Icons.close_rounded, size: 18),
+              color: AppTheme.rose,
+              tooltip: t('student.revisionRemove'),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            ),
+          ],
         ],
       ),
     );

@@ -902,12 +902,81 @@ class HandIn {
   }
 }
 
+class MySchool {
+  MySchool({
+    required this.studentId,
+    required this.tenantId,
+    required this.schoolName,
+    required this.schoolNames,
+    required this.from,
+    required this.to,
+    required this.stillEnrolled,
+    required this.current,
+  });
+
+  final String studentId;
+  final String tenantId;
+  final String schoolName;
+  final LocalText schoolNames;
+  final String? from;
+  final String? to;
+  final bool stillEnrolled;
+  final bool current;
+
+  factory MySchool.fromJson(Map<String, dynamic> j) => MySchool(
+        studentId: (j['studentId'] ?? '') as String,
+        tenantId: (j['tenantId'] ?? '') as String,
+        schoolName: (j['schoolName'] ?? '') as String,
+        schoolNames: LocalText.fromJson(j['schoolNames']),
+        from: j['from'] as String?,
+        to: j['to'] as String?,
+        stillEnrolled: (j['stillEnrolled'] ?? false) as bool,
+        current: (j['current'] ?? false) as bool,
+      );
+}
+
+class OpenedSchool {
+  OpenedSchool({
+    required this.accessToken,
+    required this.refreshToken,
+    required this.studentId,
+    required this.tenantId,
+    required this.readOnly,
+  });
+
+  final String accessToken;
+  final String? refreshToken;
+  final String studentId;
+  final String tenantId;
+  final bool readOnly;
+
+  factory OpenedSchool.fromJson(Map<String, dynamic> j) => OpenedSchool(
+        accessToken: j['accessToken'] as String,
+        refreshToken: j['refreshToken'] as String?,
+        studentId: (j['studentId'] ?? '') as String,
+        tenantId: (j['tenantId'] ?? '') as String,
+        readOnly: (j['readOnly'] ?? false) as bool,
+      );
+}
+
 class StudentApi {
   StudentApi._();
 
   static final StudentApi instance = StudentApi._();
 
   final ApiClient _api = ApiClient.instance;
+
+  Future<List<MySchool>> mySchools() async {
+    final body = await _api.get('/me/schools') as Map<String, dynamic>;
+    return ((body['schools'] as List?) ?? const [])
+        .map((s) => MySchool.fromJson((s as Map).cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
+  Future<OpenedSchool> openSchool(String studentId) async =>
+      OpenedSchool.fromJson(
+        await _api.post('/me/schools/$studentId/open') as Map<String, dynamic>,
+      );
 
   Future<List<OpenSchool>> openSchools() async {
     final body = await _api.get('/auth/schools') as List;

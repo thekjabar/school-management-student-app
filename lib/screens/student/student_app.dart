@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../api/client.dart';
 import '../../api/session.dart';
+import '../../api/student_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
+import '../../ui/async.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/nav_glyphs.dart';
+import '../../ui/pickers.dart';
 import 'announcements_screen.dart';
 import 'home_tab.dart';
 import 'id_card.dart';
@@ -34,6 +38,51 @@ class _StudentAppState extends State<StudentApp> {
             glyph: NavGlyph.profile),
       ];
 
+  bool _switching = false;
+
+  static String? _spanOf(MySchool school) {
+    if (school.from == null) return null;
+    return school.to == null
+        ? tv('student.schoolFrom', {'from': school.from!})
+        : tv('student.schoolFromTo', {'from': school.from!, 'to': school.to!});
+  }
+
+  Future<void> _switchSchool() async {
+    final schools = Session.instance.mySchools.value;
+    if (schools.length < 2 || _switching) return;
+
+    final here = schools.where((s) => s.current);
+    final picked = await pickOne<String>(
+      context,
+      title: t('student.mySchools'),
+      tint: Role.student.tint,
+      selected: here.isEmpty ? null : here.first.studentId,
+      options: [
+        for (final s in schools)
+          PickOption<String>(
+            value: s.studentId,
+            label: s.schoolNames.inLang(AppLocale.current.value) ?? s.schoolName,
+            subtitle: [
+              s.stillEnrolled ? t('student.schoolNow') : t('student.schoolLeft'),
+              ?_spanOf(s),
+            ].join(' · '),
+            icon: s.stillEnrolled ? Icons.school_rounded : Icons.history_rounded,
+          ),
+      ],
+    );
+    if (!mounted || picked == null) return;
+    if (schools.any((s) => s.studentId == picked && s.current)) return;
+
+    setState(() => _switching = true);
+    try {
+      await Session.instance.openSchool(picked);
+    } on ApiException catch (e) {
+      if (mounted) showNote(context, e.message, bad: true);
+    } finally {
+      if (mounted) setState(() => _switching = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const role = Role.student;
@@ -53,14 +102,20 @@ class _StudentAppState extends State<StudentApp> {
         bottom: false,
         child: Column(
           children: [
-            _StudentHeader(
-              greeting: greeting,
-              name: me?.name ?? '',
-              school: me?.schoolName ?? '',
-              onBell: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const StudentAnnouncementsScreen()),
+            ValueListenableBuilder<List<MySchool>>(
+              valueListenable: Session.instance.mySchools,
+              builder: (context, schools, _) => _StudentHeader(
+                greeting: greeting,
+                name: me?.name ?? '',
+                school: me?.schoolName ?? '',
+                switching: _switching,
+                onSwitchSchool: schools.length > 1 ? _switchSchool : null,
+                onBell: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const StudentAnnouncementsScreen()),
+                ),
               ),
             ),
+            const StudentReadOnlyBanner(),
             Expanded(
               child: IndexedStack(
                 index: _tab,
@@ -88,18 +143,46 @@ class _StudentAppState extends State<StudentApp> {
   }
 }
 
+class StudentReadOnlyBanner extends StatelessWidget {
+  const StudentReadOnlyBanner({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: Session.instance.readOnlyHere,
+      builder: (context, readOnly, _) {
+        if (!readOnly) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 12),
+          child: Banner2(
+            title: t('student.schoolLeft'),
+            subtitle: t('student.readOnlyHere'),
+            icon: Icons.history_rounded,
+            tint: AppTheme.amber,
+            wash: AppTheme.amberSoft,
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _StudentHeader extends StatelessWidget {
   const _StudentHeader({
     required this.greeting,
     required this.name,
     required this.school,
     required this.onBell,
+    required this.switching,
+    this.onSwitchSchool,
   });
 
   final String greeting;
   final String name;
   final String school;
   final VoidCallback onBell;
+  final bool switching;
+  final VoidCallback? onSwitchSchool;
 
   @override
   Widget build(BuildContext context) {
@@ -137,30 +220,43 @@ class _StudentHeader extends StatelessWidget {
                   style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                 ),
                 const SizedBox(height: 5),
-                Container(
-                  padding: const EdgeInsetsDirectional.fromSTEB(8, 4, 10, 4),
-                  decoration: BoxDecoration(
-                    color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.12),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.school_rounded, size: 13, color: tint),
-                      const SizedBox(width: 5),
-                      Flexible(
-                        child: Text(
-                          school.isNotEmpty ? school : t('student.roleLabel'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: tint,
+                GestureDetector(
+                  onTap: switching ? null : onSwitchSchool,
+                  child: Container(
+                    padding: const EdgeInsetsDirectional.fromSTEB(8, 4, 10, 4),
+                    decoration: BoxDecoration(
+                      color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.school_rounded, size: 13, color: tint),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            school.isNotEmpty ? school : t('student.roleLabel'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: tint,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                        if (onSwitchSchool != null) ...[
+                          const SizedBox(width: 4),
+                          switching
+                              ? SizedBox(
+                                  width: 11,
+                                  height: 11,
+                                  child: CircularProgressIndicator(strokeWidth: 1.6, color: tint),
+                                )
+                              : Icon(Icons.unfold_more_rounded, size: 13, color: tint),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
               ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../api/session.dart';
 import '../../api/student_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
@@ -173,7 +174,7 @@ class _HandInBody extends StatelessWidget {
     final submission = data.submission;
     final colour = parseHex(work.subjectColorHex, AppTheme.amber);
     final marked = submission?.marked ?? false;
-    final shut = marked || !work.handInOpen;
+    final shut = marked || !work.handInOpen || Session.instance.readOnlyHere.value;
     final files = submission?.files ?? const <HandInFile>[];
     final room = work.maxFiles - files.length;
 

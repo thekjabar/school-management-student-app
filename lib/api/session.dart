@@ -8,6 +8,7 @@ import 'client.dart';
 import 'family_payments.dart' show LocalText;
 import 'offline_cache.dart';
 import 'push.dart';
+import 'student_api.dart' show MySchool, StudentApi;
 
 const List<String> kGuardianRoles = ['GUARDIAN'];
 
@@ -136,6 +137,10 @@ class Session {
   final ValueNotifier<String?> activeTenant = ValueNotifier<String?>(null);
 
   final ValueNotifier<int> revision = ValueNotifier<int>(0);
+
+  final ValueNotifier<List<MySchool>> mySchools = ValueNotifier<List<MySchool>>(const []);
+
+  final ValueNotifier<bool> readOnlyHere = ValueNotifier<bool>(false);
 
   final ApiClient _api = ApiClient.instance;
 
@@ -290,6 +295,42 @@ class Session {
     });
   }
 
+  Future<List<MySchool>> loadMySchools() async {
+    try {
+      final rows = await StudentApi.instance.mySchools();
+      mySchools.value = rows;
+      final here = rows.where((s) => s.current).firstOrNull;
+      if (here != null) readOnlyHere.value = !here.stillEnrolled;
+      return rows;
+    } on ApiException {
+      return mySchools.value;
+    }
+  }
+
+  Future<void> openSchool(String studentId) async {
+    final opened = await StudentApi.instance.openSchool(studentId);
+    await _api.saveSession(
+      access: opened.accessToken,
+      refresh: opened.refreshToken,
+      tenantId: opened.tenantId,
+    );
+    await OfflineCache.instance.clear();
+    readOnlyHere.value = opened.readOnly;
+    await refresh();
+    await loadMySchools();
+  }
+
+  Future<void> settleNewestSchool() async {
+    final rows = await loadMySchools();
+    final newest = rows.firstOrNull;
+    if (newest == null || newest.current) return;
+    try {
+      await openSchool(newest.studentId);
+    } on ApiException {
+      // ignore: empty_catches
+    }
+  }
+
   Future<void> signOut() async {
     try {
       await _api.post('/auth/logout');
@@ -298,6 +339,8 @@ class Session {
     }
     _me = null;
     activeTenant.value = null;
+    mySchools.value = const [];
+    readOnlyHere.value = false;
     await _api.clear();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_schoolChosenKey);

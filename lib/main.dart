@@ -206,6 +206,7 @@ class _GateState extends State<_Gate> {
     final me = boot.me;
     if (me != null) {
       chosen = await _alignTenant(me, chosen);
+      if (_role == Role.student) await Session.instance.loadMySchools();
     }
     if (!mounted) return;
     setState(() {
@@ -217,7 +218,8 @@ class _GateState extends State<_Gate> {
   }
 
   Future<void> _settleAfterSignIn(Me me) async {
-    final chosen = await _alignTenant(me, false);
+    if (_role == Role.student) await Session.instance.settleNewestSchool();
+    final chosen = await _alignTenant(Session.instance.me ?? me, false);
     if (!mounted) return;
     setState(() {
       _me = Session.instance.me ?? me;
