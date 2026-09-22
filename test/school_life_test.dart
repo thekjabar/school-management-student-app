@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:student_app/api/parent_api.dart';
+import 'package:student_app/api/teacher_events.dart';
 import 'package:student_app/i18n/strings.dart';
 
 Map<String, dynamic> _event({
@@ -210,6 +211,71 @@ void main() {
         );
       }
     }
+  });
+
+  test('a teacher sees the classes of their own that an event invites', () {
+    final detail = TeacherEventDetail.fromJson({
+      ..._event(),
+      'wholeSchool': false,
+      'myClassIds': ['classA', 'classB'],
+      'classes': [
+        {
+          'classId': 'classA',
+          'className': 'Grade 4 A',
+          'classNames': {'ckb': 'پۆلی ٤ ئەلف'},
+          'students': [
+            {
+              'studentId': 'cmtzn8ufo00050nny6zw28vnr',
+              'code': 'S-1',
+              'rollNumber': '1',
+              'name': 'Hana Aram Ali',
+              'names': {'ckb': 'هانا ئارام عەلی'},
+              'reply': EventReplyKind.yes,
+              'headcount': 3,
+            },
+            {
+              'studentId': 'cmtzn8ufo00060nny6zw28vnr',
+              'code': 'S-2',
+              'rollNumber': '2',
+              'name': 'Karo Dler Sabir',
+              'names': null,
+              'reply': null,
+              'headcount': 0,
+            },
+          ],
+          'tally': {'yes': 1, 'no': 0, 'maybe': 0, 'silent': 1, 'people': 3},
+        },
+        {
+          'classId': 'classB',
+          'className': 'Grade 5 B',
+          'classNames': null,
+          'students': <Map<String, dynamic>>[],
+          'tally': {'yes': 0, 'no': 2, 'maybe': 1, 'silent': 0, 'people': 0},
+        },
+      ],
+    });
+
+    expect(detail.event.myClassIds, ['classA', 'classB']);
+    expect(detail.classes.first.students.first.coming, isTrue);
+    expect(detail.classes.first.students.last.silent, isTrue);
+    expect(detail.total.yes, 1);
+    expect(detail.total.no, 2);
+    expect(detail.total.maybe, 1);
+    expect(detail.total.silent, 1);
+    expect(detail.total.people, 3);
+    expect(detail.total.asked, 5);
+
+    AppLocale.current.value = Lang.ckb;
+    expect(detail.classes.first.classText, 'پۆلی ٤ ئەلف');
+    expect(detail.classes.first.students.first.childName, 'هانا ئارام عەلی');
+    expect(detail.classes.last.classText, 'Grade 5 B');
+    AppLocale.current.value = Lang.en;
+  });
+
+  test('a teacher event with no class of theirs carries no roster', () {
+    final detail = TeacherEventDetail.fromJson({..._event(), 'classes': <Map<String, dynamic>>[]});
+    expect(detail.classes, isEmpty);
+    expect(detail.total.asked, 0);
   });
 
   test('events and the canteen are package sections the school can switch off', () {

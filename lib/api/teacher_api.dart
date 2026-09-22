@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart' show Uint8List, ValueNotifier;
 import 'attachments.dart';
 import 'client.dart';
 import 'parent_api.dart' show AiAnswer, AiHistoryEntry, AiHistoryPage, Announcement, LocalText;
+import 'teacher_events.dart';
+
+export 'teacher_events.dart';
 
 class AiTeacherClass {
   AiTeacherClass({
@@ -542,6 +545,21 @@ class TeacherApi {
   Future<List<AttachedFile>> announcementAttachments(String id) async {
     final json = await _api.get('/teacher/announcements/$id/attachments?pageSize=50');
     return Paged.from<AttachedFile>(json, AttachedFile.fromJson).rows;
+  }
+
+  Future<List<TeacherEvent>> events({DateTime? from, DateTime? to}) async {
+    final query = <String>[
+      'pageSize=100',
+      if (from != null) 'from=${Uri.encodeQueryComponent(from.toUtc().toIso8601String())}',
+      if (to != null) 'to=${Uri.encodeQueryComponent(to.toUtc().toIso8601String())}',
+    ];
+    final json = await _api.get('/teacher/events?${query.join('&')}');
+    return Paged.from<TeacherEvent>(json, TeacherEvent.fromJson).rows;
+  }
+
+  Future<TeacherEventDetail> event(String id) async {
+    final json = await _api.get('/teacher/events/$id') as Map<String, dynamic>;
+    return TeacherEventDetail.fromJson(json);
   }
 
   Future<List<TeachingSlot>> classes() async {
