@@ -11,6 +11,7 @@ import '../../ui/insets.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import '../../ui/sheets.dart';
+import 'hand_in_screen.dart';
 
 class StudentHomeworkScreen extends StatefulWidget {
   const StudentHomeworkScreen({super.key});
@@ -191,6 +192,7 @@ class _HomeworkCard extends StatelessWidget {
                   '${work.score!.round()} / ${(work.maxScore ?? 0).round()}',
                   color: AppTheme.violet,
                 ),
+              if (work.handInOpen && !done) Pill(t('student.handIn'), color: AppTheme.blue),
             ],
           ),
         ],
@@ -280,6 +282,22 @@ class _HomeworkSheet extends StatelessWidget {
               Text(
                 work.feedback!,
                 style: TextStyle(fontSize: 13, height: 1.6, color: AppTheme.text),
+              ),
+            ],
+            if (work.handInOpen) ...[
+              const SizedBox(height: 20),
+              BigButton(
+                label: t('student.handIn'),
+                color: parseHex(work.subjectColorHex, AppTheme.amber),
+                onPressed: () {
+                  final navigator = Navigator.of(context);
+                  navigator.pop();
+                  navigator.push(
+                    MaterialPageRoute(
+                      builder: (_) => StudentHandInScreen(homeworkId: work.id),
+                    ),
+                  );
+                },
               ),
             ],
           ],

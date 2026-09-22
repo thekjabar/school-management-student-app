@@ -9,9 +9,13 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/insets.dart';
 import '../../ui/kit.dart';
+import '../awards_screen.dart';
 import 'announcements_screen.dart';
+import 'exam_planner_screen.dart';
+import 'hand_in_screen.dart';
 import 'homework_screen.dart';
 import 'id_card.dart';
+import 'points_screen.dart';
 
 class StudentHome extends StatelessWidget {
   const StudentHome({super.key, required this.onOpenTab});
@@ -52,12 +56,41 @@ class StudentHome extends StatelessWidget {
                 color: AppTheme.violet,
                 onTap: () => onOpenTab(2),
               ),
-              QuickAction(
-                icon: Icons.qr_code_2_rounded,
-                label: t('student.idCard'),
-                color: AppTheme.blue,
-                onTap: () => showIdCard(context),
-              ),
+              if (day.features.examPlanner)
+                QuickAction(
+                  icon: Icons.fact_check_outlined,
+                  label: t('student.examPlanner'),
+                  color: AppTheme.rose,
+                  onTap: () => _push(context, const StudentExamPlannerScreen()),
+                ),
+              if (day.features.housePoints)
+                QuickAction(
+                  icon: Icons.shield_outlined,
+                  label: t('student.points'),
+                  color: AppTheme.green,
+                  onTap: () => _push(context, const StudentPointsScreen()),
+                ),
+              if (day.features.awards)
+                QuickAction(
+                  icon: Icons.emoji_events_outlined,
+                  label: t('student.awards'),
+                  color: AppTheme.amber,
+                  onTap: () => _push(
+                    context,
+                    AwardsScreen(
+                      load: StudentApi.instance.awards,
+                      words: studentAwardsWords,
+                      tint: tint,
+                    ),
+                  ),
+                ),
+              if (day.features.idCard)
+                QuickAction(
+                  icon: Icons.qr_code_2_rounded,
+                  label: t('student.idCard'),
+                  color: AppTheme.blue,
+                  onTap: () => showIdCard(context),
+                ),
               QuickAction(
                 icon: Icons.campaign_outlined,
                 label: t('student.announcements'),
@@ -67,6 +100,15 @@ class StudentHome extends StatelessWidget {
             ],
           ),
           const SizedBox(height: kCardGap),
+
+          if (day.glance != null) ...[
+            _Glance(
+              glance: day.glance!,
+              handInOn: day.features.homeworkHandIn,
+              onHandIn: (id) => _push(context, StudentHandInScreen(homeworkId: id)),
+            ),
+            const SizedBox(height: kCardGap),
+          ],
 
           Card16(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
@@ -204,28 +246,169 @@ String _trim(double? value) {
 }
 
 class _Day {
-  _Day({required this.today, required this.homework, required this.marks, required this.news});
+  _Day({
+    required this.features,
+    required this.today,
+    required this.glance,
+    required this.homework,
+    required this.marks,
+    required this.news,
+  });
 
+  final StudentFeatures features;
   final TodayTimetable today;
+  final TodayGlance? glance;
   final List<Homework> homework;
   final List<Mark> marks;
   final List<StudentNotice> news;
 
+  static Future<T?> _orNothing<T>(Future<T> Function() job) async {
+    try {
+      return await job();
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<_Day> fetch() async {
     final api = StudentApi.instance;
     final results = await Future.wait([
+      api.me(),
       api.today(),
       api.homework(pageSize: 4),
       api.marks(),
       api.announcements(pageSize: 3),
+      _orNothing(api.glance),
     ]);
 
-    final marks = results[2] as List<Mark>;
+    final marks = results[3] as List<Mark>;
     return _Day(
-      today: results[0] as TodayTimetable,
-      homework: (results[1] as Paged<Homework>).rows,
+      features: (results[0] as StudentProfile).features,
+      today: results[1] as TodayTimetable,
+      glance: results[5] as TodayGlance?,
+      homework: (results[2] as Paged<Homework>).rows,
       marks: marks.take(3).toList(growable: false),
-      news: (results[3] as Paged<StudentNotice>).rows,
+      news: (results[4] as Paged<StudentNotice>).rows,
+    );
+  }
+}
+
+class _Glance extends StatelessWidget {
+  const _Glance({required this.glance, required this.handInOn, required this.onHandIn});
+
+  final TodayGlance glance;
+  final bool handInOn;
+  final void Function(String homeworkId) onHandIn;
+
+  String? get _marked {
+    switch (glance.attendanceStatus) {
+      case null:
+        return null;
+      case 'PRESENT':
+        return t('student.markedPresentToday');
+      case 'LATE':
+        return tn('student.markedLateToday', glance.minutesLate ?? 0);
+      case 'ABSENT':
+        return t('student.markedAbsentToday');
+      default:
+        return humanise(glance.attendanceStatus!);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = Role.student.tint;
+    final next = glance.nextClass;
+    final exam = glance.nextExam;
+    final marked = _marked;
+
+    final pills = <Widget>[
+      if (next != null && next.inProgress && next.minutesLeft != null)
+        Pill(tn('student.minutesLeft', next.minutesLeft!), color: AppTheme.green),
+      if (next != null && !next.inProgress && next.minutesUntilStart != null)
+        Pill(tn('student.startsInMinutes', next.minutesUntilStart!), color: tint),
+      if (glance.classesLeft > 1)
+        Pill(tn('student.lessonsLeft', glance.classesLeft), color: AppTheme.blue),
+      if (glance.classesLeft == 1)
+        Pill(t('student.lastLessonOfDay'), color: AppTheme.amber),
+    ];
+
+    if (pills.isEmpty && marked == null && exam == null && glance.dueToday.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Card16(
+      padding: EdgeInsets.fromLTRB(14, 14, 14, glance.dueToday.isEmpty ? 14 : 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (next != null && next.inProgress) ...[
+            Text(
+              t('student.nowIn'),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+                color: AppTheme.textFaint,
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
+          if (pills.isNotEmpty)
+            Wrap(spacing: 6, runSpacing: 6, children: pills),
+          if (marked != null) ...[
+            if (pills.isNotEmpty) const SizedBox(height: 10),
+            Text(
+              marked,
+              style: TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.textMuted),
+            ),
+          ],
+          if (exam != null) ...[
+            const SizedBox(height: 12),
+            TileRow(
+              icon: Icons.fact_check_outlined,
+              color: parseHex(exam.subjectColorHex, AppTheme.rose),
+              title: exam.title,
+              subtitle: '${t('student.nextExam')}  •  ${exam.subject}',
+              trailing: dueWord(exam.daysLeft),
+              trailingColor: exam.daysLeft <= 3 ? AppTheme.rose : AppTheme.textMuted,
+              last: true,
+            ),
+          ],
+          if (glance.dueToday.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              t('student.dueToday'),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+                color: AppTheme.textFaint,
+              ),
+            ),
+            const SizedBox(height: 6),
+            for (var i = 0; i < glance.dueToday.length; i++)
+              TileRow(
+                icon: subjectIcon(glance.dueToday[i].subject),
+                color: parseHex(glance.dueToday[i].subjectColorHex, AppTheme.amber),
+                title: glance.dueToday[i].title,
+                subtitle: glance.dueToday[i].subject,
+                trailing: glance.dueToday[i].handedIn != null
+                    ? t('student.handedIn')
+                    : glance.dueToday[i].handInOpen && handInOn
+                        ? t('student.handIn')
+                        : null,
+                trailingColor: glance.dueToday[i].handedIn != null
+                    ? AppTheme.green
+                    : AppTheme.blue,
+                last: i == glance.dueToday.length - 1,
+                onTap: handInOn && glance.dueToday[i].handInOpen
+                    ? () => onHandIn(glance.dueToday[i].id)
+                    : null,
+              ),
+          ],
+        ],
+      ),
     );
   }
 }
