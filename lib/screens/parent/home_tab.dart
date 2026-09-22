@@ -14,7 +14,9 @@ import '../../ui/nav_glyphs.dart';
 import 'assignments_screen.dart';
 import 'assistant_screen.dart';
 import 'bus_screen.dart';
+import 'canteen_screen.dart';
 import 'driver_feedback_screen.dart';
+import 'events_screen.dart';
 import 'attendance_screen.dart';
 import 'attitude_screen.dart';
 import 'homework_detail.dart';
@@ -237,6 +239,20 @@ class HomeTab extends StatelessWidget {
                       color: AppTheme.green,
                       section: ParentSection.driverFeedback,
                       builder: (_) => DriverFeedbackScreen(child: child),
+                    ),
+                    action(
+                      icon: Icons.celebration_outlined,
+                      label: t('quick.events'),
+                      color: AppTheme.amber,
+                      section: ParentSection.events,
+                      builder: (_) => EventsScreen(child: child),
+                    ),
+                    action(
+                      icon: Icons.restaurant_rounded,
+                      label: t('quick.canteen'),
+                      color: AppTheme.green,
+                      section: ParentSection.canteen,
+                      builder: (_) => CanteenScreen(child: child),
                     ),
                   ].nonNulls.toList(),
                 ),

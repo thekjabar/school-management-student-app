@@ -6,9 +6,11 @@ import 'attachments.dart';
 import 'client.dart';
 import 'family_payments.dart';
 import 'offline_cache.dart';
+import 'school_life.dart';
 import 'session.dart';
 
 export 'family_payments.dart';
+export 'school_life.dart';
 
 class Child {
   Child({
@@ -3131,6 +3133,131 @@ class ParentApi {
     return WhatsAppChoice.fromJson(json as Map<String, dynamic>);
   }
 
+  Future<List<SchoolEventItem>> schoolEvents(
+    String studentId, {
+    DateTime? from,
+    DateTime? to,
+    String? tenantId,
+  }) {
+    final query = <String>[
+      'pageSize=100',
+      if (from != null) 'from=${Uri.encodeQueryComponent(from.toUtc().toIso8601String())}',
+      if (to != null) 'to=${Uri.encodeQueryComponent(to.toUtc().toIso8601String())}',
+    ];
+    return _keepable(
+      '/parent/children/$studentId/events?${query.join('&')}',
+      (json) => Paged.from<SchoolEventItem>(json, SchoolEventItem.fromJson).rows,
+      tenantId: _scope(tenantId),
+    );
+  }
+
+  Future<SchoolEventItem> replyToEvent({
+    required String eventId,
+    required String studentId,
+    required String reply,
+    int? headcount,
+    String? note,
+    String? tenantId,
+  }) async {
+    final json = await _api.postAs(_scope(tenantId), '/parent/events/$eventId/reply', {
+      'studentId': studentId,
+      'reply': reply,
+      'headcount': ?headcount,
+      'note': ?(note == null || note.trim().isEmpty ? null : note.trim()),
+    });
+    return SchoolEventItem.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<CanteenBalance> canteenBalance(String studentId, {String? tenantId}) async {
+    final json = await _api.get(
+      '/parent/children/$studentId/canteen',
+      tenantId: _scope(tenantId),
+    ) as Map<String, dynamic>;
+    return CanteenBalance.fromJson(json);
+  }
+
+  Future<CanteenDayMenu> canteenMenu(
+    String studentId,
+    String day, {
+    String? tenantId,
+  }) async {
+    final json = await _api.get(
+      '/parent/children/$studentId/canteen/menu?day=${Uri.encodeQueryComponent(day)}',
+      tenantId: _scope(tenantId),
+    ) as Map<String, dynamic>;
+    return CanteenDayMenu.fromJson(json);
+  }
+
+  Future<List<CanteenOrder>> canteenOrders(
+    String studentId, {
+    String? from,
+    String? tenantId,
+  }) async {
+    final query = <String>[
+      'pageSize=60',
+      if (from != null && from.isNotEmpty) 'from=${Uri.encodeQueryComponent(from)}',
+    ];
+    final json = await _api.get(
+      '/parent/children/$studentId/canteen/orders?${query.join('&')}',
+      tenantId: _scope(tenantId),
+    );
+    return Paged.from<CanteenOrder>(json, CanteenOrder.fromJson).rows;
+  }
+
+  Future<CanteenOrder> placeCanteenOrder({
+    required String studentId,
+    required String day,
+    required Map<String, int> quantities,
+    String? tenantId,
+  }) async {
+    final json = await _api.postAs(
+      _scope(tenantId),
+      '/parent/children/$studentId/canteen/orders',
+      {
+        'day': day,
+        'lines': [
+          for (final line in quantities.entries)
+            if (line.value > 0) {'itemId': line.key, 'quantity': line.value},
+        ],
+      },
+    );
+    return CanteenOrder.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<int> cancelCanteenOrder({
+    required String studentId,
+    required String orderId,
+    String? tenantId,
+  }) async {
+    final json = await _api.deleteAs(
+      _scope(tenantId),
+      '/parent/children/$studentId/canteen/orders/$orderId',
+    );
+    final balance = json is Map ? json['balanceIqd'] : null;
+    return (balance as num?)?.toInt() ?? 0;
+  }
+
+  Future<List<CanteenLedgerRow>> canteenHistory(String studentId, {String? tenantId}) async {
+    final json = await _api.get(
+      '/parent/children/$studentId/canteen/history?pageSize=60',
+      tenantId: _scope(tenantId),
+    );
+    return Paged.from<CanteenLedgerRow>(json, CanteenLedgerRow.fromJson).rows;
+  }
+
+  Future<CanteenLimit> setCanteenDailyLimit({
+    required String studentId,
+    required int? dailyLimitIqd,
+    String? tenantId,
+  }) async {
+    final json = await _api.putAs(
+      _scope(tenantId),
+      '/parent/children/$studentId/canteen/limit',
+      {'dailyLimitIqd': ?dailyLimitIqd},
+    );
+    return CanteenLimit.fromJson(json as Map<String, dynamic>);
+  }
+
   Future<PackageOverview> packageOverview() => _keepable(
         PaymentPayee.ksp.base,
         PackageOverview.fromJson,
@@ -3975,6 +4102,8 @@ abstract final class ParentSection {
   static const consents = 'parent.consents';
   static const routeSafety = 'parent.routeSafety';
   static const dropoff = 'parent.dropoff';
+  static const events = 'parent.events';
+  static const canteen = 'parent.canteen';
 }
 
 enum SectionAccess { open, locked, hidden, unknown }

@@ -10,6 +10,7 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/screen_kit.dart';
 import 'assignments_screen.dart';
+import 'events_screen.dart';
 import 'homework_detail.dart';
 import 'section_gate.dart';
 import 'timetable_screen.dart';
@@ -25,6 +26,7 @@ class CalendarTab extends StatefulWidget {
 }
 
 class _CalendarTabState extends State<CalendarTab> {
+  final _loaderKey = GlobalKey<LoaderState<_Diary>>();
   int _view = 0;
   late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
   late DateTime _day = DateTime.now();
@@ -52,6 +54,7 @@ class _CalendarTabState extends State<CalendarTab> {
     }
 
     return Loader<_Diary>(
+      key: _loaderKey,
       tint: tint,
       watch: '$id|${ent.lockSignature(id)}',
       padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 20)),
@@ -62,6 +65,15 @@ class _CalendarTabState extends State<CalendarTab> {
           when(ParentSection.marks, () => ParentApi.instance.results(id), const <ExamResultItem>[]),
           ParentApi.instance.announcements(),
           when(ParentSection.calendar, () => ParentApi.instance.upcomingExams(id), const <UpcomingExam>[]),
+          when(
+            ParentSection.events,
+            () => ParentApi.instance.schoolEvents(
+              id,
+              from: DateTime.now().subtract(const Duration(days: 60)),
+              tenantId: widget.child.tenantId,
+            ),
+            const <SchoolEventItem>[],
+          ),
         ]);
         return _Diary(
           week: r[0] as List<DayOfLessons>,
@@ -69,6 +81,7 @@ class _CalendarTabState extends State<CalendarTab> {
           results: r[2] as List<ExamResultItem>,
           notices: r[3] as List<Announcement>,
           exams: r[4] as List<UpcomingExam>,
+          gatherings: r[5] as List<SchoolEventItem>,
         );
       },
       builder: (context, diary) {
@@ -122,16 +135,22 @@ class _CalendarTabState extends State<CalendarTab> {
                 onDay: (d) => setState(() => _day = d),
               ),
               const SizedBox(height: kCardGap),
-              _DayCard(day: _day, events: events, child: widget.child),
+              _DayCard(
+                day: _day,
+                events: events,
+                child: widget.child,
+                onReplied: _reload,
+              ),
             ] else if (_view == 1)
               _WeekCard(
                 day: _day,
                 diary: diary,
                 onDay: (d) => setState(() => _day = d),
                 child: widget.child,
+                onReplied: _reload,
               )
             else
-              _AgendaCard(diary: diary, child: widget.child),
+              _AgendaCard(diary: diary, child: widget.child, onReplied: _reload),
 
             if (diary.nextHoliday != null) ...[
               const SizedBox(height: kCardGap),
@@ -142,9 +161,11 @@ class _CalendarTabState extends State<CalendarTab> {
       },
     );
   }
+
+  void _reload() => _loaderKey.currentState?.reload();
 }
 
-enum EventKind { lesson, assignment, exam, result, notice }
+enum EventKind { lesson, assignment, exam, result, notice, gathering }
 
 class DiaryEvent {
   const DiaryEvent({
@@ -157,6 +178,7 @@ class DiaryEvent {
     this.where,
     this.colour,
     this.homework,
+    this.gathering,
   });
 
   final EventKind kind;
@@ -168,6 +190,7 @@ class DiaryEvent {
   final String? where;
   final Color? colour;
   final HomeworkItem? homework;
+  final SchoolEventItem? gathering;
 
   Color get tint =>
       colour ??
@@ -177,6 +200,7 @@ class DiaryEvent {
         EventKind.exam => AppTheme.rose,
         EventKind.result => AppTheme.amber,
         EventKind.notice => AppTheme.green,
+        EventKind.gathering => Role.parent.tint,
       };
 
   IconData get icon => switch (kind) {
@@ -185,6 +209,7 @@ class DiaryEvent {
         EventKind.exam => Icons.edit_calendar_rounded,
         EventKind.result => Icons.fact_check_outlined,
         EventKind.notice => Icons.campaign_outlined,
+        EventKind.gathering => Icons.celebration_outlined,
       };
 
   String get label => switch (kind) {
@@ -193,6 +218,7 @@ class DiaryEvent {
         EventKind.exam => t('cal.exam'),
         EventKind.result => t('cal.result'),
         EventKind.notice => t('cal.event'),
+        EventKind.gathering => t('cal.gathering'),
       };
 }
 
@@ -203,6 +229,7 @@ class _Diary {
     required this.results,
     required this.notices,
     required this.exams,
+    required this.gatherings,
   });
 
   final List<DayOfLessons> week;
@@ -212,6 +239,7 @@ class _Diary {
   final List<Announcement> notices;
 
   final List<UpcomingExam> exams;
+  final List<SchoolEventItem> gatherings;
 
   static const _weekdays = {
     DateTime.monday: 'MONDAY',
@@ -291,6 +319,20 @@ class _Diary {
       ));
     }
 
+    for (final g in gatherings.where((g) => _same(g.day, day))) {
+      events.add(DiaryEvent(
+        kind: EventKind.gathering,
+        title: g.titleText,
+        subtitle: [g.placeText, eventStateWord(g)].where((s) => s.isNotEmpty).join('  •  '),
+        at: g.startsAt,
+        startMinute: g.startsAt.hour * 60 + g.startsAt.minute,
+        endMinute: g.endsAt == null ? null : g.endsAt!.hour * 60 + g.endsAt!.minute,
+        where: g.placeText,
+        colour: eventTint(g),
+        gathering: g,
+      ));
+    }
+
     events.sort((a, b) => (a.startMinute ?? 9999).compareTo(b.startMinute ?? 9999));
     return events;
   }
@@ -306,6 +348,7 @@ class _Diary {
             EventKind.exam => AppTheme.rose,
             EventKind.result => AppTheme.amber,
             EventKind.notice => AppTheme.green,
+            EventKind.gathering => Role.parent.tint,
           },
     ];
   }
@@ -472,6 +515,7 @@ class _MonthCard extends StatelessWidget {
                 _Key(colour: AppTheme.rose, label: t('cal.exam')),
                 _Key(colour: AppTheme.amber, label: t('cal.result')),
                 _Key(colour: AppTheme.green, label: t('cal.event')),
+                _Key(colour: Role.parent.tint, label: t('cal.gathering')),
               ],
             ),
           ),
@@ -609,11 +653,17 @@ class _Cell extends StatelessWidget {
 }
 
 class _DayCard extends StatelessWidget {
-  const _DayCard({required this.day, required this.events, required this.child});
+  const _DayCard({
+    required this.day,
+    required this.events,
+    required this.child,
+    required this.onReplied,
+  });
 
   final DateTime day;
   final List<DiaryEvent> events;
   final Child child;
+  final VoidCallback onReplied;
 
   @override
   Widget build(BuildContext context) {
@@ -659,7 +709,8 @@ class _DayCard extends StatelessWidget {
               ),
             )
           else
-            for (final e in events) _EventRow(event: e, child: child),
+            for (final e in events)
+              _EventRow(event: e, child: child, onReplied: onReplied),
         ],
       ),
     );
@@ -667,13 +718,20 @@ class _DayCard extends StatelessWidget {
 }
 
 class _EventRow extends StatelessWidget {
-  const _EventRow({required this.event, required this.child});
+  const _EventRow({required this.event, required this.child, required this.onReplied});
 
   final DiaryEvent event;
   final Child child;
+  final VoidCallback onReplied;
 
-  void _open(BuildContext context) {
+  Future<void> _open(BuildContext context) async {
+    final gathering = event.gathering;
     final hw = event.homework;
+    if (gathering != null) {
+      final replied = await showEventSheet(context, child: child, event: gathering);
+      if (replied) onReplied();
+      return;
+    }
     if (hw != null) {
       openSection<void>(
         context,
@@ -702,7 +760,9 @@ class _EventRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colour = event.tint;
 
-    final opens = event.kind == EventKind.lesson || event.kind == EventKind.assignment;
+    final opens = event.kind == EventKind.lesson ||
+        event.kind == EventKind.assignment ||
+        event.kind == EventKind.gathering;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -802,12 +862,14 @@ class _WeekCard extends StatelessWidget {
     required this.diary,
     required this.onDay,
     required this.child,
+    required this.onReplied,
   });
 
   final DateTime day;
   final _Diary diary;
   final ValueChanged<DateTime> onDay;
   final Child child;
+  final VoidCallback onReplied;
 
   @override
   Widget build(BuildContext context) {
@@ -822,6 +884,7 @@ class _WeekCard extends StatelessWidget {
               day: start.add(Duration(days: i)),
               events: diary.on(start.add(Duration(days: i))),
               child: child,
+              onReplied: onReplied,
             ),
           ),
       ],
@@ -830,10 +893,11 @@ class _WeekCard extends StatelessWidget {
 }
 
 class _AgendaCard extends StatelessWidget {
-  const _AgendaCard({required this.diary, required this.child});
+  const _AgendaCard({required this.diary, required this.child, required this.onReplied});
 
   final _Diary diary;
   final Child child;
+  final VoidCallback onReplied;
 
   @override
   Widget build(BuildContext context) {
@@ -861,7 +925,12 @@ class _AgendaCard extends StatelessWidget {
         for (final d in days)
           Padding(
             padding: const EdgeInsets.only(bottom: kCardGap),
-            child: _DayCard(day: d, events: diary.on(d), child: child),
+            child: _DayCard(
+              day: d,
+              events: diary.on(d),
+              child: child,
+              onReplied: onReplied,
+            ),
           ),
       ],
     );
