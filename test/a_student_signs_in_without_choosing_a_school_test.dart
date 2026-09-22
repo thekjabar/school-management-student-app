@@ -23,13 +23,8 @@ void main() {
       ));
       if (request.url.path.endsWith('/auth/login')) {
         return http.Response.bytes(
-          utf8.encode(jsonEncode({
-            'chooseSchool': [
-              {'id': 'cmtenanterbil000000001', 'name': 'Erbil School', 'names': {'ckb': 'قوتابخانەی هەولێر'}},
-              {'id': 'cmtenantduhok000000002', 'name': 'Duhok School', 'names': {'ckb': 'قوتابخانەی دهۆک'}},
-            ],
-          })),
-          200,
+          utf8.encode(jsonEncode({'message': 'This code and password fit more than one child. Ask the school office to help you sign in.'})),
+          409,
           headers: {'content-type': 'application/json; charset=utf-8'},
         );
       }
@@ -37,24 +32,14 @@ void main() {
     });
   });
 
-  test('the code and password go without a school, and two matching schools come back as a choice', () async {
+  test('only the code and password are sent, never a school', () async {
     await expectLater(
       Session.instance.signInAsStudent(' STU-2026-00190 ', 'pass-1234'),
-      throwsA(isA<SchoolChoiceNeeded>().having((c) => c.schools.map((s) => s.id).toList(), 'schools', [
-        'cmtenanterbil000000001',
-        'cmtenantduhok000000002',
-      ])),
+      throwsA(isA<ApiException>().having((e) => e.status, 'status', 409)),
     );
     final login = calls.singleWhere((c) => c.path.endsWith('/auth/login'));
-    expect(login.body.containsKey('tenantId'), isFalse);
+    expect(login.body.keys.toSet(), {'code', 'password'});
     expect(login.body['code'], 'STU-2026-00190');
-
-    calls.clear();
-    await expectLater(
-      Session.instance.signInAsStudent('STU-2026-00190', 'pass-1234', tenantId: 'cmtenantduhok000000002'),
-      throwsA(isA<SchoolChoiceNeeded>()),
-    );
-    expect(calls.single.body['tenantId'], 'cmtenantduhok000000002');
   });
 
   testWidgets('the sign-in screen asks for a code and a password, never for a school', (tester) async {

@@ -5,12 +5,10 @@ import 'package:flutter/material.dart';
 import '../../api/client.dart';
 import '../../api/push.dart';
 import '../../api/session.dart';
-import '../../api/student_api.dart';
 import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/insets.dart';
 import '../../ui/kit.dart';
-import '../../ui/pickers.dart';
 import '../login_screen.dart' show LanguagePicker, ThemeToggle;
 
 class StudentLoginScreen extends StatefulWidget {
@@ -58,17 +56,6 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
     super.dispose();
   }
 
-  Future<String?> _pickSchool(List<OpenSchool> schools) {
-    return pickOne<String>(
-      context,
-      title: t('student.whichSchool'),
-      tint: Role.student.tint,
-      options: schools
-          .map((s) => PickOption(value: s.id, label: s.displayName, icon: Icons.school_rounded))
-          .toList(),
-    );
-  }
-
   Future<void> _signIn() async {
     if (_code.text.trim().isEmpty) {
       setState(() => _error = t('student.codeNeeded'));
@@ -84,17 +71,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
       _error = null;
     });
     try {
-      final SignInResult result;
-      try {
-        result = await Session.instance.signInAsStudent(_code.text, _password.text, tenantId: _tenantId);
-      } on SchoolChoiceNeeded catch (choice) {
-        if (!mounted) return;
-        setState(() => _busy = false);
-        final picked = await _pickSchool(choice.schools);
-        if (picked == null || !mounted) return;
-        _tenantId = picked;
-        return _signIn();
-      }
+      final result = await Session.instance.signInAsStudent(_code.text, _password.text);
       _tenantId = result.me.active.tenantId;
       if (!mounted) return;
       if (result.mustChangePassword) {

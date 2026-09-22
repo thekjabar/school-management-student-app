@@ -8,7 +8,6 @@ import 'client.dart';
 import 'family_payments.dart' show LocalText;
 import 'offline_cache.dart';
 import 'push.dart';
-import 'student_api.dart' show OpenSchool;
 
 const List<String> kGuardianRoles = ['GUARDIAN'];
 
@@ -115,12 +114,6 @@ class Me {
   }
 }
 
-class SchoolChoiceNeeded implements Exception {
-  const SchoolChoiceNeeded(this.schools);
-
-  final List<OpenSchool> schools;
-}
-
 class SignInResult {
   SignInResult({required this.me, required this.mustChangePassword});
 
@@ -188,13 +181,6 @@ class Session {
       'code': code.trim(),
       'password': password,
     }) as Map<String, dynamic>;
-
-    final choices = body['chooseSchool'];
-    if (choices is List) {
-      throw SchoolChoiceNeeded(choices
-          .map((s) => OpenSchool.fromJson((s as Map).cast<String, dynamic>()))
-          .toList(growable: false));
-    }
 
     final memberships = (body['memberships'] as List?) ?? const [];
     final signedInto = tenantId ??
