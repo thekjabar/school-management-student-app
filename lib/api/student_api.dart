@@ -4,8 +4,10 @@ import 'attachments.dart';
 import 'awards.dart';
 import 'client.dart';
 import 'family_payments.dart' show LocalText;
+import 'hand_in_file.dart';
 
 export 'awards.dart' show AwardsWall, Certificate;
+export 'hand_in_file.dart' show HandInFile;
 
 DateTime? _at(Object? value) => value == null ? null : DateTime.tryParse('$value')?.toLocal();
 
@@ -806,33 +808,6 @@ class ExamPlanner {
 
   final List<ComingExam> exams;
   final RevisionPlan plan;
-}
-
-class HandInFile {
-  HandInFile({
-    required this.id,
-    required this.assetId,
-    required this.mime,
-    required this.bytes,
-    required this.filename,
-    required this.readyToOpen,
-  });
-
-  final String id;
-  final String assetId;
-  final String? mime;
-  final int? bytes;
-  final String? filename;
-  final bool readyToOpen;
-
-  factory HandInFile.fromJson(Map<String, dynamic> j) => HandInFile(
-        id: (j['id'] ?? '') as String,
-        assetId: (j['assetId'] ?? '') as String,
-        mime: j['mime'] as String?,
-        bytes: (j['bytes'] as num?)?.toInt(),
-        filename: j['originalFilename'] as String?,
-        readyToOpen: (j['readyToOpen'] ?? false) as bool,
-      );
 }
 
 class HandInSubmission {

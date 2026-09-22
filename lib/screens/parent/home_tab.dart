@@ -11,6 +11,7 @@ import '../../ui/kit.dart';
 import '../../ui/motion.dart';
 import '../../ui/pickers.dart';
 import '../../ui/nav_glyphs.dart';
+import '../awards_screen.dart';
 import 'assignments_screen.dart';
 import 'assistant_screen.dart';
 import 'bus_screen.dart';
@@ -253,6 +254,18 @@ class HomeTab extends StatelessWidget {
                       color: AppTheme.green,
                       section: ParentSection.canteen,
                       builder: (_) => CanteenScreen(child: child),
+                    ),
+                    action(
+                      icon: Icons.workspace_premium_outlined,
+                      label: t('quick.awards'),
+                      color: AppTheme.amber,
+                      section: ParentSection.awards,
+                      builder: (_) => AwardsScreen(
+                        load: () => ParentApi.instance.childAwards(child.studentId),
+                        words: childAwardsWords,
+                        tint: Role.parent.tint,
+                        subtitle: child.name,
+                      ),
                     ),
                   ].nonNulls.toList(),
                 ),

@@ -878,6 +878,7 @@ const Map<String, String> _en = {
   'msg.fileFallback': 'Attached file',
   'msg.fileUnavailable': 'That file is not available. Ask the school office.',
   'msg.fileCannotOpen': 'Nothing on this phone can open that file.',
+  'msg.fileChecking': 'Being checked',
   'msg.filesRetry': 'Try again',
 
   'skip.title': 'Days off the bus',
@@ -2649,7 +2650,6 @@ const Map<String, String> _en = {
   'student.handInFilesFull': 'You have added all the files you are allowed.',
   'student.handInFileAdded': 'File added.',
   'student.handInFileRemoved': 'File taken off.',
-  'student.handInFileChecking': 'Being checked',
   'student.handInNothing': 'Write something or add a photograph first.',
   'student.handInCamera': 'Take a photograph',
   'student.handInGallery': 'Choose from the gallery',
@@ -3537,6 +3537,7 @@ const Map<String, String> _ckb = {
   'msg.fileFallback': 'فایلی هاوپێچکراو',
   'msg.fileUnavailable': 'ئەم فایلە بەردەست نییە. پرسیار لە نووسینگەی قوتابخانە بکە.',
   'msg.fileCannotOpen': 'هیچ شتێک لەم مۆبایلەدا ناتوانێت ئەم فایلە بکاتەوە.',
+  'msg.fileChecking': 'لە پشکنیندایە',
   'msg.filesRetry': 'دووبارە هەوڵ بدەرەوە',
 
   'skip.title': 'ڕۆژانی بێ پاس',
@@ -5308,7 +5309,6 @@ const Map<String, String> _ckb = {
   'student.handInFilesFull': 'هەموو ئەو فایلانەت زیاد کردووە کە بۆت ڕێگەپێدراوە.',
   'student.handInFileAdded': 'فایل زیاد کرا.',
   'student.handInFileRemoved': 'فایل لابرا.',
-  'student.handInFileChecking': 'لە پشکنیندایە',
   'student.handInNothing': 'سەرەتا شتێک بنووسە یان وێنەیەک زیاد بکە.',
   'student.handInCamera': 'وێنەیەک بگرە',
   'student.handInGallery': 'لە وێنەکاندا هەڵبژێرە',
@@ -6195,6 +6195,7 @@ const Map<String, String> _ar = {
   'msg.fileFallback': 'ملف مرفق',
   'msg.fileUnavailable': 'هذا الملف غير متاح. اسأل إدارة المدرسة.',
   'msg.fileCannotOpen': 'لا يوجد على هذا الهاتف ما يفتح هذا الملف.',
+  'msg.fileChecking': 'قيد الفحص',
   'msg.filesRetry': 'حاول مرة أخرى',
 
   'skip.title': 'أيام بدون الحافلة',
@@ -7962,7 +7963,6 @@ const Map<String, String> _ar = {
   'student.handInFilesFull': 'أضفت كل الملفات المسموح بها.',
   'student.handInFileAdded': 'أُضيف الملف.',
   'student.handInFileRemoved': 'أُزيل الملف.',
-  'student.handInFileChecking': 'قيد الفحص',
   'student.handInNothing': 'اكتب شيئاً أو أضف صورة أولاً.',
   'student.handInCamera': 'التقط صورة',
   'student.handInGallery': 'اختر من الصور',

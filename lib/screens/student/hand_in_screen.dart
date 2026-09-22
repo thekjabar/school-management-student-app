@@ -7,6 +7,7 @@ import '../../i18n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../ui/async.dart';
 import '../../ui/format.dart';
+import '../../ui/hand_in_files.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/pickers.dart';
@@ -289,13 +290,13 @@ class _HandInBody extends StatelessWidget {
         ),
         Heading(t('student.handInFiles'), tint: colour),
         for (final file in files) ...[
-          _FileRow(
+          HandInFileRow(
             file: file,
-            shut: shut,
             busy: busy,
             tint: colour,
             onOpen: () => onOpenFile(file),
-            onRemove: () => onRemoveFile(file),
+            onRemove: shut ? null : () => onRemoveFile(file),
+            removeTooltip: t('student.handInRemoveFile'),
           ),
           const SizedBox(height: 8),
         ],
@@ -402,93 +403,6 @@ class _AnswerState extends State<_Answer> {
         ],
         const SizedBox(height: 10),
       ],
-    );
-  }
-}
-
-class _FileRow extends StatelessWidget {
-  const _FileRow({
-    required this.file,
-    required this.shut,
-    required this.busy,
-    required this.tint,
-    required this.onOpen,
-    required this.onRemove,
-  });
-
-  final HandInFile file;
-  final bool shut;
-  final bool busy;
-  final Color tint;
-  final VoidCallback onOpen;
-  final VoidCallback onRemove;
-
-  static String _size(int? bytes) {
-    if (bytes == null || bytes <= 0) return '';
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).round()} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final mime = (file.mime ?? '').toLowerCase();
-    final icon = mime.startsWith('image/')
-        ? Icons.image_rounded
-        : mime.contains('pdf')
-            ? Icons.picture_as_pdf_rounded
-            : Icons.insert_drive_file_rounded;
-    final caption = [
-      if (_size(file.bytes).isNotEmpty) _size(file.bytes),
-      if (!file.readyToOpen) t('student.handInFileChecking'),
-    ].join('  •  ');
-
-    return Card16(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-      radius: 13,
-      onTap: file.readyToOpen ? onOpen : null,
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: file.readyToOpen ? tint : AppTheme.textFaint),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  file.filename ?? t('msg.fileFallback'),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.text,
-                  ),
-                ),
-                if (caption.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(caption, style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted)),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (file.readyToOpen)
-            Icon(Icons.open_in_new_rounded, size: 17, color: AppTheme.textFaint),
-          if (!shut) ...[
-            const SizedBox(width: 4),
-            IconButton(
-              onPressed: busy ? null : onRemove,
-              icon: const Icon(Icons.close_rounded, size: 18),
-              color: AppTheme.rose,
-              tooltip: t('student.handInRemoveFile'),
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }

@@ -2,9 +2,11 @@ import 'package:flutter/foundation.dart' show Uint8List, ValueNotifier;
 
 import 'attachments.dart';
 import 'client.dart';
+import 'hand_in_file.dart';
 import 'parent_api.dart' show AiAnswer, AiHistoryEntry, AiHistoryPage, Announcement, LocalText;
 import 'teacher_events.dart';
 
+export 'hand_in_file.dart' show HandInFile;
 export 'teacher_events.dart';
 
 class AiTeacherClass {
@@ -286,6 +288,11 @@ class HomeworkSheetRow {
     required this.name,
     required this.status,
     required this.score,
+    required this.submittedAt,
+    required this.handedInText,
+    required this.feedback,
+    required this.gradedAt,
+    required this.files,
   })  : savedStatus = status,
         savedScore = score;
 
@@ -297,8 +304,17 @@ class HomeworkSheetRow {
   num? score;
   final String savedStatus;
   final num? savedScore;
+  final DateTime? submittedAt;
+  final String? handedInText;
+  final String? feedback;
+  final DateTime? gradedAt;
+  final List<HandInFile> files;
 
   bool get changed => status != savedStatus || score != savedScore;
+
+  bool get handedIn => (handedInText ?? '').trim().isNotEmpty || files.isNotEmpty;
+
+  bool get marked => gradedAt != null;
 
   Map<String, Object?> toEntry() => {
         'studentId': studentId,
@@ -313,6 +329,13 @@ class HomeworkSheetRow {
         name: (j['name'] ?? '') as String,
         status: (j['status'] ?? 'NOT_SUBMITTED') as String,
         score: j['score'] as num?,
+        submittedAt: DateTime.tryParse((j['submittedAt'] ?? '') as String)?.toLocal(),
+        handedInText: j['handedInText'] as String?,
+        feedback: j['feedback'] as String?,
+        gradedAt: DateTime.tryParse((j['gradedAt'] ?? '') as String)?.toLocal(),
+        files: ((j['files'] as List?) ?? const [])
+            .map((f) => HandInFile.fromJson((f as Map).cast<String, dynamic>()))
+            .toList(growable: false),
       );
 }
 
@@ -323,6 +346,8 @@ class HomeworkSheet {
     required this.maxScore,
     required this.className,
     required this.subjectName,
+    required this.dueDate,
+    required this.handInOpen,
     required this.rows,
   });
 
@@ -331,6 +356,8 @@ class HomeworkSheet {
   final num? maxScore;
   final String className;
   final String subjectName;
+  final DateTime? dueDate;
+  final bool handInOpen;
   final List<HomeworkSheetRow> rows;
 
   List<Map<String, Object?>> changedEntries() => rows.where((r) => r.changed).map((r) => r.toEntry()).toList();
@@ -343,6 +370,8 @@ class HomeworkSheet {
       maxScore: hw['maxScore'] as num?,
       className: (hw['className'] ?? '') as String,
       subjectName: (hw['subjectName'] ?? '') as String,
+      dueDate: DateTime.tryParse((hw['dueDate'] ?? '') as String)?.toLocal(),
+      handInOpen: (hw['handInOpen'] ?? false) as bool,
       rows: ((j['students'] as List?) ?? const [])
           .map((e) => HomeworkSheetRow.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -648,6 +677,21 @@ class TeacherApi {
   Future<HomeworkSheet> homeworkSheet(String id) async {
     final json = await _api.get('/teacher/homework/$id/submissions');
     return HomeworkSheet.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<AttachedFile> openHandInFile(String homeworkId, String assetId) async {
+    final j = await _api.get('/teacher/homework/$homeworkId/submissions/files/$assetId')
+        as Map<String, dynamic>;
+    return AttachedFile(
+      id: (j['id'] ?? assetId) as String,
+      caption: null,
+      url: j['url'] as String?,
+      thumbnailUrl: null,
+      kind: 'OTHER',
+      mime: j['mime'] as String?,
+      bytes: (j['bytes'] as num?)?.toInt(),
+      filename: j['originalFilename'] as String?,
+    );
   }
 
   Future<int> saveHomeworkMarks(HomeworkSheet sheet) async {

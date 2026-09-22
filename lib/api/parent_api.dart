@@ -3,12 +3,14 @@ import 'package:flutter/foundation.dart';
 
 import '../i18n/strings.dart';
 import 'attachments.dart';
+import 'awards.dart';
 import 'client.dart';
 import 'family_payments.dart';
 import 'offline_cache.dart';
 import 'school_life.dart';
 import 'session.dart';
 
+export 'awards.dart' show AwardsWall, Certificate;
 export 'family_payments.dart';
 export 'school_life.dart';
 
@@ -2761,6 +2763,11 @@ class ParentApi {
     return Paged.from<ExamResultItem>(json, ExamResultItem.fromJson).rows;
   }
 
+  Future<AwardsWall> childAwards(String studentId) async {
+    final json = await _api.get('/parent/children/$studentId/awards');
+    return AwardsWall.fromJson(json as Map<String, dynamic>);
+  }
+
   Future<List<ReportCardSummary>> reportCards(String studentId) async {
     final json = await _api.get('/parent/children/$studentId/report-cards');
     return (json as List)
@@ -4192,6 +4199,7 @@ abstract final class ParentSection {
   static const events = 'parent.events';
   static const canteen = 'parent.canteen';
   static const studentAccount = 'parent.studentAccount';
+  static const awards = 'parent.awards';
 }
 
 enum SectionAccess { open, locked, hidden, unknown }
