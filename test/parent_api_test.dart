@@ -22,6 +22,7 @@ import 'package:student_app/api/session.dart';
 
 const phone = '07501190001';
 const password = 'School@123';
+const _leaveReason = 'Automated check from the app test. Safe to ignore.';
 
 void main() {
   // The token store is a Flutter plugin; in a test it needs a backing map.
@@ -215,22 +216,52 @@ void main() {
   });
 
   test('leave requests parse, and one can be raised and withdrawn', () async {
+    DateTime midnight(DateTime d) => DateTime(d.year, d.month, d.day);
+
+    // Withdraw anything this test stranded, so its rows cannot pile up. A real
+    // family's request never carries this reason, so nothing else is touched.
+    for (final stale in await ParentApi.instance.leaveRequests()) {
+      final ours = stale.reason?.contains(_leaveReason) ?? false;
+      final open = stale.status == 'PENDING' || stale.status == 'APPROVED';
+      final over = stale.toDate.isBefore(midnight(DateTime.now()));
+      if (ours && open && !over) await ParentApi.instance.cancelLeave(stale.id);
+    }
+
     final before = await ParentApi.instance.leaveRequests();
 
-    final today = DateTime.now();
+    // The server refuses days already covered by a PENDING or APPROVED request,
+    // including leave a school raised that this test must not cancel. So ask
+    // for the first day this child has nothing on, not for today.
+    final busy = before
+        .where((r) => r.studentId == child.studentId && (r.status == 'PENDING' || r.status == 'APPROVED'))
+        .toList();
+    var day = midnight(DateTime.now());
+    bool taken(DateTime d) => busy.any(
+        (r) => !d.isBefore(midnight(r.fromDate)) && !d.isAfter(midnight(r.toDate)));
+    while (taken(day)) {
+      day = day.add(const Duration(days: 1));
+    }
+
     await ParentApi.instance.requestLeave(
       studentId: child.studentId,
       kind: 'SICK',
-      from: today,
-      to: today,
-      reason: 'Automated check from the app test. Safe to ignore.',
+      from: day,
+      to: day,
+      reason: _leaveReason,
     );
 
     final after = await ParentApi.instance.leaveRequests();
     expect(after.length, greaterThan(before.length), reason: 'the request was not created');
 
-    final mine = after.firstWhere((r) => r.reason?.contains('Automated check') ?? false);
-    expect(mine.status, 'PENDING');
+    final mine = after.firstWhere((r) => r.reason?.contains(_leaveReason) ?? false);
+    // Leave a family reports is accepted on the spot rather than left waiting,
+    // and the screen shows that note instead of "waiting for the school".
+    expect(mine.status, 'APPROVED');
+    expect(mine.decisionNote, isNotEmpty);
+    // The server nests the child under `student`. If this ever comes back null
+    // the leave screen stops filtering and shows one child's leave under both.
+    expect(mine.studentId, child.studentId,
+        reason: 'the row did not carry the child it belongs to');
     await ParentApi.instance.cancelLeave(mine.id);
   });
 
@@ -306,8 +337,20 @@ void main() {
     expect(children, isNotEmpty);
 
     var riders = 0;
+    var locked = 0;
     for (final child in children) {
-      final safety = await ParentApi.instance.routeSafety(child.studentId);
+      final RouteSafety safety;
+      try {
+        safety = await ParentApi.instance.routeSafety(child.studentId);
+      } on SectionLockedException catch (e) {
+        // Route safety sits inside the KSP package. A child whose family has
+        // not taken the package must be refused by name, not answered with an
+        // empty shell the screen would render as real figures.
+        expect(e.studentId, child.studentId);
+        expect(e.section, isNotEmpty);
+        locked++;
+        continue;
+      }
 
       expect(safety.from, isNotEmpty, reason: 'the screen captions every figure with the period');
       expect(safety.to, isNotEmpty);
@@ -362,6 +405,8 @@ void main() {
       if (reaching.sent == 0) expect(reaching.deliveredRatePct, isNull);
     }
 
+    expect(locked, lessThan(children.length),
+        reason: 'every child was locked, so the figures themselves were never checked');
     expect(riders, greaterThan(0), reason: 'no child on this account rides a bus, so nothing was checked');
   });
 

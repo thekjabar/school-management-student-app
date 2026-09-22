@@ -1502,7 +1502,8 @@ class LeaveRequestItem {
         reason: j['reason'] as String?,
         status: (j['status'] ?? 'PENDING') as String,
         decisionNote: j['decisionNote'] as String?,
-        studentId: j['studentId'] as String?,
+        studentId: (j['student'] as Map<String, dynamic>?)?['id'] as String? ??
+            j['studentId'] as String?,
       );
 }
 
