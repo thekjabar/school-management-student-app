@@ -8,27 +8,46 @@ import '../../ui/format.dart';
 import '../../ui/home_kit.dart';
 import '../../ui/insets.dart';
 import '../../ui/kit.dart';
+import '../../ui/motion.dart';
+import 'student_kit.dart';
 
 class StudentWeek extends StatelessWidget {
   const StudentWeek({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Loader<List<TimetableDay>>(
+    return Loader<_Timetable>(
       tint: Role.student.tint,
       padding: clearOfTheBar(context, const EdgeInsets.fromLTRB(kGutter, 0, kGutter, 18)),
-      load: StudentApi.instance.week,
+      load: _Timetable.fetch,
       empty: t('timetable.none'),
-      isEmpty: (days) => days.every((d) => d.slots.isEmpty),
-      builder: (context, days) => _Week(days: days),
+      isEmpty: (week) => week.days.every((d) => d.slots.isEmpty),
+      builder: (context, week) => _Week(days: week.days, className: week.className),
+    );
+  }
+}
+
+class _Timetable {
+  _Timetable({required this.days, required this.className});
+
+  final List<TimetableDay> days;
+  final String? className;
+
+  static Future<_Timetable> fetch() async {
+    final api = StudentApi.instance;
+    final results = await Future.wait([api.week(), api.me()]);
+    return _Timetable(
+      days: results[0] as List<TimetableDay>,
+      className: (results[1] as StudentProfile).schoolClass?.name,
     );
   }
 }
 
 class _Week extends StatefulWidget {
-  const _Week({required this.days});
+  const _Week({required this.days, required this.className});
 
   final List<TimetableDay> days;
+  final String? className;
 
   @override
   State<_Week> createState() => _WeekState();
@@ -49,69 +68,94 @@ class _WeekState extends State<_Week> {
     final day = widget.days.where((d) => d.weekday == _weekday).firstOrNull;
     final slots = day?.slots ?? const <Lesson>[];
 
+    final isToday = _weekday == todayWeekday();
+    final subtitle = [
+      if (slots.isNotEmpty) tn('student.lessonCount', slots.length),
+      if ((widget.className ?? '').isNotEmpty) widget.className!,
+    ].join('  •  ');
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          height: 40,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: widget.days.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 8),
-            itemBuilder: (context, i) {
-              final d = widget.days[i];
-              final on = d.weekday == _weekday;
-              return GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => setState(() => _weekday = d.weekday),
-                child: Container(
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(horizontal: 15),
-                  decoration: BoxDecoration(
-                    color: on ? tint : AppTheme.surface,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: on ? tint : AppTheme.border),
-                  ),
-                  child: Text(
-                    weekdayName(d.weekday),
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: on ? Colors.white : AppTheme.textMuted,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
+        DayChips(
+          labels: [for (final d in widget.days) weekdayName(d.weekday)],
+          selected: widget.days.indexWhere((d) => d.weekday == _weekday),
+          onPick: (i) => setState(() => _weekday = widget.days[i].weekday),
+          tint: tint,
         ),
         const SizedBox(height: kCardGap),
-        Card16(
-          padding: EdgeInsets.fromLTRB(14, 14, 14, slots.isEmpty ? 14 : 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SectionRow(title: weekdayName(_weekday)),
-              if (slots.isEmpty)
-                Text(
-                  t('timetable.nothingThatDay'),
-                  style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted, height: 1.45),
-                )
-              else
-                ScheduleTimeline(
-                  trailingIcon: Icons.circle_outlined,
-                  entries: [
-                    for (final s in slots)
-                      ScheduleEntry(
-                        time: clock12(s.startMinute),
-                        subject: s.subject,
-                        teacher: s.teacherName,
-                        room: s.room,
-                        color: parseHex(s.subjectColorHex, tint),
+        Rise(
+          index: 0,
+          child: Card16(
+            padding: EdgeInsets.fromLTRB(14, 13, 14, slots.isEmpty ? 14 : 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            weekdayName(_weekday),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.4,
+                              color: AppTheme.text,
+                            ),
+                          ),
+                          if (subtitle.isNotEmpty) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                            ),
+                          ],
+                        ],
                       ),
+                    ),
+                    if (isToday) ...[
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          StudentSectionLabel(t('student.todaySchedule')),
+                          const SizedBox(height: 3),
+                          Text(
+                            shortDate(DateTime.now()),
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
-            ],
+                const SizedBox(height: 11),
+                if (slots.isEmpty)
+                  Text(
+                    t('timetable.nothingThatDay'),
+                    style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted, height: 1.45),
+                  )
+                else
+                  ScheduleTimeline(
+                    trailingIcon: Icons.circle_outlined,
+                    entries: [for (final s in slots) lessonEntry(s, tint)],
+                  ),
+              ],
+            ),
           ),
         ),
       ],
