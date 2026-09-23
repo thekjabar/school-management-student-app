@@ -4,19 +4,46 @@ import '../ui/home_kit.dart';
 import '../ui/kit.dart';
 import 'package:flutter/services.dart';
 
+class RolePage {
+  const RolePage({
+    required this.light,
+    required this.night,
+    required this.surfaceNight,
+    required this.borderNight,
+    required this.hero,
+  });
+
+  final Color light;
+  final Color night;
+  final Color surfaceNight;
+  final Color borderNight;
+
+  final List<Color> hero;
+}
+
+const _studentPage = RolePage(
+  light: Color(0xFFF1FBFD),
+  night: Color(0xFF071A20),
+  surfaceNight: Color(0xFF0F262C),
+  borderNight: Color(0xFF1E3B41),
+  hero: [Color(0xFF0193A3), Color(0xFF06AEB4), Color(0xFF33DBD6)],
+);
+
 enum Role {
   parent('Parent', Color(0xFF6D3FF7), Color(0xFFF2EEFD)),
-  student('Student', Color(0xFF22C55E), Color(0xFFE7F8EE)),
+  student('Student', Color(0xFF07BAB0), Color(0xFFDDF5F6), page: _studentPage),
   teacher('Teacher', Color(0xFF4D994B), Color(0xFFE7F1E6)),
   driver('Driver', Color(0xFFFB6A00), Color(0xFFFFEFE2)),
   admin('Admin', Color(0xFF6D4AFF), Color(0xFFECE8FE));
 
-  const Role(this.label, this.tint, this._lightWash);
+  const Role(this.label, this.tint, this._lightWash, {this.page});
 
   final String label;
   final Color tint;
 
   final Color _lightWash;
+
+  final RolePage? page;
 
   Color get wash => AppTheme.dark
       ? Color.lerp(AppTheme.canvas, tint, 0.14)!
@@ -26,11 +53,18 @@ enum Role {
 class AppTheme {
   static bool dark = false;
 
+  static Role skin = Role.parent;
+
   static Color _pick(Color light, Color night) => dark ? night : light;
 
-  static Color get canvas => _pick(const Color(0xFFFCFCFE), const Color(0xFF0A1324));
-  static Color get surface => _pick(const Color(0xFFFFFFFF), const Color(0xFF121A29));
-  static Color get border => _pick(const Color(0xFFEEEFF4), const Color(0xFF212A3D));
+  static RolePage? get _page => skin.page;
+
+  static Color get canvas =>
+      _pick(_page?.light ?? const Color(0xFFFCFCFE), _page?.night ?? const Color(0xFF0A1324));
+  static Color get surface =>
+      _pick(const Color(0xFFFFFFFF), _page?.surfaceNight ?? const Color(0xFF121A29));
+  static Color get border =>
+      _pick(const Color(0xFFEEEFF4), _page?.borderNight ?? const Color(0xFF212A3D));
 
   static Color get text => _pick(const Color(0xFF111827), const Color(0xFFF2F4F8));
   static Color get textMuted => _pick(const Color(0xFF6B7280), const Color(0xFF97A1B4));
@@ -66,6 +100,20 @@ class AppTheme {
           offset: Offset(0, 4),
         ),
       ];
+
+  static LinearGradient heroGradient(Color fallback) {
+    final stops = _page?.hero;
+    final colors = stops == null
+        ? [fallback, Color.lerp(fallback, Colors.white, 0.22)!]
+        : dark
+            ? [for (final c in stops) Color.lerp(c, const Color(0xFF041116), 0.22)!]
+            : stops;
+    return LinearGradient(
+      begin: Alignment.bottomLeft,
+      end: Alignment.topRight,
+      colors: colors,
+    );
+  }
 
   static SystemUiOverlayStyle get systemOverlay => SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,

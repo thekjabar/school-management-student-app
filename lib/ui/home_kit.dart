@@ -246,6 +246,9 @@ class ScheduleEntry {
     required this.teacher,
     required this.room,
     required this.color,
+    this.timeSuffix,
+    this.railColor,
+    this.nowLabel,
   });
 
   final String time;
@@ -253,6 +256,10 @@ class ScheduleEntry {
   final String? teacher;
   final String? room;
   final Color color;
+
+  final String? timeSuffix;
+  final Color? railColor;
+  final String? nowLabel;
 }
 
 class ScheduleTimeline extends StatelessWidget {
@@ -270,6 +277,8 @@ class ScheduleTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final stacked = entries.any((e) => e.timeSuffix != null);
+
     return Column(
       children: [
         for (var i = 0; i < entries.length; i++)
@@ -278,22 +287,14 @@ class ScheduleTimeline extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(
-                  width: 42,
-                  child: Center(
-                    child: Text(
-                      entries[i].time,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textMuted,
-                      ),
-                    ),
-                  ),
+                  width: stacked ? 50 : 42,
+                  child: Center(child: _Clock(entry: entries[i])),
                 ),
                 _Rail(
-                  colour: entries[i].color,
+                  colour: entries[i].railColor ?? entries[i].color,
                   first: i == 0,
                   last: i == entries.length - 1,
+                  now: entries[i].nowLabel != null,
                 ),
                 Expanded(
                   child: GestureDetector(
@@ -319,12 +320,57 @@ class ScheduleTimeline extends StatelessWidget {
   }
 }
 
+class _Clock extends StatelessWidget {
+  const _Clock({required this.entry});
+
+  final ScheduleEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final on = entry.nowLabel != null;
+    final live = entry.railColor ?? entry.color;
+    final head = Text(
+      entry.time,
+      maxLines: 1,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: on ? FontWeight.w800 : FontWeight.w600,
+        color: on ? live : AppTheme.textMuted,
+      ),
+    );
+    if (entry.timeSuffix == null) return head;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        head,
+        Text(
+          entry.timeSuffix!,
+          maxLines: 1,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            height: 1.25,
+            color: on ? live : AppTheme.textFaint,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _Rail extends StatelessWidget {
-  const _Rail({required this.colour, required this.first, required this.last});
+  const _Rail({
+    required this.colour,
+    required this.first,
+    required this.last,
+    this.now = false,
+  });
 
   final Color colour;
   final bool first;
   final bool last;
+  final bool now;
 
   @override
   Widget build(BuildContext context) {
@@ -342,11 +388,26 @@ class _Rail extends StatelessWidget {
       child: Column(
         children: [
           line(!first),
-          Container(
-            width: 9,
-            height: 9,
-            decoration: BoxDecoration(color: colour, shape: BoxShape.circle),
-          ),
+          now
+              ? Container(
+                  width: 15,
+                  height: 15,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: colour.withValues(alpha: AppTheme.dark ? 0.32 : 0.20),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(color: colour, shape: BoxShape.circle),
+                  ),
+                )
+              : Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(color: colour, shape: BoxShape.circle),
+                ),
           line(!last),
         ],
       ),
@@ -407,6 +468,10 @@ class _Lesson extends StatelessWidget {
             ],
           ),
         ),
+        if (entry.nowLabel != null) ...[
+          Pill(entry.nowLabel!, color: entry.railColor ?? entry.color),
+          const SizedBox(width: 8),
+        ],
         Icon(trailing, size: 19, color: AppTheme.textFaint),
       ],
     );

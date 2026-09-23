@@ -118,6 +118,7 @@ class _KspAppState extends State<KspApp> with WidgetsBindingObserver {
   Widget _app(Lang lang, AppThemeMode mode) {
     final platformDark =
         WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
+    AppTheme.skin = _role;
     AppTheme.dark = switch (mode) {
       AppThemeMode.dark => true,
       AppThemeMode.light => false,

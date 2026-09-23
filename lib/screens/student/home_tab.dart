@@ -14,8 +14,8 @@ import 'announcements_screen.dart';
 import 'exam_planner_screen.dart';
 import 'hand_in_screen.dart';
 import 'homework_screen.dart';
-import 'id_card.dart';
 import 'points_screen.dart';
+import 'student_kit.dart';
 
 class StudentHome extends StatelessWidget {
   const StudentHome({super.key, required this.onOpenTab});
@@ -33,46 +33,50 @@ class StudentHome extends StatelessWidget {
       builder: (context, day) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _NextLesson(lesson: day.today.nextSlot, lessons: day.today.slots.length),
+          _NextLesson(
+            lesson: day.today.nextSlot,
+            lessons: day.today.slots.length,
+            onOpen: () => onOpenTab(1),
+          ),
           const SizedBox(height: kCardGap),
 
-          QuickActions(
-            actions: [
-              QuickAction(
-                icon: Icons.calendar_month_outlined,
+          StudentTiles(
+            tiles: [
+              StudentTile(
+                icon: Icons.calendar_month_rounded,
                 label: t('student.timetable'),
                 color: tint,
                 onTap: () => onOpenTab(1),
               ),
-              QuickAction(
-                icon: Icons.description_outlined,
+              StudentTile(
+                icon: Icons.description_rounded,
                 label: t('student.homework'),
                 color: AppTheme.amber,
                 onTap: () => _push(context, const StudentHomeworkScreen()),
               ),
-              QuickAction(
-                icon: Icons.workspace_premium_outlined,
+              StudentTile(
+                icon: Icons.workspace_premium_rounded,
                 label: t('student.marks'),
-                color: AppTheme.violet,
+                color: AppTheme.blue,
                 onTap: () => onOpenTab(2),
               ),
               if (day.features.examPlanner)
-                QuickAction(
-                  icon: Icons.fact_check_outlined,
+                StudentTile(
+                  icon: Icons.fact_check_rounded,
                   label: t('student.examPlanner'),
                   color: AppTheme.rose,
                   onTap: () => _push(context, const StudentExamPlannerScreen()),
                 ),
               if (day.features.housePoints)
-                QuickAction(
-                  icon: Icons.shield_outlined,
+                StudentTile(
+                  icon: Icons.shield_rounded,
                   label: t('student.points'),
                   color: AppTheme.green,
                   onTap: () => _push(context, const StudentPointsScreen()),
                 ),
               if (day.features.awards)
-                QuickAction(
-                  icon: Icons.emoji_events_outlined,
+                StudentTile(
+                  icon: Icons.emoji_events_rounded,
                   label: t('student.awards'),
                   color: AppTheme.amber,
                   onTap: () => _push(
@@ -84,19 +88,6 @@ class StudentHome extends StatelessWidget {
                     ),
                   ),
                 ),
-              if (day.features.idCard)
-                QuickAction(
-                  icon: Icons.qr_code_2_rounded,
-                  label: t('student.idCard'),
-                  color: AppTheme.blue,
-                  onTap: () => showIdCard(context),
-                ),
-              QuickAction(
-                icon: Icons.campaign_outlined,
-                label: t('student.announcements'),
-                color: AppTheme.rose,
-                onTap: () => _push(context, const StudentAnnouncementsScreen()),
-              ),
             ],
           ),
           const SizedBox(height: kCardGap),
@@ -110,34 +101,24 @@ class StudentHome extends StatelessWidget {
             const SizedBox(height: kCardGap),
           ],
 
+          SectionRow(
+            title: t('student.todaySchedule'),
+            actionLabel: t('student.fullTimetable'),
+            onAction: () => onOpenTab(1),
+          ),
           Card16(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SectionRow(
-                  title: t('student.todaySchedule'),
-                  actionLabel: t('student.fullTimetable'),
-                  onAction: () => onOpenTab(1),
-                ),
-                if (day.today.slots.isEmpty)
-                  _Quiet(text: t('student.nothingToday'))
-                else
-                  ScheduleTimeline(
+            padding: const EdgeInsets.fromLTRB(10, 4, 14, 4),
+            child: day.today.slots.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 10, 0, 12),
+                    child: _Quiet(text: t('student.nothingToday')),
+                  )
+                : ScheduleTimeline(
                     trailingIcon: Icons.circle_outlined,
                     entries: [
-                      for (final s in day.today.slots)
-                        ScheduleEntry(
-                          time: clock12(s.startMinute),
-                          subject: s.subject,
-                          teacher: s.teacherName,
-                          room: s.room,
-                          color: parseHex(s.subjectColorHex, tint),
-                        ),
+                      for (final s in day.today.slots) lessonEntry(s, tint),
                     ],
                   ),
-              ],
-            ),
           ),
           const SizedBox(height: kCardGap),
 
@@ -322,9 +303,9 @@ class _Glance extends StatelessWidget {
     final exam = glance.nextExam;
     final marked = _marked;
 
+    final inLesson = next != null && next.inProgress && next.minutesLeft != null;
+
     final pills = <Widget>[
-      if (next != null && next.inProgress && next.minutesLeft != null)
-        Pill(tn('student.minutesLeft', next.minutesLeft!), color: AppTheme.green),
       if (next != null && !next.inProgress && next.minutesUntilStart != null)
         Pill(tn('student.startsInMinutes', next.minutesUntilStart!), color: tint),
       if (glance.classesLeft > 1)
@@ -333,167 +314,115 @@ class _Glance extends StatelessWidget {
         Pill(t('student.lastLessonOfDay'), color: AppTheme.amber),
     ];
 
-    if (pills.isEmpty && marked == null && exam == null && glance.dueToday.isEmpty) {
+    if (!inLesson && pills.isEmpty && marked == null && exam == null && glance.dueToday.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    return Card16(
-      padding: EdgeInsets.fromLTRB(14, 14, 14, glance.dueToday.isEmpty ? 14 : 2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (next != null && next.inProgress) ...[
-            Text(
-              t('student.nowIn'),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-                color: AppTheme.textFaint,
-              ),
+    final rest = pills.isNotEmpty || marked != null || exam != null || glance.dueToday.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (inLesson) _nowCard(next, tint),
+        if (inLesson && rest) const SizedBox(height: kCardGap),
+        if (rest)
+          Card16(
+            padding: EdgeInsets.fromLTRB(14, 14, 14, glance.dueToday.isEmpty ? 14 : 2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (pills.isNotEmpty)
+                  Wrap(spacing: 6, runSpacing: 6, children: pills),
+                if (marked != null) ...[
+                  if (pills.isNotEmpty) const SizedBox(height: 10),
+                  Text(
+                    marked,
+                    style: TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.textMuted),
+                  ),
+                ],
+                if (exam != null) ...[
+                  const SizedBox(height: 12),
+                  TileRow(
+                    icon: Icons.fact_check_outlined,
+                    color: parseHex(exam.subjectColorHex, AppTheme.rose),
+                    title: exam.title,
+                    subtitle: '${t('student.nextExam')}  •  ${exam.subject}',
+                    trailing: dueWord(exam.daysLeft),
+                    trailingColor: exam.daysLeft <= 3 ? AppTheme.rose : AppTheme.textMuted,
+                    last: true,
+                  ),
+                ],
+                if (glance.dueToday.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  StudentSectionLabel(t('student.dueToday')),
+                  const SizedBox(height: 6),
+                  for (var i = 0; i < glance.dueToday.length; i++)
+                    TileRow(
+                      icon: subjectIcon(glance.dueToday[i].subject),
+                      color: parseHex(glance.dueToday[i].subjectColorHex, AppTheme.amber),
+                      title: glance.dueToday[i].title,
+                      subtitle: glance.dueToday[i].subject,
+                      trailing: glance.dueToday[i].handedIn != null
+                          ? t('student.handedIn')
+                          : glance.dueToday[i].handInOpen && handInOn
+                              ? t('student.handIn')
+                              : null,
+                      trailingColor: glance.dueToday[i].handedIn != null
+                          ? AppTheme.green
+                          : AppTheme.blue,
+                      last: i == glance.dueToday.length - 1,
+                      onTap: handInOn && glance.dueToday[i].handInOpen
+                          ? () => onHandIn(glance.dueToday[i].id)
+                          : null,
+                    ),
+                ],
+              ],
             ),
-            const SizedBox(height: 4),
-          ],
-          if (pills.isNotEmpty)
-            Wrap(spacing: 6, runSpacing: 6, children: pills),
-          if (marked != null) ...[
-            if (pills.isNotEmpty) const SizedBox(height: 10),
-            Text(
-              marked,
-              style: TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.textMuted),
-            ),
-          ],
-          if (exam != null) ...[
-            const SizedBox(height: 12),
-            TileRow(
-              icon: Icons.fact_check_outlined,
-              color: parseHex(exam.subjectColorHex, AppTheme.rose),
-              title: exam.title,
-              subtitle: '${t('student.nextExam')}  •  ${exam.subject}',
-              trailing: dueWord(exam.daysLeft),
-              trailingColor: exam.daysLeft <= 3 ? AppTheme.rose : AppTheme.textMuted,
-              last: true,
-            ),
-          ],
-          if (glance.dueToday.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              t('student.dueToday'),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-                color: AppTheme.textFaint,
-              ),
-            ),
-            const SizedBox(height: 6),
-            for (var i = 0; i < glance.dueToday.length; i++)
-              TileRow(
-                icon: subjectIcon(glance.dueToday[i].subject),
-                color: parseHex(glance.dueToday[i].subjectColorHex, AppTheme.amber),
-                title: glance.dueToday[i].title,
-                subtitle: glance.dueToday[i].subject,
-                trailing: glance.dueToday[i].handedIn != null
-                    ? t('student.handedIn')
-                    : glance.dueToday[i].handInOpen && handInOn
-                        ? t('student.handIn')
-                        : null,
-                trailingColor: glance.dueToday[i].handedIn != null
-                    ? AppTheme.green
-                    : AppTheme.blue,
-                last: i == glance.dueToday.length - 1,
-                onTap: handInOn && glance.dueToday[i].handInOpen
-                    ? () => onHandIn(glance.dueToday[i].id)
-                    : null,
-              ),
-          ],
-        ],
-      ),
+          ),
+      ],
+    );
+  }
+
+  Widget _nowCard(Lesson next, Color tint) {
+    final start = next.startMinute;
+    final end = next.endMinute;
+    final span = start != null && end != null ? end - start : 0;
+    return NowCard(
+      minutesLeft: next.minutesLeft!,
+      fraction: span > 0 ? next.minutesLeft! / span : 1,
+      subject: next.subject,
+      under: [
+        if ((next.teacherName ?? '').isNotEmpty) next.teacherName!,
+        if ((next.room ?? '').isNotEmpty) next.room!,
+      ].join('  •  '),
+      color: parseHex(next.subjectColorHex, tint),
     );
   }
 }
 
 class _NextLesson extends StatelessWidget {
-  const _NextLesson({required this.lesson, required this.lessons});
+  const _NextLesson({required this.lesson, required this.lessons, required this.onOpen});
 
   final Lesson? lesson;
   final int lessons;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
-    final tint = Role.student.tint;
     final next = lesson;
 
-    return Card16(
-      padding: const EdgeInsets.all(16),
-      color: tint,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.22),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Icon(
-                  next == null ? Icons.celebration_rounded : subjectIcon(next.subject),
-                  size: 19,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Text(
-                  next == null ? t('student.doneForToday') : t('student.nextLesson'),
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white70,
-                  ),
-                ),
-              ),
-              Text(
-                tn('student.lessonsToday', lessons),
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white70,
-                ),
-              ),
+    return StudentHero(
+      label: next == null ? t('student.doneForToday') : t('student.nextLesson'),
+      title: next?.subject ?? t('student.restWell'),
+      badge: lessons == 0 ? null : tn('student.lessonsTodayCount', lessons),
+      facts: next == null
+          ? const []
+          : [
+              (Icons.schedule_rounded, clock12(next.startMinute)),
+              if ((next.room ?? '').isNotEmpty) (Icons.meeting_room_rounded, next.room!),
             ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            next?.subject ?? t('student.restWell'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.6,
-              height: 1.15,
-              color: Colors.white,
-            ),
-          ),
-          if (next != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              [
-                clock12(next.startMinute),
-                if ((next.teacherName ?? '').isNotEmpty) next.teacherName!,
-                if ((next.room ?? '').isNotEmpty) next.room!,
-              ].join('  •  '),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12.5, color: Colors.white),
-            ),
-          ],
-        ],
-      ),
+      openLabel: next == null ? null : t('student.viewLesson'),
+      onOpen: next == null ? null : onOpen,
     );
   }
 }
