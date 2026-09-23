@@ -249,6 +249,7 @@ class ScheduleEntry {
     this.timeSuffix,
     this.railColor,
     this.nowLabel,
+    this.done = false,
   });
 
   final String time;
@@ -260,6 +261,7 @@ class ScheduleEntry {
   final String? timeSuffix;
   final Color? railColor;
   final String? nowLabel;
+  final bool done;
 }
 
 class ScheduleTimeline extends StatelessWidget {
@@ -472,7 +474,18 @@ class _Lesson extends StatelessWidget {
           Pill(entry.nowLabel!, color: entry.railColor ?? entry.color),
           const SizedBox(width: 8),
         ],
-        Icon(trailing, size: 19, color: AppTheme.textFaint),
+        if (entry.done)
+          Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: entry.railColor ?? entry.color,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check_rounded, size: 15, color: Colors.white),
+          )
+        else
+          Icon(trailing, size: 19, color: AppTheme.textFaint),
       ],
     );
   }

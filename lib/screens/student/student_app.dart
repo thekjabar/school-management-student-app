@@ -198,37 +198,72 @@ class _StudentHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(kGutter, 8, kGutter, 12),
       child: Row(
         children: [
-          CircleInitials(label: name, tint: tint, size: 48),
-          const SizedBox(width: 11),
+          GestureDetector(
+            onTap: switching ? null : onSwitchSchool,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: tint, width: 2),
+                  ),
+                  child: CircleInitials(label: name, tint: tint, size: 54),
+                ),
+                if (onSwitchSchool != null)
+                  PositionedDirectional(
+                    end: -2,
+                    bottom: -2,
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: tint,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppTheme.canvas, width: 2),
+                      ),
+                      child: switching
+                          ? const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: CircularProgressIndicator(strokeWidth: 1.6, color: Colors.white),
+                            )
+                          : const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Colors.white),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '$greeting $first 👋',
+                  greeting,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500, color: AppTheme.textMuted),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  first.isEmpty ? '👋' : '$first 👋',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 22,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
+                    letterSpacing: -0.6,
                     height: 1.2,
                     color: AppTheme.text,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  t('student.greetLine'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
-                ),
-                const SizedBox(height: 5),
+                const SizedBox(height: 6),
                 GestureDetector(
                   onTap: switching ? null : onSwitchSchool,
                   child: Container(
-                    padding: const EdgeInsetsDirectional.fromSTEB(8, 4, 10, 4),
+                    padding: const EdgeInsetsDirectional.fromSTEB(10, 5, 12, 5),
                     decoration: BoxDecoration(
                       color: tint.withValues(alpha: AppTheme.dark ? 0.20 : 0.12),
                       borderRadius: BorderRadius.circular(999),
@@ -236,30 +271,16 @@ class _StudentHeader extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.school_rounded, size: 13, color: tint),
-                        const SizedBox(width: 5),
+                        Icon(Icons.school_rounded, size: 14, color: tint),
+                        const SizedBox(width: 6),
                         Flexible(
                           child: Text(
                             school.isNotEmpty ? school : t('student.roleLabel'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: tint,
-                            ),
+                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: tint),
                           ),
                         ),
-                        if (onSwitchSchool != null) ...[
-                          const SizedBox(width: 4),
-                          switching
-                              ? SizedBox(
-                                  width: 11,
-                                  height: 11,
-                                  child: CircularProgressIndicator(strokeWidth: 1.6, color: tint),
-                                )
-                              : Icon(Icons.unfold_more_rounded, size: 13, color: tint),
-                        ],
                       ],
                     ),
                   ),
@@ -270,7 +291,7 @@ class _StudentHeader extends StatelessWidget {
           const SizedBox(width: 8),
           ValueListenableBuilder<int>(
             valueListenable: Push.arrived,
-            builder: (context, arrived, _) => StudentBell(unread: arrived > 0, onTap: onBell),
+            builder: (context, arrived, _) => StudentBell(count: arrived, onTap: onBell),
           ),
         ],
       ),

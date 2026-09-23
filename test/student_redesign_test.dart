@@ -243,7 +243,6 @@ void main() {
     expect(find.byType(StudentHero), findsOneWidget);
     expect(find.text('Arabic Language'), findsWidgets);
     expect(find.text(t('student.nextLesson')), findsOneWidget);
-    expect(find.text(tn('student.lessonsTodayCount', 3)), findsOneWidget);
     expect(find.text(t('student.viewLesson')), findsOneWidget);
 
     expect(find.text(t('student.timetable')), findsOneWidget);
@@ -252,13 +251,18 @@ void main() {
     expect(find.text(t('student.examPlanner')), findsOneWidget);
     expect(find.text(t('student.points')), findsOneWidget);
 
-    expect(find.byType(NowCard), findsOneWidget);
-    expect(find.text('9'), findsWidgets);
+    expect(find.text(t('student.nowIn')), findsOneWidget);
+    expect(find.text(tn('student.minutesLeft', 9)), findsOneWidget);
 
-    expect(find.text(t('student.todaySchedule')), findsOneWidget);
+    expect(find.text(t('student.homeSchedule')), findsOneWidget);
+    expect(find.text(t('student.viewFullTimetable')), findsOneWidget);
     expect(find.byType(ScheduleTimeline), findsWidgets);
     expect(find.text('Homeroom'), findsWidgets);
     expect(find.text(t('student.now')), findsWidgets);
+
+    expect(find.text(t('student.homeworkDue')), findsNothing);
+    expect(find.text(t('student.recentMarks')), findsNothing);
+    expect(find.text(t('student.latestNews')), findsNothing);
 
     expect(tester.takeException(), isNull);
   });

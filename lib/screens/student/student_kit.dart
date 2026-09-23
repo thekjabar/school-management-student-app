@@ -10,7 +10,7 @@ import '../../ui/home_kit.dart';
 import '../../ui/kit.dart';
 import '../../ui/motion.dart';
 
-ScheduleEntry lessonEntry(Lesson lesson, Color tint) {
+ScheduleEntry lessonEntry(Lesson lesson, Color tint, {bool finished = false}) {
   final parts = clock12(lesson.startMinute).split(' ');
   return ScheduleEntry(
     time: parts.first,
@@ -21,6 +21,7 @@ ScheduleEntry lessonEntry(Lesson lesson, Color tint) {
     color: parseHex(lesson.subjectColorHex, tint),
     railColor: tint,
     nowLabel: lesson.inProgress ? t('student.now') : null,
+    done: finished && !lesson.inProgress,
   );
 }
 
@@ -29,75 +30,53 @@ class StudentHero extends StatelessWidget {
     super.key,
     required this.label,
     required this.title,
-    required this.facts,
-    required this.badge,
+    required this.line,
     this.onOpen,
     this.openLabel,
   });
 
   final String label;
   final String title;
-  final List<(IconData, String)> facts;
-  final String? badge;
+  final String? line;
   final VoidCallback? onOpen;
   final String? openLabel;
 
   @override
   Widget build(BuildContext context) {
+    final tint = Role.student.tint;
+    final wash = AppTheme.dark ? const Color(0xFF123A3E) : const Color(0xFFE7F7F6);
+    final rtl = Directionality.of(context) == TextDirection.rtl;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: AppTheme.heroGradient(Role.student.tint),
+        color: wash,
         borderRadius: BorderRadius.circular(kCardRadius + 2),
+        border: Border.all(color: tint.withValues(alpha: AppTheme.dark ? 0.30 : 0.14)),
         boxShadow: AppTheme.dark
             ? null
-            : [
-                BoxShadow(
-                  color: Role.student.tint.withValues(alpha: 0.30),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+            : [BoxShadow(color: tint.withValues(alpha: 0.10), blurRadius: 18, offset: const Offset(0, 6))],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(kCardRadius + 2),
+        borderRadius: BorderRadius.circular(kCardRadius + 1),
         child: Stack(
           children: [
             PositionedDirectional(
-              end: -14,
-              bottom: -18,
-              child: Image.asset(
-                'assets/art/student_study.png',
-                width: 168,
-                fit: BoxFit.contain,
-                excludeFromSemantics: true,
-              ),
-            ),
-            if (badge != null)
-              PositionedDirectional(
-                end: 12,
-                top: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                  constraints: const BoxConstraints(maxWidth: 96),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF04333A).withValues(alpha: 0.40),
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: Text(
-                    badge!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      height: 1.25,
-                      color: Colors.white,
-                    ),
-                  ),
+              end: 0,
+              top: 0,
+              bottom: 0,
+              width: 170,
+              child: Opacity(
+                opacity: AppTheme.dark ? 0.35 : 1,
+                child: Image.asset(
+                  rtl ? 'assets/art/student_books_rtl.png' : 'assets/art/student_books.png',
+                  fit: BoxFit.cover,
+                  alignment: rtl ? Alignment.centerRight : Alignment.centerLeft,
+                  excludeFromSemantics: true,
                 ),
               ),
+            ),
             Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(17, 17, 17, 17),
+              padding: const EdgeInsetsDirectional.fromSTEB(18, 18, 18, 18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -106,60 +85,34 @@ class StudentHero extends StatelessWidget {
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withValues(alpha: 0.88),
-                    ),
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: tint),
                   ),
-                  const SizedBox(height: 7),
+                  const SizedBox(height: 6),
                   SizedBox(
-                    width: 210,
+                    width: 180,
                     child: Text(
                       title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 23,
+                      style: TextStyle(
+                        fontSize: 22,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: -0.7,
+                        letterSpacing: -0.6,
                         height: 1.15,
-                        color: Colors.white,
+                        color: AppTheme.text,
                       ),
                     ),
                   ),
-                  if (facts.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: 210,
-                      child: Wrap(
-                        spacing: 14,
-                        runSpacing: 6,
-                        children: [
-                          for (final (icon, text) in facts)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(icon, size: 14, color: Colors.white),
-                                const SizedBox(width: 5),
-                                Text(
-                                  text,
-                                  textDirection: TextDirection.ltr,
-                                  style: const TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                        ],
-                      ),
+                  if (line != null) ...[
+                    const SizedBox(height: 7),
+                    Text(
+                      line!,
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppTheme.textMuted),
                     ),
                   ],
                   if (onOpen != null && openLabel != null) ...[
-                    const SizedBox(height: 14),
-                    _GhostButton(label: openLabel!, onTap: onOpen!),
+                    const SizedBox(height: 15),
+                    _FilledButton(label: openLabel!, color: tint, onTap: onOpen!),
                   ],
                 ],
               ),
@@ -171,10 +124,11 @@ class StudentHero extends StatelessWidget {
   }
 }
 
-class _GhostButton extends StatelessWidget {
-  const _GhostButton({required this.label, required this.onTap});
+class _FilledButton extends StatelessWidget {
+  const _FilledButton({required this.label, required this.color, required this.onTap});
 
   final String label;
+  final Color color;
   final VoidCallback onTap;
 
   @override
@@ -185,24 +139,23 @@ class _GhostButton extends StatelessWidget {
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
         child: Container(
-          padding: const EdgeInsetsDirectional.fromSTEB(15, 9, 12, 9),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(999),
-          ),
+          padding: const EdgeInsetsDirectional.fromSTEB(18, 10, 13, 10),
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(999)),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0C3B45),
-                ),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
               ),
-              const SizedBox(width: 7),
-              const Icon(Icons.arrow_forward_rounded, size: 15, color: Color(0xFF0C3B45)),
+              const SizedBox(width: 8),
+              Icon(
+                Directionality.of(context) == TextDirection.rtl
+                    ? Icons.chevron_left_rounded
+                    : Icons.chevron_right_rounded,
+                size: 20,
+                color: Colors.white,
+              ),
             ],
           ),
         ),
@@ -225,20 +178,103 @@ class StudentTile {
   final VoidCallback onTap;
 }
 
-class StudentTiles extends StatelessWidget {
+class StudentTiles extends StatefulWidget {
   const StudentTiles({super.key, required this.tiles});
 
   final List<StudentTile> tiles;
 
   @override
+  State<StudentTiles> createState() => _StudentTilesState();
+}
+
+class _StudentTilesState extends State<StudentTiles> {
+  static const _perView = 5;
+  final _scroll = ScrollController();
+  double _at = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_moved);
+  }
+
+  @override
+  void dispose() {
+    _scroll.removeListener(_moved);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _moved() {
+    final max = _scroll.position.maxScrollExtent;
+    setState(() => _at = max <= 0 ? 0 : (_scroll.offset / max).clamp(0.0, 1.0));
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final tiles = widget.tiles;
+    final scrolls = tiles.length > _perView;
     return Card16(
-      padding: const EdgeInsets.fromLTRB(6, 14, 6, 13),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: EdgeInsets.fromLTRB(6, 14, 6, scrolls ? 12 : 13),
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final width = box.maxWidth / _perView;
+          return Column(
+            children: [
+              if (!scrolls)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < tiles.length; i++) Expanded(child: _Tile(tile: tiles[i], index: i)),
+                  ],
+                )
+              else ...[
+                SizedBox(
+                  height: 94,
+                  child: ListView.builder(
+                    controller: _scroll,
+                    scrollDirection: Axis.horizontal,
+                    itemCount: tiles.length,
+                    itemBuilder: (context, i) => SizedBox(width: width, child: _Tile(tile: tiles[i], index: i)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _Indicator(fraction: _perView / tiles.length, at: _at, color: Role.student.tint),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _Indicator extends StatelessWidget {
+  const _Indicator({required this.fraction, required this.at, required this.color});
+
+  final double fraction;
+  final double at;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    const track = 56.0;
+    final thumb = track * fraction.clamp(0.2, 1.0);
+    return Container(
+      width: track,
+      height: 5,
+      decoration: BoxDecoration(color: AppTheme.border, borderRadius: BorderRadius.circular(3)),
+      child: Stack(
         children: [
-          for (var i = 0; i < tiles.length; i++)
-            Expanded(child: _Tile(tile: tiles[i], index: i)),
+          PositionedDirectional(
+            start: (track - thumb) * at,
+            top: 0,
+            bottom: 0,
+            child: Container(
+              width: thumb,
+              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3)),
+            ),
+          ),
         ],
       ),
     );
@@ -265,13 +301,13 @@ class _Tile extends StatelessWidget {
               index: index,
               extraDelay: const Duration(milliseconds: 60),
               child: Container(
-                width: 46,
-                height: 46,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
                   color: tile.color.withValues(alpha: AppTheme.dark ? 0.22 : 0.12),
-                  borderRadius: BorderRadius.circular(15),
+                  borderRadius: BorderRadius.circular(17),
                 ),
-                child: Icon(tile.icon, size: 23, color: tile.color),
+                child: Icon(tile.icon, size: 25, color: tile.color),
               ),
             ),
             const SizedBox(height: 9),
@@ -283,7 +319,7 @@ class _Tile extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 10.5,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w600,
                   letterSpacing: -0.2,
                   height: 1.25,
@@ -619,9 +655,9 @@ class StudentSectionLabel extends StatelessWidget {
 }
 
 class StudentBell extends StatelessWidget {
-  const StudentBell({super.key, required this.unread, required this.onTap});
+  const StudentBell({super.key, required this.count, required this.onTap});
 
-  final bool unread;
+  final int count;
   final VoidCallback onTap;
 
   @override
@@ -630,17 +666,24 @@ class StudentBell extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         SquareButton(icon: Icons.notifications_none_rounded, onTap: onTap),
-        if (unread)
+        if (count > 0)
           PositionedDirectional(
-            top: -1,
-            end: -1,
+            top: -6,
+            end: -6,
             child: Container(
-              width: 11,
-              height: 11,
+              constraints: const BoxConstraints(minWidth: 20),
+              height: 20,
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: AppTheme.rose,
-                shape: BoxShape.circle,
+                color: Role.student.tint,
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: AppTheme.canvas, width: 2),
+              ),
+              child: Text(
+                count > 9 ? '9+' : '$count',
+                textDirection: TextDirection.ltr,
+                style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Colors.white, height: 1),
               ),
             ),
           ),
