@@ -150,8 +150,8 @@ class StudentProfileTab extends StatelessWidget {
 
           _Section(t('settings.notifications')),
           Card16(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-            child: PushRow(tint: tint),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            child: const _PushSwitch(),
           ),
 
           _Section(t('more.account')),
@@ -199,6 +199,92 @@ class StudentProfileTab extends StatelessWidget {
     await Session.instance.signOut();
     await Push.forget();
     if (context.mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+  }
+}
+
+class _PushSwitch extends StatefulWidget {
+  const _PushSwitch();
+
+  @override
+  State<_PushSwitch> createState() => _PushSwitchState();
+}
+
+class _PushSwitchState extends State<_PushSwitch> with WidgetsBindingObserver {
+  bool _on = Push.granted;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() => _on = Push.granted);
+    }
+  }
+
+  Future<void> _flip(bool wanted) async {
+    if (!wanted) {
+      showNote(context, t('more.pushTurnOffInPhone'));
+      return;
+    }
+    final ok = await Push.askPermission();
+    if (!mounted) return;
+    setState(() => _on = ok);
+    if (!ok) showNote(context, t('more.pushBlocked'), bad: true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = _on ? AppTheme.green : AppTheme.amber;
+
+    return Row(
+      children: [
+        Chip36(
+          icon: _on ? Icons.notifications_active_rounded : Icons.notifications_off_rounded,
+          color: tone,
+          size: 38,
+        ),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                t('more.push'),
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
+                  color: AppTheme.text,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _on ? t('more.pushOn') : t('more.pushOff'),
+                style: TextStyle(fontSize: 11.5, height: 1.35, color: AppTheme.textMuted),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Switch.adaptive(
+          value: _on,
+          activeThumbColor: Colors.white,
+          activeTrackColor: AppTheme.green,
+          onChanged: _flip,
+        ),
+      ],
+    );
   }
 }
 
