@@ -171,7 +171,9 @@ class StudentHome extends StatelessWidget {
                       subtitle: day.marks[i].examTitle,
                       trailing: day.marks[i].wasAbsent
                           ? t('marks.absent')
-                          : '${_trim(day.marks[i].score)} / ${_trim(day.marks[i].maxScore)}',
+                          : ltrIsolated(
+                              '${_trim(day.marks[i].score)} / ${_trim(day.marks[i].maxScore)}',
+                            ),
                       trailingSub: percent(day.marks[i].percent),
                       trailingColor:
                           day.marks[i].isPass == false ? AppTheme.rose : AppTheme.green,

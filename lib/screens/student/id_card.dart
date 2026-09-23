@@ -215,7 +215,7 @@ class _StudentIdCardSheetState extends State<StudentIdCardSheet> {
             fontSize: 17,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.4,
-            color: AppTheme.text,
+            color: tint,
           ),
         ),
         const SizedBox(height: 6),

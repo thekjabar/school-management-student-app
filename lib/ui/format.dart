@@ -18,6 +18,8 @@ String clock12(int? minuteOfDay) {
   return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $suffix';
 }
 
+String ltrIsolated(String text) => '\u2066$text\u2069';
+
 String hhmm(DateTime? at) {
   if (at == null) return '—';
   return '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';

@@ -276,6 +276,7 @@ class _MarkRow extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 _scoreLabel(mark),
+                textDirection: TextDirection.ltr,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,

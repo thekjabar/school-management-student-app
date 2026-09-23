@@ -611,6 +611,7 @@ class IconFigure {
     required this.value,
     required this.caption,
     required this.color,
+    this.fitValue = false,
   });
 
   final IconData icon;
@@ -618,6 +619,7 @@ class IconFigure {
   final String value;
   final String caption;
   final Color color;
+  final bool fitValue;
 }
 
 class IconFigureStrip extends StatelessWidget {
@@ -712,16 +714,35 @@ class _Figure extends StatelessWidget {
                     ),
                   ),
                 ),
-                line(
-                  figure.value,
-                  TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
-                    height: 1.3,
-                    color: AppTheme.text,
+                if (figure.fitValue)
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: line(
+                        figure.value,
+                        TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          height: 1.3,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  line(
+                    figure.value,
+                    TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                      height: 1.3,
+                      color: AppTheme.text,
+                    ),
                   ),
-                ),
                 line(
                   figure.caption,
                   TextStyle(fontSize: 7.5, color: AppTheme.textFaint, height: 1.35),

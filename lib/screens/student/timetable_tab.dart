@@ -128,7 +128,7 @@ class _WeekState extends State<_Week> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          StudentSectionLabel(t('student.todaySchedule')),
+                          StudentSectionLabel(t('student.todaySchedule'), color: tint),
                           const SizedBox(height: 3),
                           Text(
                             shortDate(DateTime.now()),

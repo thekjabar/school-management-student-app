@@ -418,6 +418,16 @@ void main() {
       expect(plain.railColor, isNull);
       expect(plain.nowLabel, isNull,
           reason: 'the parent and teacher timelines must opt in, never inherit');
+
+      const figure = IconFigure(
+        icon: Icons.badge_outlined,
+        label: 'Code',
+        value: 'STU-2026-00018',
+        caption: '',
+        color: Color(0xFF2563EB),
+      );
+      expect(figure.fitValue, isFalse,
+          reason: 'only the student asks a figure to shrink to fit');
     });
   });
 }

@@ -98,6 +98,7 @@ class StudentProfileTab extends StatelessWidget {
                         value: profile.code,
                         caption: '',
                         color: tint,
+                        fitValue: true,
                       ),
                       IconFigure(
                         icon: Icons.cake_outlined,
@@ -281,6 +282,9 @@ class _PushSwitchState extends State<_PushSwitch> with WidgetsBindingObserver {
           value: _on,
           activeThumbColor: Colors.white,
           activeTrackColor: AppTheme.green,
+          inactiveThumbColor: AppTheme.textFaint,
+          inactiveTrackColor: AppTheme.canvas,
+          trackOutlineColor: WidgetStatePropertyAll(AppTheme.border),
           onChanged: _flip,
         ),
       ],

@@ -144,6 +144,7 @@ class StudentHero extends StatelessWidget {
                                 const SizedBox(width: 5),
                                 Text(
                                   text,
+                                  textDirection: TextDirection.ltr,
                                   style: const TextStyle(
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.w600,
@@ -598,9 +599,10 @@ class DayChips extends StatelessWidget {
 }
 
 class StudentSectionLabel extends StatelessWidget {
-  const StudentSectionLabel(this.title, {super.key});
+  const StudentSectionLabel(this.title, {super.key, this.color});
 
   final String title;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -610,7 +612,7 @@ class StudentSectionLabel extends StatelessWidget {
         fontSize: 10.5,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.8,
-        color: AppTheme.textFaint,
+        color: color ?? AppTheme.textFaint,
       ),
     );
   }

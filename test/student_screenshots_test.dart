@@ -3,7 +3,6 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -22,6 +21,8 @@ import 'package:student_app/screens/student/timetable_tab.dart';
 import 'package:student_app/theme/app_theme.dart';
 
 const _outDir = r'D:\abdulsamad\design\student-redesign\built';
+
+const _iconFont = r'D:\flutter\bin\cache\artifacts\material_fonts\materialicons-regular.otf';
 
 const _fonts = [
   r'C:\Windows\Fonts\segoeui.ttf',
@@ -205,6 +206,15 @@ void _routes() {
 }
 
 Future<void> _loadFonts() async {
+  final icons = File(_iconFont);
+  if (icons.existsSync()) {
+    final loader = FontLoader('MaterialIcons');
+    loader.addFont(
+      icons.readAsBytes().then((b) => ByteData.view(Uint8List.fromList(b).buffer)),
+    );
+    await loader.load();
+  }
+
   for (final family in ['Roboto', 'Segoe UI', 'Arial']) {
     final loader = FontLoader(family);
     var any = false;
@@ -240,14 +250,16 @@ Future<void> _shoot(WidgetTester tester, String name, Widget body) async {
   await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 60)));
   await tester.pumpAndSettle();
 
-  final boundary = key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-  final image = await boundary.toImage(pixelRatio: 2);
-  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-  image.dispose();
+  await tester.runAsync(() async {
+    final boundary = key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+    final image = await boundary.toImage();
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
 
-  final dir = Directory(_outDir);
-  if (!dir.existsSync()) dir.createSync(recursive: true);
-  File('$_outDir\\$name.png').writeAsBytesSync(bytes!.buffer.asUint8List());
+    final dir = Directory(_outDir);
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    File('$_outDir\\$name.png').writeAsBytesSync(bytes!.buffer.asUint8List());
+  });
 }
 
 void main() {
