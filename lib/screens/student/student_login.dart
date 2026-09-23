@@ -144,7 +144,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                       ],
                     ),
                     SizedBox(height: art * 0.16),
-                    _Crest(size: art, tint: role.tint),
+                    _Crest(size: art),
                     SizedBox(height: art * 0.16),
                     _Card(child: _choosing ? _chooseForm(role) : _signInForm(role)),
                   ],
@@ -389,26 +389,19 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
 }
 
 class _Crest extends StatelessWidget {
-  const _Crest({required this.size, required this.tint});
+  const _Crest({required this.size});
 
   final double size;
-  final Color tint;
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Container(
-        width: size,
-        height: size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          shape: BoxShape.circle,
-          boxShadow: AppTheme.dark
-              ? null
-              : const [BoxShadow(color: Color(0x14101828), blurRadius: 22, offset: Offset(0, 8))],
-        ),
-        child: Icon(Icons.auto_stories_rounded, size: size * 0.46, color: tint),
+      child: Image.asset(
+        'assets/art/student_logo.png',
+        width: size * 1.6,
+        height: size * 1.6,
+        fit: BoxFit.contain,
+        semanticLabel: t('role.student'),
       ),
     );
   }
