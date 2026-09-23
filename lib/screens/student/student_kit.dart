@@ -604,17 +604,45 @@ class StudentSectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 20, 4, 9),
-      child: Text(
-        title.toUpperCase(),
-        style: TextStyle(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-          color: AppTheme.textFaint,
-        ),
+    return Text(
+      title.toUpperCase(),
+      style: TextStyle(
+        fontSize: 10.5,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.8,
+        color: AppTheme.textFaint,
       ),
+    );
+  }
+}
+
+class StudentBell extends StatelessWidget {
+  const StudentBell({super.key, required this.unread, required this.onTap});
+
+  final bool unread;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        SquareButton(icon: Icons.notifications_none_rounded, onTap: onTap),
+        if (unread)
+          PositionedDirectional(
+            top: -1,
+            end: -1,
+            child: Container(
+              width: 11,
+              height: 11,
+              decoration: BoxDecoration(
+                color: AppTheme.rose,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppTheme.canvas, width: 2),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

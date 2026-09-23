@@ -118,16 +118,23 @@ class _StudentIdCardSheetState extends State<StudentIdCardSheet> {
               ),
             ),
             const SizedBox(height: 18),
-            Text(
-              t('student.idCard'),
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.3,
-                color: AppTheme.text,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Chip36(icon: Icons.verified_user_rounded, color: tint, size: 32),
+                const SizedBox(width: 9),
+                Text(
+                  t('student.idCard'),
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                    color: AppTheme.text,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               t('student.idCardBody'),
               textAlign: TextAlign.center,

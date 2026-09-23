@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api/client.dart';
+import '../../api/push.dart';
 import '../../api/session.dart';
 import '../../api/student_api.dart';
 import '../../i18n/strings.dart';
@@ -15,6 +16,7 @@ import 'home_tab.dart';
 import 'id_card.dart';
 import 'marks_tab.dart';
 import 'profile_tab.dart';
+import 'student_kit.dart';
 import 'timetable_tab.dart';
 
 class StudentApp extends StatefulWidget {
@@ -110,9 +112,12 @@ class _StudentAppState extends State<StudentApp> {
                 school: me?.schoolName ?? '',
                 switching: _switching,
                 onSwitchSchool: schools.length > 1 ? _switchSchool : null,
-                onBell: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const StudentAnnouncementsScreen()),
-                ),
+                onBell: () {
+                  Push.arrived.value = 0;
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const StudentAnnouncementsScreen()),
+                  );
+                },
               ),
             ),
             const StudentReadOnlyBanner(),
@@ -263,7 +268,10 @@ class _StudentHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          SquareButton(icon: Icons.notifications_none_rounded, onTap: onBell),
+          ValueListenableBuilder<int>(
+            valueListenable: Push.arrived,
+            builder: (context, arrived, _) => StudentBell(unread: arrived > 0, onTap: onBell),
+          ),
         ],
       ),
     );
