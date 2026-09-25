@@ -140,6 +140,7 @@ class _BusScreenState extends State<BusScreen> {
                     _liveBuses(),
                     _assignedStops(),
                     _homeArrivals(),
+                    _delays(),
                   ]);
                   final buses = r[1] as List<LiveBus>;
                   return _Bus(
@@ -149,6 +150,7 @@ class _BusScreenState extends State<BusScreen> {
                         .firstOrNull,
                     stops: r[2] as AssignedStops?,
                     homeArrivals: r[3] as List<HomeArrival>,
+                    delays: r[4] as List<DelayDay>,
                   );
                 },
                 builder: (context, bus) {
@@ -197,6 +199,10 @@ class _BusScreenState extends State<BusScreen> {
                         onConfirmed: () => _loaderKey.currentState?.reload(),
                       ),
                       const SizedBox(height: kCardGap),
+                      if (usualDelayLines(bus.delays, DateTime.now().weekday).isNotEmpty) ...[
+                        _UsualDelay(days: bus.delays),
+                        const SizedBox(height: kCardGap),
+                      ],
                       _Tiles(bus: bus, trip: trip),
                       const SizedBox(height: kCardGap),
                       Card16(
@@ -442,6 +448,16 @@ class _BusScreenState extends State<BusScreen> {
     }
   }
 
+  Future<List<DelayDay>> _delays() async {
+    final open = Entitlements.instance.current.value.access(widget.child.studentId, ParentSection.delayForecast);
+    if (open != SectionAccess.open) return const <DelayDay>[];
+    try {
+      return await ParentApi.instance.delayForecast(widget.child.studentId);
+    } catch (_) {
+      return const <DelayDay>[];
+    }
+  }
+
   Future<List<HomeArrival>> _homeArrivals() async {
     try {
       return await ParentApi.instance.homeArrivals(studentId: widget.child.studentId);
@@ -483,7 +499,10 @@ class _Bus {
     required this.live,
     required this.stops,
     required this.homeArrivals,
+    this.delays = const [],
   });
+
+  final List<DelayDay> delays;
 
   final TransportInfo transport;
   final LiveBus? live;
@@ -1557,6 +1576,54 @@ class _Tile extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+const _smallestDelayWorthSaying = 3;
+
+List<({String text, int trips})> usualDelayLines(List<DelayDay> days, int weekday) {
+  final lines = <({String text, int trips})>[];
+  for (final morning in [true, false]) {
+    final d = days.where((x) => x.morning == morning && x.weekday == weekday).firstOrNull;
+    if (d == null || d.minutes.abs() < _smallestDelayWorthSaying) continue;
+    final key = d.minutes > 0 ? (morning ? 'delay.lateOut' : 'delay.lateReturn') : (morning ? 'delay.earlyOut' : 'delay.earlyReturn');
+    lines.add((text: tv(key, {'day': t('day.$weekday'), 'n': d.minutes.abs()}), trips: d.trips));
+  }
+  return lines;
+}
+
+class _UsualDelay extends StatelessWidget {
+  const _UsualDelay({required this.days});
+
+  final List<DelayDay> days;
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = usualDelayLines(days, DateTime.now().weekday);
+    final trips = lines.map((l) => l.trips).fold<int>(0, (a, b) => a > b ? a : b);
+    return Card16(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Chip36(icon: Icons.schedule_rounded, color: AppTheme.amber),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(t('delay.title'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.text)),
+                const SizedBox(height: 6),
+                for (final l in lines) ...[
+                  Text(l.text, style: TextStyle(fontSize: 13, height: 1.45, color: AppTheme.text)),
+                  const SizedBox(height: 4),
+                ],
+                Text(tn('delay.basis', trips), style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted)),
+              ],
+            ),
+          ),
         ],
       ),
     );

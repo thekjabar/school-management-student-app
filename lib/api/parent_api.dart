@@ -2842,6 +2842,13 @@ class ParentApi {
     return TransportInfo.fromJson(json);
   }
 
+  Future<List<DelayDay>> delayForecast(String studentId) async {
+    final json = await _api.get('/parent/children/$studentId/delay-forecast') as Map<String, dynamic>;
+    return ((json['days'] as List?) ?? const [])
+        .map((d) => DelayDay.fromJson((d as Map).cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
   Future<List<LiveBus>> live() async {
     final json = await _api.get('/parent/live/children');
     return Paged.from<LiveBus>(json, LiveBus.fromJson).rows;
@@ -4179,6 +4186,7 @@ abstract final class ParentSection {
   static const ai = 'parent.ai';
   static const track = 'parent.track';
   static const bus = 'parent.bus';
+  static const delayForecast = 'parent.delayForecast';
   static const attendance = 'parent.attendance';
   static const messages = 'parent.messages';
   static const assignments = 'parent.assignments';
@@ -4424,4 +4432,20 @@ class Entitlements {
     _fetchedAt = null;
     current.value = PackageEntitlements.none;
   }
+}
+
+class DelayDay {
+  const DelayDay({required this.morning, required this.weekday, required this.minutes, required this.trips});
+
+  final bool morning;
+  final int weekday;
+  final int minutes;
+  final int trips;
+
+  factory DelayDay.fromJson(Map<String, dynamic> j) => DelayDay(
+        morning: j['leg'] == 'OUT',
+        weekday: (j['weekday'] as num?)?.toInt() ?? 0,
+        minutes: (j['minutes'] as num?)?.toInt() ?? 0,
+        trips: (j['trips'] as num?)?.toInt() ?? 0,
+      );
 }
