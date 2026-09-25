@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_bg">#FFFFFF</color>
+    <color name="widget_row">#F2EEFD</color>
+    <color name="widget_accent">#6D3FF7</color>
+    <color name="widget_text">#101828</color>
+    <color name="widget_muted">#667085</color>
+    <color name="widget_warn">#B54708</color>
+    <string name="widget_description">When the school bus reaches your children</string>
+</resources>

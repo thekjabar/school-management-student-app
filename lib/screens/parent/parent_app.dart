@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:home_widget/home_widget.dart';
 
+import '../../api/bus_widget.dart';
 import '../../api/client.dart';
 import '../../api/offline_cache.dart';
 import '../../api/parent_api.dart';
@@ -62,7 +64,27 @@ class _ParentAppState extends State<ParentApp>
     ApiClient.instance.onSectionLocked = _serverSaysLocked;
     Push.tapped.addListener(_pushTapped);
     Push.arrived.addListener(_refreshUnread);
+    Push.arrived.addListener(_refreshWidget);
+    _widgetTaps = HomeWidget.widgetClicked.listen(_widgetTapped);
+    unawaited(HomeWidget.initiallyLaunchedFromHomeWidget().then(_widgetTapped));
     _load();
+    unawaited(BusWidget.refresh());
+  }
+
+  StreamSubscription<Uri?>? _widgetTaps;
+  Uri? _pendingWidgetTap;
+
+  void _refreshWidget() => unawaited(BusWidget.refresh());
+
+  void _widgetTapped(Uri? uri) {
+    if (uri == null || uri.host != 'track') return;
+    if (_children == null) {
+      _pendingWidgetTap = uri;
+      return;
+    }
+    _pendingWidgetTap = null;
+    final child = uri.queryParameters['child'];
+    unawaited(_openAlert(AlertLink(category: 'ARRIVAL_ETA', studentId: (child ?? '').isEmpty ? null : child)));
   }
 
   @override
@@ -70,6 +92,8 @@ class _ParentAppState extends State<ParentApp>
     WidgetsBinding.instance.removeObserver(this);
     Push.tapped.removeListener(_pushTapped);
     Push.arrived.removeListener(_refreshUnread);
+    Push.arrived.removeListener(_refreshWidget);
+    unawaited(_widgetTaps?.cancel());
     _messagesFocus.dispose();
     if (ApiClient.instance.onSectionLocked == _serverSaysLocked) {
       ApiClient.instance.onSectionLocked = null;
@@ -86,6 +110,7 @@ class _ParentAppState extends State<ParentApp>
     if (state == AppLifecycleState.resumed) {
       unawaited(Entitlements.instance.refresh());
       unawaited(_refreshUnread());
+      unawaited(BusWidget.refresh());
     }
   }
 
@@ -115,6 +140,7 @@ class _ParentAppState extends State<ParentApp>
 
     await _refreshUnread();
     _pushTapped();
+    if (_pendingWidgetTap != null) _widgetTapped(_pendingWidgetTap);
   }
 
   @override

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' show MapboxOptions;
 
 import 'api/boot.dart';
+import 'api/bus_widget.dart';
 import 'api/client.dart';
 import 'api/language_refresh.dart';
 import 'api/push.dart';
@@ -57,6 +58,7 @@ Future<void> main() async {
   await AppThemeSetting.restore();
   unawaited(PlatformStatusService.instance.start(kRole));
   await Push.start();
+  unawaited(BusWidget.start());
   runApp(const KspApp());
 }
 

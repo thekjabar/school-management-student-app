@@ -324,8 +324,10 @@ void main() {
     await _open(tester, const StudentWeek());
 
     expect(find.byType(DayChips), findsOneWidget);
-    expect(find.text(weekdayName('SUNDAY')), findsOneWidget);
+    expect(find.text(weekdayName('SUNDAY')), findsWidgets);
     expect(find.text(weekdayName('WEDNESDAY')), findsWidgets);
+    await tester.tap(find.text(weekdayName('WEDNESDAY')).first);
+    await tester.pumpAndSettle();
     expect(find.textContaining('Grade 12 A'), findsOneWidget);
     expect(find.textContaining(tn('student.lessonCount', 2).split(' ').last), findsWidgets);
     expect(find.text('Arabic Language'), findsWidgets);

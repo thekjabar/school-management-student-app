@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../i18n/strings.dart';
+import 'bus_widget.dart';
 import 'client.dart';
 import 'family_payments.dart' show LocalText;
 import 'offline_cache.dart';
@@ -346,6 +347,7 @@ class Session {
     await prefs.remove(_schoolChosenKey);
     _api.signalSignedOut();
     await Push.forget();
+    await BusWidget.signedOut();
   }
 }
 
