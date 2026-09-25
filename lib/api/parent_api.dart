@@ -4187,6 +4187,7 @@ abstract final class ParentSection {
   static const track = 'parent.track';
   static const bus = 'parent.bus';
   static const delayForecast = 'parent.delayForecast';
+  static const familyDay = 'parent.familyDay';
   static const attendance = 'parent.attendance';
   static const messages = 'parent.messages';
   static const assignments = 'parent.assignments';

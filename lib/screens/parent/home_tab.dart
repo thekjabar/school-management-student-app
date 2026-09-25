@@ -18,6 +18,7 @@ import 'bus_screen.dart';
 import 'canteen_screen.dart';
 import 'driver_feedback_screen.dart';
 import 'events_screen.dart';
+import 'family_day_screen.dart';
 import 'attendance_screen.dart';
 import 'attitude_screen.dart';
 import 'homework_detail.dart';
@@ -148,6 +149,14 @@ class HomeTab extends StatelessWidget {
                       section: ParentSection.track,
                       builder: (_) => TrackScreen(child: child),
                     ),
+                    if (Entitlements.instance.current.value.sectionsByChild.length > 1)
+                      action(
+                        icon: Icons.family_restroom_rounded,
+                        label: t('familyDay.quick'),
+                        color: AppTheme.amber,
+                        section: ParentSection.familyDay,
+                        builder: (_) => const FamilyDayScreen(),
+                      ),
                     action(
                       icon: Icons.directions_bus_outlined,
                       label: t('quick.bus'),
